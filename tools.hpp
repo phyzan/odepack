@@ -5,31 +5,42 @@
 #include <iostream>
 #include <iomanip>
 
-template<class Tt, class Ty>
-using ode = Ty(*)(const Tt&, const Ty&, const std::vector<Tt>&);
+template<class Tt, size_t N=0>
+using vec = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>, Eigen::Array<Tt, N, 1>>;
 
-template<class Tt, class Ty>
-using event = std::function<bool(const Tt&, const Tt&, const Ty&, const Ty&)>;
+template<class Tt, size_t N=0>
+using ode = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>(*)(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const std::vector<Tt>&), Eigen::Array<Tt, N, 1>(*)(const Tt&, const Eigen::Array<Tt, N, 1>&, const std::vector<Tt>&)>;
+
+
+template<class Tt, size_t N=0>
+using ode_t = std::function<std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const std::vector<Tt>&), Eigen::Array<Tt, N, 1>(const Tt&, const Eigen::Array<Tt, N, 1>&, const std::vector<Tt>&)>>;
+
+template<class Tt, size_t N=0>
+using event = std::conditional_t<(N == 0), std::function<bool(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&)>, std::function<bool(const Tt&, const Eigen::Array<Tt, N, 1>&, const Tt&, const Eigen::Array<Tt, N, 1>&)>>;
+
+template<class Tt, size_t N=0>
+using event_t = std::function<std::conditional_t<(N == 0), bool(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&), bool(const Tt&, const Eigen::Array<Tt, N, 1>&, const Tt&, const Eigen::Array<Tt, N, 1>&)>>;
+
 
 template<class T>
 std::vector<T> bisect(const T& a, const T& b, const T& xtol);
 
 
-template<class Tt, class Ty>
+template<class Tt, size_t N>
 struct OdeResult{
 
     std::vector<Tt> t;
-    std::vector<Ty> y;
+    std::vector<vec<Tt, N>> y;
     bool diverges;
     bool is_stiff;
     long double runtime;
 };
 
-template<class Tt, class Ty>
+template<class Tt, size_t N>
 struct SolverState{
 
     Tt t;
-    Ty y;
+    vec<Tt, N> y;
     bool diverges;
     bool is_stiff;
     bool is_running;
@@ -40,17 +51,17 @@ struct SolverState{
     }
 };
 
-template<class Tt, class Ty>
+template<class Tt, size_t N>
 struct ICS{
     Tt t0;
-    Ty y0;
+    vec<Tt, N> y0;
 };
 
 
-template<class Tt, class Ty>
+template<class Tt, size_t N>
 struct OdeArgs{
 
-    ICS<Tt, Ty> ics;
+    ICS<Tt, N> ics;
     Tt t;
     Tt h;
     Tt rtol = 1e-3;
@@ -59,8 +70,8 @@ struct OdeArgs{
     std::string method = "RK45";
     size_t max_frames = 0;
     std::vector<Tt> args;
-    event<Tt, Ty> getcond = nullptr;
-    event<Tt, Ty> breakcond = nullptr;
+    event<Tt, N> getcond = nullptr;
+    event<Tt, N> breakcond = nullptr;
 };
 
 

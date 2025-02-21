@@ -8,15 +8,13 @@
 
 
 
-template<class ODS, class Tt, size_t N = 0>
+template<class ODS, class Tt, size_t N = 0, typename Callable = ode<Tt, N>>
 class OdeSolver{
 
 
 public:
 
-    using Ty = std::conditional_t<(N == 0),
-    Eigen::Array<Tt, Eigen::Dynamic, 1>,
-    Eigen::Array<Tt, N, 1>>;
+    using Ty = vec<Tt, N>;
 
     static constexpr Tt MAX_FACTOR = Tt(10);
     static constexpr Tt SAFETY = Tt(9)/10;
@@ -24,7 +22,7 @@ public:
 
 public:
 
-    const ode<Tt, Ty> f;
+    const ode<Tt, N> f;
     const Tt t_max;
     const Tt min_h;
     const std::vector<Tt> args;
@@ -52,8 +50,8 @@ public:
 
     const bool& is_running() const {return _is_running;}
 
-    SolverState<Tt, Ty> state() const {
-        SolverState<Tt, Ty> res = {_t, _y, _diverges, _is_stiff, _is_running, neval};
+    SolverState<Tt, N> state() const {
+        SolverState<Tt, N> res = {_t, _y, _diverges, _is_stiff, _is_running, neval};
         return res;
     }
 
@@ -68,7 +66,7 @@ public:
 
 protected:
 
-    OdeSolver(ode<Tt, Ty> func, const Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args): f(func), t_max(span[1]), min_h(min_h), args(args), direction( h > 0 ? 1 : -1), n(y0.size()), _h(h), _t(span[0]), _y(y0) {}//make constructor in case F is not lambda or std::function, to reduce overhead. F might need to be a template parameter
+    OdeSolver(Callable&& func, const Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args): f(std::forward<Callable>(func)), t_max(span[1]), min_h(min_h), args(args), direction( h > 0 ? 1 : -1), n(y0.size()), _h(h), _t(span[0]), _y(y0) {}//make constructor in case F is not lambda or std::function, to reduce overhead. F might need to be a template parameter
     
 
     ~OdeSolver() = default;
@@ -78,7 +76,7 @@ protected:
 private:
 
     OdeSolver(const OdeSolver& other) = default;
-    OdeSolver<Tt, Ty> operator=(const OdeSolver<Tt, Ty>&) = delete;
+    OdeSolver operator=(const OdeSolver&) = delete;
 };
 
 
@@ -89,14 +87,14 @@ private:
 */
 
 
-template<class ODS, class Tt, size_t N>
-void OdeSolver<ODS, Tt, N>::advance_by(const Tt& h){
+template<class ODS, class Tt, size_t N, typename Callable>
+void OdeSolver<ODS, Tt, N, Callable>::advance_by(const Tt& h){
     _update(_t+h, step(_t, _y, h));
 }
 
 
-template<class ODS, class Tt, size_t N>
-void OdeSolver<ODS, Tt, N>::_update(const Tt& t_new, const OdeSolver<ODS, Tt, N>::Ty& y_new, const Tt& h_next){
+template<class ODS, class Tt, size_t N, typename Callable>
+void OdeSolver<ODS, Tt, N, Callable>::_update(const Tt& t_new, const OdeSolver<ODS, Tt, N, Callable>::Ty& y_new, const Tt& h_next){
     if (! _is_running){
         throw std::runtime_error("Solver has finished integrating.");
     }
