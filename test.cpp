@@ -1,45 +1,38 @@
-#include "adaptive_rk.hpp"
+#include "pyode.hpp"
 #include <iostream>
 #include <chrono>
 
 
-using Tf = vec<double, 1>;
+const size_t n = 4;
+
+using Tf = vec<double, n>;
 
 Tf f(const double& t, const Tf& y, const std::vector<double>& args) {
-    // Tf v(1);
-    // v << std::cos(t);
-    return Tf{std::cos(t)};
-    // return Tf::Constant(std::cos(t));
+    return {y[2], y[3], -y[0], -y[1]};
 }
 
 
+int main() {    
+    Tf y0(n);
+    y0 << 1, 1, 2.3, 4.5;
+    double pi = 3.14159265359;
+    double t_max = 10001*pi/2;
 
-int main() {
-    // Create an Eigen::Array for the initial condition
-    Tf y0(1);  // initial condition
-    y0.setZero(); // set to zero
-    // Eigen::Array<double, 1, 1> t_span(0., 5.); // time span [0., 5.]
+    ODE<double, n> ode(f);
 
-    // Now pass these Eigen::Array objects as arguments
+    ICS<double, n> ics = {0., y0};
+    OdeArgs<double, n> args = {ics, t_max, 0.1, 0., 1e-10, 0., "RK45"};
 
+    OdeResult<double, n> res = ode.solve(args);
 
-    RK23<double, 1> solver1(f, y0, {0., 10001*1.57079632679}, 0.1, 0., {}, 1e-5, 1e-10);
-
-    auto start = std::chrono::high_resolution_clock::now();
-    while (solver1.is_running()) {
-        solver1.advance();
-    }
-    solver1.state().show();
-    
-    // After loop
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    
-    std::cout << "Total runtime: " << elapsed.count() << " seconds\n";
-
-    // std::cout << n << std::endl;
+    std::cout << std::endl << res.runtime << "\n";
+    std::cout << res.y.size() << "\n\n";
+    std::cout << res.y[res.y.size()-1];
     
 }
 
 
-//g++ -std=c++20 -O3 test.cpp -o test
+//g++ -O3 -Wall -shared -std=c++20 -fopenmp test.cpp -o test
+
+
+//g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) test.cpp -o pytest$(python3-config --extension-suffix)

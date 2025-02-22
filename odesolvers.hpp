@@ -6,9 +6,27 @@
 #include <eigen3/Eigen/Dense>
 #include "tools.hpp"
 
+template<class Tt, size_t N = 0, bool raw = true>
+struct SolverArgs{
+
+    ode_t<Tt, N, raw> f;
+    ICS<Tt, N> ics;
+    Tt t;
+    Tt h;
+    Tt rtol;
+    Tt atol;
+    Tt h_min;
+    std::vector<Tt> args;
+};
+
+template<class Tt, size_t N = 0, bool raw = true>
+SolverArgs<Tt, N, raw> to_SolverArgs(const ode_t<Tt, N, raw>& f, const OdeArgs<Tt, N>& args){
+    return {f, args.ics, args.t, args.h, args.rtol, args.atol, args.cutoff_step, args.args};
+}
 
 
-template<class ODS, class Tt, size_t N = 0, bool raw = true>
+
+template<class Tt, size_t N = 0, bool raw = true>
 class OdeSolver{
 
 
@@ -21,14 +39,14 @@ public:
     static constexpr Tt SAFETY = Tt(9)/10;
     static constexpr Tt MIN_FACTOR = Tt(2)/10;
 
-public:
-
-    const ode<Tt, N> f;
+    const Callable f;
     const Tt t_max;
     const Tt min_h;
     const std::vector<Tt> args;
     const int direction;
     const size_t n;
+    const Tt rtol;
+    const Tt atol;
 
 private:
 
@@ -59,25 +77,34 @@ public:
     //MODIFIERS
     void stop() {_is_running = false;}
 
-    void advance_by(const Tt& h);
+    bool advance_by(const Tt& h);
 
-    Ty step(const Tt& t_old, const Ty& y_old, const Tt& h) {return static_cast<ODS*>(this)->step(t_old, y_old, h);}
+    //step(...) must NOT depend on current state
+    virtual Ty step(const Tt& t_old, const Ty& y_old, const Tt& h) const = 0;
 
-    void advance(){static_cast<ODS*>(this)->advance();}
+    virtual bool advance() = 0;
+
+    void set_ics(const Tt& t0, const Ty& y0){
+        if (_is_running){
+            _t = t0;
+            _y = y0;
+        }
+        else{
+            throw std::runtime_error("Cannot set new ics to solver, as it has already finished integrating.");
+        }
+    }
+    ~OdeSolver() = default;
 
 protected:
 
-    OdeSolver(Callable&& func, const Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args): f(std::forward<Callable>(func)), t_max(span[1]), min_h(min_h), args(args), direction( h > 0 ? 1 : -1), n(y0.size()), _h(h), _t(span[0]), _y(y0) {}//make constructor in case F is not lambda or std::function, to reduce overhead. F might need to be a template parameter
-    
+    OdeSolver(const SolverArgs<Tt, N, raw>& S): f(S.f), t_max(S.t), min_h(S.h_min), args(S.args), direction( S.h > 0 ? 1 : -1), n(S.ics.y0.size()), _h(S.h), _t(S.ics.t0), _y(S.ics.y0), rtol(S.rtol), atol(S.atol) {}
 
-    ~OdeSolver() = default;
-
-    void _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
+    bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
 
 private:
 
-    OdeSolver(const OdeSolver& other) = default;
     OdeSolver operator=(const OdeSolver&) = delete;
+    OdeSolver(const OdeSolver& other) = default;
 };
 
 
@@ -88,31 +115,37 @@ private:
 */
 
 
-template<class ODS, class Tt, size_t N, bool raw>
-void OdeSolver<ODS, Tt, N, raw>::advance_by(const Tt& h){
-    _update(_t+h, step(_t, _y, h));
+template<class Tt, size_t N, bool raw>
+bool OdeSolver<Tt, N, raw>::advance_by(const Tt& h){
+    return _update(_t+h, step(_t, _y, h), h);
 }
 
 
-template<class ODS, class Tt, size_t N, bool raw>
-void OdeSolver<ODS, Tt, N, raw>::_update(const Tt& t_new, const OdeSolver<ODS, Tt, N, raw>::Ty& y_new, const Tt& h_next){
+template<class Tt, size_t N, bool raw>
+bool OdeSolver<Tt, N, raw>::_update(const Tt& t_new, const OdeSolver<Tt, N, raw>::Ty& y_new, const Tt& h_next){
+
+    bool success = true;
     if (! _is_running){
+        success = false;
         throw std::runtime_error("Solver has finished integrating.");
     }
 
     bool _stop = false;
     Tt stepsize = h_next*direction;
     if (stepsize < 0){
+        success = false;
         throw std::runtime_error("Wrong direction of integration");
     }
 
     if (stepsize <= min_h){
         _is_stiff = true;
         _stop = true;
+        success = false;
     }
     if (!y_new.isFinite().all()){
         _diverges = true;
         _stop = true;
+        success = false;
     }
     else if (t_new*direction >= t_max*direction){
         _y = this->step(_t, _y, t_max-_t);
@@ -129,6 +162,8 @@ void OdeSolver<ODS, Tt, N, raw>::_update(const Tt& t_new, const OdeSolver<ODS, T
     }
 
     if (_stop) stop();
+
+    return success;
 }
 
 #endif

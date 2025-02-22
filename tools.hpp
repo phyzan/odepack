@@ -103,6 +103,7 @@ struct OdeArgs{
     std::vector<Tt> args;
     event_t<Tt, N, raw> getcond = nullptr;
     event_t<Tt, N, raw> breakcond = nullptr;
+
 };
 
 
