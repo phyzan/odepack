@@ -6,14 +6,18 @@
 using Tf = vec<double, 1>;
 
 Tf f(const double& t, const Tf& y, const std::vector<double>& args) {
+    // Tf v(1);
+    // v << std::cos(t);
     return Tf{std::cos(t)};
+    // return Tf::Constant(std::cos(t));
 }
 
 
 
 int main() {
     // Create an Eigen::Array for the initial condition
-    Tf y0 = Tf::Zero();  // initial condition
+    Tf y0(1);  // initial condition
+    y0.setZero(); // set to zero
     // Eigen::Array<double, 1, 1> t_span(0., 5.); // time span [0., 5.]
 
     // Now pass these Eigen::Array objects as arguments

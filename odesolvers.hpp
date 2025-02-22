@@ -8,13 +8,14 @@
 
 
 
-template<class ODS, class Tt, size_t N = 0, typename Callable = ode<Tt, N>>
+template<class ODS, class Tt, size_t N = 0, bool raw = true>
 class OdeSolver{
 
 
 public:
 
     using Ty = vec<Tt, N>;
+    using Callable = ode_t<Tt, N, raw>;
 
     static constexpr Tt MAX_FACTOR = Tt(10);
     static constexpr Tt SAFETY = Tt(9)/10;
@@ -87,14 +88,14 @@ private:
 */
 
 
-template<class ODS, class Tt, size_t N, typename Callable>
-void OdeSolver<ODS, Tt, N, Callable>::advance_by(const Tt& h){
+template<class ODS, class Tt, size_t N, bool raw>
+void OdeSolver<ODS, Tt, N, raw>::advance_by(const Tt& h){
     _update(_t+h, step(_t, _y, h));
 }
 
 
-template<class ODS, class Tt, size_t N, typename Callable>
-void OdeSolver<ODS, Tt, N, Callable>::_update(const Tt& t_new, const OdeSolver<ODS, Tt, N, Callable>::Ty& y_new, const Tt& h_next){
+template<class ODS, class Tt, size_t N, bool raw>
+void OdeSolver<ODS, Tt, N, raw>::_update(const Tt& t_new, const OdeSolver<ODS, Tt, N, raw>::Ty& y_new, const Tt& h_next){
     if (! _is_running){
         throw std::runtime_error("Solver has finished integrating.");
     }

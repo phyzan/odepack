@@ -3,7 +3,6 @@
 
 
 #include "odesolvers.hpp"
-#include <iostream>
 
 template<typename Tt, int Norder, int Nstages> 
 using A_matrix = Eigen::Array<Tt, Nstages, Norder>;
@@ -20,18 +19,19 @@ using E_matrix = Eigen::Array<Tt, Nstages+1, 1>;
 
 
 
-template<class RK, class Tt, int Nstages, int Norder, size_t N = 0, typename Callable = ode<Tt, N>>
-class RungeKutta : public OdeSolver<RungeKutta<RK, Tt, Nstages, Norder, N>, Tt, N, Callable>{              
+template<class RK, class Tt, int Nstages, int Norder, size_t N = 0, bool raw = true>
+class RungeKutta : public OdeSolver<RungeKutta<RK, Tt, Nstages, Norder, N>, Tt, N, raw>{
 
 public:
 
-    using OdsBase = OdeSolver<RungeKutta<RK, Tt, Nstages, Norder, N>, Tt, N, Callable>;
+    using OdsBase = OdeSolver<RungeKutta<RK, Tt, Nstages, Norder, N>, Tt, N, raw>;
     using typename OdsBase::Ty;
     using StageContainer = std::array<Ty, Nstages+1>;
     using Atype = A_matrix<Tt, Norder, Nstages>;
     using Btype = B_matrix<Tt, Norder, Nstages>;
     using Ctype = C_matrix<Tt, Norder, Nstages>;
     using Etype = E_matrix<Tt, Norder, Nstages>;
+    using typename OdsBase::Callable;
 
 
     const Tt rtol;
@@ -154,17 +154,18 @@ public:
 
 
 
-template<class Tt, size_t N = 0, typename Callable = ode<Tt, N>>
-class RK45 : public RungeKutta<RK45<Tt, N, Callable>, Tt, 6, 5, N, Callable>{
+template<class Tt, size_t N = 0, bool raw = true>
+class RK45 : public RungeKutta<RK45<Tt, N, raw>, Tt, 6, 5, N, raw>{
 
     static const int Norder = 5;
     static const int Nstages = 6;
 
-    using RKbase = RungeKutta<RK45<Tt, N, Callable>, Tt, Nstages, Norder, N, Callable>;
+    using RKbase = RungeKutta<RK45<Tt, N, raw>, Tt, Nstages, Norder, N, raw>;
+    using typename RKbase::Callable;
     
 
 public:
-    RK45(Callable func, const typename RKbase::Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args, const Tt& rtol, const Tt& atol) : RungeKutta<RK45<Tt, N, Callable>, Tt, Nstages, Norder, N, Callable>(std::forward<Callable>(func), y0, span, h, min_h, args, rtol, atol){}
+    RK45(Callable&& func, const typename RKbase::Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args, const Tt& rtol, const Tt& atol) : RungeKutta<RK45<Tt, N, raw>, Tt, Nstages, Norder, N, raw>(std::forward<Callable>(func), y0, span, h, min_h, args, rtol, atol){}
 
     static RKbase::Atype Amatrix() {
         typename RKbase::Atype A;
@@ -215,17 +216,18 @@ public:
 
 
 
-template<class Tt, size_t N = 0, typename Callable = ode<Tt, N>>
-class RK23 : public RungeKutta<RK23<Tt, N, Callable>, Tt, 3, 3, N, Callable> {
+template<class Tt, size_t N = 0, bool raw = true>
+class RK23 : public RungeKutta<RK23<Tt, N, raw>, Tt, 3, 3, N, raw> {
 
     static const int Norder = 3;
     static const int Nstages = 3;
 
-    using RKbase = RungeKutta<RK23<Tt, N, Callable>, Tt, Nstages, Norder, N, Callable>;
+    using RKbase = RungeKutta<RK23<Tt, N, raw>, Tt, Nstages, Norder, N, raw>;
+    using typename RKbase::Callable;
     
 public:
-    RK23(Callable func, const typename RKbase::Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args, const Tt& rtol, const Tt& atol) 
-        : RungeKutta<RK23<Tt, N, Callable>, Tt, Nstages, Norder, N, Callable>(std::forward<Callable>(func), y0, span, h, min_h, args, rtol, atol) {}
+    RK23(Callable&& func, const typename RKbase::Ty& y0, const Tt (&span)[2], const Tt& h, const Tt& min_h, const std::vector<Tt>& args, const Tt& rtol, const Tt& atol) 
+        : RungeKutta<RK23<Tt, N, raw>, Tt, Nstages, Norder, N, raw>(std::forward<Callable>(func), y0, span, h, min_h, args, rtol, atol) {}
 
     static RKbase::Atype Amatrix() {
         typename RKbase::Atype A;
