@@ -76,6 +76,10 @@
         "span": "cpp",
         "variant": "cpp",
         "list": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "geometry": "cpp",
+        "eigenvalues": "cpp",
+        "lu": "cpp",
+        "cholesky": "cpp"
     }
 }

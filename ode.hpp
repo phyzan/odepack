@@ -72,7 +72,7 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
     const event_t<Tt, N, raw_event>& getcond = params.getcond;
     const event_t<Tt, N, raw_event>& breakcond = params.breakcond;
     bool capture = false;
-    int k=1;
+    size_t k=1;
     const Tt& t0 = params.ics.t0;
     const Tt& t_max = params.t;
     Tt t = t0;

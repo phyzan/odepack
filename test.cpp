@@ -1,4 +1,4 @@
-#include "pyode.hpp"
+#include "ode.hpp"
 #include <iostream>
 #include <chrono>
 
@@ -32,7 +32,7 @@ int main() {
 }
 
 
-//g++ -O3 -Wall -shared -std=c++20 -fopenmp test.cpp -o test
-
+// g++ -std=c++20 -O3 -fPIC -Wall -shared  -fopenmp test.cpp -o test bad
+// g++ -std=c++20 -O3 -Wall -fPIC test.cpp -o test good
 
 //g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) test.cpp -o pytest$(python3-config --extension-suffix)

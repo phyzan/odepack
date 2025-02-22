@@ -93,11 +93,11 @@ public:
             throw std::runtime_error("Cannot set new ics to solver, as it has already finished integrating.");
         }
     }
-    ~OdeSolver() = default;
+    virtual ~OdeSolver() = default;
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, N, raw>& S): f(S.f), t_max(S.t), min_h(S.h_min), args(S.args), direction( S.h > 0 ? 1 : -1), n(S.ics.y0.size()), _h(S.h), _t(S.ics.t0), _y(S.ics.y0), rtol(S.rtol), atol(S.atol) {}
+    OdeSolver(const SolverArgs<Tt, N, raw>& S): f(S.f), t_max(S.t), min_h(S.h_min), args(S.args), direction( S.h > 0 ? 1 : -1), n(S.ics.y0.size()), rtol(S.rtol), atol(S.atol), _h(S.h), _t(S.ics.t0), _y(S.ics.y0) {}
 
     bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
 

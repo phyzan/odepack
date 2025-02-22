@@ -32,7 +32,7 @@ std::vector<T> bisect(Callable&& f, const T& a, const T& b, const T& xtol){
     T err = 2*xtol;
     T _a = a;
     T _b = b;
-    T c;
+    T c = a;
     T fm;
 
     if (f(a)*f(b) > 0){
