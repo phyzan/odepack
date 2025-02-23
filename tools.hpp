@@ -4,27 +4,33 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <mpfr.h>
 
 template<class Tt, size_t N=0>
 using vec = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>, Eigen::Array<Tt, N, 1>>;
 
 template<class Tt, size_t N=0>
-using ode = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>(*)(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const std::vector<Tt>&), Eigen::Array<Tt, N, 1>(*)(const Tt&, const Eigen::Array<Tt, N, 1>&, const std::vector<Tt>&)>;
+using ode = vec<Tt, N>(*)(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&);
 
 template<class Tt, size_t N=0>
-using ode_f = std::function<std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const std::vector<Tt>&), Eigen::Array<Tt, N, 1>(const Tt&, const Eigen::Array<Tt, N, 1>&, const std::vector<Tt>&)>>;
+using ode_f = vec<Tt, N>(*)(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&);
 
 template<class Tt, size_t N=0>
-using event = std::conditional_t<(N == 0), std::function<bool(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&)>, std::function<bool(const Tt&, const Eigen::Array<Tt, N, 1>&, const Tt&, const Eigen::Array<Tt, N, 1>&)>>;
+using event = std::function<bool(const Tt&, const vec<Tt, N>&, const Tt&, vec<Tt, N>&)>;
 
 template<class Tt, size_t N=0>
-using event_f = std::function<std::conditional_t<(N == 0), bool(const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&, const Tt&, const Eigen::Array<Tt, Eigen::Dynamic, 1>&), bool(const Tt&, const Eigen::Array<Tt, N, 1>&, const Tt&, const Eigen::Array<Tt, N, 1>&)>>;
+using event_f = bool(const Tt&, const vec<Tt, N>&, const Tt&, const vec<Tt, N>&);
 
 template<class Tt, size_t N=0, bool raw = true>
 using ode_t = std::conditional_t<(raw==true), ode<Tt, N>, ode_f<Tt, N>>;
 
 template<class Tt, size_t N=0, bool raw = true>
 using event_t = std::conditional_t<(raw==true), event<Tt, N>, event_f<Tt, N>>;
+
+
+
+
+
 
 
 template<class T, typename Callable>
