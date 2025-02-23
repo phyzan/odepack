@@ -18,13 +18,12 @@ using E_matrix = Eigen::Array<Tt, Nstages+1, 1>;
 
 
 
-
-template<class Tt, int Nstages, int Norder, size_t N = 0, bool raw = true>
-class RungeKutta : public OdeSolver<Tt, N, raw>{
+template<class Tt, int Nstages, int Norder, size_t N, bool raw_ode, bool raw_event>
+class RungeKutta : public OdeSolver<Tt, N, raw_ode, raw_event>{
 
 public:
 
-    using OdsBase = OdeSolver<Tt, N, raw>;
+    using OdsBase = OdeSolver<Tt, N, raw_ode, raw_event>;
     using typename OdsBase::Ty;
     using StageContainer = std::array<Ty, Nstages+1>;
     using Atype = A_matrix<Tt, Norder, Nstages>;
@@ -41,7 +40,7 @@ public:
         return _step(t_old, y_old, h, this->_K);
     }
 
-    bool advance() override {
+    State<Tt, N> adaptive_step() const override {
         const Tt t = this->t_now();
         const Ty y = this->y_now();
         Tt habs = this->h_now()*this->direction;
@@ -84,7 +83,7 @@ public:
             }
         }
 
-        return this->_update(t_new, y_new, habs*this->direction);
+        return {t_new, y_new,  habs*this->direction};
     }
 
     const Atype A;
@@ -94,7 +93,7 @@ public:
 
 protected:
 
-    RungeKutta(const SolverArgs<Tt, N, raw>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
+    RungeKutta(const SolverArgs<Tt, N, raw_ode, raw_event>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
 
 private:
 
@@ -147,17 +146,17 @@ private:
 
 
 
-template<class Tt, size_t N = 0, bool raw = true>
-class RK45 : public RungeKutta<Tt, 6, 5, N, raw>{
+template<class Tt, size_t N = 0, bool raw_ode = true, bool raw_event = true>
+class RK45 : public RungeKutta<Tt, 6, 5, N, raw_ode, raw_event>{
 
     static const int Norder = 5;
     static const int Nstages = 6;
 
-    using RKbase = RungeKutta<Tt, Nstages, Norder, N, raw>;
+    using RKbase = RungeKutta<Tt, Nstages, Norder, N, raw_ode, raw_event>;
     
 
 public:
-    RK45(const SolverArgs<Tt, N, raw>& S) : RungeKutta<Tt, Nstages, Norder, N, raw>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK45(const SolverArgs<Tt, N, raw_ode, raw_event>& S) : RungeKutta<Tt, Nstages, Norder, N, raw_ode, raw_event>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RKbase::Atype Amatrix() const override{
         typename RKbase::Atype A;
@@ -208,16 +207,16 @@ public:
 
 
 
-template<class Tt, size_t N = 0, bool raw = true>
-class RK23 : public RungeKutta<Tt, 3, 3, N, raw> {
+template<class Tt, size_t N = 0, bool raw_ode = true, bool raw_event = true>
+class RK23 : public RungeKutta<Tt, 3, 3, N, raw_ode, raw_event> {
 
     static const int Norder = 3;
     static const int Nstages = 3;
 
-    using RKbase = RungeKutta<Tt, Nstages, Norder, N, raw>;
+    using RKbase = RungeKutta<Tt, Nstages, Norder, N, raw_ode, raw_event>;
     
 public:
-    RK23(const SolverArgs<Tt, N, raw>& S) : RungeKutta<Tt, Nstages, Norder, N, raw>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK23(const SolverArgs<Tt, N, raw_ode, raw_event>& S) : RungeKutta<Tt, Nstages, Norder, N, raw_ode, raw_event>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RKbase::Atype Amatrix() const override{
         typename RKbase::Atype A;

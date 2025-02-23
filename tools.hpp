@@ -6,6 +6,9 @@
 #include <iomanip>
 #include <mpfr.h>
 
+
+// USEFUL ALIASES
+
 template<class Tt, size_t N=0>
 using vec = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>, Eigen::Array<Tt, N, 1>>;
 
@@ -13,13 +16,13 @@ template<class Tt, size_t N=0>
 using ode = vec<Tt, N>(*)(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&);
 
 template<class Tt, size_t N=0>
-using ode_f = vec<Tt, N>(*)(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&);
+using ode_f = std::function<vec<Tt, N>(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&)>;
 
 template<class Tt, size_t N=0>
-using event = std::function<bool(const Tt&, const vec<Tt, N>&, const Tt&, vec<Tt, N>&)>;
+using event_f = std::function<bool(const Tt&, const vec<Tt, N>&, const Tt&, vec<Tt, N>&)>;
 
 template<class Tt, size_t N=0>
-using event_f = bool(const Tt&, const vec<Tt, N>&, const Tt&, const vec<Tt, N>&);
+using event = bool(*)(const Tt&, const vec<Tt, N>&, const Tt&, const vec<Tt, N>&);
 
 template<class Tt, size_t N=0, bool raw = true>
 using ode_t = std::conditional_t<(raw==true), ode<Tt, N>, ode_f<Tt, N>>;
@@ -28,10 +31,7 @@ template<class Tt, size_t N=0, bool raw = true>
 using event_t = std::conditional_t<(raw==true), event<Tt, N>, event_f<Tt, N>>;
 
 
-
-
-
-
+//BISECTION USED FOR EVENTS IN ODES
 
 template<class T, typename Callable>
 std::vector<T> bisect(Callable&& f, const T& a, const T& b, const T& xtol){
@@ -63,6 +63,8 @@ std::vector<T> bisect(Callable&& f, const T& a, const T& b, const T& xtol){
 }
 
 
+//ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
+
 template<class Tt, size_t N>
 struct OdeResult{
 
@@ -73,6 +75,8 @@ struct OdeResult{
     long double runtime;
 };
 
+
+
 template<class Tt, size_t N>
 struct SolverState{
 
@@ -82,11 +86,23 @@ struct SolverState{
     bool is_stiff;
     bool is_running;
     size_t neval;
+    bool event;
 
     void show(const int& precision = 15) const{
-        std::cout << std::endl << std::setprecision(precision) << "t: " << t << "\ny: " << y << "\ndiverges: " << diverges << "\nis_stiff: " << is_stiff << "\nis_running: " << is_running << "\nUpdates: " << neval << std::endl;
+        std::cout << std::endl << std::setprecision(precision) << "t: " << t << "\ny: " << y.transpose() << "\ndiverges: " << diverges << "\nis_stiff: " << is_stiff << "\nis_running: " << is_running << "\nUpdates: " << neval << "\nevent: " << event << std::endl;
     }
 };
+
+
+template<class Tt, size_t N>
+struct State{
+
+    Tt t;
+    vec<Tt, N> y;
+    Tt dt;
+
+};
+
 
 template<class Tt, size_t N>
 struct ICS{
@@ -95,7 +111,7 @@ struct ICS{
 };
 
 
-template<class Tt, size_t N, bool raw=true>
+template<class Tt, size_t N, bool raw_event>
 struct OdeArgs{
 
     ICS<Tt, N> ics;
@@ -107,8 +123,8 @@ struct OdeArgs{
     std::string method = "RK45";
     size_t max_frames = 0;
     std::vector<Tt> args;
-    event_t<Tt, N, raw> getcond = nullptr;
-    event_t<Tt, N, raw> breakcond = nullptr;
+    event_t<Tt, N, raw_event> getcond = nullptr;
+    event_t<Tt, N, raw_event> breakcond = nullptr;
 
 };
 
