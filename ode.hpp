@@ -7,18 +7,18 @@
 #include <chrono>
 #include <omp.h>
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-OdeSolver<Tt, N, raw_ode, raw_event>* getSolver(const ode_t<Tt, N, raw_ode>& f, const OdeArgs<Tt, N, raw_event>& args) {
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+OdeSolver<Tt, Ty, raw_ode, raw_event>* getSolver(const ode_t<Tt, Ty, raw_ode>& f, const OdeArgs<Tt, Ty, raw_event>& args) {
 
-    SolverArgs<Tt, N, raw_ode, raw_event> S = to_SolverArgs<Tt, N, raw_ode, raw_event>(f, args);
+    SolverArgs<Tt, Ty, raw_ode, raw_event> S = to_SolverArgs<Tt, Ty, raw_ode, raw_event>(f, args);
 
-    OdeSolver<Tt, N, raw_ode, raw_event>* solver = nullptr;
+    OdeSolver<Tt, Ty, raw_ode, raw_event>* solver = nullptr;
 
     if (args.method == "RK23") {
-        solver = new RK23<Tt, N, raw_ode, raw_event>(S);
+        solver = new RK23<Tt, Ty, raw_ode, raw_event>(S);
     }
     else if (args.method == "RK45") {
-        solver = new RK45<Tt, N, raw_ode, raw_event>(S);
+        solver = new RK45<Tt, Ty, raw_ode, raw_event>(S);
     }
     else {
         throw std::runtime_error("Unknown solver method");
@@ -27,31 +27,31 @@ OdeSolver<Tt, N, raw_ode, raw_event>* getSolver(const ode_t<Tt, N, raw_ode>& f, 
     return solver;
 }
 
-template<class Tt, size_t N = 0, bool raw_ode = true, bool raw_event = true>
+template<class Tt, class Ty, bool raw_ode = true, bool raw_event = true>
 class ODE{
 
 public:
 
     
-    ode_t<Tt, N, raw_ode> f;
+    ode_t<Tt, Ty, raw_ode> f;
 
-    ODE(ode_t<Tt, N, raw_ode> ode = nullptr) : f(ode) {};
+    ODE(ode_t<Tt, Ty, raw_ode> ode = nullptr) : f(ode) {};
 
-    const OdeResult<Tt, N> solve(const OdeArgs<Tt, N, raw_event>& args) const;
+    const OdeResult<Tt, Ty> solve(const OdeArgs<Tt, Ty, raw_event>& args) const;
 
-    const std::vector<OdeResult<Tt, N>> solve_all(const std::vector<OdeArgs<Tt, N, raw_event>>& args, int threads=-1) const;
+    const std::vector<OdeResult<Tt, Ty>> solve_all(const std::vector<OdeArgs<Tt, Ty, raw_event>>& args, int threads=-1) const;
 };
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
 struct OdeSet{
 
-    ODE<Tt, N, raw_ode, raw_event> ode;
-    OdeArgs<Tt, N, raw_event> params;
+    ODE<Tt, Ty, raw_ode, raw_event> ode;
+    OdeArgs<Tt, Ty, raw_event> params;
 
 };
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-std::vector<OdeResult<Tt, N>> dsolve_all(const std::vector<OdeSet<Tt, N, raw_ode, raw_event>>& data, int threads);
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+std::vector<OdeResult<Tt, Ty>> dsolve_all(const std::vector<OdeSet<Tt, Ty, raw_ode, raw_event>>& data, int threads);
 
 
 /*
@@ -61,21 +61,22 @@ std::vector<OdeResult<Tt, N>> dsolve_all(const std::vector<OdeSet<Tt, N, raw_ode
 */
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N, raw_event>& params) const{
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+const OdeResult<Tt, Ty> ODE<Tt, Ty, raw_ode, raw_event>::solve(const OdeArgs<Tt, Ty, raw_event>& params) const{
 
     //MAYBE KEEP ALL WHEN EVENTS. IF SO, RETURN ARRAY WITH EVENTS TOO
 
     //extract data from params first
     const size_t& max_frames = params.max_frames;
-    size_t k=1;
     const Tt& t0 = params.ics.t0;
     const Tt& t_max = params.t;
     Tt t = t0;
-    vec<Tt, N> y = params.ics.y0;
-
+    Ty y = params.ics.y0;
+    size_t k=1;
     std::vector<Tt> t_arr;
-    std::vector<vec<Tt, N>> y_arr;
+    std::vector<Ty> y_arr;
+
+    
     if (max_frames > 1){
         t_arr.reserve(max_frames);
         y_arr.reserve(max_frames);
@@ -83,7 +84,7 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
     t_arr.push_back(t);
     y_arr.push_back(y);
 
-    OdeSolver<Tt, N, raw_ode, raw_event>* solver = getSolver<Tt, N, raw_ode, raw_event>(this->f, params);
+    OdeSolver<Tt, Ty, raw_ode, raw_event>* solver = getSolver<Tt, Ty, raw_ode, raw_event>(this->f, params);
 
     auto t1 = std::chrono::high_resolution_clock::now();
     while (solver->is_running()){
@@ -97,7 +98,7 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
                     ++k;
                 }
             }
-            else if ( (max_frames == 0) || (std::abs(t-t0)*(max_frames-1) >= k*std::abs(t_max-t0)) ){
+            else if ( (max_frames == 0) || (abs(t-t0)*(max_frames-1) >= k*abs(t_max-t0)) ){
                 t_arr.push_back(t);
                 y_arr.push_back(y);
                 ++k;
@@ -113,9 +114,9 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
 
     std::chrono::duration<long double> runtime = t2-t1;
 
-    SolverState<Tt, N> state = solver->state();
+    SolverState<Tt, Ty> state = solver->state();
 
-    OdeResult<Tt, N> res{t_arr, y_arr, state.diverges, state.is_stiff, runtime.count()};
+    OdeResult<Tt, Ty> res{t_arr, y_arr, state.diverges, state.is_stiff, runtime.count()};
 
     delete solver;
     solver = nullptr;
@@ -124,24 +125,24 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
 }
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-const std::vector<OdeResult<Tt, N>> ODE<Tt, N, raw_ode, raw_event>::solve_all(const std::vector<OdeArgs<Tt, N, raw_event>>& args, int threads) const{
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+const std::vector<OdeResult<Tt, Ty>> ODE<Tt, Ty, raw_ode, raw_event>::solve_all(const std::vector<OdeArgs<Tt, Ty, raw_event>>& args, int threads) const{
     //define all sets of ode-args
-    std::vector<OdeSet<Tt, N, raw_ode, raw_event>> data(args.size());
+    std::vector<OdeSet<Tt, Ty, raw_ode, raw_event>> data(args.size());
     for (size_t i=0; i<args.size(); i++){
         data[i] = {*this, args[i]};
     }
 
-    std::vector<OdeResult<Tt, N>> res = dsolve_all(data, threads);
+    std::vector<OdeResult<Tt, Ty>> res = dsolve_all(data, threads);
 
     return res;
 }
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-std::vector<OdeResult<Tt, N>> dsolve_all(const std::vector<OdeSet<Tt, N, raw_ode, raw_event>>& data, int threads){
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+std::vector<OdeResult<Tt, Ty>> dsolve_all(const std::vector<OdeSet<Tt, Ty, raw_ode, raw_event>>& data, int threads){
 
     const size_t n = data.size();
-    std::vector<OdeResult<Tt, N>> res(n);
+    std::vector<OdeResult<Tt, Ty>> res(n);
 
     threads = (threads == -1) ? omp_get_max_threads() : threads;
     #pragma omp parallel for schedule(dynamic) num_threads(threads)

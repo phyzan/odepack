@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <eigen3/Eigen/Dense>
 
 
 // USEFUL ALIASES
@@ -11,23 +12,48 @@
 template<class Tt, size_t N=0>
 using vec = std::conditional_t<(N == 0), Eigen::Array<Tt, Eigen::Dynamic, 1>, Eigen::Array<Tt, N, 1>>;
 
-template<class Tt, size_t N=0>
-using ode = vec<Tt, N>(*)(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&);
+template<class Tt, class Ty>
+using ode = Ty(*)(const Tt&, const Ty&, const std::vector<Tt>&);
 
-template<class Tt, size_t N=0>
-using ode_f = std::function<vec<Tt, N>(const Tt&, const vec<Tt, N>&, const std::vector<Tt>&)>;
+template<class Tt, class Ty>
+using ode_f = std::function<Ty(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
-template<class Tt, size_t N=0>
-using event_f = std::function<bool(const Tt&, const vec<Tt, N>&, const Tt&, vec<Tt, N>&)>;
+template<class Tt, class Ty>
+using event_f = std::function<bool(const Tt&, const Ty&, const Tt&, Ty&)>;
 
-template<class Tt, size_t N=0>
-using event = bool(*)(const Tt&, const vec<Tt, N>&, const Tt&, const vec<Tt, N>&);
+template<class Tt, class Ty>
+using event = bool(*)(const Tt&, const Ty&, const Tt&, const Ty&);
 
-template<class Tt, size_t N=0, bool raw = true>
-using ode_t = std::conditional_t<(raw==true), ode<Tt, N>, ode_f<Tt, N>>;
+template<class Tt, class Ty, bool raw>
+using ode_t = std::conditional_t<(raw==true), ode<Tt, Ty>, ode_f<Tt, Ty>>;
 
-template<class Tt, size_t N=0, bool raw = true>
-using event_t = std::conditional_t<(raw==true), event<Tt, N>, event_f<Tt, N>>;
+template<class Tt, class Ty, bool raw>
+using event_t = std::conditional_t<(raw==true), event<Tt, Ty>, event_f<Tt, Ty>>;
+
+template<class T, int Nr, int Nc>
+T norm(const Eigen::Array<T, Nr, Nc>& f){
+    return (f*f).sum();
+}
+
+template<class T, int Nr, int Nc>
+Eigen::Array<T, Nr, Nc> cwise_abs(const Eigen::Array<T, Nr, Nc>& f){
+    return f.cwiseAbs();
+}
+
+template<class T, int Nr, int Nc>
+Eigen::Array<T, Nr, Nc> cwise_max(const Eigen::Array<T, Nr, Nc>& a, const Eigen::Array<T, Nr, Nc>& b){
+    return a.cwiseMax(b);
+}
+
+template<class T>
+T abs(const T& x){
+    return (x > 0) ? x : -x;
+}
+
+template<class T, int Nr, int Nc>
+bool All_isFinite(const Eigen::Array<T, Nr, Nc>& arr){
+    return arr.isFinite().all();
+}
 
 
 //BISECTION USED FOR EVENTS IN ODES
@@ -64,11 +90,11 @@ std::vector<T> bisect(Callable&& f, const T& a, const T& b, const T& xtol){
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
-template<class Tt, size_t N>
+template<class Tt, class Ty>
 struct OdeResult{
 
     std::vector<Tt> t;
-    std::vector<vec<Tt, N>> y;
+    std::vector<Ty> y;
     bool diverges;
     bool is_stiff;
     long double runtime;
@@ -76,11 +102,11 @@ struct OdeResult{
 
 
 
-template<class Tt, size_t N>
+template<class Tt, class Ty>
 struct SolverState{
 
     Tt t;
-    vec<Tt, N> y;
+    Ty y;
     bool diverges;
     bool is_stiff;
     bool is_running;
@@ -88,32 +114,32 @@ struct SolverState{
     bool event;
 
     void show(const int& precision = 15) const{
-        std::cout << std::endl << std::setprecision(precision) << "t: " << t << "\ny: " << y.transpose() << "\ndiverges: " << diverges << "\nis_stiff: " << is_stiff << "\nis_running: " << is_running << "\nUpdates: " << neval << "\nevent: " << event << std::endl;
+        std::cout << std::endl << std::setprecision(precision) << "t: " << t << "\ny: " << y << "\ndiverges: " << diverges << "\nis_stiff: " << is_stiff << "\nis_running: " << is_running << "\nUpdates: " << neval << "\nevent: " << event << std::endl;
     }
 };
 
 
-template<class Tt, size_t N>
+template<class Tt, class Ty>
 struct State{
 
     Tt t;
-    vec<Tt, N> y;
+    Ty y;
     Tt dt;
 
 };
 
 
-template<class Tt, size_t N>
+template<class Tt, class Ty>
 struct ICS{
     Tt t0;
-    vec<Tt, N> y0;
+    Ty y0;
 };
 
 
-template<class Tt, size_t N, bool raw_event>
+template<class Tt, class Ty, bool raw_event>
 struct OdeArgs{
 
-    ICS<Tt, N> ics;
+    ICS<Tt, Ty> ics;
     Tt t;
     Tt h;
     Tt rtol = 1e-3;
@@ -121,9 +147,9 @@ struct OdeArgs{
     Tt cutoff_step = 0.;
     std::string method = "RK45";
     size_t max_frames = 0;
-    std::vector<Tt> args;
-    event_t<Tt, N, raw_event> getcond = nullptr;
-    event_t<Tt, N, raw_event> breakcond = nullptr;
+    std::vector<Tt> args = {};
+    event_t<Tt, Ty, raw_event> getcond = nullptr;
+    event_t<Tt, Ty, raw_event> breakcond = nullptr;
 
 };
 

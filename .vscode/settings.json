@@ -85,6 +85,8 @@
         "householder": "cpp",
         "jacobi": "cpp",
         "qr": "cpp",
-        "svd": "cpp"
+        "svd": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp"
     }
 }

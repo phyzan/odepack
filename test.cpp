@@ -3,9 +3,8 @@
 #include <chrono>
 
 
-const size_t n = 4;
 
-using Tf = vec<double, n>;
+using Tf = vec<double, 4>;
 
 Tf f(const double& t, const Tf& y, const std::vector<double>& args) {
     return {y[2], y[3], -y[0], -y[1]};
@@ -17,18 +16,18 @@ bool getevent(const double& t1, const Tf& f1, const double& t2, const Tf& f2){
 
 
 int main() {    
-    Tf y0(n);
+    Tf y0(4);
     y0 << 1, 1, 2.3, 4.5;
     double pi = 3.14159265359;
     double t_max = 10001*pi/2;
 
-    ODE<double, n, true, true> ode(f);
+    ODE<double, Tf, true, true> ode(f);
 
-    ICS<double, n> ics = {0., y0};
-    OdeArgs<double, n, true> args = {ics, t_max, 0.1, 1e-5, 1e-10, 0., "RK23", 0, {}};
+    ICS<double, Tf> ics = {0., y0};
+    OdeArgs<double, Tf, true> args = {ics, t_max, 0.001, 1e-5, 1e-10, 0., "RK23", 400000, {}};
 
 
-    OdeResult<double, n> res = ode.solve(args);
+    OdeResult<double, Tf> res = ode.solve(args);
 
     std::cout << std::endl << res.runtime << "\n";
     std::cout << res.y.size() << "\n\n";

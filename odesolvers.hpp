@@ -3,43 +3,41 @@
 
 #include <array>
 #include <string>
-#include <eigen3/Eigen/Dense>
 #include "tools.hpp"
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
 struct SolverArgs{
 
-    ode_t<Tt, N, raw_ode> f;
-    ICS<Tt, N> ics;
-    Tt t;
-    Tt h;
-    Tt rtol;
-    Tt atol;
-    Tt h_min;
-    std::vector<Tt> args;
-    event_t<Tt, N, raw_event> getevent;
-    event_t<Tt, N, raw_event> stopevent;
+    const ode_t<Tt, Ty, raw_ode> f;
+    const ICS<Tt, Ty> ics;
+    const Tt t;
+    const Tt h;
+    const Tt rtol;
+    const Tt atol;
+    const Tt h_min;
+    const std::vector<Tt> args;
+    const event_t<Tt, Ty, raw_event> getevent;
+    const event_t<Tt, Ty, raw_event> stopevent;
     
 };
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-SolverArgs<Tt, N, raw_ode, raw_event> to_SolverArgs(const ode_t<Tt, N, raw_ode>& f, const OdeArgs<Tt, N, raw_event>& args){
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+SolverArgs<Tt, Ty, raw_ode, raw_event> to_SolverArgs(const ode_t<Tt, Ty, raw_ode>& f, const OdeArgs<Tt, Ty, raw_event>& args){
     return {f, args.ics, args.t, args.h, args.rtol, args.atol, args.cutoff_step, args.args, args.getcond, args.breakcond};
 }
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
 class OdeSolver{
 
 
 public:
 
-    using Ty = vec<Tt, N>;
-    using Callable = ode_t<Tt, N, raw_ode>;
+    using Callable = ode_t<Tt, Ty, raw_ode>;
 
-    static constexpr Tt MAX_FACTOR = Tt(10);
-    static constexpr Tt SAFETY = Tt(9)/10;
-    static constexpr Tt MIN_FACTOR = Tt(2)/10;
+    const Tt MAX_FACTOR = Tt(10);
+    const Tt SAFETY = Tt(9)/10;
+    const Tt MIN_FACTOR = Tt(2)/10;
 
     const Callable f;
     const Tt t_max;
@@ -49,8 +47,8 @@ public:
     const size_t n;
     const Tt rtol;
     const Tt atol;
-    event_t<Tt, N, raw_event> getevent;
-    event_t<Tt, N, raw_event> stopevent;
+    event_t<Tt, Ty, raw_event> getevent;
+    event_t<Tt, Ty, raw_event> stopevent;
 
 private:
 
@@ -78,8 +76,8 @@ public:
 
     const bool& is_running() const {return _is_running;}
 
-    SolverState<Tt, N> state() const {
-        SolverState<Tt, N> res = {_t, _y, _diverges, _is_stiff, _is_running, neval, _event};
+    SolverState<Tt, Ty> state() const {
+        SolverState<Tt, Ty> res = {_t, _y, _diverges, _is_stiff, _is_running, neval, _event};
         return res;
     }
 
@@ -95,13 +93,13 @@ public:
 
     virtual Ty step(const Tt& t_old, const Ty& y_old, const Tt& h) const = 0;
 
-    virtual State<Tt, N> adaptive_step() const = 0;
+    virtual State<Tt, Ty> adaptive_step() const = 0;
 
 
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, N, raw_ode, raw_event>& S): f(S.f), t_max(S.t), min_h(S.h_min), args(S.args), direction( S.h > 0 ? 1 : -1), n(S.ics.y0.size()), rtol(S.rtol), atol(S.atol), getevent(S.getevent), stopevent(S.stopevent), _h(S.h), _t(S.ics.t0), _y(S.ics.y0) {}
+    OdeSolver(const SolverArgs<Tt, Ty, raw_ode, raw_event>& S): f(S.f), t_max(S.t), min_h(S.h_min), args(S.args), direction( S.h > 0 ? 1 : -1), n(S.ics.y0.size()), rtol(S.rtol), atol(S.atol), getevent(S.getevent), stopevent(S.stopevent), _h(S.h), _t(S.ics.t0), _y(S.ics.y0) {}
 
     bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next, const bool& is_event);
 
@@ -110,14 +108,14 @@ private:
     OdeSolver operator=(const OdeSolver&) = delete;
     OdeSolver(const OdeSolver& other) = default;
 
-    bool _examine_state(State<Tt, N>& next, const event_t<Tt, N, raw_event>& event)const{
+    bool _examine_state(State<Tt, Ty>& next, const event_t<Tt, Ty, raw_event>& event)const{
         
         Tt t_new, h_new;
         Ty y_new;
 
         if ( event(_t, _y, next.t, next.y) ){
             std::function<Tt(Tt)> func = [this, event](const Tt& t_next) -> int {
-                vec<Tt, N> y_next = this->step(this->_t, this->_y, t_next-this->_t);
+                Ty y_next = this->step(this->_t, this->_y, t_next-this->_t);
                 return (event(this->_t, this->_y, t_next, y_next) > 0) ? 1: -1;
             };
             
@@ -132,7 +130,7 @@ private:
         }
     }
 
-    bool _go_to_state(State<Tt, N>& next){
+    bool _go_to_state(State<Tt, Ty>& next){
         bool _stop = false;
         bool success;
         bool is_event = false;
@@ -157,23 +155,23 @@ private:
 */
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-bool OdeSolver<Tt, N, raw_ode, raw_event>::advance(){
-    State<Tt, N> next = adaptive_step();
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+bool OdeSolver<Tt, Ty, raw_ode, raw_event>::advance(){
+    State<Tt, Ty> next = adaptive_step();
     return _go_to_state(next);
 }
 
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-bool OdeSolver<Tt, N, raw_ode, raw_event>::advance_by(const Tt& h){
-    State<Tt, N> next = step(h);
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+bool OdeSolver<Tt, Ty, raw_ode, raw_event>::advance_by(const Tt& h){
+    State<Tt, Ty> next = step(h);
     return _go_to_state(next);
 }
 
 
-template<class Tt, size_t N, bool raw_ode, bool raw_event>
-bool OdeSolver<Tt, N, raw_ode, raw_event>::_update(const Tt& t_new, const OdeSolver<Tt, N, raw_ode, raw_event>::Ty& y_new, const Tt& h_next, const bool& is_event){
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+bool OdeSolver<Tt, Ty, raw_ode, raw_event>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_next, const bool& is_event){
 
     bool success = true;
     if (! _is_running){
@@ -193,7 +191,7 @@ bool OdeSolver<Tt, N, raw_ode, raw_event>::_update(const Tt& t_new, const OdeSol
         _stop = true;
         success = false;
     }
-    if (!y_new.isFinite().all()){
+    if (!All_isFinite(y_new)){
         _diverges = true;
         _stop = true;
         success = false;
