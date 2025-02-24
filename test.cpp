@@ -24,7 +24,7 @@ int main() {
     ODE<double, Tf, true, true> ode(f);
 
     ICS<double, Tf> ics = {0., y0};
-    OdeArgs<double, Tf, true> args = {ics, t_max, 0.001, 1e-5, 1e-10, 0., "RK23", 400000, {}};
+    OdeArgs<double, Tf, true> args = {ics, t_max, 0.001, 1e-5, 1e-10, 0., "RK23", 400, {}};
 
 
     OdeResult<double, Tf> res = ode.solve(args);

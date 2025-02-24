@@ -12,10 +12,10 @@ namespace py = pybind11;
 
 
 template<class Tt, class Ty>
-ode_f<Tt, Ty> to_Ode(const py::object& f);
-
-template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event);
+
+template<class ArrayType, class T>
+ArrayType toCPP_Array(const py::array& A);
 
 template<class T, class ArrayType>
 py::array_t<T> to_numpy(const ArrayType& array, const std::vector<size_t>& shape);
@@ -61,18 +61,17 @@ struct PyOdeArgs{
 template<class Tt, class Ty>
 class PyOde : public ODE<Tt, Ty, false, false>{
 
-    public:
-        PyOde(const py::object& df): ODE<Tt, Ty, false, false>(to_Ode<Tt, Ty>(df)) {}
+public:
 
-        PyOde(ode_f<Tt, Ty> df): ODE<Tt, Ty, false, false>(df) {}
+    PyOde(ode_f<Tt, Ty> df): ODE<Tt, Ty, false, false>(df) {}
 
-        PyOde<Tt, Ty> copy() const;
-        
-        const PyOdeResult<Tt> pysolve(const py::tuple& ics, const Tt& t, const Tt& dt, const Tt& rtol, const Tt& atol, const Tt& cutoff_step, const py::str& method, const size_t& max_frames, const py::tuple& pyargs, const py::object& getcond, const py::object& breakcond) const;
-        
-        py::list pysolve_all(const py::list&, int threads) const;
+    PyOde<Tt, Ty> copy() const;
+    
+    const PyOdeResult<Tt> pysolve(const py::tuple& ics, const Tt& t, const Tt& dt, const Tt& rtol, const Tt& atol, const Tt& cutoff_step, const py::str& method, const size_t& max_frames, const py::tuple& pyargs, const py::object& getcond, const py::object& breakcond) const;
+    
+    py::list pysolve_all(const py::list&, int threads) const;
 
-        static py::list py_dsolve_all(const py::list& data, int threads);
+    static py::list py_dsolve_all(const py::list& data, int threads);
 
 };
 
@@ -102,14 +101,6 @@ PyOdeResult<Tt> to_PyOdeResult(const OdeResult<Tt, Ty>& res);
 */
 
 template<class Tt, class Ty>
-ode_f<Tt, Ty> to_Ode(const py::object& f){
-    ode_f<Tt, Ty> g = [f](const Tt& t, const Ty& y, const std::vector<Tt> args) -> Ty {
-        return f(t, y);
-    };
-    return g;
-}
-
-template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event){
     event_f<Tt, Ty> g = [py_event](const Tt& t1, const Ty& f1, const Tt& t2, const Ty& f2) -> bool {
         bool res = py_event(t1, t2, f1, f2).equal(py::bool_(true));
@@ -118,14 +109,27 @@ event_f<Tt, Ty> to_event(const py::object py_event){
     return g;
 }
 
+template<class ArrayType, class T>
+ArrayType toCPP_Array(const py::array& A){
+    size_t n = A.size();
+    ArrayType res(n);
+
+    const T* data = static_cast<const T*>(A.data());
+
+    for (size_t i=0; i<n; i++){
+        // res[i] = data[i].template cast<T>();
+        res[i] = data[i];
+    }
+    return res;
+}
 
 template<class T, class ArrayType>
 py::array_t<T> to_numpy(const ArrayType& array, const std::vector<size_t>& shape){
     return py::array_t<T>(shape, array.data());
 }
 
-template<class Tt, class Ty>
-std::vector<Tt> flatten(const std::vector<Ty>& f){
+template<class Tt, size_t N>
+std::vector<Tt> flatten(const std::vector<vec<Tt, N>>& f){
     size_t nt = f.size();
     size_t nd = f[0].size();
     std::vector<Tt> res(nt*nd);
@@ -150,7 +154,7 @@ py::tuple to_tuple(const std::vector<T>& arr) {
 
 template<class Tt, class Ty>
 OdeArgs<Tt, Ty, false> to_OdeArgs(const PyOdeArgs<Tt>& pyparams){
-    ICS<Tt, Ty> ics = {pyparams.ics[0], pyparams.ics[1]};
+    ICS<Tt, Ty> ics = {pyparams.ics[0].template cast<Tt>(), toCPP_Array<Ty, Tt>(pyparams.ics[1])};
     Tt t = pyparams.t;
     Tt h = pyparams.h;
     Tt rtol = pyparams.rtol;
@@ -270,7 +274,6 @@ py::list PyOde<Tt, Ty>::py_dsolve_all(const py::list& data, int threads){
 template<class Tt, class Ty>
 void define_ode_module(py::module& m) {
     py::class_<PyOde<Tt, Ty>>(m, "LowLevelODE", py::module_local())
-        .def(py::init<py::object>(), py::arg("f"))
         .def("solve", &PyOde<Tt, Ty>::pysolve,
             py::arg("ics"),
             py::arg("t"),
@@ -312,5 +315,11 @@ void define_lowlevel_ode(py::module& m, ode_f<Tt, Ty> func_ptr){
         return PyOde<Tt, Ty>(func_ptr);
     });
 }
+
+
+// PYBIND11_MODULE(pytest, m) {
+//     define_ode_module<double, vec<double, 0>>(m);
+// }
+
 
 #endif
