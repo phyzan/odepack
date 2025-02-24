@@ -80,6 +80,11 @@
         "geometry": "cpp",
         "eigenvalues": "cpp",
         "lu": "cpp",
-        "cholesky": "cpp"
+        "cholesky": "cpp",
+        "locale": "cpp",
+        "householder": "cpp",
+        "jacobi": "cpp",
+        "qr": "cpp",
+        "svd": "cpp"
     }
 }

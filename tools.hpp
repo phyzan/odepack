@@ -4,7 +4,6 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include <mpfr.h>
 
 
 // USEFUL ALIASES

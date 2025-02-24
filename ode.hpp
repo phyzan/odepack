@@ -64,10 +64,7 @@ std::vector<OdeResult<Tt, N>> dsolve_all(const std::vector<OdeSet<Tt, N, raw_ode
 template<class Tt, size_t N, bool raw_ode, bool raw_event>
 const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N, raw_event>& params) const{
 
-
-    // PREALLOCATE WHEN GIVEN MAX_FRAMES
-    //CHECK WITH k and MAX_FRAMES AND ALL TO MAKE SURE ALL IS GOOD
-    //MAYBE KEEP ALL WHEN EVENTS
+    //MAYBE KEEP ALL WHEN EVENTS. IF SO, RETURN ARRAY WITH EVENTS TOO
 
     //extract data from params first
     const size_t& max_frames = params.max_frames;
@@ -77,8 +74,14 @@ const OdeResult<Tt, N> ODE<Tt, N, raw_ode, raw_event>::solve(const OdeArgs<Tt, N
     Tt t = t0;
     vec<Tt, N> y = params.ics.y0;
 
-    std::vector<Tt> t_arr = {t};
-    std::vector<vec<Tt, N>> y_arr = {y};
+    std::vector<Tt> t_arr;
+    std::vector<vec<Tt, N>> y_arr;
+    if (max_frames > 1){
+        t_arr.reserve(max_frames);
+        y_arr.reserve(max_frames);
+    }
+    t_arr.push_back(t);
+    y_arr.push_back(y);
 
     OdeSolver<Tt, N, raw_ode, raw_event>* solver = getSolver<Tt, N, raw_ode, raw_event>(this->f, params);
 
