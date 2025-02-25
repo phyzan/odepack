@@ -328,13 +328,13 @@ void define_ode_module(py::module& m) {
         .def_readonly("runtime", &PyOdeResult<Tt>::runtime);
     }
 
-template<class Tt, class Ty>
-void define_lowlevel_ode(py::module& m, const ode<Tt, Ty>& func_ptr){
-    define_ode_module<Tt, Ty>(m);
 
-    m.def("ode", [func_ptr]() {
-        return PyOde<Tt, Ty>(func_ptr);
-    });
+template<class Tt, class Ty>
+void define_lowlevel_ode(py::module& m, ode<Tt, Ty> func_ptr){
+    // define_ode_module<Tt, Ty>(m);
+    // m.def("ode", [func_ptr]() {
+    //     return PyOde<Tt, Ty>(func_ptr);
+    // });
 }
 
 
