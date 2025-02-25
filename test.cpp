@@ -43,8 +43,8 @@ int main() {
 
 /*
 
-git clone <repository_link>
-cd my_cpp_library
+git clone https://github.com/phyzan/odepack
+cd odepack
 chmod +x install.sh
 sudo ./install.sh
 
