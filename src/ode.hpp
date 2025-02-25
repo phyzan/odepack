@@ -147,7 +147,7 @@ std::vector<OdeResult<Tt, Ty>> dsolve_all(const std::vector<OdeSet<Tt, Ty, raw_o
 
     threads = (threads == -1) ? omp_get_max_threads() : threads;
 
-    if (threads == 1){
+    if (threads > 1){
         #pragma omp parallel for schedule(dynamic) num_threads(threads)
         for (size_t i=0; i<n; i++){
             res[i] = data[i].ode.solve(data[i].params);
