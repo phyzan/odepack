@@ -19,7 +19,7 @@ template<class Tt, class Ty>
 using ode_f = std::function<Ty(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
 template<class Tt, class Ty>
-using event_f = std::function<bool(const Tt&, const Ty&, const Tt&, Ty&)>;
+using event_f = std::function<bool(const Tt&, const Ty&, const Tt&, const Ty&)>;
 
 template<class Tt, class Ty>
 using event = bool(*)(const Tt&, const Ty&, const Tt&, const Ty&);
