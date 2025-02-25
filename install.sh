@@ -8,3 +8,8 @@ fi
 mkdir -p "$DEST_DIR"
 cp src/*.hpp "$DEST_DIR"
 echo "Installation complete. The header files are now located in $DEST_DIR"
+
+cd ..
+rm -rf "odepack"
+
+echo "The git cloned directory 'odepack' has been removed."
