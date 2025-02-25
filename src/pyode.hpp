@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <functional>
-#include <ode.hpp>
+#include "ode.hpp"
 
 
 namespace py = pybind11;
@@ -329,15 +329,13 @@ void define_ode_module(py::module& m) {
     }
 
 template<class Tt, class Ty>
-void define_lowlevel_ode(py::module& m, ode_f<Tt, Ty> func_ptr){
+void define_lowlevel_ode(py::module& m, const ode_f<Tt, Ty>& func_ptr){
     define_ode_module<Tt, Ty>(m);
 
     m.def("ode", [func_ptr]() {
         return PyOde<Tt, Ty>(func_ptr);
     });
 }
-
-
 
 
 #endif
