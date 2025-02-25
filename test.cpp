@@ -39,3 +39,15 @@ int main() {
 // g++ -std=c++20 -O3 -fopenmp -Wall -fPIC test.cpp -o test good
 
 //g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) test.cpp -o pytest$(python3-config --extension-suffix)
+
+
+/*
+
+git clone <repository_link>
+cd my_cpp_library
+chmod +x install.sh
+sudo ./install.sh
+
+
+
+*/

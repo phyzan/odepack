@@ -6,5 +6,5 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 mkdir -p "$DEST_DIR"
-cp src/*.h "$DEST_DIR"
+cp src/*.hpp "$DEST_DIR"
 echo "Installation complete. The header files are now located in $DEST_DIR"
