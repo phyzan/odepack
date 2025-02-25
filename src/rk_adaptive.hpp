@@ -1,6 +1,7 @@
 #ifndef ADAPTIVE_RK_HPP
 #define ADAPTIVE_RK_HPP
 
+//https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method
 
 #include "odesolvers.hpp"
 

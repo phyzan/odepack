@@ -2,10 +2,11 @@
 #define ODE_HPP
 
 #include <variant>
-#include "adaptive_rk.hpp"
+#include "rk_adaptive.hpp"
 #include <unordered_map>
 #include <chrono>
 #include <omp.h>
+
 
 template<class Tt, class Ty, bool raw_ode, bool raw_event>
 OdeSolver<Tt, Ty, raw_ode, raw_event>* getSolver(const ode_t<Tt, Ty, raw_ode>& f, const OdeArgs<Tt, Ty, raw_event>& args) {
@@ -64,6 +65,7 @@ std::vector<OdeResult<Tt, Ty>> dsolve_all(const std::vector<OdeSet<Tt, Ty, raw_o
 template<class Tt, class Ty, bool raw_ode, bool raw_event>
 const OdeResult<Tt, Ty> ODE<Tt, Ty, raw_ode, raw_event>::solve(const OdeArgs<Tt, Ty, raw_event>& params) const{
 
+    auto t1 = std::chrono::high_resolution_clock::now();
     //MAYBE KEEP ALL WHEN EVENTS. IF SO, RETURN ARRAY WITH EVENTS TOO
 
     //extract data from params first
@@ -86,7 +88,6 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty, raw_ode, raw_event>::solve(const OdeArgs<Tt,
 
     OdeSolver<Tt, Ty, raw_ode, raw_event>* solver = getSolver<Tt, Ty, raw_ode, raw_event>(this->f, params);
 
-    auto t1 = std::chrono::high_resolution_clock::now();
     while (solver->is_running()){
         if (solver->advance()){
             t = solver->t_now();

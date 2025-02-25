@@ -108,43 +108,9 @@ private:
     OdeSolver operator=(const OdeSolver&) = delete;
     OdeSolver(const OdeSolver& other) = default;
 
-    bool _examine_state(State<Tt, Ty>& next, const event_t<Tt, Ty, raw_event>& event)const{
-        
-        Tt t_new, h_new;
-        Ty y_new;
+    bool _examine_state(State<Tt, Ty>& next, const event_t<Tt, Ty, raw_event>& event)const;
 
-        if ( event(_t, _y, next.t, next.y) ){
-            std::function<Tt(Tt)> func = [this, event](const Tt& t_next) -> int {
-                Ty y_next = this->step(this->_t, this->_y, t_next-this->_t);
-                return (event(this->_t, this->_y, t_next, y_next) > 0) ? 1: -1;
-            };
-            
-            t_new = bisect(func, _t, next.t, 1e-12)[2];
-            h_new = t_new - _t;
-            y_new = step(_t, _y, h_new);
-            next = {t_new, y_new, h_new};
-            return true;
-        }
-        else{
-            return false;
-        }
-    }
-
-    bool _go_to_state(State<Tt, Ty>& next){
-        bool _stop = false;
-        bool success;
-        bool is_event = false;
-        if (stopevent != nullptr){
-            is_event = _examine_state(next, stopevent);
-            _stop = is_event;
-        }
-        else if (getevent != nullptr){
-            is_event = _examine_state(next, getevent);
-        }
-        success = _update(next.t, next.y, next.dt, is_event);
-        if (_stop) stop();
-        return success;
-    }
+    bool _go_to_state(State<Tt, Ty>& next);
 };
 
 
@@ -216,6 +182,47 @@ bool OdeSolver<Tt, Ty, raw_ode, raw_event>::_update(const Tt& t_new, const Ty& y
 
     return success;
 }
+
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+bool OdeSolver<Tt, Ty, raw_ode, raw_event>::_examine_state(State<Tt, Ty>& next, const event_t<Tt, Ty, raw_event>& event)const{
+        
+    Tt t_new, h_new;
+    Ty y_new;
+
+    if ( event(_t, _y, next.t, next.y) ){
+        std::function<Tt(Tt)> func = [this, event](const Tt& t_next) -> int {
+            Ty y_next = this->step(this->_t, this->_y, t_next-this->_t);
+            return (event(this->_t, this->_y, t_next, y_next) > 0) ? 1: -1;
+        };
+        
+        t_new = bisect(func, _t, next.t, 1e-12)[2];
+        h_new = t_new - _t;
+        y_new = step(_t, _y, h_new);
+        next = {t_new, y_new, h_new};
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+template<class Tt, class Ty, bool raw_ode, bool raw_event>
+bool OdeSolver<Tt, Ty, raw_ode, raw_event>::_go_to_state(State<Tt, Ty>& next){
+    bool _stop = false;
+    bool success;
+    bool is_event = false;
+    if (stopevent != nullptr){
+        is_event = _examine_state(next, stopevent);
+        _stop = is_event;
+    }
+    else if (getevent != nullptr){
+        is_event = _examine_state(next, getevent);
+    }
+    success = _update(next.t, next.y, next.dt, is_event);
+    if (_stop) stop();
+    return success;
+}
+
 
 
 #endif

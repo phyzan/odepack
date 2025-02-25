@@ -55,6 +55,15 @@ bool All_isFinite(const Eigen::Array<T, Nr, Nc>& arr){
     return arr.isFinite().all();
 }
 
+template<class T, int Nr, int Nc>
+std::vector<int> shape(const Eigen::Array<T, Nr, Nc>& arr){
+    return {arr.rows(), arr.cols()};
+}
+
+template<class T>
+std::vector<int> shape(const std::vector<T>& arr){
+    return {arr.size()};
+}
 
 //BISECTION USED FOR EVENTS IN ODES
 

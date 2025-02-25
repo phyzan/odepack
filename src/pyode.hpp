@@ -10,15 +10,18 @@
 
 namespace py = pybind11;
 
+template<class Tt, class Ty>
+ode_f<Tt, Ty> to_ODE_callable(py::object& f);
 
 template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event);
 
-template<class ArrayType, class T>
-ArrayType toCPP_Array(const py::array& A);
+template<class Tt, class Ty>
+Ty toCPP_Array(const py::array& A);
 
-template<class T, class ArrayType>
-py::array_t<T> to_numpy(const ArrayType& array, const std::vector<size_t>& shape);
+
+template<class Scalar, class ArrayType>
+py::array_t<Scalar> to_numpy(const ArrayType& array, const std::vector<size_t>& _shape = {});
 
 template<class Tt, class Ty>
 std::vector<Tt> flatten(const std::vector<Ty>&);
@@ -65,6 +68,8 @@ public:
 
     PyOde(ode_f<Tt, Ty> df): ODE<Tt, Ty, false, false>(df) {}
 
+    PyOde(py::object df): ODE<Tt, Ty, false, false>(to_ODE_callable<Tt, Ty>(df)) {}
+
     PyOde<Tt, Ty> copy() const;
     
     const PyOdeResult<Tt> pysolve(const py::tuple& ics, const Tt& t, const Tt& dt, const Tt& rtol, const Tt& atol, const Tt& cutoff_step, const py::str& method, const size_t& max_frames, const py::tuple& pyargs, const py::object& getcond, const py::object& breakcond) const;
@@ -101,35 +106,47 @@ PyOdeResult<Tt> to_PyOdeResult(const OdeResult<Tt, Ty>& res);
 */
 
 template<class Tt, class Ty>
+ode_f<Tt, Ty> to_ODE_callable(py::object& f){
+    ode_f<Tt, Ty> g = [f](const Tt& t, const Ty& y, const std::vector<Tt>& args) -> Ty {
+        return toCPP_Array<Tt, Ty>(f(t, to_numpy<Tt>(y), *to_tuple(args)));
+    };
+    return g;
+}
+
+template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event){
     event_f<Tt, Ty> g = [py_event](const Tt& t1, const Ty& f1, const Tt& t2, const Ty& f2) -> bool {
-        bool res = py_event(t1, t2, f1, f2).equal(py::bool_(true));
+        bool res = py_event(t1, t2, to_numpy<Tt>(f1), to_numpy<Tt>(f2)).equal(py::bool_(true));
         return res;
     };
     return g;
 }
 
-template<class ArrayType, class T>
-ArrayType toCPP_Array(const py::array& A){
+template<class Tt, class Ty>
+Ty toCPP_Array(const py::array& A){
     size_t n = A.size();
-    ArrayType res(n);
+    Ty res(n);
 
-    const T* data = static_cast<const T*>(A.data());
+    const Tt* data = static_cast<const Tt*>(A.data());
 
     for (size_t i=0; i<n; i++){
-        // res[i] = data[i].template cast<T>();
         res[i] = data[i];
     }
     return res;
 }
 
-template<class T, class ArrayType>
-py::array_t<T> to_numpy(const ArrayType& array, const std::vector<size_t>& shape){
-    return py::array_t<T>(shape, array.data());
+template<class Scalar, class ArrayType>
+py::array_t<Scalar> to_numpy(const ArrayType& array, const std::vector<size_t>& _shape){
+    if (_shape.size() == 0){
+        return py::array_t<Scalar>(shape(array), array.data());
+    }
+    else{
+        return py::array_t<Scalar>(_shape, array.data());
+    }
 }
 
-template<class Tt, size_t N>
-std::vector<Tt> flatten(const std::vector<vec<Tt, N>>& f){
+template<class Tt, class Ty>
+std::vector<Tt> flatten(const std::vector<Ty>& f){
     size_t nt = f.size();
     size_t nd = f[0].size();
     std::vector<Tt> res(nt*nd);
@@ -154,7 +171,7 @@ py::tuple to_tuple(const std::vector<T>& arr) {
 
 template<class Tt, class Ty>
 OdeArgs<Tt, Ty, false> to_OdeArgs(const PyOdeArgs<Tt>& pyparams){
-    ICS<Tt, Ty> ics = {pyparams.ics[0].template cast<Tt>(), toCPP_Array<Ty, Tt>(pyparams.ics[1])};
+    ICS<Tt, Ty> ics = {pyparams.ics[0].template cast<Tt>(), toCPP_Array<Tt, Ty>(pyparams.ics[1])};
     Tt t = pyparams.t;
     Tt h = pyparams.h;
     Tt rtol = pyparams.rtol;
@@ -162,11 +179,14 @@ OdeArgs<Tt, Ty, false> to_OdeArgs(const PyOdeArgs<Tt>& pyparams){
     Tt cutoff_step = pyparams.cutoff_step;
     std::string method = pyparams.method.template cast<std::string>();
     size_t max_frames = pyparams.max_frames;
-    const std::vector<Tt> args;
+    std::vector<Tt> args;
     event_f<Tt, Ty> getcond = nullptr;
     event_f<Tt, Ty> breakcond = nullptr;
 
     //CONVERT PYARGS TO POINTER FOR ARGS
+    if (!pyparams.pyargs.empty()){
+        args = toCPP_Array<Tt, std::vector<Tt>>(pyparams.pyargs);
+    }
 
     if (!pyparams.getcond.is(py::none())) {
         getcond = to_event<Tt, Ty>(pyparams.getcond);
@@ -188,7 +208,7 @@ PyOdeResult<Tt> to_PyOdeResult(const OdeResult<Tt, Ty>& res){
     size_t nd = res.y[0].size();
     size_t nt = res.y.size();
 
-    PyOdeResult<Tt> pyres{res.t, f_flat, to_numpy<Tt>(res.t, {nt}), to_numpy<Tt>(f_flat, {nt, nd}), res.diverges, res.is_stiff, res.runtime};
+    PyOdeResult<Tt> pyres{res.t, f_flat, to_numpy<Tt>(res.t), to_numpy<Tt>(f_flat, {nt, nd}), res.diverges, res.is_stiff, res.runtime};
 
     return pyres;
 }
@@ -274,6 +294,7 @@ py::list PyOde<Tt, Ty>::py_dsolve_all(const py::list& data, int threads){
 template<class Tt, class Ty>
 void define_ode_module(py::module& m) {
     py::class_<PyOde<Tt, Ty>>(m, "LowLevelODE", py::module_local())
+        .def(py::init<py::object>(), py::arg("f"))
         .def("solve", &PyOde<Tt, Ty>::pysolve,
             py::arg("ics"),
             py::arg("t"),
@@ -288,7 +309,7 @@ void define_ode_module(py::module& m) {
             py::arg("getcond") = py::none(),
             py::arg("breakcond") = py::none())
         .def("solve_all", &PyOde<Tt, Ty>::pysolve_all,
-            py::arg("params"),
+            py::arg("parameter_list"),
             py::arg("threads") = -1)
         .def("copy", &PyOde<Tt, Ty>::copy)
         .def_static("dsolve_all", &PyOde<Tt, Ty>::py_dsolve_all,
@@ -305,7 +326,7 @@ void define_ode_module(py::module& m) {
         .def_readonly("diverges", &PyOdeResult<Tt>::diverges)
         .def_readonly("is_stiff", &PyOdeResult<Tt>::is_stiff)
         .def_readonly("runtime", &PyOdeResult<Tt>::runtime);
-}
+    }
 
 template<class Tt, class Ty>
 void define_lowlevel_ode(py::module& m, ode_f<Tt, Ty> func_ptr){
@@ -317,9 +338,8 @@ void define_lowlevel_ode(py::module& m, ode_f<Tt, Ty> func_ptr){
 }
 
 
-// PYBIND11_MODULE(pytest, m) {
-//     define_ode_module<double, vec<double, 0>>(m);
-// }
 
 
 #endif
+
+//g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) pyode.cpp -o _lowlevelode$(python3-config --extension-suffix)
