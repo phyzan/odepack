@@ -43,8 +43,8 @@ public:
     State<Tt, Ty> adaptive_step() const override {
         const Tt t = this->t_now();
         const Ty y = this->y_now();
-        Tt habs = this->h_now()*this->direction;
         const Ty yabs = cwise_abs(y);
+        Tt habs = this->h_now()*this->direction;
         Tt h;
         Tt t_new;
         Ty y_new;
@@ -64,23 +64,17 @@ public:
             scale = this->atol + cwise_max(yabs, cwise_abs(y_new))*this->rtol;
             err_norm = _error_norm(_K, h, scale);
             if (err_norm < 1){
-                if (err_norm == 0){
-                    factor = this->MAX_FACTOR;
-                }
-                else{
-                    factor = std::min(this->MAX_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
-                }
-
+                factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
                 if (step_rejected){
                     factor = factor < 1 ? factor : 1;
                 }
-                habs *= factor;
                 step_accepted = true;
             }
             else {
-                habs *= std::max(this->MIN_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
+                factor = std::max(this->MIN_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
                 step_rejected = true;
             }
+            habs *= factor;
         }
 
         return {t_new, y_new,  habs*this->direction};

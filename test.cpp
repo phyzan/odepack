@@ -31,7 +31,7 @@ int main() {
 
     std::cout << std::endl << res.runtime << "\n";
     std::cout << res.y.size() << "\n\n";
-    // std::cout << res.y[res.y.size()-1];
+    std::cout << res.y[res.y.size()-1];
     
 }
 

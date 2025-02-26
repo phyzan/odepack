@@ -321,6 +321,7 @@ void define_ode_module(py::module& m) {
 
 
     py::class_<PyOdeResult<Tt>>(m, "OdeResult", py::module_local())
+        // .def(py::init<py::array, py::array, bool, bool, double>(), py::arg("t"), py::arg("y"), py::arg("diverges"), py::arg("is_stiff"), py::arg("runtime"){})
         .def_readonly("t", &PyOdeResult<Tt>::t)
         .def_readonly("y", &PyOdeResult<Tt>::y)
         .def_readonly("diverges", &PyOdeResult<Tt>::diverges)
