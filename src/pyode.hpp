@@ -116,7 +116,7 @@ ode_f<Tt, Ty> to_ODE_callable(py::object& f){
 template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event){
     event_f<Tt, Ty> g = [py_event](const Tt& t1, const Ty& f1, const Tt& t2, const Ty& f2) -> bool {
-        bool res = py_event(t1, t2, to_numpy<Tt>(f1), to_numpy<Tt>(f2)).equal(py::bool_(true));
+        bool res = py_event(t1, to_numpy<Tt>(f1), t2, to_numpy<Tt>(f2)).equal(py::bool_(true));
         return res;
     };
     return g;
@@ -342,3 +342,4 @@ void define_lowlevel_ode(py::module& m, ode<Tt, Ty> func_ptr){
 #endif
 
 //g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) pyode.cpp -o _lowlevelode$(python3-config --extension-suffix)
+
