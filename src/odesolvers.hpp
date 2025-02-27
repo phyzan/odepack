@@ -210,8 +210,9 @@ template<class Tt, class Ty, bool raw_ode, bool raw_event>
 bool OdeSolver<Tt, Ty, raw_ode, raw_event>::_go_to_state(State<Tt, Ty>& next){
     bool is_event = false;
     if (stopevent != nullptr && _examine_state(next, stopevent)){
+        bool res = _update(next.t, next.y, next.dt, false);
         stop();
-        return _update(next.t, next.y, next.dt, is_event);
+        return res;
     }
     if (getevent != nullptr){
         is_event = _examine_state(next, getevent);

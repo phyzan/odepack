@@ -75,6 +75,9 @@ public:
                 step_rejected = true;
             }
             habs *= factor;
+            if (habs == 0.){
+                break;
+            }
         }
 
         return {t_new, y_new,  habs*this->direction};
