@@ -107,6 +107,9 @@ PyOdeResult<Tt> to_PyOdeResult(const OdeResult<Tt, Ty>& res);
 
 template<class Tt, class Ty>
 ode_f<Tt, Ty> to_ODE_callable(py::object& f){
+    if (f.is_none()){
+        return nullptr;
+    }
     ode_f<Tt, Ty> g = [f](const Tt& t, const Ty& y, const std::vector<Tt>& args) -> Ty {
         return toCPP_Array<Tt, Ty>(f(t, to_numpy<Tt>(y), *to_tuple(args)));
     };
@@ -115,6 +118,9 @@ ode_f<Tt, Ty> to_ODE_callable(py::object& f){
 
 template<class Tt, class Ty>
 event_f<Tt, Ty> to_event(const py::object py_event){
+    if (py_event.is_none()){
+        return nullptr;
+    }
     event_f<Tt, Ty> g = [py_event](const Tt& t1, const Ty& f1, const Tt& t2, const Ty& f2) -> bool {
         bool res = py_event(t1, to_numpy<Tt>(f1), t2, to_numpy<Tt>(f2)).equal(py::bool_(true));
         return res;
@@ -188,11 +194,11 @@ OdeArgs<Tt, Ty, false> to_OdeArgs(const PyOdeArgs<Tt>& pyparams){
         args = toCPP_Array<Tt, std::vector<Tt>>(pyparams.pyargs);
     }
 
-    if (!pyparams.getcond.is(py::none())) {
+    if (!pyparams.getcond.is_none()) {
         getcond = to_event<Tt, Ty>(pyparams.getcond);
     }
     
-    if (!pyparams.breakcond.is(py::none())) {
+    if (!pyparams.breakcond.is_none()) {
         breakcond = to_event<Tt, Ty>(pyparams.breakcond);
     }
 
@@ -327,7 +333,7 @@ void define_ode_module(py::module& m) {
         .def_readonly("diverges", &PyOdeResult<Tt>::diverges)
         .def_readonly("is_stiff", &PyOdeResult<Tt>::is_stiff)
         .def_readonly("runtime", &PyOdeResult<Tt>::runtime);
-    }
+}
 
 
 template<class Tt, class Ty>
