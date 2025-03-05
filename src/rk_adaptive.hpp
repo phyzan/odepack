@@ -19,12 +19,12 @@ using E_matrix = Eigen::Array<Tt, Nstages+1, 1>;
 
 
 
-template<class Tt, class Ty, int Nstages, int Norder, bool raw_ode, bool raw_event>
-class RungeKutta : public OdeSolver<Tt, Ty, raw_ode, raw_event>{
+template<class Tt, class Ty, int Nstages, int Norder>
+class RungeKutta : public OdeSolver<Tt, Ty>{
 
 public:
 
-    using OdsBase = OdeSolver<Tt, Ty, raw_ode, raw_event>;
+    using OdsBase = OdeSolver<Tt, Ty>;
     using StageContainer = std::array<Ty, Nstages+1>;
     using Atype = A_matrix<Tt, Norder, Nstages>;
     using Btype = B_matrix<Tt, Norder, Nstages>;
@@ -36,21 +36,15 @@ public:
     virtual Ctype Cmatrix() const = 0;
     virtual Etype Ematrix() const = 0;
 
-    Ty step(const Tt& t_old, const Ty& y_old, const Tt& h) const override{
-        return _step(t_old, y_old, h, this->_K);
+    Ty step(const Tt& t_old, const Ty& q_old, const Tt& h) const override{
+        return _step(t_old, q_old, h, this->_K);
     }
 
     State<Tt, Ty> adaptive_step() const override {
-        const Tt t = this->t_now();
-        const Ty y = this->y_now();
-        const Ty yabs = cwise_abs(y);
-        Tt habs = this->h_now()*this->direction;
-        Tt h;
-        Tt t_new;
-        Ty y_new;
-        Tt err_norm;
-        Ty scale;
-        Tt factor;
+        const Ty& qabs = cwise_abs(this->q);
+        Tt habs = this->stepsize;
+        Tt h, t_new, err_norm, factor, _factor;
+        Ty q_new, scale;
 
         bool step_accepted = false;
         bool step_rejected = false;
@@ -58,29 +52,30 @@ public:
         while (!step_accepted){
 
             h = habs * this->direction;
-            t_new = t+h;
+            t_new = this->t+h;
 
-            y_new = step(t, y, h); 
-            scale = this->atol + cwise_max(yabs, cwise_abs(y_new))*this->rtol;
+            q_new = step(this->t, this->q, h);
+            scale = this->atol + cwise_max(qabs, cwise_abs(q_new))*this->rtol;
             err_norm = _error_norm(_K, h, scale);
+            _factor = this->SAFETY*std::pow(err_norm, err_exp);
             if (err_norm < 1){
-                factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
+                factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
                 if (step_rejected){
                     factor = factor < 1 ? factor : 1;
                 }
                 step_accepted = true;
             }
             else {
-                factor = std::max(this->MIN_FACTOR, this->SAFETY*std::pow(err_norm, err_exp));
+                factor = std::max(this->MIN_FACTOR, _factor);
                 step_rejected = true;
             }
             habs *= factor;
-            if (habs == 0.){
+            if (habs == 0){
                 break;
             }
         }
 
-        return {t_new, y_new,  habs*this->direction};
+        return {t_new, q_new,  habs};
     }
 
     const Atype A;
@@ -90,39 +85,38 @@ public:
 
 protected:
 
-    RungeKutta(const SolverArgs<Tt, Ty, raw_ode, raw_event>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
+    RungeKutta(const SolverArgs<Tt, Ty>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
 
 private:
 
-    const int err_est_ord = Norder-1;
-    const Tt err_exp = Tt(-1.)/Tt(Norder*1.);
+    const Tt err_exp = Tt(-1)/Tt(Norder);
     mutable StageContainer _K;//always holds the value given to it by the last "step" call
 
 
-    Ty _step(const Tt& t_old, const Ty& y_old, const Tt& h, StageContainer& K) const{
+    Ty _step(const Tt& t_old, const Ty& q_old, const Tt& h, StageContainer& K) const{
 
-        Ty dy;
-        K[0] = this->f(t_old, y_old, this->args);
+        Ty dq;
+        K[0] = this->f(t_old, q_old, this->args);
 
         Ty temp = B(0)*K[0];
 
         for (size_t s = 1; s < Nstages; s++){
             //calculate df
-            dy = K[0] * this->A(s, 0) * h;
+            dq = K[0] * this->A(s, 0) * h;
             for (size_t j=1; j<s; j++){
-                dy += this->A(s, j) * K[j] * h;
+                dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            K[s] = this->f(t_old+this->C(s)*h, y_old+dy, this->args);
+            K[s] = this->f(t_old+this->C(s)*h, q_old+dq, this->args);
             temp += B(s)*K[s];
         }
 
-        Ty y_new = y_old + temp*h;
+        Ty q_new = q_old + temp*h;
 
 
-        K[Nstages] = this->f(t_old+h, y_new, this->args);
+        K[Nstages] = this->f(t_old+h, q_new, this->args);
 
-        return y_new;
+        return q_new;
 
     };
 
@@ -143,17 +137,17 @@ private:
 
 
 
-template<class Tt, class Ty, bool raw_ode = true, bool raw_event = true>
-class RK45 : public RungeKutta<Tt, Ty, 6, 5, raw_ode, raw_event>{
+template<class Tt, class Ty>
+class RK45 : public RungeKutta<Tt, Ty, 6, 5>{
 
     static const int Norder = 5;
     static const int Nstages = 6;
 
-    using RKbase = RungeKutta<Tt, Ty, Nstages, Norder, raw_ode, raw_event>;
+    using RKbase = RungeKutta<Tt, Ty, Nstages, Norder>;
     
 
 public:
-    RK45(const SolverArgs<Tt, Ty, raw_ode, raw_event>& S) : RungeKutta<Tt, Ty, Nstages, Norder, raw_ode, raw_event>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK45(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RKbase::Atype Amatrix() const override{
         typename RKbase::Atype A;
@@ -204,16 +198,16 @@ public:
 
 
 
-template<class Tt, class Ty, bool raw_ode = true, bool raw_event = true>
-class RK23 : public RungeKutta<Tt, Ty, 3, 3, raw_ode, raw_event> {
+template<class Tt, class Ty>
+class RK23 : public RungeKutta<Tt, Ty, 3, 3> {
 
     static const int Norder = 3;
     static const int Nstages = 3;
 
-    using RKbase = RungeKutta<Tt, Ty, Nstages, Norder, raw_ode, raw_event>;
+    using RKbase = RungeKutta<Tt, Ty, Nstages, Norder>;
     
 public:
-    RK23(const SolverArgs<Tt, Ty, raw_ode, raw_event>& S) : RungeKutta<Tt, Ty, Nstages, Norder, raw_ode, raw_event>(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK23(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RKbase::Atype Amatrix() const override{
         typename RKbase::Atype A;
