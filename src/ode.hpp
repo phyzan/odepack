@@ -137,11 +137,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     size_t i = N;
 
     _solver->set_goal(t0+interval);
-    if (max_events == 0){
-        _solver->stop("Max events was set to 0. No integration performed");
-    }
-
-
+    
     while (_solver->is_running()){
         if (_solver->advance()){
 
