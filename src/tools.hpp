@@ -22,6 +22,7 @@ using event_f = std::function<Tt(const Tt&, const Ty&, const std::vector<Tt>&)>;
 template<class Tt, class Ty>
 using is_event_f = std::function<bool(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
+using _Shape = std::vector<size_t>;
 
 
 template<class T, int Nr, int Nc>
