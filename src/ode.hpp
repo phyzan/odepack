@@ -159,7 +159,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
     _solver->set_goal(t0+interval);
 
-    std::cout << std::endl;
+
     
     while (_solver->is_running()){
         if (_solver->advance()){
@@ -181,7 +181,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
         if (display){
             Tt percentage = (_solver->t() - t0)/(_solver->tmax()-t0);
             if (percentage*MAX_PRINTS >= prints){
-                std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
+                std::cout <<std::endl << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
                 prints++;
             }
 
