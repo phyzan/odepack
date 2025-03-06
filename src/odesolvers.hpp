@@ -52,7 +52,7 @@ public:
         else{
             _message = "Running";
             _is_running = true;
-            return true
+            return true;
         }
     }
 
