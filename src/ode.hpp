@@ -154,7 +154,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     long int event_counter = 0;
     long int frame_counter = 0;
     size_t i = N;
-    int MAX_PRINTS = 100000;
+    int MAX_PRINTS = 100;
     int prints = 0;
 
     _solver->set_goal(t0+interval);
