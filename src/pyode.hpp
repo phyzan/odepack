@@ -186,7 +186,7 @@ public:
     }
 
     NpArray<Tt, Ty> q()const{
-        throw std::runtime_error("sdf");
+        throw std::runtime_error(std::to_string(_shape.size())+ " sdf");
         NpArray<Tt, Ty> res(ode.q, _shape);
         return res;
     }
