@@ -175,7 +175,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
             }
         }
         if (display){
-            std::cout << std::endl << std::setprecision(3) << "\r\033[2K" << "Progress: " << (_solver->t() - t0)/(_solver->tmax()-t0) << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
+            std::cout << std::endl << std::setprecision(3) << "\r\033[2K" << "Progressssss: " << (_solver->t() - t0)/(_solver->tmax()-t0) << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
         }
     }
 
