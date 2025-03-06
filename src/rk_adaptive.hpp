@@ -57,7 +57,7 @@ public:
             q_new = step(this->t(), this->q(), h);
             scale = this->atol() + cwise_max(qabs, cwise_abs(q_new))*this->rtol();
             err_norm = _error_norm(_K, h, scale);
-            _factor = this->SAFETY*std::pow(err_norm, err_exp);
+            _factor = this->SAFETY*pow(err_norm, err_exp);
             if (err_norm < 1){
                 factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
                 if (step_rejected){
