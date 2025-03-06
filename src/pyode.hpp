@@ -63,7 +63,7 @@ struct NpArray{
     NpArray(const std::vector<Ty>& array, const _Shape& shape){
         _array = flatten<Tt, Ty>(array);
         _shape = getShape(array.size(), shape);
-        throw std::runtime_error(std::to_string(array.size()) + " "+ std::to_string(shape[0]));
+        throw std::runtime_error(std::to_string(array.size()) + " "+ std::to_string(shape.size()));
     }
 
     const py::array_t<Tt> get()const{
