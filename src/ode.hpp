@@ -158,6 +158,8 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     int prints = 0;
 
     _solver->set_goal(t0+interval);
+
+    std::cout << std::endl;
     
     while (_solver->is_running()){
         if (_solver->advance()){
