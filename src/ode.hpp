@@ -4,7 +4,6 @@
 #include <variant>
 #include <span>
 #include "rk_adaptive.hpp"
-#include "rk_classic.hpp"
 #include <unordered_map>
 #include <chrono>
 #include <omp.h>
@@ -21,9 +20,6 @@ OdeSolver<Tt, Ty>* getSolver(const SolverArgs<Tt, Ty>& S, const std::string& met
     else if (method == "RK45") {
         solver = new RK45<Tt, Ty>(S);
     }
-    else if (method == "RK4") {
-        solver = new RK4<Tt, Ty>(S);
-    }
     else {
         throw std::runtime_error("Unknown solver method");
     }
@@ -36,6 +32,8 @@ class ODE{
 
 public:
 
+
+
     ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : _Nevents(events.size()) {
 
         const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, stop_events, event_tol};
@@ -47,6 +45,19 @@ public:
     ODE(const SolverArgs<Tt, Ty>& S, const std::string& method) : _Nevents(S.events.size()){
         _solver = getSolver(S, method);
         _register_state();
+    }
+
+    ODE(const ODE<Tt, Ty>& other){
+        _copy_data(other);
+    }
+
+    ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
+        if (&other == this) return *this;
+
+        delete _solver;
+        _copy_data(other);
+        return *this;
+
     }
 
     ~ODE(){delete _solver;}
@@ -86,22 +97,30 @@ public:
         return _solver->is_dead();
     }
 
-    const std::vector<Tt>& t = _t_arr;
-    const std::vector<Ty>& q = _q_arr;
-    const double& runtime = _runtime;
+    const std::vector<Tt>& t()const {return _t_arr;}
+    const std::vector<Ty>& q()const{return _q_arr;}
+    const double& runtime() const{return _runtime;}
 
 private:
 
     OdeSolver<Tt, Ty>* _solver;
     std::vector<Tt> _t_arr;
     std::vector<Ty> _q_arr;
+    std::vector<std::vector<size_t>> _Nevents;
     double _runtime = 0.;
 
-    std::vector<std::vector<size_t>> _Nevents;
 
     void _register_state(){
-        _t_arr.push_back(_solver->t);
-        _q_arr.push_back(_solver->q);
+        _t_arr.push_back(_solver->t());
+        _q_arr.push_back(_solver->q());
+    }
+
+    void _copy_data(const ODE<Tt, Ty>& other){
+        _solver = other._solver->clone();
+        _t_arr = other._t_arr;
+        _q_arr = other._q_arr;
+        _Nevents = other._Nevents;
+        _runtime = other._runtime;
     }
 
 };
@@ -130,7 +149,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    const Tt t0 = _solver->t;
+    const Tt t0 = _solver->t();
     const size_t N = _t_arr.size();
     long int event_counter = 0;
     long int frame_counter = 0;
@@ -149,7 +168,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
                 ++i;
                 _register_state();
             }
-            else if ( (max_frames == -1) || (abs(_solver->t-t0)*max_frames >= (frame_counter+1)*interval) ){
+            else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
                 ++frame_counter;
                 ++i;
@@ -173,13 +192,13 @@ SolverState<Tt, Ty> ODE<Tt, Ty>::advance(){
         _solver->set_goal(std::numeric_limits<Tt>::infinity());
     }
     if (_solver->advance()){
-        if (_solver->current_event() != nullptr){
+        if (_solver->at_event()){
             _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
         }
         _register_state();
     }
     
-    _solver->set_goal(_solver->t);
+    _solver->set_goal(_solver->t());
     return _solver->state();
 }
 

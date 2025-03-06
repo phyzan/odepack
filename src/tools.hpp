@@ -112,6 +112,9 @@ void _assert_valid_name(const std::string& name){
 template<class Tt, class Ty>
 class Event{
 
+    //_t_event and _q_event implemented as pointers so that they are null when an event has not been determined instead of
+    //having a default value, or one determined from a previous .determine() call.
+
 public:
     Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr) : _name(name), _when(when), _check_if(check_if), _mask(mask) {
         _assert_valid_name(name);
@@ -119,6 +122,18 @@ public:
 
     Event(const std::string& name, std::vector<Tt> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr) : _name(name), _when_t(when), _check_if(check_if), _mask(mask){
         _assert_valid_name(name);
+    }
+
+    Event(const Event<Tt, Ty>& other){
+        _copy_data(other);
+    }
+
+    Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other){
+        if (&other == this) return *this;
+        delete _t_event;
+        delete _q_event;
+        _copy_data(other);
+        return *this;
     }
 
     bool determine(const Tt& t1, const Tt& t2, const std::vector<Tt>& args, std::function<Ty(const Tt&)> q, const Tt& tol){
@@ -172,15 +187,30 @@ public:
 
 private:
 
-    const std::string _name;
-    const std::vector<Tt> _when_t = {};
-    const event_f<Tt, Ty> _when;
-    const is_event_f<Tt, Ty> _check_if = nullptr;
-    const Func<Tt, Ty> _mask = nullptr;
+    std::string _name;
+    std::vector<Tt> _when_t;
+    event_f<Tt, Ty> _when;
+    is_event_f<Tt, Ty> _check_if = nullptr;
+    Func<Tt, Ty> _mask = nullptr;
     int _i = 0;
     Tt* _t_event = nullptr;
     Ty* _q_event = nullptr;
 
+    void _copy_data(const Event<Tt, Ty>& other){
+        _name = other._name;
+        _when_t = other._when_t;
+        _when = other._when;
+        _check_if = other._check_if;
+        _mask = other._mask;
+        _i = other._i;
+        _t_event = new Tt;
+        _q_event = new Ty;
+        if (other._t_event != nullptr){
+            *_t_event = *other._t_event;
+            *_q_event = *other._q_event;
+        }
+
+    }
 };
 
 
@@ -211,9 +241,9 @@ public:
 
 private:
 
-    const std::string _name;
-    const event_f<Tt, Ty> _when = nullptr;
-    const is_event_f<Tt, Ty> _check_if = nullptr;
+    std::string _name;
+    event_f<Tt, Ty> _when = nullptr;
+    is_event_f<Tt, Ty> _check_if = nullptr;
 
 };
 
