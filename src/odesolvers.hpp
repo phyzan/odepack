@@ -182,7 +182,7 @@ void OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
     //then setting a new goal successfully will resume the solver
     if ((_is_stiff || _diverges) && (!_is_dead || _is_running) ){
         //sanity check. 
-        throw std::runtime_error("Bug detected");
+        throw std::runtime_error("Bug detected: Solver half alive");
     }
 
     if (_is_dead){
@@ -231,7 +231,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
     if (h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
         success = false;
-        throw std::runtime_error("Bug detected");
+        throw std::runtime_error("Bug detected: Absolute stepsize < 0");
     }
 
     if (!All_isFinite(y_new)){
