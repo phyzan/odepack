@@ -109,3 +109,6 @@ class LowLevelODE:
 
     @property
     def is_dead(self)->float:...
+
+
+def integrate_all(ode_array, interval, max_frames=-1, max_events=-1, terminate=True):...
