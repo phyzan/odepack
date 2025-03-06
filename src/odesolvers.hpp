@@ -46,6 +46,14 @@ public:
     const bool& is_running() const {return _is_running;}
     const bool& is_dead() const {return _is_dead;}
     const std::string& message() {return _message;}
+    bool resume(){
+        if (_is_running) return true;
+        else if (_is_dead || _direction == 0) return false;
+        else{
+            _message = "Running";
+            _is_running = true;
+        }
+    }
 
     const bool at_event()const{
         return _current_event_index != -1;
@@ -117,7 +125,7 @@ private:
     bool _is_running = true;
     bool _is_dead = false;
     size_t _N=0;//total number of solution updates
-    std::string _message = "Alive"; //different from "running".
+    std::string _message; //different from "running".
     int _direction;
     std::vector<StopEvent<Tt, Ty>> _stop_events;
     std::vector<Event<Tt, Ty>> _events;
@@ -169,6 +177,8 @@ private:
 
 template<class Tt, class Ty>
 void OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
+    //if the solver was stopped (but not killed) earlier,
+    //then setting a new goal successfully will resume the solver
     if ((_is_stiff || _diverges) && (!_is_dead || _is_running) ){
         //sanity check. 
         throw std::runtime_error("Bug detected");
@@ -184,8 +194,8 @@ void OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
     }
     else{
         _tmax = t_max_new;
-        _is_running = true;
         _direction = ( t_max_new > _t) ? 1 : -1;
+        resume();
     }
 }
 
@@ -200,8 +210,8 @@ bool OdeSolver<Tt, Ty>::advance(){
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
-    Ty q_next = step(habs*direction);
-    return _go_to_state({_t+habs*direction, q_next, habs});
+    Ty q_next = step(habs*_direction);
+    return _go_to_state({_t+habs*_direction, q_next, habs});
 }
 
 
@@ -215,7 +225,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
     }
     else if (! _is_running){
         success = false;
-        throw std::runtime_error("Solver has finished integrating. Please set new t_max goal to continue integrating *before* advancing");
+        throw std::runtime_error("Solver has finished integrating. Please set new t_max goal or call resume() to continue integrating *before* advancing");
     }
 
     if (h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
@@ -244,7 +254,6 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _t = t_new;
         _q = y_new;
         _habs = h_next;
-        _message = "Alive";
         _N++;
     }
 

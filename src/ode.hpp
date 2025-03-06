@@ -174,6 +174,9 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
                 ++i;
             }
         }
+        if (display){
+            std::cout << std::endl << std::setprecision(3) << "\rProgress: " << (_solver->t() - t0)/(_solver->tmax()-t0) << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
+        }
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();
