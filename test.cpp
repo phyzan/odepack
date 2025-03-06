@@ -37,7 +37,7 @@ int main(){
     ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1});
     ODE<Tt, Tf> ode2 = ode;
 
-    ode.integrate(100).examine();
+    ode.integrate(100, -1, -1, true, true).examine();
     ode2.integrate(10).examine();
 
     ode.state().show();
