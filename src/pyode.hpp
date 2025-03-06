@@ -12,7 +12,7 @@ namespace py = pybind11;
 template<class Tt, class Ty>
 Func<Tt, Ty> to_Func(py::object f, const _Shape& shape);
 
-_Shape shape(const py::array& arr);
+_Shape shape(const py::array arr);
 
 _Shape getShape(const size_t& dim1, const _Shape& shape){
     std::vector<size_t> result;
@@ -252,10 +252,9 @@ Ty toCPP_Array(const py::array& A){
     return res;
 }
 
-std::vector<size_t> shape(const py::array& arr) {
+_Shape shape(const py::array arr) {
     const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
     size_t ndim = arr.ndim();  // Number of dimensions
-    throw std::runtime_error(" sdsddff");
     std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
     return res;
 }
