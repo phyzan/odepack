@@ -255,7 +255,7 @@ Ty toCPP_Array(const py::array& A){
 std::vector<size_t> shape(const py::array& arr) {
     const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
     size_t ndim = arr.ndim();  // Number of dimensions
-    throw std::runtime_error(std::to_string(ndim)+ " sdsddff");
+    throw std::runtime_error(" sdsddff");
     std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
     return res;
 }
