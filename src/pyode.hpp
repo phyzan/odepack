@@ -404,7 +404,7 @@ void define_ode_module(py::module& m) {
         .def("advance", &PyODE<Tt, Ty>::py_advance)
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return self.t().get();})
-        .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return self.q().get();})
+        .def_property_readonly("qqq", [](const PyODE<Tt, Ty>& self){return self.q().get();})
         .def("event_map", [](const PyODE<Tt, Ty>& self){return to_PyDict(self.ode.event_map());})
         .def_property_readonly("runtime", [](const PyODE<Tt, Ty>& self){return self.ode.runtime;})
         .def_property_readonly("is_stiff", [](const PyODE<Tt, Ty>& self){return self.ode.is_stiff();})
