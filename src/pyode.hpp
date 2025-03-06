@@ -12,7 +12,7 @@ namespace py = pybind11;
 template<class Tt, class Ty>
 Func<Tt, Ty> to_Func(py::object f, const _Shape& shape);
 
-_Shape shape(const py::array arr);
+_Shape shape(const py::array& arr);
 
 _Shape getShape(const size_t& dim1, const _Shape& shape){
     std::vector<size_t> result;
@@ -162,7 +162,7 @@ public:
 
     PyODE(py::object f, const Tt t0, const py::array q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::object stop_events) : ode(PyOdeArgs<Tt, Ty>{f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events}.to_ODE()), _shape(shape(q0)){}
 
-    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : ode(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events){}
+    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : ode(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events), _shape({q0.size()}){}
 
     PySolverState<Tt, Ty> py_state() const{
         SolverState<Tt, Ty> s = ode.state();
@@ -252,8 +252,7 @@ Ty toCPP_Array(const py::array& A){
     return res;
 }
 
-_Shape shape(const py::array arr) {
-    throw std::runtime_error("sdfgdfg");
+_Shape shape(const py::array& arr) {
     const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
     size_t ndim = arr.ndim();  // Number of dimensions
     std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
