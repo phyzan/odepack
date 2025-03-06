@@ -63,7 +63,6 @@ struct NpArray{
     NpArray(const std::vector<Ty>& array, const _Shape& shape){
         _array = flatten<Tt, Ty>(array);
         _shape = getShape(array.size(), shape);
-        throw std::runtime_error(std::to_string(array.size()) + " "+ std::to_string(shape.size()));
     }
 
     const py::array_t<Tt> get()const{
@@ -161,7 +160,9 @@ public:
 
     ODE<Tt, Ty> ode;
 
-    PyODE(py::object f, const Tt t0, const py::array q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::object stop_events) : ode(PyOdeArgs<Tt, Ty>{f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events}.to_ODE()), _shape(shape(q0)){}
+    PyODE(py::object f, const Tt t0, const py::array q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::object stop_events) : ode(PyOdeArgs<Tt, Ty>{f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events}.to_ODE()), _shape(shape(q0)){
+        throw std::runtime_error(std::to_string(_shape)+ " sdf");
+    }
 
     PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : ode(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events){}
 
