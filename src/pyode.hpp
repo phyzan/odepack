@@ -253,6 +253,7 @@ Ty toCPP_Array(const py::array& A){
 }
 
 _Shape shape(const py::array arr) {
+    throw std::runtime_error("sdfgdfg");
     const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
     size_t ndim = arr.ndim();  // Number of dimensions
     std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
