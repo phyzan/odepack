@@ -2,10 +2,9 @@ import numpy as np
 from typing import Callable
 import numpy as np
 
-# Type hint for a callable that takes a float, a numpy array, and any number of arguments, and returns a float
-Func = Callable[[float, np.ndarray], np.ndarray]
-ObjFunc = Callable[[float, np.ndarray], float]
-BoolFunc = Callable[[float, np.ndarray], bool]
+Func = Callable[[float, np.ndarray], np.ndarray] #f(t, q, *args) -> q
+ObjFunc = Callable[[float, np.ndarray], float] #  f(t, q, *args) -> float
+BoolFunc = Callable[[float, np.ndarray], bool] #  f(t, q, *args) -> bool
 
 
 class Event:
