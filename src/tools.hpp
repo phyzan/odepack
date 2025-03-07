@@ -152,7 +152,7 @@ public:
                 }
             }
         }
-        else if ( (t1 <= _when_t[_i]) && (_when_t[_i] <= t2)){
+        else if ((_i < static_cast<int>(_when_t.size())) && (t1 <= _when_t[_i]) && (_when_t[_i] <= t2)){
             _t_event = new Tt;
             _q_event = new Ty;
             *_t_event = _when_t[_i++];

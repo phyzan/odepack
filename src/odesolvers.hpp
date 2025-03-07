@@ -308,34 +308,6 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
         return false;
     }
     else if (_N > 0){
-    //     _current_event_index = -1;
-    //     bool success;
-
-    //     for (const StopEvent<Tt, Ty>& _stop_ev : _stop_events){
-    //         if (_stop_ev.is_between(this->_t, this->_q, next.t, next.q, this->_args)){
-    //             success = _update(next.t, next.q, next.h_next);
-    //             stop(_stop_ev.name());
-    //             return success;
-    //         }
-    //     }
-
-    //     for (int i=0; i<static_cast<int>(_events.size()); i++){
-    //         if (_adapt_to_event(next, _events[i])){
-    //             if (_current_event_index != -1){
-    //                 _events[_current_event_index].go_back();
-    //             }
-    //             _current_event_index = i;
-    //         }
-    //     }
-
-    //     if (_current_event_index != -1){
-    //         Event<Tt, Ty>& ev = _events[_current_event_index];
-    //         return _update(ev.t_event(), ev.q_event(), next.h_next);
-    //     }
-    // }
-    // return _update(next.t, next.q, next.h_next);
-
-
         _current_event_index = -1;
         bool success;
 

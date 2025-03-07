@@ -41,6 +41,10 @@ int main(){
     ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1, event2, event3});
     ODE<Tt, Tf> ode2 = ode;
 
+
+    // ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-5, 1e-10, 0., {}, "RK23", 1e-10, {event1, event2, event3});
+
+    // ode.integrate(t_max, 100).examine();
     // OdeSolver<Tt, Tf>* s = ode.solver();
     // s->free();
     // std::cout << s->f()(1, {1, 1, 2.3, 4.5}, {});
@@ -60,7 +64,7 @@ int main(){
     // }
 
     // ode.integrate(10).examine();
-    ode.integrate(8.56);
+    // ode.integrate(8.56);
     // ode.integrate(8.56);
     // ode.state().show();
     ode.state().show();
