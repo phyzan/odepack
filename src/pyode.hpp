@@ -278,6 +278,9 @@ py::array_t<Scalar> to_numpy(const ArrayType& array, const _Shape& _shape){
 template<class Tt, class Ty>
 std::vector<Tt> flatten(const std::vector<Ty>& f){
     size_t nt = f.size();
+    if (nt == 0){
+        return {};
+    }
     size_t nd = f[0].size();
     std::vector<Tt> res(nt*nd);
 
@@ -286,6 +289,7 @@ std::vector<Tt> flatten(const std::vector<Ty>& f){
             res[i*nd + j] = f[i][j];
         }
     }
+    std::cout << "exiting\n";
     return res;
 }
 
