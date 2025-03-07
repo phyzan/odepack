@@ -209,13 +209,14 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
 template<class Tt, class Ty>
 bool ODE<Tt, Ty>::advance(){
-    bool success = _solver->advance();
-    if (success && _solver->at_event()){
-        _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
+    if (_solver->advance()){
+        if (_solver->at_event()){
+            _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
+        }
         _register_state();
+        return true;
     }
-    
-    return success;
+    return false;
 }
 
 
