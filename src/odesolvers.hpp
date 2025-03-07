@@ -63,7 +63,7 @@ public:
     }
 
     bool free(){
-        return _solver->set_goal(std::numeric_limits<Tt>::infinity());
+        return set_goal(std::numeric_limits<Tt>::infinity());
     }
 
     const bool at_event()const{
@@ -294,9 +294,11 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
 
     if (_is_dead){
         _warn_dead();
+        return false;
     }
     else if (!_is_running){
         _warn_paused();
+        return false;
     }
     else if (_N > 0){
         _current_event_index = -1;
