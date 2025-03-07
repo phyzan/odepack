@@ -51,9 +51,6 @@ public:
         if (_is_dead){
             _warn_dead();
         }
-        else if (!_is_running) {
-            _warn_paused();
-        }
         else{
             _message = "Running";
             _is_running = true;

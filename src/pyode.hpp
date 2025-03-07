@@ -169,11 +169,6 @@ public:
         return PySolverState<Tt, Ty>(s.t, s.q, s.habs, s.event, s.diverges, s.is_stiff, s.is_running, s.is_dead, s.N, s.message, _shape); 
     }
 
-    PySolverState<Tt, Ty> py_advance(){
-        ode.advance();
-        return py_state();
-    }
-
     PyOdeResult<Tt, Ty> py_integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const bool& display){
         OdeResult<Tt, Ty> res = ode.integrate(interval, max_frames, max_events, terminate, display);
         PyOdeResult<Tt, Ty> pyres(res, _shape);
@@ -402,9 +397,9 @@ void define_ode_module(py::module& m) {
             py::arg("terminate")=true,
             py::arg("display")=false)
         .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);})
-        .def("advance", &PyODE<Tt, Ty>::py_advance)
-        .def("resume", &PyODE<Tt, Ty>::py_advance)
-        .def("free", &PyODE<Tt, Ty>::py_advance)
+        .def("advance", [](const PyODE<Tt, Ty>& self){return self.ode.advance();})
+        .def("resume", [](const PyODE<Tt, Ty>& self){return self.ode.resume();})
+        .def("free", [](const PyODE<Tt, Ty>& self){return self.ode.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return self.t().get();})
         .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return self.q().get();})
