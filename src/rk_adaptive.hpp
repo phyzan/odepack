@@ -87,9 +87,11 @@ protected:
 
     RungeKutta(const SolverArgs<Tt, Ty>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
 
+    RungeKutta(const RungeKutta<Tt, Ty>& other) : OdsBase(other){}
+
     RungeKutta<Tt, Ty, Nstages, Norder> operator=(const RungeKutta<Tt, Ty, Nstages, Norder>& other){
         if (&other == this) return *this;
-        OdeSolver<Tt, Ty>::operator=(other);
+        OdsBase::operator=(other);
         return *this;
     }
 
@@ -155,6 +157,8 @@ class RK45 : public RungeKutta<Tt, Ty, 6, 5>{
 public:
 
     RK45(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+
+    RK45(const RK45<Tt, Ty>& other) : RKbase(other) {}
 
     RK45<Tt, Ty>& operator=(const RK45<Tt, Ty>& other){
         RungeKutta<Tt, Ty, Nstages, Norder>::operator=(other);
@@ -225,8 +229,10 @@ class RK23 : public RungeKutta<Tt, Ty, 3, 3> {
 public:
     RK23(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
+    RK23(const RK23<Tt, Ty>& other) : RKbase(other) {}
+
     RK23<Tt, Ty>& operator=(const RK23<Tt, Ty>& other){
-        RungeKutta<Tt, Ty, Nstages, Norder>::operator=(other);
+        RKbase::operator=(other);
     }
 
     RK23<Tt, Ty>* clone() const override{
