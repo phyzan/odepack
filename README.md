@@ -15,15 +15,23 @@ Optimized compile commands
 (A) Compiling python extension (for python 3.12):
 ------------------------------------------
 
-(A1) g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
+(A1)
+------------------------------------------
+g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
 
-(A2) g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -fno-math-errno -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
+(A2)
+------------------------------------------
+g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -fno-math-errno -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
 -------------------------------------------
 
 
 (B) Compiling c++ program
 ------------------------------------------
 
-(B1) g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fPIC <name>.cpp -o <name> -lmpfr -lgmp
+(B1)
+------------------------------------------
+g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fPIC <name>.cpp -o <name> -lmpfr -lgmp
 
-(B2) g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fno-math-errno -fPIC <name>.cpp -o <name> -lmpfr -lgmp
+(B2)
+------------------------------------------
+g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fno-math-errno -fPIC <name>.cpp -o <name> -lmpfr -lgmp
