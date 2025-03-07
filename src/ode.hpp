@@ -177,7 +177,6 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
                 }
                 ++i;
                 _register_state();
-                std::cout << std::endl << _t_arr[_Nevents[0][_Nevents[0].size()-1]] << " df " << std::endl;
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
