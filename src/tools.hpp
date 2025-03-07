@@ -11,7 +11,7 @@
 
 // USEFUL ALIASES
 
-template<class Tt, int N>
+template<class Tt, int N=-1>
 using vec = Eigen::Array<Tt, 1, N>;
 
 template<class Tt, class Ty>
