@@ -87,7 +87,7 @@ protected:
 
     RungeKutta(const SolverArgs<Tt, Ty>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
 
-    RungeKutta(const RungeKutta<Tt, Ty>& other) : OdsBase(other){}
+    RungeKutta(const RungeKutta<Tt, Ty, Nstages, Norder>& other) : OdsBase(other){}
 
     RungeKutta<Tt, Ty, Nstages, Norder> operator=(const RungeKutta<Tt, Ty, Nstages, Norder>& other){
         if (&other == this) return *this;
