@@ -197,6 +197,8 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
         std::cout << std::endl;
     }
 
+    std::cout << std::endl << _Nevents[0][0] << " df " << _Nevents[0][1] << std::endl;
+
     auto t2 = std::chrono::high_resolution_clock::now();
     
     std::chrono::duration<double> rt = t2-t1;
