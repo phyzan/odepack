@@ -172,12 +172,12 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
             if ((event_counter != max_events) && _solver->at_event()){
                 _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
-                std::cout << std::endl << _solver->t() << " df " << std::endl;
                 if ( (++event_counter == max_events) && terminate){
                     _solver->stop("Max events reached");
                 }
                 ++i;
                 _register_state();
+                std::cout << std::endl << _t_arr[_Nevents[0][_Nevents[0].size()-1]] << " df " << std::endl;
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
