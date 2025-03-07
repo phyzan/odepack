@@ -70,6 +70,10 @@ public:
         return _solver->free();
     }
 
+    bool free(){
+        return _solver->resume();
+    }
+
     bool advance();
 
     std::map<std::string, std::vector<size_t>> event_map(const size_t& start_point=0) const{

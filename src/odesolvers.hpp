@@ -51,6 +51,9 @@ public:
         if (_is_dead){
             _warn_dead();
         }
+        else if (_direction == 0){
+            _warn_travolta();
+        }
         else{
             _message = "Running";
             _is_running = true;
@@ -153,6 +156,10 @@ private:
 
     void _warn_paused(){
         std::cout << std::endl << "Solver has paused integrating. Please resume the integrator by any means to continue advancing *before* doing so.\n";
+    }
+
+    void _warn_travolta(){
+        std::cout << std::endl << "Solver has not been specified an integration direction, possibly because the Tmax goal was reached. Please set a new Tmax goal first or free() the solver.\n";
     }
 
     void _copy_data(const OdeSolver<Tt, Ty>& other){
