@@ -226,7 +226,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
     }
     else if (! _is_running){
         success = false;
-        throw std::runtime_error("Solver has finished integrating. Please set new t_max goal or call resume() to continue integrating *before* advancing");
+        throw std::runtime_error("Solver has paused integrating. Please set new t_max goal or call resume() to continue integrating *before* advancing");
     }
 
     if (h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
@@ -284,7 +284,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
-
+    std::cout << std::endl << _is_running << " asdsdf\n";
     if (_N > 0){
         _current_event_index = -1;
         bool success;
