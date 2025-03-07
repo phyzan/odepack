@@ -3,10 +3,27 @@ Single-command installation to usr/include folder:
 git clone https://github.com/phyzan/odepack && cd odepack && chmod +x install.sh && sudo ./install.sh && cd ..
 
 
-compile python extension (replace 3.12 with your python version):
-
-g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) pyode.cpp -o odepack$(python3-config --extension-suffix)
-
-for mpfr:
-
+For mpfr and Eigen support:
+------------------------
 sudo apt install libmpfrc++-dev
+sudo apt install libeigen3-dev
+
+
+Optimized compile commands
+================================
+
+(A) Compiling python extension (for python 3.12):
+------------------------------------------
+
+(A1) g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
+
+(A2) g++ -O3 -Wall -march=native -shared -std=c++20 -fopenmp -fno-math-errno -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) <name>.cpp -o <name>$(python3-config --extension-suffix) -lmpfr -lgmp
+-------------------------------------------
+
+
+(B) Compiling c++ program
+------------------------------------------
+
+(B1) g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fPIC <name>.cpp -o <name> -lmpfr -lgmp
+
+(B2) g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fno-math-errno -fPIC <name>.cpp -o <name> -lmpfr -lgmp
