@@ -136,7 +136,7 @@ private:
 
     Tt _error_norm(const StageContainer& K, const Tt& h, const Ty& scale) const{
         Ty f = _error(K, h) / scale;
-        return std::sqrt(norm(f) / f.size());
+        return sqrt(norm(f) / f.size());
     }
 
 };

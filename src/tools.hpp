@@ -6,6 +6,7 @@
 #include <map>
 #include <iomanip>
 #include <eigen3/Eigen/Dense>
+#include <eigen3/unsupported/Eigen/MPRealSupport>
 
 
 // USEFUL ALIASES

@@ -187,6 +187,9 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
         }
     }
+    if (display){
+        std::cout << std::endl;
+    }
 
     auto t2 = std::chrono::high_resolution_clock::now();
     

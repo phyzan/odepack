@@ -87,6 +87,7 @@
         "qr": "cpp",
         "svd": "cpp",
         "condition_variable": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "mprealsupport": "cpp"
     }
 }
