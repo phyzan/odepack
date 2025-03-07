@@ -66,7 +66,11 @@ public:
 
     const SolverState<Tt, Ty> state() const {return _solver->state();}
 
-    SolverState<Tt, Ty> advance();
+    bool free(){
+        return _solver->free();
+    }
+
+    bool advance();
 
     std::map<std::string, std::vector<size_t>> event_map(const size_t& start_point=0) const{
         std::map<std::string, std::vector<size_t>> res;
@@ -202,18 +206,14 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 }
 
 template<class Tt, class Ty>
-SolverState<Tt, Ty> ODE<Tt, Ty>::advance(){
-    if (!_solver->is_running()){
-        _solver->set_goal(std::numeric_limits<Tt>::infinity());
-    }
-    if (_solver->advance()){
-        if (_solver->at_event()){
-            _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
-        }
+bool ODE<Tt, Ty>::advance(){
+    bool success = _solver->advance();
+    if (success && _solver->at_event()){
+        _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
         _register_state();
     }
     
-    return _solver->state();
+    return success;
 }
 
 

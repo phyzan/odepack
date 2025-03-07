@@ -26,7 +26,7 @@ public:
     void kill(const std::string& text = "") {_is_running = false; _is_dead = true; _message = (text == "") ? "Killed by user" : text;}
     bool advance_by(const Tt& h);
     bool advance();
-    void set_goal(const Tt& t_max);
+    bool set_goal(const Tt& t_max);
 
     //ACCESSORS
     const Tt& t() const { return _t; }
@@ -46,14 +46,24 @@ public:
     const bool& is_running() const {return _is_running;}
     const bool& is_dead() const {return _is_dead;}
     const std::string& message() {return _message;}
+
     bool resume(){
-        if (_is_running) return true;
-        else if (_is_dead || _direction == 0) return false;
+        if (_is_dead){
+            _warn_dead();
+        }
+        else if (!_is_running) {
+            _warn_paused();
+        }
         else{
             _message = "Running";
             _is_running = true;
             return true;
         }
+        return false;
+    }
+
+    bool free(){
+        return _solver->set_goal(std::numeric_limits<Tt>::infinity());
     }
 
     const bool at_event()const{
@@ -141,7 +151,11 @@ private:
     bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
 
     void _warn_dead(){
-        throw std::runtime_error("Solver has permanently stop integrating. If this is not due to calling .kill(), call state() to see the cause.");
+        std::cout << std::endl << "Solver has permanently stop integrating. If this is not due to calling .kill(), call state() to see the cause.\n";
+    }
+
+    void _warn_paused(){
+        std::cout << std::endl << "Solver has paused integrating. Please resume the integrator by any means to continue advancing *before* doing so.\n";
     }
 
     void _copy_data(const OdeSolver<Tt, Ty>& other){
@@ -177,7 +191,7 @@ private:
 */
 
 template<class Tt, class Ty>
-void OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
+bool OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
     //if the solver was stopped (but not killed) earlier,
     //then setting a new goal successfully will resume the solver
     if ((_is_stiff || _diverges) && (!_is_dead || _is_running) ){
@@ -187,16 +201,18 @@ void OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
 
     if (_is_dead){
         _warn_dead();
+        return false;
     }
     else if (t_max_new == _t){
         _direction = 0;
         _tmax = t_max_new;
         stop("Waiting for new Tmax");
+        return true;
     }
     else{
         _tmax = t_max_new;
         _direction = ( t_max_new > _t) ? 1 : -1;
-        resume();
+        return resume();
     }
 }
 
@@ -220,15 +236,6 @@ template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_next){
     
     bool success = true;
-    if (_is_dead){
-        success = false;
-        _warn_dead();
-    }
-    else if (! _is_running){
-        success = false;
-        throw std::runtime_error("Solver has paused integrating. Please set new t_max goal or call resume() to continue integrating *before* advancing");
-    }
-
     if (h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
         success = false;
         throw std::runtime_error("Bug detected: Absolute stepsize < 0");
@@ -284,7 +291,14 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
-    if (_N > 0){
+
+    if (_is_dead){
+        _warn_dead();
+    }
+    else if (!_is_running){
+        _warn_paused();
+    }
+    else if (_N > 0){
         _current_event_index = -1;
         bool success;
         int k = 0;

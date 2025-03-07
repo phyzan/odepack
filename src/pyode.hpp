@@ -403,6 +403,8 @@ void define_ode_module(py::module& m) {
             py::arg("display")=false)
         .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);})
         .def("advance", &PyODE<Tt, Ty>::py_advance)
+        .def("resume", &PyODE<Tt, Ty>::py_advance)
+        .def("free", &PyODE<Tt, Ty>::py_advance)
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return self.t().get();})
         .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return self.q().get();})
