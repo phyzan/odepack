@@ -32,14 +32,36 @@ int main(){
     Tf q0 = {1, 1, 2.3, 4.5};
     
     Event<Tt, Tf> event1("Event1", fevent, nullptr, mask);
-    StopEvent<Tt, Tf> event2("Event2", fevent);
+    Event<Tt, Tf> event2("Event2", {1-1e-13, 2-1e-10, 3-1e-10}, nullptr, mask);
+    Event<Tt, Tf> event3("Event3", {1, 2, 3}, nullptr, mask);
 
-    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1});
+
+    // StopEvent<Tt, Tf> event2("stopevent", fevent);
+
+    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1, event2, event3});
     ODE<Tt, Tf> ode2 = ode;
 
-    ode.integrate(100, -1, -1, true, true).examine();
-    ode2.integrate(10).examine();
+    // OdeSolver<Tt, Tf>* s = ode.solver();
+    // s->free();
+    // std::cout << s->f()(1, {1, 1, 2.3, 4.5}, {});
+    // // ode2.free();
+    // while (true){
+    //     s->state().show();
+    //     s->advance();
+    //     std::cin.get();
+    // }
+    // ode.integrate(10).examine();
+    // ode.state().show();
+    // ode.free();
+    // while (true){
+    //     ode2.state().show();
+    //     ode2.advance();
+    //     std::cin.get();
+    // }
 
+    // ode.integrate(10).examine();
+    ode.integrate(8.56);
+    // ode.integrate(8.56);
+    // ode.state().show();
     ode.state().show();
-    ode2.state().show();
 }

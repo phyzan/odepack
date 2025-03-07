@@ -110,13 +110,15 @@ protected:
         set_goal(S.tmax);
     }
 
+    OdeSolver(const OdeSolver<Tt, Ty>& other){
+        _copy_data(other);
+    };
+
+
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
         _copy_data(other);
     }
 
-    OdeSolver(const OdeSolver<Tt, Ty>& other){
-        _copy_data(other);
-    };
 
 
 private:
@@ -164,6 +166,7 @@ private:
 
     void _copy_data(const OdeSolver<Tt, Ty>& other){
         //arguments below are passed into the SolverState when commanded
+        _t = other._t;
         _q = other._q;
         _habs = other._habs;
         _tmax = other._tmax;
@@ -250,7 +253,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _diverges = true;
         success = false;
     }
-    else if (h_next <= _h_min){
+    else if ( (h_next <= _h_min) & (_current_event_index == -1)){
         kill("Ode very stiff");
         _is_stiff = true;
         success = false;
@@ -305,9 +308,36 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
         return false;
     }
     else if (_N > 0){
+    //     _current_event_index = -1;
+    //     bool success;
+
+    //     for (const StopEvent<Tt, Ty>& _stop_ev : _stop_events){
+    //         if (_stop_ev.is_between(this->_t, this->_q, next.t, next.q, this->_args)){
+    //             success = _update(next.t, next.q, next.h_next);
+    //             stop(_stop_ev.name());
+    //             return success;
+    //         }
+    //     }
+
+    //     for (int i=0; i<static_cast<int>(_events.size()); i++){
+    //         if (_adapt_to_event(next, _events[i])){
+    //             if (_current_event_index != -1){
+    //                 _events[_current_event_index].go_back();
+    //             }
+    //             _current_event_index = i;
+    //         }
+    //     }
+
+    //     if (_current_event_index != -1){
+    //         Event<Tt, Ty>& ev = _events[_current_event_index];
+    //         return _update(ev.t_event(), ev.q_event(), next.h_next);
+    //     }
+    // }
+    // return _update(next.t, next.q, next.h_next);
+
+
         _current_event_index = -1;
         bool success;
-        int k = 0;
 
         for (const StopEvent<Tt, Ty>& _stop_ev : _stop_events){
             if (_stop_ev.is_between(this->_t, this->_q, next.t, next.q, this->_args)){
@@ -317,13 +347,24 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
             }
         }
 
-        for (Event<Tt, Ty>& ev : _events){
-            if (_adapt_to_event(next, ev)){
-                success = _update(ev.t_event(), ev.q_event(), next.h_next);
-                _current_event_index = k;
-                return success;
+        Tt _habs_temp = next.h_next;
+
+        for (int i=0; i<static_cast<int>(_events.size()); i++){
+            if (_adapt_to_event(next, _events[i])){
+                if (_current_event_index != -1){
+                    _events[_current_event_index].go_back();
+                }
+                _current_event_index = i;
             }
-            k++;
+        }
+
+        if (_current_event_index != -1){
+            Event<Tt, Ty>& ev = _events[_current_event_index];
+            success = _update(ev.t_event(), ev.q_event(), next.h_next);
+            if (next.h_next <= _h_min){
+                _habs = _habs_temp; //this needs to happen after the update in case of event.
+            }
+            return success;
         }
     }
     return _update(next.t, next.q, next.h_next);

@@ -109,6 +109,10 @@ public:
     const std::vector<Ty>& q()const{return _q_arr;}
     const double& runtime() const{return _runtime;}
 
+    OdeSolver<Tt, Ty>* solver() const{
+        return _solver->clone();
+    }
+
 private:
 
     OdeSolver<Tt, Ty>* _solver;

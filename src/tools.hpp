@@ -131,17 +131,13 @@ public:
 
     Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other){
         if (&other == this) return *this;
-        delete _t_event;
-        delete _q_event;
+        _clear();
         _copy_data(other);
         return *this;
     }
 
     bool determine(const Tt& t1, const Tt& t2, const std::vector<Tt>& args, std::function<Ty(const Tt&)> q, const Tt& tol){
-        delete _t_event;
-        delete _q_event;
-        _t_event = nullptr;
-        _q_event = nullptr;
+        _clear();
         if (_when != nullptr){
             std::function<Tt(Tt)> obj_fun = [this, q, args](const Tt& t) ->Tt {
                 return _when(t, q(t), args);
@@ -149,9 +145,7 @@ public:
 
             if (_check_if == nullptr || (_check_if(t1, q(t1), args) && _check_if(t2, q(t2), args))){
                 if (_when(t1, q(t1), args) * _when(t2, q(t2), args) <= 0){
-
-                    _t_event = new Tt;
-                    _q_event = new Ty;
+                    _realloc();
                     *_t_event = bisect(obj_fun, t1, t2, tol)[2];
                     *_q_event = (_mask == nullptr) ? q(*_t_event) : _mask(*_t_event, q(*_t_event), args);
                     return true;
@@ -168,6 +162,13 @@ public:
         return false;
     }
 
+    void go_back(){
+        _clear();
+        if (_when == nullptr && _i > 0){
+            _i--;
+        }
+    }
+
     const Tt& t_event(){
         return *_t_event;
     }
@@ -181,8 +182,7 @@ public:
     }
 
     ~Event(){
-        delete _t_event;
-        delete _q_event;
+        _clear();
     }
 
 
@@ -204,13 +204,23 @@ private:
         _check_if = other._check_if;
         _mask = other._mask;
         _i = other._i;
-        _t_event = new Tt;
-        _q_event = new Ty;
+        _realloc();
         if (other._t_event != nullptr){
             *_t_event = *other._t_event;
             *_q_event = *other._q_event;
         }
+    }
 
+    void _clear(){
+        delete _t_event;
+        delete _q_event;
+        _t_event = nullptr;
+        _q_event = nullptr;
+    }
+
+    void _realloc(){
+        _t_event = new Tt;
+        _q_event = new Ty;
     }
 };
 
