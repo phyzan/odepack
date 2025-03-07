@@ -397,9 +397,9 @@ void define_ode_module(py::module& m) {
             py::arg("terminate")=true,
             py::arg("display")=false)
         .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);})
-        .def("advance", [](const PyODE<Tt, Ty>& self){return self.ode.advance();})
-        .def("resume", [](const PyODE<Tt, Ty>& self){return self.ode.resume();})
-        .def("free", [](const PyODE<Tt, Ty>& self){return self.ode.free();})
+        .def("advance", [](PyODE<Tt, Ty>& self){return self.ode.advance();})
+        .def("resume", [](PyODE<Tt, Ty>& self){return self.ode.resume();})
+        .def("free", [](PyODE<Tt, Ty>& self){return self.ode.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return self.t().get();})
         .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return self.q().get();})
