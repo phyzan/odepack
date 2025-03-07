@@ -70,7 +70,7 @@ public:
         return _solver->free();
     }
 
-    bool free(){
+    bool resume(){
         return _solver->resume();
     }
 
