@@ -3,7 +3,7 @@
 #include <iostream>
 
 PYBIND11_MODULE(odepack, m) {
-    define_ode_module<double, Eigen::Array<double, 1, -1>>(m);
+    define_ode_module<double, Eigen::Array<double, 1, 4>>(m);
 }
 
 

@@ -289,7 +289,6 @@ std::vector<Tt> flatten(const std::vector<Ty>& f){
             res[i*nd + j] = f[i][j];
         }
     }
-    std::cout << "exiting\n";
     return res;
 }
 
