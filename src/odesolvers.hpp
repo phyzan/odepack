@@ -284,7 +284,6 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
-    std::cout << std::endl << _is_running << " asdsdf\n";
     if (_N > 0){
         _current_event_index = -1;
         bool success;

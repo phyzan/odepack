@@ -213,7 +213,6 @@ SolverState<Tt, Ty> ODE<Tt, Ty>::advance(){
         _register_state();
     }
     
-    _solver->set_goal(_solver->t());
     return _solver->state();
 }
 
