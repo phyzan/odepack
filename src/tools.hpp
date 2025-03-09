@@ -23,6 +23,9 @@ using event_f = std::function<Tt(const Tt&, const Ty&, const std::vector<Tt>&)>;
 template<class Tt, class Ty>
 using is_event_f = std::function<bool(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
+template<class Tt>
+using _ObjFun = std::function<Tt(const Tt&)>;
+
 using _Shape = std::vector<size_t>;
 
 
@@ -117,11 +120,7 @@ class Event{
     //having a default value, or one determined from a previous .determine() call.
 
 public:
-    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr) : _name(name), _when(when), _check_if(check_if), _mask(mask) {
-        _assert_valid_name(name);
-    }
-
-    Event(const std::string& name, std::vector<Tt> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr) : _name(name), _when_t(when), _check_if(check_if), _mask(mask){
+    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, const Tt& period=0, const Tt& start=0, Func<Tt, Ty> mask=nullptr) : _name(name), _when(when), _check_if(check_if), _period(period), _start(start), _mask(mask), _t_period(start), _t_period_previous(start){
         _assert_valid_name(name);
     }
 
@@ -138,34 +137,36 @@ public:
 
     bool determine(const Tt& t1, const Tt& t2, const std::vector<Tt>& args, std::function<Ty(const Tt&)> q, const Tt& tol){
         _clear();
+        Tt t_determined = t2;
+        bool determined = false;
         if (_when != nullptr){
-            std::function<Tt(Tt)> obj_fun = [this, q, args](const Tt& t) ->Tt {
+            _ObjFun<Tt> obj_fun = [this, q, args](const Tt& t) ->Tt {
                 return _when(t, q(t), args);
             };
 
             if (_check_if == nullptr || (_check_if(t1, q(t1), args) && _check_if(t2, q(t2), args))){
                 if (_when(t1, q(t1), args) * _when(t2, q(t2), args) <= 0){
-                    _realloc();
-                    *_t_event = bisect(obj_fun, t1, t2, tol)[2];
-                    *_q_event = (_mask == nullptr) ? q(*_t_event) : _mask(*_t_event, q(*_t_event), args);
-                    return true;
+                    t_determined = bisect(obj_fun, t1, t2, tol)[2];
+                    determined = true;
                 }
             }
         }
-        else if ((_i < static_cast<int>(_when_t.size())) && (t1 <= _when_t[_i]) && (_when_t[_i] <= t2)){
-            _t_event = new Tt;
-            _q_event = new Ty;
-            *_t_event = _when_t[_i++];
-            *_q_event = (_mask == nullptr) ? q(*_t_event) : _mask(*_t_event, q(*_t_event), args);
+
+
+        if (_determine_periodic_event_between(t1, t_determined) || determined){
+            _realloc();
+            _set(t_determined, q(t_determined), args);
             return true;
         }
-        return false;
+        else{
+            return false;
+        }
     }
 
     void go_back(){
         _clear();
-        if (_when == nullptr && _i > 0){
-            _i--;
+        if (_period > 0){
+            _t_period = _t_period_previous;
         }
     }
 
@@ -189,23 +190,28 @@ public:
 private:
 
     std::string _name;
-    std::vector<Tt> _when_t;
     event_f<Tt, Ty> _when;
     is_event_f<Tt, Ty> _check_if = nullptr;
+    Tt _period;
+    Tt _start;
     Func<Tt, Ty> _mask = nullptr;
-    int _i = 0;
+    Tt _t_period;
+    Tt _t_period_previous;
     Tt* _t_event = nullptr;
     Ty* _q_event = nullptr;
 
     void _copy_data(const Event<Tt, Ty>& other){
         _name = other._name;
-        _when_t = other._when_t;
         _when = other._when;
         _check_if = other._check_if;
+        _period = other._period;
+        _start = other._start;
         _mask = other._mask;
-        _i = other._i;
-        _realloc();
+        _t_period = other._t_period;
+        _t_period_previous = other._t_period_previous;
+        _clear();
         if (other._t_event != nullptr){
+            _realloc();
             *_t_event = *other._t_event;
             *_q_event = *other._q_event;
         }
@@ -221,6 +227,30 @@ private:
     void _realloc(){
         _t_event = new Tt;
         _q_event = new Ty;
+    }
+
+    bool _determine_periodic_event_between(const Tt& t1, Tt& t2) {
+        //if between t1 and t2, return it, else return t2 ((*_t_event)*dir > dir*_t_period+_period)
+        if (_period <= 0){
+            return false;
+        }
+
+        const int direction = (t2 > t1) ? 1 : -1;
+        const Tt next = _t_period + direction*_period;
+        if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
+            _t_period_previous = _t_period;
+            _t_period = next;
+            t2 = next;
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    void _set(const Tt& t, const Ty& q, const std::vector<Tt>& args){
+        *_t_event = t;
+        *_q_event = (_mask == nullptr) ? q : _mask(*_t_event, q, args);
     }
 };
 

@@ -24,7 +24,8 @@ public:
     //MODIFIERS
     void stop(const std::string& text = "") {_is_running = false; _message = (text == "") ? "Stopped by user" : text;}
     void kill(const std::string& text = "") {_is_running = false; _is_dead = true; _message = (text == "") ? "Killed by user" : text;}
-    bool advance_by(const Tt& h);
+    bool advance_by(const Tt& habs);
+    bool advance_by_any(const Tt& h);
     bool advance();
     bool set_goal(const Tt& t_max);
 
@@ -234,10 +235,22 @@ bool OdeSolver<Tt, Ty>::advance(){
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
-    Ty q_next = step(habs*_direction);
-    return _go_to_state({_t+habs*_direction, q_next, habs});
+    if (habs <= 0){
+        std::cout << std::endl << "Please provide a positive stepsize in .advance_by(habs)\n";
+        return false;
+    }
+    Ty q_next = step(_t, _q, habs*_direction);
+    State<Tt, Ty> next = {_t+habs*_direction, q_next, habs};
+    return _go_to_state(next);
 }
 
+template<class Tt, class Ty>
+bool OdeSolver<Tt, Ty>::advance_by_any(const Tt& h){
+    set_goal(_t+h);
+    Ty q_next = step(_t, _q, h);
+    State<Tt, Ty> next = {_t+h, q_next, h*_direction};
+    return _go_to_state(next);
+}
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_next){
@@ -307,7 +320,7 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
         _warn_paused();
         return false;
     }
-    else if (_N > 0){
+    else {
         _current_event_index = -1;
         bool success;
 
