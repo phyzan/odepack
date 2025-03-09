@@ -374,8 +374,10 @@ void define_ode_module(py::module& m) {
 
     m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate){
         std::vector<ODE<Tt, Ty>*> array;
+        PyODE<Tt, Ty>* ode_ptr = nullptr;
         for (const py::handle& item : list){
-            array.push_back(&(item.cast<PyODE<Tt, Ty>&>()));
+            ode_ptr = &(item.cast<PyODE<Tt, Ty>&>());
+            array.push_back(ode_ptr);
         }
         integrate_all(array, interval, max_frames, max_events, terminate);
     }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=-1, py::arg("terminate")=true);
