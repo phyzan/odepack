@@ -28,6 +28,11 @@ using _ObjFun = std::function<Tt(const Tt&)>;
 
 using _Shape = std::vector<size_t>;
 
+template<class T>
+using complex = std::complex<T>;
+
+using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
+
 
 template<class T, int Nr, int Nc>
 T norm(const Eigen::Array<T, Nr, Nc>& f){
