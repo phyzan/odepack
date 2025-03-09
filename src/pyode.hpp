@@ -364,7 +364,7 @@ void define_ode_module(py::module& m) {
         .def("free", [](PyODE<Tt, Ty>& self){return self.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(self.t());})
-        .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(flatten<Tt, Ty>(self.q()), self.q0_shape);})
+        .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(flatten<Tt, Ty>(self.q()), getShape(self.t().size(), self.q0_shape));})
         .def_property_readonly("event_map", [](const PyODE<Tt, Ty>& self){return to_PyDict(self.event_map());})
         .def_property_readonly("runtime", &PyODE<Tt, Ty>::runtime)
         .def_property_readonly("is_stiff", &PyODE<Tt, Ty>::is_stiff)
