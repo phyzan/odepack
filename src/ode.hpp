@@ -142,6 +142,11 @@ void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, co
 
     #pragma omp parallel for schedule(dynamic)
     for (ODE<Tt, Ty>* ode : list){
+        while (true){
+            ode->state().show();
+            std::cin.get();
+            ode->advance();
+        }
         ode->integrate(interval, max_frames, max_events, terminate);
     }
 }
