@@ -131,6 +131,7 @@ protected:
 
 
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
+        std::cout << "GKGKGKGKGKG\n";
         _copy_data(other);
     }
 
@@ -301,9 +302,8 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _habs = h_next;
         _N++;
     }
-    std::cout << _autosave << "\n";
+
     if (success && _autosave){
-        std::cout << "YEEEEAH\n";
         write_chechpoint(_file, _t, _q, _current_event_index);
     }
 
