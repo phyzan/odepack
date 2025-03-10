@@ -122,7 +122,6 @@ public:
 
     PyODE(const PyODE<Tt, Ty>& other) : ODE<Tt, Ty>(other), q0_shape(other.q0_shape){
         std::cout << typeid(other).name() << " sdffgkaboom\n";
-        q0_shape = other.q0_shape;
     }
 
     PySolverState<Tt, Ty> py_state() const{
