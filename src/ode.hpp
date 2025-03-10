@@ -48,7 +48,7 @@ public:
     }
 
     ODE(const ODE<Tt, Ty>& other){
-        std::cout << typeid(other) << " fgkaboom\n";
+        std::cout << typeid(other).name() << " fgkaboom\n";
         _copy_data(other);
     }
 
