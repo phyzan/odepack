@@ -399,6 +399,7 @@ struct SolverArgs{
     const Tt event_tol;
     const std::string save_dir;
     const bool save_events_only;
+    const bool live_save;
 };
 
 
