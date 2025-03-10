@@ -120,6 +120,8 @@ public:
 
     PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir = "") : ODE<Tt, Ty>(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events, savedir), q0_shape({q0.size()}){}
 
+    PyODE(PyODE<Tt, Ty>&& other):ODE<Tt, Ty>(std::move(other)), q0_shape(other.q0_shape){}
+
     PyODE(const PyODE<Tt, Ty>& other) : ODE<Tt, Ty>(other), q0_shape(other.q0_shape){}
 
     PySolverState<Tt, Ty> py_state() const{
@@ -139,7 +141,7 @@ class UniquePyOde{
     }
 
 private:
-    
+
 
 };
 

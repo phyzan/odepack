@@ -40,6 +40,10 @@ public:
         _register_state();
     }
 
+    ODE(ODE<Tt, Ty>&& other): _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_arr(std::move(other._q_arr)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
+        other._solver = nullptr;
+    }
+
     ODE(const SolverArgs<Tt, Ty>& S, const std::string& method) : _Nevents(S.events.size()){
         _solver = getSolver(S, method);
         _register_state();

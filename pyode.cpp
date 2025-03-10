@@ -1,4 +1,4 @@
-#include <odepack/pyode.hpp>
+#include <src/pyode.hpp>
 
 template<class T>
 using StackVec = vec<T, 4>;

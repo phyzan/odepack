@@ -132,9 +132,34 @@ protected:
         _copy_data(other);
     };
 
-    OdeSolver(const OdeSolver<Tt, Ty>& other){
-        _copy_data(other);
-    };
+    OdeSolver(OdeSolver<Tt, Ty>&& other) : 
+    _f(std::move(other._f)),
+    _rtol(std::move(other._rtol)),
+    _atol(std::move(other._atol)),
+    _h_min(std::move(other._h_min)),
+    _args(std::move(other._args)),
+    _event_tol(std::move(other._event_tol)),
+    _n(other._n),
+    _t(std::move(other._t)),
+    _q(std::move(other._q)),
+    _habs(std::move(other._habs)),
+    _tmax(other._tmax),
+    _diverges(other._diverges),
+    _is_stiff(other._is_stiff),
+    _is_running(other._is_running),
+    _is_dead(other._is_dead),
+    _N(other._N),
+    _message(std::move(other._message)),
+    _direction(other._direction),
+    _stop_events(std::move(other._stop_events)),
+    _events(std::move(other._events)),
+    _current_event_index(other._current_event_index),
+    _filename(std::move(other._filename)),
+    _file(std::move(other._file)),
+    _autosave(other._autosave){
+        other._file = std::ofstream();
+    }
+
 
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
         _copy_data(other);
@@ -212,9 +237,6 @@ private:
         _n = other._n;
         _filename = other._filename;
         _autosave = other._autosave;
-        if (_autosave){
-            _file = other._file;
-        }
     }
 };
 
