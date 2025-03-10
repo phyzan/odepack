@@ -139,7 +139,6 @@ private:
 
 template<class Tt, class Ty>
 void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate=true){
-
     #pragma omp parallel for schedule(dynamic)
     for (ODE<Tt, Ty>* ode : list){
         ode->integrate(interval, max_frames, max_events, terminate);
