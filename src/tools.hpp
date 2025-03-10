@@ -402,8 +402,8 @@ struct SolverArgs{
 
 
 template<class Tt, class Ty>
-void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q){
-    file << t;
+void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q, const int& event_index){
+    file << t << " " << event_index;
     for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
         file << " " << q[i];
     }

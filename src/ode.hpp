@@ -126,7 +126,7 @@ public:
             }
 
             for (size_t i = 0; i < _t_arr.size(); ++i) {
-                write_chechpoint(file, _t_arr[i], _q_arr[i]);
+                write_chechpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
             }
             file.close(); // Close the file
             return true;

@@ -303,7 +303,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
     }
 
     if (success && _autosave){
-        write_chechpoint(_file, _t, _q);
+        write_chechpoint(_file, _t, _q, _current_event_index);
     }
 
     return success;
