@@ -131,7 +131,6 @@ protected:
 
 
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
-        std::cout << "GKGKGKGKGKG\n";
         _copy_data(other);
     }
 
@@ -184,6 +183,7 @@ private:
 
     void _copy_data(const OdeSolver<Tt, Ty>& other){
         //arguments below are passed into the SolverState when commanded
+        std::cout << "GKGKGKGKGKG\n";
         _t = other._t;
         _q = other._q;
         _habs = other._habs;
