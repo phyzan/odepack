@@ -398,6 +398,7 @@ struct SolverArgs{
     const std::vector<StopEvent<Tt, Ty>> stop_events;
     const Tt event_tol;
     const std::string save_dir;
+    const bool save_events_only;
 };
 
 
