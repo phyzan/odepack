@@ -133,8 +133,6 @@ public:
         }
     }
 
-    
-
 private:
 
     OdeSolver<Tt, Ty>* _solver;
