@@ -48,6 +48,7 @@ public:
     }
 
     ODE(const ODE<Tt, Ty>& other){
+        std::cout << other._solver->autosave() << " fgkaboom\n";
         _copy_data(other);
     }
 
