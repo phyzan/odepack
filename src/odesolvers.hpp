@@ -359,7 +359,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
     // if it is not an event or smth it is left unchanged.
     // otherwise, it is modified to depict the event with high accuracy
     std::function<Ty(Tt)> qfunc;
-    Tt t_new, h_new;
+    Tt t_new;
     Ty q_new;
 
     qfunc = [this](const Tt& t_next) -> Ty { return this->step(this->_t, this->_q, t_next-this->_t);};
@@ -367,8 +367,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
     if (event.determine(this->_t, next.t, this->_args, qfunc, this->_event_tol)){
         t_new = event.t_event();
         q_new = event.q_event();
-        h_new = t_new - this->_t;
-        next = {t_new, q_new, abs(h_new)};
+        next = {t_new, q_new, abs(next.t - t_new)};
         return true;
     }
     return false;

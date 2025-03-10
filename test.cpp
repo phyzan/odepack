@@ -24,11 +24,13 @@ int main(){
     Tf q0 = {1, 1, 2.3, 4.5};
     
     Event<Tt, Tf> event1("Event1", fevent, nullptr, 1, 0);
+    Event<Tt, Tf> event2("Event2", fevent, nullptr, 1, -1e-9);
+    // Event<Tt, Tf> event1("Event1", fevent, nullptr, 1, 0);
 
 
     // StopEvent<Tt, Tf> event2("stopevent", fevent);
 
-    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1}, {}, "zfg.txt");
+    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 0., 1e-12, 1e-8, {}, "RK45", 1e-10, {event1, event2}, {});
     ODE<Tt, Tf> ode2 = ode;
 
 
@@ -39,7 +41,8 @@ int main(){
 
     // s->set_goal
     ode.free();
-    for (int i=0; i<5; i++){
+    while (true){
+        ode.state().show();
         std::cin.get();
         ode.advance();
         // std::cin.getline(buffer, 100);
