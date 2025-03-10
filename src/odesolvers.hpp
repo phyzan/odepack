@@ -51,6 +51,9 @@ public:
     const bool& is_running() const {return _is_running;}
     const bool& is_dead() const {return _is_dead;}
     const std::string& message() {return _message;}
+    const bool& autosave() const{
+        return _autosave;
+    }
 
     bool resume(){
         if (_is_dead){

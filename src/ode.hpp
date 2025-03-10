@@ -48,12 +48,10 @@ public:
     }
 
     ODE(const ODE<Tt, Ty>& other){
-        std::cout << "fdgshgzxfghsfghxgjxhj";
         _copy_data(other);
     }
 
     ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
-        std::cout << "fdgshgzxfghsfghxgjxhj\n";
         if (&other == this) return *this;
 
         delete _solver;
@@ -135,7 +133,7 @@ public:
         }
     }
 
-private:
+protected:
 
     OdeSolver<Tt, Ty>* _solver;
     std::vector<Tt> _t_arr;
@@ -143,7 +141,7 @@ private:
     std::vector<std::vector<size_t>> _Nevents;
     double _runtime = 0.;
 
-
+private:
     void _register_state(){
         _t_arr.push_back(_solver->t());
         _q_arr.push_back(_solver->q());
