@@ -125,6 +125,11 @@ public:
         std::cout << this << " 2sdffgkaboom\n";
     }
 
+    PyODE(PyODE<Tt, Ty>&& other) : ODE<Tt, Ty>(other), q0_shape(other.q0_shape){
+        std::cout << &other << " RRR\n";
+        std::cout << this << " RRRR\n";
+    }
+
     PySolverState<Tt, Ty> py_state() const{
         SolverState<Tt, Ty> s = this->state();
         return PySolverState<Tt, Ty>(s.t, s.q, s.habs, s.event, s.diverges, s.is_stiff, s.is_running, s.is_dead, s.N, s.message, q0_shape); 
