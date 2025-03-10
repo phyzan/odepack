@@ -132,6 +132,9 @@ protected:
         _copy_data(other);
     };
 
+    OdeSolver(const OdeSolver<Tt, Ty>& other){
+        _copy_data(other);
+    };
 
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
         _copy_data(other);
@@ -207,7 +210,11 @@ private:
         _args = other._args;
         _event_tol = other._event_tol;
         _n = other._n;
-
+        _filename = other._filename;
+        _autosave = other._autosave;
+        if (_autosave){
+            _file = other._file;
+        }
     }
 };
 

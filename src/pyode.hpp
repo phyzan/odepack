@@ -130,6 +130,19 @@ public:
     const _Shape q0_shape;
 };
 
+
+template<class Tt, class Ty>
+class UniquePyOde{
+
+    UniquePyOde(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir = ""){
+        
+    }
+
+private:
+    
+
+};
+
 #pragma GCC visibility pop
 
 
