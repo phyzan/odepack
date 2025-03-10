@@ -359,7 +359,7 @@ void define_ode_module(py::module& m) {
             py::arg("max_events")=-1,
             py::arg("terminate")=true,
             py::arg("display")=false)
-        .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);        std::cout << typeid(other).name() << " sdfsdfsdfsdfdfgkaboom\n";})
+        .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);        std::cout << " sdfsdfsdfsdfdfgkaboom\n";})
         .def("advance", [](PyODE<Tt, Ty>& self){return self.advance();})
         .def("resume", [](PyODE<Tt, Ty>& self){return self.resume();})
         .def("free", [](PyODE<Tt, Ty>& self){return self.free();})
