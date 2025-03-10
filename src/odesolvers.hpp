@@ -113,9 +113,7 @@ protected:
 
     OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir) {
         set_goal(S.tmax);
-        std::cout << "sdf\n";
         if (!_filename.empty()){
-            std::cout << "YES\n";
             if (typeid(Tt) != typeid(_q[0])){
                 throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose solution array is not 1D");
             }
@@ -303,8 +301,9 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _habs = h_next;
         _N++;
     }
-
+    std::cout << "zdfdf\n";
     if (success && _autosave){
+        std::cout << "YEEEEAH\n";
         write_chechpoint(_file, _t, _q, _current_event_index);
     }
 
