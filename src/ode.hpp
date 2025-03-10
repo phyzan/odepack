@@ -32,8 +32,6 @@ class ODE{
 
 public:
 
-
-
     ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir="") : _Nevents(events.size()) {
 
         const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, stop_events, event_tol, savedir};
@@ -48,7 +46,6 @@ public:
     }
 
     ODE(const ODE<Tt, Ty>& other){
-        std::cout << typeid(other).name() << " fgkaboom\n";
         _copy_data(other);
     }
 
