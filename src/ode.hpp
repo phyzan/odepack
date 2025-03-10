@@ -48,10 +48,12 @@ public:
     }
 
     ODE(const ODE<Tt, Ty>& other){
+        std::cout << "fdgshgzxfghsfghxgjxhj";
         _copy_data(other);
     }
 
     ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
+        std::cout << "fdgshgzxfghsfghxgjxhj\n";
         if (&other == this) return *this;
 
         delete _solver;
