@@ -372,15 +372,13 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("is_dead", &PyODE<Tt, Ty>::is_dead);
 
 
-    m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate){
+    m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const bool& display){
         std::vector<ODE<Tt, Ty>*> array;
-        PyODE<Tt, Ty>* ode_ptr = nullptr;
         for (const py::handle& item : list){
-            ode_ptr = &(item.cast<PyODE<Tt, Ty>&>());
-            array.push_back(ode_ptr);
+            array.push_back(&(item.cast<PyODE<Tt, Ty>&>()));
         }
-        integrate_all(array, interval, max_frames, max_events, terminate);
-    }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=-1, py::arg("terminate")=true);
+        integrate_all(array, interval, max_frames, max_events, terminate, display);
+    }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=-1, py::arg("terminate")=true, py::arg("display")=false);
 }
 
 
