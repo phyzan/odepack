@@ -212,8 +212,12 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
         if (display){
             Tt percentage = (_solver->t() - t0)/(_solver->tmax()-t0);
             if (percentage*MAX_PRINTS >= prints){
-                std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
-                prints++;
+                #pragma omp critical
+                {
+                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
+                    prints++;
+                }
+
             }
 
         }
