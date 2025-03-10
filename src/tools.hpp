@@ -82,8 +82,8 @@ std::vector<T> subvec(const std::vector<T>& x, const size_t& start) {
 
 //BISECTION USED FOR EVENTS IN ODES
 
-template<class T, typename Callable>
-std::vector<T> bisect(Callable&& f, const T& a, const T& b, const T& atol){
+template<class T>
+std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol){
     T err = 2*atol+1;
     T _a = a;
     T _b = b;
