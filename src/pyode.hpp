@@ -116,9 +116,9 @@ template<class Tt, class Ty>
 class PyODE : public ODE<Tt, Ty>{
 public:
 
-    PyODE(py::object f, const Tt t0, const py::array q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::object stop_events) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0)), t0, toCPP_Array<Tt, Ty>(q0), stepsize, rtol, atol, min_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), event_tol, to_Events<Tt, Ty>(events, shape(q0)), to_StopEvents<Tt, Ty>(stop_events, shape(q0))), q0_shape(shape(q0)){}
+    PyODE(py::object f, const Tt t0, const py::array q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::object stop_events, py::str savedir) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0)), t0, toCPP_Array<Tt, Ty>(q0), stepsize, rtol, atol, min_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), event_tol, to_Events<Tt, Ty>(events, shape(q0)), to_StopEvents<Tt, Ty>(stop_events, shape(q0)), savedir.cast<std::string>()), q0_shape(shape(q0)){}
 
-    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : ODE<Tt, Ty>(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events), q0_shape({q0.size()}){}
+    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir = "") : ODE<Tt, Ty>(f, t0, q0, stepsize, rtol, atol, min_step, args, method, event_tol, events, stop_events, savedir), q0_shape({q0.size()}){}
 
     PySolverState<Tt, Ty> py_state() const{
         SolverState<Tt, Ty> s = this->state();
@@ -337,7 +337,7 @@ void define_ode_module(py::module& m) {
         
 
     py::class_<PyODE<Tt, Ty>>(m, "LowLevelODE", py::module_local())
-        .def(py::init<py::object, Tt, py::array, Tt, Tt, Tt, Tt, py::tuple, py::str, Tt, py::object, py::object>(),
+        .def(py::init<py::object, Tt, py::array, Tt, Tt, Tt, Tt, py::tuple, py::str, Tt, py::object, py::object, py::str>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -350,7 +350,8 @@ void define_ode_module(py::module& m) {
             py::arg("method")="RK45",
             py::arg("event_tol")=1e-12,
             py::arg("events")=py::none(),
-            py::arg("stop_events")=py::none())
+            py::arg("stop_events")=py::none(),
+            py::arg("savedir")="")
         .def("integrate", [](PyODE<Tt, Ty>& self, const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const bool& display){return PyOdeResult<Tt, Ty>(self.integrate(interval, max_frames, max_events, terminate, display), self.q0_shape);},
             py::arg("interval"),
             py::kw_only(),
@@ -363,6 +364,7 @@ void define_ode_module(py::module& m) {
         .def("resume", [](PyODE<Tt, Ty>& self){return self.resume();})
         .def("free", [](PyODE<Tt, Ty>& self){return self.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
+        .def("save", [](PyODE<Tt, Ty>& self, py::str savedir){return self.save(savedir.cast<std::string>());}, py::arg("savedir"))
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(self.t());})
         .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(flatten<Tt, Ty>(self.q()), getShape(self.t().size(), self.q0_shape));})
         .def_property_readonly("event_map", [](const PyODE<Tt, Ty>& self){return to_PyDict(self.event_map());})

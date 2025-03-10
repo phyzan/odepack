@@ -28,7 +28,7 @@ int main(){
 
     // StopEvent<Tt, Tf> event2("stopevent", fevent);
 
-    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1});
+    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-6, 1e-12, 1e-8, {}, "RK45", 1e-10, {event1}, {}, "zfg.txt");
     ODE<Tt, Tf> ode2 = ode;
 
 
@@ -36,33 +36,15 @@ int main(){
 
     // ode.integrate(t_max, 100).examine();
     // return 0;
-    OdeSolver<Tt, Tf>* s = ode.solver();
-    s->free();
-
-    std::string _input;
-    // std::cout << s->f()(1, {1, 1, 2.3, 4.5}, {});
-    // // ode2.free();
-    char buffer[100];  // Buffer to store input
-     // Read input
-
-    std::string input;  // Convert to std::string
-
-    try {
-        double value = std::stod(input);  // Convert to double
-        std::cout << "Converted value: " << value << '\n';
-    } catch (const std::exception& e) {
-        std::cerr << "Invalid input: " << e.what() << '\n';
-    }
 
     // s->set_goal
-
-    while (true){
-        s->state().show();
+    ode.free();
+    for (int i=0; i<5; i++){
+        std::cin.get();
+        ode.advance();
         // std::cin.getline(buffer, 100);
         // input = buffer;
         // double val = std::stod(input);
-        s->advance();
-        std::cin.get();
     }
     // }
     // ode.integrate(10).examine();

@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <eigen3/Eigen/Dense>
 #include <eigen3/unsupported/Eigen/MPRealSupport>
+#include <fstream>
 
 
 // USEFUL ALIASES
@@ -396,8 +397,18 @@ struct SolverArgs{
     const std::vector<Event<Tt, Ty>> events;
     const std::vector<StopEvent<Tt, Ty>> stop_events;
     const Tt event_tol;
+    const std::string save_dir;
 };
 
+
+template<class Tt, class Ty>
+void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q){
+    file << t;
+    for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
+        file << " " << q[i];
+    }
+    file << "\n";
+}
 
 
 

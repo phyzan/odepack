@@ -34,9 +34,9 @@ public:
 
 
 
-    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}) : _Nevents(events.size()) {
+    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir="") : _Nevents(events.size()) {
 
-        const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, stop_events, event_tol};
+        const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, stop_events, event_tol, savedir};
         _solver = getSolver(S, method);
 
         _register_state();
@@ -112,6 +112,28 @@ public:
     OdeSolver<Tt, Ty>* solver() const{
         return _solver->clone();
     }
+
+    bool save(const std::string& filename) const{
+        if (typeid(Tt) != typeid(_q_arr[0][0])){
+            std::cerr << ".save() only works for system of odes that are expressed in a 1D array\n";
+            return false;
+        }
+        else{
+            std::ofstream file(filename, std::ios::out);
+            if (!file){
+                std::cerr << "Could not open file:" << filename << "\n";
+                return false;
+            }
+
+            for (size_t i = 0; i < _t_arr.size(); ++i) {
+                write_chechpoint(file, _t_arr[i], _q_arr[i]);
+            }
+            file; // Close the file
+            return true;
+        }
+    }
+
+    
 
 private:
 

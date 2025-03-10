@@ -19,7 +19,11 @@ public:
     const Tt MIN_FACTOR = Tt(2)/10;
 
 
-    virtual ~OdeSolver() = default;
+    virtual ~OdeSolver(){
+        if (_autosave){
+            _file.close();
+        }
+    };
 
     //MODIFIERS
     void stop(const std::string& text = "") {_is_running = false; _message = (text == "") ? "Stopped by user" : text;}
@@ -107,8 +111,18 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events) {
+    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir) {
         set_goal(S.tmax);
+        if (!_filename.empty()){
+            if (typeid(Tt) != typeid(_q[0])){
+                throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose solution array is not 1D");
+            }
+            _file.open(_filename, std::ios::out);
+            if (!_file){
+                throw std::runtime_error("Could not open file in OdeSolver for automatic saving: " + _filename + "\n");
+            }
+            _autosave = true;
+        }
     }
 
     OdeSolver(const OdeSolver<Tt, Ty>& other){
@@ -144,7 +158,9 @@ private:
     std::vector<StopEvent<Tt, Ty>> _stop_events;
     std::vector<Event<Tt, Ty>> _events;
     int _current_event_index = -1;
-
+    std::string _filename;
+    std::ofstream _file;
+    bool _autosave = false;
 
 
     bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
@@ -188,6 +204,7 @@ private:
         _args = other._args;
         _event_tol = other._event_tol;
         _n = other._n;
+
     }
 };
 
@@ -283,6 +300,10 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _q = y_new;
         _habs = h_next;
         _N++;
+    }
+
+    if (success && _autosave){
+        write_chechpoint(_file, _t, _q);
     }
 
     return success;
