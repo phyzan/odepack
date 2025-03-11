@@ -70,6 +70,33 @@ public:
         return false;
     }
 
+    bool release_file(){
+        if (_autosave){
+            _file.flush();
+            _file.close();
+            _autosave = false;
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    bool file_is_ready()const{
+        return _file.good();
+    }
+
+    bool reopen_file(){
+        if (!_file.good() || _file.is_open()){
+            return false;
+        }
+        else{
+            _file.open(_filename, std::ios::app);
+            _autosave = true;
+            return true;
+        }
+    }
+
     bool free(){
         return set_goal(std::numeric_limits<Tt>::infinity());
     }

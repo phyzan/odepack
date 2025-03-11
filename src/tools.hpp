@@ -151,7 +151,9 @@ public:
             };
 
             if (_check_if == nullptr || (_check_if(t1, q(t1), args) && _check_if(t2, q(t2), args))){
-                if (_when(t1, q(t1), args) * _when(t2, q(t2), args) <= 0){
+                Tt val1 = _when(t1, q(t1), args);
+                Tt val2 = _when(t2, q(t2), args);
+                if (val1 * val2 <= 0 && val1 != 0){
                     t_determined = bisect(obj_fun, t1, t2, tol)[2];
                     determined = true;
                 }

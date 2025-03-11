@@ -55,11 +55,9 @@ public:
 
     ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
         if (&other == this) return *this;
-
         delete _solver;
         _copy_data(other);
         return *this;
-
     }
 
     ~ODE(){delete _solver;}
@@ -190,6 +188,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     int MAX_PRINTS = 100;
     int prints = 0;
 
+    _solver->reopen_file();
     _solver->set_goal(t0+interval);
     
     while (_solver->is_running()){
@@ -233,19 +232,23 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
     OdeResult<Tt, Ty> res = {subvec(_t_arr, N), subvec(_q_arr, N), event_map(N), _solver->diverges(), _solver->is_stiff(), !_solver->is_dead(), rt.count(), _solver->message()};
 
     _runtime += res.runtime;
+    _solver->release_file();
     return res;
 }
 
 template<class Tt, class Ty>
 bool ODE<Tt, Ty>::advance(){
+    bool success = false;
+    _solver->reopen_file();
     if (_solver->advance()){
         if (_solver->at_event()){
             _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
         }
         _register_state();
-        return true;
+        success = true;
     }
-    return false;
+    _solver->release_file();
+    return success;
 }
 
 
