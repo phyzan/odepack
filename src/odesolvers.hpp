@@ -345,6 +345,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         if (!_save_events_only || (_current_event_index != -1)){
             write_chechpoint(_file, _t, _q, _current_event_index);
             if (_live_save){
+                throw std::runtime_error("dsfg");
                 _file.flush();
             }
         }
