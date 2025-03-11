@@ -114,7 +114,7 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir), _save_events_only(S.save_events_only), _live_save(S.live_save) {
+    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir), _save_events_only(S.save_events_only) {
         set_goal(S.tmax);
         if (!_filename.empty()){
             if (typeid(Tt) != typeid(_q[0])){
@@ -158,8 +158,7 @@ protected:
     _filename(std::move(other._filename)),
     _file(std::move(other._file)),
     _autosave(other._autosave),
-    _save_events_only(other._save_events_only),
-    _live_save(other._live_save){
+    _save_events_only(other._save_events_only){
         other._file = std::ofstream();
     }
 
@@ -196,7 +195,6 @@ private:
     std::ofstream _file;
     bool _autosave = false;
     bool _save_events_only = false;
-    bool _live_save = false;
 
 
     bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
@@ -243,7 +241,6 @@ private:
         _filename = other._filename;
         _autosave = other._autosave;
         _save_events_only = other._save_events_only;
-        _live_save = other._live_save;
     }
 };
 
@@ -344,10 +341,6 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
     if (success && _autosave){
         if (!_save_events_only || (_current_event_index != -1)){
             write_chechpoint(_file, _t, _q, _current_event_index);
-            if (_live_save){
-                throw std::runtime_error("dsfg");
-                _file.flush();
-            }
         }
         
     }
