@@ -106,6 +106,9 @@ class LowLevelODE:
     def event_map(self)->dict[str, np.ndarray]:...
 
     @property
+    def solver_filename(self)->str:...
+
+    @property
     def runtime(self)->float:...
 
     @property

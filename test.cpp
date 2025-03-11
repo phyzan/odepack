@@ -23,7 +23,7 @@ int main(){
     double t_max = 10001*pi/2;
     Tf q0 = {1, 1, 2.3, 4.5};
     
-    Event<Tt, Tf> event1("Event1", fevent, nullptr, 1, 0);
+    Event<Tt, Tf> event1("Event1", nullptr, nullptr, 1, 0);
     Event<Tt, Tf> event2("Event2", fevent, nullptr, 1, -1e-9);
     // Event<Tt, Tf> event1("Event1", fevent, nullptr, 1, 0);
 
