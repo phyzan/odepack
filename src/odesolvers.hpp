@@ -125,6 +125,7 @@ protected:
                 throw std::runtime_error("Could not open file in OdeSolver for automatic saving: " + _filename + "\n");
             }
             _autosave = true;
+            write_chechpoint(_file, _t, _q, -1);
         }
     }
 
