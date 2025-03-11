@@ -76,6 +76,10 @@ public:
 
     bool advance();
 
+    const std::string& solver_filename() const{
+        return _solver->filename();
+    }
+
     std::map<std::string, std::vector<size_t>> event_map(const size_t& start_point=0) const{
         std::map<std::string, std::vector<size_t>> res;
         size_t index;

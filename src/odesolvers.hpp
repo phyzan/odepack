@@ -97,6 +97,10 @@ public:
         }
     }
 
+    const std::string& filename()const{
+        return _filename;
+    }
+
     bool free(){
         return set_goal(std::numeric_limits<Tt>::infinity());
     }
