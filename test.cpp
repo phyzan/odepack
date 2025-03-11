@@ -30,7 +30,7 @@ int main(){
 
     // StopEvent<Tt, Tf> event2("stopevent", fevent);
 
-    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 0., 1e-12, 1e-8, {}, "RK45", 1e-10, {event1, event2}, {});
+    ODE<Tt, Tf> ode(f, 0, q0, 1e-5, 0., 1e-14, 1e-3, {}, "RK45", 1e-10, {event1, event2}, {});
     ODE<Tt, Tf> ode2 = ode;
 
 

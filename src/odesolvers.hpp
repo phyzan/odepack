@@ -106,7 +106,7 @@ public:
 
     virtual Ty step(const Tt& t_old, const Ty& q_old, const Tt& h) const = 0;
 
-    virtual State<Tt, Ty> adaptive_step() const = 0;
+    virtual State<Tt, Ty> adaptive_step() const = 0; //derived implementation must account for h_min
 
     virtual OdeSolver<Tt, Ty>* clone() const = 0;
 
@@ -255,7 +255,7 @@ template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
     //if the solver was stopped (but not killed) earlier,
     //then setting a new goal successfully will resume the solver
-    if ((_is_stiff || _diverges) && (!_is_dead || _is_running) ){
+    if ((_diverges) && (!_is_dead || _is_running) ){
         //sanity check. 
         throw std::runtime_error("Bug detected: Solver half alive");
     }
@@ -292,9 +292,18 @@ bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
         std::cout << std::endl << "Please provide a positive stepsize in .advance_by(habs)\n";
         return false;
     }
+
+    bool _set_non_stiff = false;
+    if (habs <= _h_min && !_is_stiff){
+        _set_non_stiff = true;
+    }
     Ty q_next = step(_t, _q, habs*_direction);
     State<Tt, Ty> next = {_t+habs*_direction, q_next, habs};
-    return _go_to_state(next);
+    bool success = _go_to_state(next);
+    if (success && _set_non_stiff){
+        _is_stiff = false;
+    }
+    return success;
 }
 
 template<class Tt, class Ty>
@@ -319,11 +328,6 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _diverges = true;
         success = false;
     }
-    else if ( (h_next <= _h_min) & (_current_event_index == -1)){
-        kill("Ode very stiff");
-        _is_stiff = true;
-        success = false;
-    }
     else if (t_new*_direction >= _tmax*_direction){
         stop("T_max goal reached");
         _q = this->step(_t, _q, _tmax-_t);
@@ -336,14 +340,17 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _q = y_new;
         _habs = h_next;
         _N++;
+        if ( (h_next <= _h_min) & (_current_event_index == -1)){
+            _is_stiff = true;
+        }
     }
 
     if (success && _autosave){
         if (!_save_events_only || (_current_event_index != -1)){
             write_chechpoint(_file, _t, _q, _current_event_index);
         }
-        
     }
+
 
     return success;
 }

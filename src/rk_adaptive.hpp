@@ -73,6 +73,11 @@ public:
             if (habs == 0){
                 break;
             }
+            else if (habs <= this->h_min()){
+                habs = this->h_min();
+                break;
+            }
+            
         }
 
         return {t_new, q_new,  habs};
