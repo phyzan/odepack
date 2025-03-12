@@ -369,7 +369,7 @@ void define_ode_module(py::module& m) {
         .def("resume", [](PyODE<Tt, Ty>& self){return self.resume();})
         .def("free", [](PyODE<Tt, Ty>& self){return self.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
-        .def("save", [](PyODE<Tt, Ty>& self, py::str savedir){return self.save(savedir.cast<std::string>());}, py::arg("savedir"))
+        .def("save_data", [](PyODE<Tt, Ty>& self, py::str savedir){return self.save_data(savedir.cast<std::string>());}, py::arg("savedir"))
         .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(self.t());})
         .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(flatten<Tt, Ty>(self.q()), getShape(self.t().size(), self.q0_shape));})
         .def_property_readonly("event_map", [](const PyODE<Tt, Ty>& self){return to_PyDict(self.event_map());})

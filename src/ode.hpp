@@ -117,9 +117,9 @@ public:
         return _solver->clone();
     }
 
-    bool save(const std::string& filename) const{
+    bool save_data(const std::string& filename) const{
         if (typeid(Tt) != typeid(_q_arr[0][0])){
-            std::cerr << ".save() only works for system of odes that are expressed in a 1D array\n";
+            std::cerr << ".save_data() only works for system of odes that are expressed in a 1D array\n";
             return false;
         }
         else{

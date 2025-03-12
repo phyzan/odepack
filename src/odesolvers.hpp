@@ -359,6 +359,10 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _diverges = true;
         success = false;
     }
+    else if (h_next == 0){
+        _is_stiff = true;
+        kill("Required stepsize was smaller than machine precision");
+    }
     else if (t_new*_direction >= _tmax*_direction){
         stop("T_max goal reached");
         _q = this->step(_t, _q, _tmax-_t);
