@@ -126,7 +126,7 @@ class Event{
     //having a default value, or one determined from a previous .determine() call.
 
 public:
-    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, const Tt& period=0, const Tt& start=0, Func<Tt, Ty> mask=nullptr) : _name(name), _when(when), _check_if(check_if), _period(period), _start(start), _mask(mask), _t_period(start), _t_period_previous(start){
+    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, const Tt& period=0, const Tt& start=0, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false) : _name(name), _when(when), _check_if(check_if), _period(period), _start(start), _mask(mask), _hide_mask(hide_mask), _t_period(start), _t_period_previous(start){
         _assert_valid_name(name);
     }
 
@@ -171,6 +171,14 @@ public:
         }
     }
 
+    const bool& hide_mask()const{
+        return _hide_mask;
+    }
+
+    bool has_mask()const{
+        return _mask != nullptr;
+    }
+
     void go_back(){
         _clear();
         if (_period > 0){
@@ -178,12 +186,16 @@ public:
         }
     }
 
-    const Tt& t_event(){
+    const Tt& t_event()const{
         return *_t_event;
     }
 
-    const Ty& q_event(){
+    const Ty& q_event()const{
         return *_q_event;
+    }
+
+    const Ty& q_masked()const{
+        return *_q_masked;
     }
 
     const std::string& name()const{
@@ -203,10 +215,12 @@ private:
     Tt _period;
     Tt _start;
     Func<Tt, Ty> _mask = nullptr;
+    bool _hide_mask; // variable that is only used externally for odesolvers to determine when and whether to call q_event or q_masked.
     Tt _t_period;
     Tt _t_period_previous;
     Tt* _t_event = nullptr;
     Ty* _q_event = nullptr;
+    Ty* _q_masked = nullptr;
 
     void _copy_data(const Event<Tt, Ty>& other){
         _name = other._name;
@@ -215,6 +229,7 @@ private:
         _period = other._period;
         _start = other._start;
         _mask = other._mask;
+        _hide_mask = other._hide_mask;
         _t_period = other._t_period;
         _t_period_previous = other._t_period_previous;
         _clear();
@@ -222,19 +237,32 @@ private:
             _realloc();
             *_t_event = *other._t_event;
             *_q_event = *other._q_event;
+            *_q_masked = *other._q_masked; //this line has the same effect whether _mask is null or not (which is whether _q_masked != _q_event or not)
         }
     }
 
     void _clear(){
         delete _t_event;
         delete _q_event;
+        if (_q_masked != _q_event){
+            delete _q_masked;
+        }
         _t_event = nullptr;
         _q_event = nullptr;
+        _q_masked = nullptr;
     }
 
     void _realloc(){
+        //always used after _clear();
         _t_event = new Tt;
         _q_event = new Ty;
+        if (_mask != nullptr){
+            _q_masked = new Ty;
+        }
+        else{
+            _q_masked = _q_event;
+        }
+
     }
 
     bool _determine_periodic_event_between(const Tt& t1, Tt& t2) {
@@ -257,8 +285,13 @@ private:
     }
 
     void _set(const Tt& t, const Ty& q, const std::vector<Tt>& args){
+        //always called right after _realloc(), before calling _clear() e.g.;
         *_t_event = t;
-        *_q_event = (_mask == nullptr) ? q : _mask(*_t_event, q, args);
+        *_q_event = q;
+        if (_mask != nullptr){
+            //this also means that _q_masked already points to a different memory location from _realloc();
+            *_q_masked = _mask(*_t_event, q, args);
+        }
     }
 };
 

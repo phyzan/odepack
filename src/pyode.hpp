@@ -59,7 +59,7 @@ std::vector<StopEvent<Tt, Ty>> to_StopEvents(py::object events, const _Shape& sh
 template<class Tt, class Ty>
 struct PyEvent{
 
-    PyEvent(py::str name, py::object when, py::object check_if, const Tt& period, const Tt& start, py::object mask): _name(name.cast<std::string>()), py_when(when), py_check_if(check_if), period(period), start(start), py_mask(mask){}
+    PyEvent(py::str name, py::object when, py::object check_if, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask): _name(name.cast<std::string>()), py_when(when), py_check_if(check_if), period(period), start(start), py_mask(mask), hide_mask(hide_mask){}
 
     std::string _name;
     py::object py_when;
@@ -67,9 +67,10 @@ struct PyEvent{
     Tt period;
     Tt start;
     py::object py_mask;
+    bool hide_mask;
 
     Event<Tt, Ty> toEvent(const _Shape& shape){
-        return Event<Tt, Ty>(_name, to_event<Tt, Ty>(py_when, shape), to_event_check<Tt, Ty>(py_check_if, shape), period, start, to_Func<Tt, Ty>(py_mask, shape));
+        return Event<Tt, Ty>(_name, to_event<Tt, Ty>(py_when, shape), to_event_check<Tt, Ty>(py_check_if, shape), period, start, to_Func<Tt, Ty>(py_mask, shape), hide_mask);
     }
 };
 
@@ -294,13 +295,14 @@ std::vector<StopEvent<Tt, Ty>> to_StopEvents(py::object events, const _Shape& sh
 template<class Tt, class Ty>
 void define_ode_module(py::module& m) {
     py::class_<PyEvent<Tt, Ty>>(m, "Event", py::module_local())
-        .def(py::init<py::str, py::object, py::object, Tt, Tt, py::object>(),
+        .def(py::init<py::str, py::object, py::object, Tt, Tt, py::object, py::bool_>(),
             py::arg("name"),
             py::arg("when"),
             py::arg("check_if")=py::none(),
             py::arg("period")=0,
             py::arg("start")=0,
-            py::arg("mask")=py::none());
+            py::arg("mask")=py::none(),
+            py::arg("hide_mask")=false);
 
     py::class_<PyStopEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
         .def(py::init<py::str, py::object, py::object>(),

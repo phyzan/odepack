@@ -9,7 +9,7 @@ BoolFunc = Callable[[float, np.ndarray], bool] #  f(t, q, *args) -> bool
 
 class Event:
 
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, period=0., start=0., mask: Func=None):...
+    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, period=0., start=0., mask: Func=None, hide_mask=False):...
 
 
 class StopEvent:

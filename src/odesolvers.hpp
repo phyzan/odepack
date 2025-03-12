@@ -20,6 +20,7 @@ public:
 
 
     virtual ~OdeSolver(){
+        _clear_checkpoint();
         if (_autosave){
             _file.close();
         }
@@ -35,7 +36,7 @@ public:
 
     //ACCESSORS
     const Tt& t() const { return _t; }
-    const Ty& q() const { return _q; }
+    const Ty& q() const { return *_q_exposed; }
     const Tt& stepsize() const { return _habs; }
     const Tt& tmax() const { return _tmax; }
     const int& direction() const { return _direction; }
@@ -114,7 +115,7 @@ public:
     }
 
     const SolverState<Tt, Ty> state() const {
-        return {_t, _q, _habs, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
+        return {_t, q(), _habs, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
     }
 
     const Event<Tt, Ty>* current_event() const{
@@ -147,6 +148,7 @@ protected:
 
     OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir), _save_events_only(S.save_events_only) {
         set_goal(S.tmax);
+        _q_exposed = &_q;
         if (!_filename.empty()){
             if (typeid(Tt) != typeid(_q[0])){
                 throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose solution array is not 1D");
@@ -189,6 +191,10 @@ protected:
     _filename(std::move(other._filename)),
     _file(std::move(other._file)),
     _autosave(other._autosave),
+    _t_check(other._t_check),
+    _q_check(other._q_check),
+    _habs_check(other._habs_check),
+    _q_exposed( (other._q_exposed == &other._q) ? &_q : other._q_exposed), //if other._q_exposed != other._q, set the pointer to the dymamically allocated object of the q_event the "other" points to.
     _save_events_only(other._save_events_only){
         other._file = std::ofstream();
     }
@@ -226,6 +232,10 @@ private:
     std::ofstream _file;
     bool _autosave = false;
     bool _save_events_only = false;
+    Tt* _t_check = nullptr;
+    Ty* _q_check = nullptr;
+    Tt* _habs_check = nullptr;
+    const Ty* _q_exposed = nullptr; //view_only pointer
 
 
     bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
@@ -235,7 +245,7 @@ private:
     bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
 
     void _warn_dead(){
-        std::cout << std::endl << "Solver has permanently stop integrating. If this is not due to calling .kill(), call state() to see the cause.\n";
+        std::cout << std::endl << "Solver has permanently stop integrating. Termination cause:\n\t" << _message << "\n";
     }
 
     void _warn_paused(){
@@ -260,7 +270,7 @@ private:
         _message = other._message;
         _direction = other._direction;
         _stop_events = other._stop_events; // Copying the vector
-        _events = other._events; // Copying the vector
+        _events = other._events; // Copying the vector. The events are deepcopied
         _current_event_index = other._current_event_index;
         _f = other._f;
         _rtol = other._rtol;
@@ -272,7 +282,37 @@ private:
         _filename = other._filename;
         _autosave = other._autosave;
         _save_events_only = other._save_events_only;
+        _clear_checkpoint();
+        if (other._t_check != nullptr){
+            _make_checkpoint(*other._t_check, *other._q_check, *other._habs_check);
+        }
+        if (other._q_exposed == &other._q){
+            _q_exposed = &_q;
+        }
+        else{
+            _q_exposed = &(_events.at(_current_event_index).q_event());
+        }
     }
+
+
+    void _make_checkpoint(const Tt& t, const Ty& q, const Tt& habs){
+        _t_check = new Tt;
+        _q_check = new Ty;
+        _habs_check = new Tt;
+        *_t_check = t;
+        *_q_check = q;
+        *_habs_check = habs;
+    }
+
+    void _clear_checkpoint(){
+        delete _t_check;
+        delete _q_check;
+        delete _habs_check;
+        _t_check = nullptr;
+        _q_check = nullptr;
+        _habs_check = nullptr;
+    }
+
 };
 
 
@@ -324,6 +364,10 @@ bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
         return false;
     }
 
+    if (_t_check != nullptr){
+        _clear_checkpoint();
+    }
+
     bool _set_non_stiff = false;
     if (habs <= _h_min && !_is_stiff){
         _set_non_stiff = true;
@@ -339,6 +383,10 @@ bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
 
 template<class Tt, class Ty>
 bool OdeSolver<Tt, Ty>::advance_by_any(const Tt& h){
+    if (_t_check != nullptr){
+        _clear_checkpoint();
+    }
+
     set_goal(_t+h);
     Ty q_next = step(_t, _q, h);
     State<Tt, Ty> next = {_t+h, q_next, h*_direction};
@@ -363,7 +411,14 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _is_stiff = true;
         kill("Required stepsize was smaller than machine precision");
     }
-    else if (t_new*_direction >= _tmax*_direction){
+
+    //make or clear checkpoint first
+    if (_current_event_index == -1 && _t_check != nullptr){
+        _clear_checkpoint();
+    }
+
+
+    if (t_new*_direction >= _tmax*_direction){
         stop("T_max goal reached");
         _q = this->step(_t, _q, _tmax-_t);
         _t = _tmax;
@@ -382,7 +437,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
     if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
-            write_chechpoint(_file, _t, _q, _current_event_index);
+            write_chechpoint(_file, _t, q(), _current_event_index);
         }
     }
 
@@ -402,9 +457,18 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
     qfunc = [this](const Tt& t_next) -> Ty { return this->step(this->_t, this->_q, t_next-this->_t);};
     
     if (event.determine(this->_t, next.t, this->_args, qfunc, this->_event_tol)){
+        if (_current_event_index == -1 && !event.has_mask()){
+            _make_checkpoint(next.t, next.q, next.h_next);
+        }
+        else if ( _t_check != nullptr && event.has_mask()){
+            _clear_checkpoint();
+        }
         t_new = event.t_event();
-        q_new = event.q_event();
-        next = {t_new, q_new, abs(next.t - t_new)};
+        q_new = event.q_masked();
+        next = {t_new, q_new, next.h_next};
+        if (event.hide_mask()){
+            _q_exposed = &event.q_event();
+        }
         return true;
     }
     return false;
@@ -423,18 +487,12 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
     }
     else {
         _current_event_index = -1;
+        int _stop_ev_index = -1;
         bool success;
-
-        for (const StopEvent<Tt, Ty>& _stop_ev : _stop_events){
-            if (_stop_ev.is_between(this->_t, this->_q, next.t, next.q, this->_args)){
-                success = _update(next.t, next.q, next.h_next);
-                stop(_stop_ev.name());
-                return success;
-            }
+        _q_exposed = &_q;
+        if (_t_check != nullptr){
+            next = {*_t_check, *_q_check, *_habs_check};
         }
-
-        Tt _habs_temp = next.h_next;
-
         for (int i=0; i<static_cast<int>(_events.size()); i++){
             if (_adapt_to_event(next, _events[i])){
                 if (_current_event_index != -1){
@@ -444,16 +502,22 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
             }
         }
 
-        if (_current_event_index != -1){
-            Event<Tt, Ty>& ev = _events[_current_event_index];
-            success = _update(ev.t_event(), ev.q_event(), next.h_next);
-            if (next.h_next <= _h_min){
-                _habs = _habs_temp; //this needs to happen after the update in case of event.
+        for (int i=0; i<static_cast<int>(_stop_events.size()); i++){
+            if (_stop_events[i].is_between(this->_t, this->_q, next.t, next.q, this->_args)){
+                _stop_ev_index = i;
+                break;
             }
-            return success;
         }
+
+        success = _update(next.t, next.q, next.h_next);
+
+        if (_stop_ev_index != -1){
+            stop(_stop_events[_stop_ev_index].name());
+        }
+
+        return success;
     }
-    return _update(next.t, next.q, next.h_next);
+
 }
 
 

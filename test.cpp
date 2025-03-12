@@ -16,6 +16,10 @@ bool check_fevent(const Tt& t, const Tf& f, const std::vector<Tt>& args){
     return f[3]>0;
 }
 
+Tf mask(const Tt& t, const Tf& f, const std::vector<Tt>& args){
+    return {1, 1, 0, 0};
+}
+
 
 int main(){
 
@@ -23,19 +27,21 @@ int main(){
     double t_max = 10001*pi/2;
     Tf q0 = {1, 1, 2.3, 4.5};
     
-    Event<Tt, Tf> event1("Event1", nullptr, nullptr, 0, 0);
-    Event<Tt, Tf> event2("Event2", fevent, nullptr, 0, -1e-9);
+
+    // Event<Tt, Tf> event2("Event1", fevent, nullptr, 1, -1e-5, mask, true);
+    Event<Tt, Tf> event1("Event1", fevent, nullptr, 0, 0, nullptr, true);
     // Event<Tt, Tf> event1("Event1", fevent, nullptr, 1, 0);
 
 
     // StopEvent<Tt, Tf> event2("stopevent", fevent);
 
-    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-5, 1e-10, 1e-8, {}, "RK23", 1e-10, {event2});
+    ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-5, 1e-10, 1e-8, {}, "RK23", 1e-10, {});
 
-
-    ode.integrate(t_max, 0);
-    std::cout << ode.runtime();
-
+    ode.integrate(t_max, -1, 0).examine();
+    ode.state().show();
+        // std::cin.getline(buffer, 100);
+        // input = buffer;
+        // double val = std::stod(input);
 
     // ODE<Tt, Tf> ode(f, 0, q0, 1e-2, 1e-5, 1e-10, 0., {}, "RK23", 1e-10, {event1, event2, event3});
 
