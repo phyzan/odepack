@@ -468,6 +468,8 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
         }
         t_new = event.t_event();
         q_new = event.q_masked();
+        // std::cout << event.q_event() << "  HEREEEEE\n";
+        // std::cout << q_new << "  MASKED\n";
         next = {t_new, q_new, next.h_next};
         if (event.hide_mask()){
             _q_exposed = &event.q_event();
