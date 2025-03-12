@@ -37,6 +37,9 @@ public:
     //ACCESSORS
     const Tt& t() const { return _t; }
     const Ty& q() const { return *_q_exposed; }
+    const Ty& q_true() const { return _q; }
+
+
     const Tt& stepsize() const { return _habs; }
     const Tt& tmax() const { return _tmax; }
     const int& direction() const { return _direction; }
@@ -493,6 +496,7 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
         if (_t_check != nullptr){
             next = {*_t_check, *_q_check, *_habs_check};
         }
+
         for (int i=0; i<static_cast<int>(_events.size()); i++){
             if (_adapt_to_event(next, _events[i])){
                 if (_current_event_index != -1){
@@ -502,6 +506,7 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
             }
         }
 
+
         for (int i=0; i<static_cast<int>(_stop_events.size()); i++){
             if (_stop_events[i].is_between(this->_t, this->_q, next.t, next.q, this->_args)){
                 _stop_ev_index = i;
@@ -510,7 +515,6 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
         }
 
         success = _update(next.t, next.q, next.h_next);
-
         if (_stop_ev_index != -1){
             stop(_stop_events[_stop_ev_index].name());
         }

@@ -113,8 +113,8 @@ public:
     const std::vector<Ty>& q()const{return _q_arr;}
     const double& runtime() const{return _runtime;}
 
-    OdeSolver<Tt, Ty>* solver() const{
-        return _solver->clone();
+    const OdeSolver<Tt, Ty>& solver() const{
+        return *_solver;
     }
 
     bool save_data(const std::string& filename) const{
