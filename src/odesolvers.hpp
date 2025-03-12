@@ -87,7 +87,7 @@ public:
     }
 
     bool reopen_file(){
-        if (!_file.good() || _file.is_open()){
+        if (_autosave || _filename.empty()){
             return false;
         }
         else{
@@ -380,7 +380,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         }
     }
 
-    if (success && _autosave){
+    if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
             write_chechpoint(_file, _t, _q, _current_event_index);
         }

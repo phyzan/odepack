@@ -89,6 +89,7 @@
         "condition_variable": "cpp",
         "mutex": "cpp",
         "mprealsupport": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "codecvt": "cpp"
     }
 }
