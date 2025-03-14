@@ -163,7 +163,7 @@ private:
 
 template<class Tt, class Ty>
 void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate=true, const bool& display = false){
-    #pragma omp target teams distribute parallel for map(tofrom: list) device(gpu_id)
+    #pragma omp target teams distribute parallel for map(tofrom: list) device(0)
     for (ODE<Tt, Ty>* ode : list){
         ode->integrate(interval, max_frames, max_events, terminate, display);
     }
