@@ -422,7 +422,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
 
     if (t_new*_direction >= _tmax*_direction){
-        if (_current_event_index != -1){
+        if ( (t_new*_direction > _tmax*_direction) && (_current_event_index != -1) ){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index].go_back();
@@ -474,8 +474,6 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
         }
         t_new = event.t_event();
         q_new = event.q_masked();
-        // std::cout << event.q_event() << "  HEREEEEE\n";
-        // std::cout << q_new << "  MASKED\n";
         next = {t_new, q_new, next.h_next};
         if (event.hide_mask()){
             _q_exposed = &event.q_event();

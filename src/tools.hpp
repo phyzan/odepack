@@ -126,7 +126,7 @@ class Event{
     //having a default value, or one determined from a previous .determine() call.
 
 public:
-    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, const Tt& period=0, const Tt& start=0, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false) : _name(name), _when(when), _check_if(check_if), _period(period), _start(start), _mask(mask), _hide_mask(hide_mask), _t_period(start), _t_period_previous(start){
+    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, const Tt& period=0, const Tt& start=0, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false) : _name(name), _when(when), _check_if(check_if), _period(period), _start(start), _mask(mask), _hide_mask(hide_mask){
         _assert_valid_name(name);
     }
 
@@ -181,9 +181,10 @@ public:
 
     void go_back(){
         _clear();
-        if (_period > 0){
-            _t_period = _t_period_previous;
+        if (_is_periodic_event){
+            _np = _np_previous;
         }
+        _is_periodic_event = false;
     }
 
     const Tt& t_event()const{
@@ -214,10 +215,11 @@ private:
     is_event_f<Tt, Ty> _check_if = nullptr;
     Tt _period;
     Tt _start;
+    long int _np = 0;
+    long int _np_previous = 0;
+    bool _is_periodic_event = false;
     Func<Tt, Ty> _mask = nullptr;
     bool _hide_mask; // variable that is only used externally for odesolvers to determine when and whether to call q_event or q_masked.
-    Tt _t_period;
-    Tt _t_period_previous;
     Tt* _t_event = nullptr;
     Ty* _q_event = nullptr;
     Ty* _q_masked = nullptr;
@@ -230,8 +232,9 @@ private:
         _start = other._start;
         _mask = other._mask;
         _hide_mask = other._hide_mask;
-        _t_period = other._t_period;
-        _t_period_previous = other._t_period_previous;
+        _np = other._np;
+        _np_previous = other._np_previous;
+        _is_periodic_event = other._is_periodic_event;
         _clear();
         if (other._t_event != nullptr){
             _realloc();
@@ -272,14 +275,16 @@ private:
         }
 
         const int direction = (t2 > t1) ? 1 : -1;
-        const Tt next = _t_period + direction*_period;
+        const Tt next = _start+(_np+direction)*_period;
         if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
-            _t_period_previous = _t_period;
-            _t_period = next;
+            _np_previous = _np;
+            _np += direction;
             t2 = next;
+            _is_periodic_event = true;
             return true;
         }
         else{
+            _is_periodic_event = false;
             return false;
         }
     }
