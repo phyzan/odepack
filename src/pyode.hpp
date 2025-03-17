@@ -314,7 +314,7 @@ void define_ode_module(py::module& m) {
     py::class_<PyAnyEvent<Tt, Ty>>(m, "AnyEvent", py::module_());
 
     py::class_<PyEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "Event", py::module_local())
-        .def(py::init<py::str, py::object, py::object, py::object, py::bool_>()
+        .def(py::init<py::str, py::object, py::object, py::object, py::bool_>(),
             py::arg("name"),
             py::arg("when"),
             py::arg("check_if")=py::none(),
@@ -322,7 +322,7 @@ void define_ode_module(py::module& m) {
             py::arg("hide_mask")=false);
 
         py::class_<PyPerEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "PeriodicEvent", py::module_local())
-            .def(py::init<py::str, Tt, Tt, py::object, py::bool_>()
+            .def(py::init<py::str, Tt, Tt, py::object, py::bool_>(),
                 py::arg("name"),
                 py::arg("period"),
                 py::arg("start")=0,
@@ -330,7 +330,7 @@ void define_ode_module(py::module& m) {
                 py::arg("hide_mask")=false);
 
         py::class_<StopEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
-            .def(py::init<py::str, py::object, py::object, py::object, py::bool_>()
+            .def(py::init<py::str, py::object, py::object, py::object, py::bool_>(),
                 py::arg("name"),
                 py::arg("when"),
                 py::arg("check_if")=py::none(),
