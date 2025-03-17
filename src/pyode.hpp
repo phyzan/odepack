@@ -83,7 +83,7 @@ class PyEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
 
-    Event<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
         delete this->_event_ptr;
         this->_event_ptr = new Event<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape), to_event_check<Tt, Ty>(this->py_check_if, shape), to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
         return this->_event_ptr;
@@ -97,7 +97,7 @@ class PyPerEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyPerEvent<Tt, Ty>(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask), _period(period), _start(start){}
 
-    PeriodicEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
         delete this->_event_ptr;
         this->_event_ptr = new PeriodicEvent<Tt, Ty>(this->_name, this->_period, this->_start, to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
         return this->_event_ptr;
@@ -119,7 +119,7 @@ class PyStopEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyStopEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
 
-    StopEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
         delete this->_event_ptr;
         this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape), to_event_check<Tt, Ty>(this->py_check_if, shape), to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
         return this->_event_ptr;
