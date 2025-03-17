@@ -311,7 +311,7 @@ std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape)
 template<class Tt, class Ty>
 void define_ode_module(py::module& m) {
 
-    py::class_<PyAnyEvent<Tt, Ty>>(m, "AnyEvent", py::module_());
+    py::class_<PyAnyEvent<Tt, Ty>>(m, "AnyEvent", py::module_local());
 
     py::class_<PyEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "Event", py::module_local())
         .def(py::init<py::str, py::object, py::object, py::object, py::bool_>(),
