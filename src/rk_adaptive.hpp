@@ -167,7 +167,7 @@ public:
     RK45(const RK45<Tt, Ty>& other) : RKbase(other) {}
 
     RK45<Tt, Ty>& operator=(const RK45<Tt, Ty>& other){
-        RungeKutta<Tt, Ty, Nstages, Norder>::operator=(other);
+        return RungeKutta<Tt, Ty, Nstages, Norder>::operator=(other);
     }
 
     RK45<Tt, Ty>* clone() const override{
@@ -238,7 +238,7 @@ public:
     RK23(const RK23<Tt, Ty>& other) : RKbase(other) {}
 
     RK23<Tt, Ty>& operator=(const RK23<Tt, Ty>& other){
-        RKbase::operator=(other);
+        return RKbase::operator=(other);
     }
 
     RK23<Tt, Ty>* clone() const override{

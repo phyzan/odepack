@@ -1,20 +1,28 @@
 import numpy as np
 from typing import Callable
-import numpy as np
 
 Func = Callable[[float, np.ndarray], np.ndarray] #f(t, q, *args) -> q
 ObjFunc = Callable[[float, np.ndarray], float] #  f(t, q, *args) -> float
 BoolFunc = Callable[[float, np.ndarray], bool] #  f(t, q, *args) -> bool
 
 
-class Event:
+class AnyEvent:
+    pass
 
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, period=0., start=0., mask: Func=None, hide_mask=False):...
+
+class Event(AnyEvent):
+
+    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False):...
 
 
-class StopEvent:
+class PeriodicEvent(AnyEvent):
 
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None):...
+    def __init__(self, name: str, period=0., start=0., mask: Func=None, hide_mask=False): ...
+
+
+class StopEvent(AnyEvent):
+
+    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False):...
 
 
 class OdeResult:
@@ -80,7 +88,7 @@ class SolverState:
 
 class LowLevelODE:
 
-    def __init__(self, f, t0, q0, stepsize, *, rtol=1e-6, atol=1e-12, min_step=0., args=(), method="RK45", event_tol=1e-12, events: list[Event]=None, stop_events: list[StopEvent] = None, savedir="", save_events_only=False):...
+    def __init__(self, f, t0, q0, stepsize, *, rtol=1e-6, atol=1e-12, min_step=0., args=(), method="RK45", event_tol=1e-12, events: list[AnyEvent]=None, savedir="", save_events_only=False):...
 
     def integrate(self, interval, *, max_frames=-1, max_events=-1, terminate=True, display=False)->OdeResult:...
 

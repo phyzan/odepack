@@ -21,7 +21,7 @@ OdeSolver<Tt, Ty>* getSolver(const SolverArgs<Tt, Ty>& S, const std::string& met
         solver = new RK45<Tt, Ty>(S);
     }
     else {
-        throw std::runtime_error("Unknown solver method");
+        throw std::runtime_error("Unknown solver method: "+method);
     }
 
     return solver;
@@ -31,14 +31,6 @@ template<class Tt, class Ty>
 class ODE{
 
 public:
-
-    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<Event<Tt, Ty>>& events = {}, const std::vector<StopEvent<Tt, Ty>>& stop_events = {}, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
-
-        const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, stop_events, event_tol, savedir, save_events_only};
-        _solver = getSolver(S, method);
-
-        _register_state();
-    }
 
     ODE(ODE<Tt, Ty>&& other): _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_arr(std::move(other._q_arr)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
         other._solver = nullptr;
@@ -51,6 +43,14 @@ public:
 
     ODE(const ODE<Tt, Ty>& other){
         _copy_data(other);
+    }
+
+    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+
+        const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, event_tol, savedir, save_events_only};
+        _solver = getSolver(S, method);
+
+        _register_state();
     }
 
     ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
@@ -83,8 +83,8 @@ public:
     std::map<std::string, std::vector<size_t>> event_map(const size_t& start_point=0) const{
         std::map<std::string, std::vector<size_t>> res;
         size_t index;
-        for (size_t i=0; i<_solver->events().size(); i++){
-            const Event<Tt, Ty>& ev = _solver->events()[i];
+        for (size_t i=0; i<_solver->events_size(); i++){
+            const AnyEvent<Tt, Ty>& ev = *_solver->event(i);
             res[ev.name()] = {};
             std::vector<size_t>& list = res[ev.name()];
             for (size_t j=0; j<_Nevents[i].size(); j++){
@@ -200,8 +200,10 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
             if ((event_counter != max_events) && _solver->at_event()){
                 _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
-                if ( (++event_counter == max_events) && terminate){
-                    _solver->stop("Max events reached");
+                if (!_solver->current_event()->is_stop_event()){
+                    if ( (++event_counter == max_events) && terminate){
+                        _solver->stop("Max events reached");
+                    }
                 }
                 ++i;
                 _register_state();

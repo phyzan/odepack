@@ -90,6 +90,16 @@
         "mutex": "cpp",
         "mprealsupport": "cpp",
         "fstream": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "__verbose_abort": "cpp",
+        "print": "cpp",
+        "stack": "cpp",
+        "__hash_table": "cpp",
+        "__node_handle": "cpp",
+        "bitset": "cpp",
+        "__split_buffer": "c",
+        "__bit_reference": "c",
+        "__tree": "c",
+        "__config": "cpp"
     }
 }

@@ -4,7 +4,38 @@
 #include <array>
 #include <string>
 #include "tools.hpp"
+#include "events.hpp"
 #include <limits>
+
+
+
+template<class Tt, class Ty>
+struct SolverArgs{
+
+    const Func<Tt, Ty> f;
+    const Tt t0;
+    const Tt tmax;
+    const Ty q0;
+    const Tt habs;
+    const Tt rtol;
+    const Tt atol;
+    const Tt h_min;
+    const std::vector<Tt> args;
+    const std::vector<AnyEvent<Tt, Ty>*> events;
+    const Tt event_tol;
+    const std::string save_dir;
+    const bool save_events_only;
+};
+
+
+template<class Tt, class Ty>
+void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q, const int& event_index){
+    file << event_index << " " << std::setprecision(16) << t;
+    for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
+        file << " " << std::setprecision(16) << q[i];
+    }
+    file << "\n";
+}
 
 
 template<class Tt, class Ty>
@@ -21,6 +52,7 @@ public:
 
     virtual ~OdeSolver(){
         _clear_checkpoint();
+        _delete_events();
         if (_autosave){
             _file.close();
         }
@@ -114,16 +146,16 @@ public:
     }
 
     std::string event_name() const{
-        return at_event() ? _events[_current_event_index].name() : "";
+        return at_event() ? current_event()->name() : "";
     }
 
     const SolverState<Tt, Ty> state() const {
         return {_t, q(), _habs, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
     }
 
-    const Event<Tt, Ty>* current_event() const{
+    const AnyEvent<Tt, Ty>* current_event() const{
         //we need pointer and not reference, because it might be null
-        return (_current_event_index == -1) ? nullptr : &(_events[_current_event_index]);
+        return at_event() ? _events[_current_event_index] : nullptr;
     }
 
     const int& current_event_index() const{
@@ -131,8 +163,12 @@ public:
         return _current_event_index;
     }
 
-    const std::vector<Event<Tt, Ty>>& events() const{
-        return _events;
+    const AnyEvent<Tt, Ty>* event(const size_t& i){
+        return _events[i];
+    }
+
+    size_t events_size()const{
+        return _events.size();
     }
 
 
@@ -149,12 +185,13 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _stop_events(S.stop_events), _events(S.events), _filename(S.save_dir), _save_events_only(S.save_events_only) {
+    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _filename(S.save_dir), _save_events_only(S.save_events_only) {
+        _make_new_events(S.events);
         set_goal(S.tmax);
         _q_exposed = &_q;
         if (!_filename.empty()){
             if (typeid(Tt) != typeid(_q[0])){
-                throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose solution array is not 1D");
+                throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose step is not 1D");
             }
             _file.open(_filename, std::ios::out);
             if (!_file){
@@ -167,49 +204,29 @@ protected:
 
     OdeSolver(const OdeSolver<Tt, Ty>& other){
         _copy_data(other);
+        _filename = "";
+        _autosave = false;
     };
 
-    OdeSolver(OdeSolver<Tt, Ty>&& other) : 
-    _f(std::move(other._f)),
-    _rtol(std::move(other._rtol)),
-    _atol(std::move(other._atol)),
-    _h_min(std::move(other._h_min)),
-    _args(std::move(other._args)),
-    _event_tol(std::move(other._event_tol)),
-    _n(other._n),
-    _t(std::move(other._t)),
-    _q(std::move(other._q)),
-    _habs(std::move(other._habs)),
-    _tmax(other._tmax),
-    _diverges(other._diverges),
-    _is_stiff(other._is_stiff),
-    _is_running(other._is_running),
-    _is_dead(other._is_dead),
-    _N(other._N),
-    _message(std::move(other._message)),
-    _direction(other._direction),
-    _stop_events(std::move(other._stop_events)),
-    _events(std::move(other._events)),
-    _current_event_index(other._current_event_index),
-    _filename(std::move(other._filename)),
-    _file(std::move(other._file)),
-    _autosave(other._autosave),
-    _t_check(other._t_check),
-    _q_check(other._q_check),
-    _habs_check(other._habs_check),
-    _q_exposed( (other._q_exposed == &other._q) ? &_q : other._q_exposed), //if other._q_exposed != other._q, set the pointer to the dymamically allocated object of the q_event the "other" points to.
-    _save_events_only(other._save_events_only){
-        other._file = std::ofstream();
+    OdeSolver(OdeSolver<Tt, Ty>&& other):_file(std::move(other._file)){
+        //not the most efficient, but the most readable :)
+        //besides the time scale of a copy is insignificant to the timescale of
+        //solving an ode.
+        _copy_data(other);
     }
 
 
     OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
         _copy_data(other);
+        _filename = "";
+        _autosave = false;
+        return *this;
     }
 
 
 
 private:
+
     Callable _f;
     Tt _rtol;
     Tt _atol;
@@ -228,8 +245,7 @@ private:
     size_t _N=0;//total number of solution updates
     std::string _message; //different from "running".
     int _direction;
-    std::vector<StopEvent<Tt, Ty>> _stop_events;
-    std::vector<Event<Tt, Ty>> _events;
+    std::vector<AnyEvent<Tt, Ty>*> _events;
     int _current_event_index = -1;
     std::string _filename;
     std::ofstream _file;
@@ -241,7 +257,7 @@ private:
     const Ty* _q_exposed = nullptr; //view_only pointer
 
 
-    bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
+    bool _adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& event);
 
     bool _go_to_state(State<Tt, Ty>& next);
 
@@ -260,7 +276,14 @@ private:
     }
 
     void _copy_data(const OdeSolver<Tt, Ty>& other){
-        //arguments below are passed into the SolverState when commanded
+        //does not copy _file, this has to be managed outside this function
+        _f = other._f;
+        _rtol = other._rtol;
+        _atol = other._atol;
+        _h_min = other._h_min;
+        _args = other._args;
+        _event_tol = other._event_tol;
+        _n = other._n;
         _t = other._t;
         _q = other._q;
         _habs = other._habs;
@@ -272,19 +295,13 @@ private:
         _N = other._N;
         _message = other._message;
         _direction = other._direction;
-        _stop_events = other._stop_events; // Copying the vector
-        _events = other._events; // Copying the vector. The events are deepcopied
         _current_event_index = other._current_event_index;
-        _f = other._f;
-        _rtol = other._rtol;
-        _atol = other._atol;
-        _h_min = other._h_min;
-        _args = other._args;
-        _event_tol = other._event_tol;
-        _n = other._n;
+        _save_events_only = other._save_events_only;
+
         _filename = other._filename;
         _autosave = other._autosave;
-        _save_events_only = other._save_events_only;
+
+        _make_new_events(other._events);
         _clear_checkpoint();
         if (other._t_check != nullptr){
             _make_checkpoint(*other._t_check, *other._q_check, *other._habs_check);
@@ -293,10 +310,9 @@ private:
             _q_exposed = &_q;
         }
         else{
-            _q_exposed = &(_events.at(_current_event_index).q_event());
+            _q_exposed = &current_event()->q_event();
         }
     }
-
 
     void _make_checkpoint(const Tt& t, const Ty& q, const Tt& habs){
         _t_check = new Tt;
@@ -314,6 +330,41 @@ private:
         _t_check = nullptr;
         _q_check = nullptr;
         _habs_check = nullptr;
+    }
+
+    void _make_new_events(const std::vector<AnyEvent<Tt, Ty>*>& events){
+
+        //FIRST create a new vector with new allocated objects, because "events" might be
+        //our current _events vector. We sort the vector to contain normal events first,
+        //and stop_events after to improve runtime performance and not miss out on any stop_events
+        //if a single step encouters multiple events.
+        std::vector<AnyEvent<Tt, Ty>*> new_events;
+        std::vector<AnyEvent<Tt, Ty>*> new_stop_events;
+        for (size_t i=0; i<events.size(); i++){
+            if (events[i]->is_stop_event()){
+                new_stop_events.push_back(events[i]->clone());
+            }
+            else{
+                new_events.push_back(events[i]->clone());
+            }
+        }
+
+        //push the pointers into a new (sorted) array
+        std::vector<AnyEvent<Tt, Ty>*> result(events.size());
+        std::copy(new_events.begin(), new_events.end(), result.begin());
+        std::copy(new_stop_events.begin(), new_stop_events.end(), result.begin() + new_events.size());
+
+        //NOW we can delete our current events
+        _delete_events();
+
+        _events = result;        
+    }
+
+    void _delete_events(){
+        for (size_t i=0; i<_events.size(); i++){
+            delete this->_events[i];
+            this->_events[i] = nullptr;
+        }
     }
 
 };
@@ -425,7 +476,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         if ( (t_new*_direction > _tmax*_direction) && (_current_event_index != -1) ){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
-            _events[_current_event_index].go_back();
+            _events[_current_event_index]->go_back();
             _current_event_index = -1;
         }
         stop("T_max goal reached");
@@ -435,13 +486,14 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _N++;
     }
     else{
+        if ( (h_next <= _h_min) & (h_next < _habs)){
+            _is_stiff = true;
+        }
         _t = t_new;
         _q = y_new;
         _habs = h_next;
         _N++;
-        if ( (h_next <= _h_min) & (_current_event_index == -1)){
-            _is_stiff = true;
-        }
+
     }
 
     if (_autosave && success){
@@ -450,12 +502,16 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         }
     }
 
+    if (at_event() && current_event()->is_stop_event()){
+        stop(current_event()->name());
+    }
+
 
     return success;
 }
 
 template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event){
+bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& event){
     // takes next state (which means tnew, hnew, and hnext_new)
     // if it is not an event or smth it is left unchanged.
     // otherwise, it is modified to depict the event with high accuracy
@@ -466,7 +522,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
     qfunc = [this](const Tt& t_next) -> Ty { return this->step(this->_t, this->_q, t_next-this->_t);};
     
     if (event.determine(this->_t, next.t, this->_args, qfunc, this->_event_tol)){
-        if (_current_event_index == -1 && !event.has_mask()){
+        if (_current_event_index == -1 && event.allows_checkpoint()){
             _make_checkpoint(next.t, next.q, next.h_next);
         }
         else if ( _t_check != nullptr && event.has_mask()){
@@ -496,36 +552,24 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
     }
     else {
         _current_event_index = -1;
-        int _stop_ev_index = -1;
-        bool success;
         _q_exposed = &_q;
         if (_t_check != nullptr){
             next = {*_t_check, *_q_check, *_habs_check};
         }
 
         for (int i=0; i<static_cast<int>(_events.size()); i++){
-            if (_adapt_to_event(next, _events[i])){
+            if (_adapt_to_event(next, *_events[i])){
                 if (_current_event_index != -1){
-                    _events[_current_event_index].go_back();
+                    _events[_current_event_index]->go_back();
                 }
                 _current_event_index = i;
+                if (current_event()->is_stop_event()){
+                    break;
+                }
             }
         }
 
-
-        for (int i=0; i<static_cast<int>(_stop_events.size()); i++){
-            if (_stop_events[i].is_between(this->_t, this->_q, next.t, next.q, this->_args)){
-                _stop_ev_index = i;
-                break;
-            }
-        }
-
-        success = _update(next.t, next.q, next.h_next);
-        if (_stop_ev_index != -1){
-            stop(_stop_events[_stop_ev_index].name());
-        }
-
-        return success;
+        return _update(next.t, next.q, next.h_next);
     }
 
 }
