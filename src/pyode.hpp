@@ -95,7 +95,7 @@ template<class Tt, class Ty>
 class PyPerEvent : public PyAnyEvent<Tt, Ty>{
 
 public:
-    PyPerEvent<Tt, Ty>(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask), _period(period), _start(start){}
+    PyPerEvent(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask), _period(period), _start(start){}
 
     AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
         delete this->_event_ptr;
@@ -329,7 +329,7 @@ void define_ode_module(py::module& m) {
                 py::arg("mask")=py::none(),
                 py::arg("hide_mask")=false);
 
-        py::class_<StopEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
+        py::class_<PyStopEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
             .def(py::init<py::str, py::object, py::object, py::object, py::bool_>(),
                 py::arg("name"),
                 py::arg("when"),
