@@ -474,8 +474,13 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
     if (t_new*_direction >= _tmax*_direction){
         if (t_new == _tmax){
-            std::cout << std::endl << y_new-this->step(_t, _q, _tmax-_t) << std::endl;
+            Ty p = y_new-this->step(_t, _q, _tmax-_t);
+            std::cout << std::endl << p << std::endl;
             _q = y_new;
+            if (p.abs().maxCoeff() > 1e-2){
+                std::cout << "Q_new: " << y_new << "\nWould: " << this->step(_t, _q, _tmax-_t) << std::endl;
+                throw std::runtime_error("df");
+            }
         }
         else if ( _current_event_index != -1 ){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered

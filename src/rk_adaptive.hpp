@@ -53,8 +53,10 @@ public:
 
             h = habs * this->direction();
             t_new = this->t()+h;
-
+            
+            std::cout << "t: " << this->t() << "\nq: " << this->q_true() << "\nh: " << h << "\n";
             q_new = step(this->t(), this->q_true(), h);
+            std::cout << "q_new: " << q_new << "\n" << std::endl;
             scale = this->atol() + cwise_max(qabs, cwise_abs(q_new))*this->rtol();
             err_norm = _error_norm(_K, h, scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
