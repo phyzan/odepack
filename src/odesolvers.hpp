@@ -185,7 +185,7 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs), _filename(S.save_dir), _save_events_only(S.save_events_only) {
+    OdeSolver(const SolverArgs<Tt, Ty>& S): _f(S.f), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _args(S.args), _event_tol(S.event_tol), _n(S.q0.size()), _t(S.t0), _q(S.q0), _habs(S.habs < S.h_min ? S.h_min : S.habs), _filename(S.save_dir), _save_events_only(S.save_events_only) {
         _make_new_events(S.events);
         set_goal(S.tmax);
         _q_exposed = &_q;
@@ -474,16 +474,9 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
     if (t_new*_direction >= _tmax*_direction){
         if (t_new == _tmax){
-            Ty p = y_new-this->step(_t, _q, _tmax-_t);
-            std::cout << std::endl << p << std::endl;
-            if (p.abs().maxCoeff() > 1e-2){
-                std::cout << "T: " << this->t() << "\nQ: " << this->q_true() << "\nh: " << _tmax-_t << "\n";
-                std::cout << "Q_new: " << y_new << "\nWould: " << this->step(_t, _q, _tmax-_t) << std::endl;
-                throw std::runtime_error("df");
-            }
             _q = y_new;
         }
-        else if ( _current_event_index != -1 ){
+        else if (_current_event_index != -1){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
@@ -499,8 +492,14 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         _N++;
     }
     else{
-        if ( (h_next <= _h_min) & (h_next < _habs)){
+        if ( h_next == _h_min){
             _is_stiff = true;
+            if (h_next > _habs){
+                throw std::runtime_error("Bug detected in min_step implementation (1).");
+            }
+        }
+        else if (h_next < _h_min){
+            throw std::runtime_error("Bug detected in min_step implementation (2).");
         }
         _t = t_new;
         _q = y_new;

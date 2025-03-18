@@ -41,7 +41,12 @@ public:
     }
 
     State<Tt, Ty> adaptive_step() const override {
-        const Ty& qabs = cwise_abs(this->q_true());
+        const Ty& q = this->q_true();
+        const Ty qabs = cwise_abs(q);
+        const Tt& t = this->t();
+        const Tt& h_min = this->h_min();
+        const Tt& atol = this->atol();
+        const Tt& rtol = this->rtol();
         Tt habs = this->stepsize();
         Tt h, t_new, err_norm, factor, _factor;
         Ty q_new, scale;
@@ -52,12 +57,10 @@ public:
         while (!step_accepted){
 
             h = habs * this->direction();
-            t_new = this->t()+h;
-            
-            std::cout << "t: " << this->t() << "\nq: " << this->q_true() << "\nh: " << h << "\n";
-            q_new = step(this->t(), this->q_true(), h);
-            std::cout << "q_new: " << q_new << "\n" << std::endl;
-            scale = this->atol() + cwise_max(qabs, cwise_abs(q_new))*this->rtol();
+            t_new = t+h;
+
+            q_new = step(t, q, h);
+            scale = atol + cwise_max(qabs, cwise_abs(q_new))*rtol;
             err_norm = _error_norm(_K, h, scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
             if (err_norm < 1){
@@ -72,11 +75,8 @@ public:
                 step_rejected = true;
             }
             habs *= factor;
-            if (habs == 0){
-                break;
-            }
-            else if (habs <= this->h_min()){
-                habs = this->h_min();
+            if (habs <= h_min){
+                habs = h_min;
                 break;
             }
             
