@@ -41,12 +41,13 @@ public:
     }
 
     State<Tt, Ty> adaptive_step() const override {
-        const Ty& q = this->q_true();
-        const Ty qabs = cwise_abs(q);
         const Tt& t = this->t();
         const Tt& h_min = this->h_min();
+        const Tt& h_max = this->h_max();
         const Tt& atol = this->atol();
         const Tt& rtol = this->rtol();
+        const Ty& q = this->q_true();
+        const Ty qabs = cwise_abs(q);
         Tt habs = this->stepsize();
         Tt h, t_new, err_norm, factor, _factor;
         Ty q_new, scale;
@@ -75,7 +76,10 @@ public:
                 step_rejected = true;
             }
             habs *= factor;
-            if (habs <= h_min){
+            if (habs > h_max){
+                habs = h_max;
+            }
+            if (habs < h_min){
                 habs = h_min;
                 break;
             }
@@ -92,9 +96,9 @@ public:
 
 protected:
 
-    RungeKutta(const SolverArgs<Tt, Ty>& S, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S), A(A), B(B), C(C), E(E) {}
+    RungeKutta(const SolverArgs<Tt, Ty>& S, const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(Tt(-1)/Tt(err_est_ord+1)) {}
 
-    RungeKutta(const RungeKutta<Tt, Ty, Nstages, Norder>& other) : OdsBase(other), A(other.A), B(other.B), C(other.C), E(other.E), _K(other._K){}
+    RungeKutta(const RungeKutta<Tt, Ty, Nstages, Norder>& other) : OdsBase(other), A(other.A), B(other.B), C(other.C), E(other.E), _K(other._K), err_exp(other.err_exp){}
 
     RungeKutta<Tt, Ty, Nstages, Norder> operator=(const RungeKutta<Tt, Ty, Nstages, Norder>& other){
         if (&other == this) return *this;
@@ -105,14 +109,14 @@ protected:
 
 private:
 
-    const Tt err_exp = Tt(-1)/Tt(Norder);
     mutable StageContainer _K;//always holds the value given to it by the last "step" call
+    const Tt err_exp;
 
 
     Ty _step(const Tt& t_old, const Ty& q_old, const Tt& h, StageContainer& K) const{
 
         Ty dq;
-        K[0] = this->f()(t_old, q_old, this->args());
+        K[0] = this->f(t_old, q_old);
 
         Ty temp = B(0)*K[0];
 
@@ -123,15 +127,12 @@ private:
                 dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            K[s] = this->f()(t_old+this->C(s)*h, q_old+dq, this->args());
+            K[s] = this->f(t_old+this->C(s)*h, q_old+dq);
             temp += B(s)*K[s];
         }
 
         Ty q_new = q_old + temp*h;
-
-
-        K[Nstages] = this->f()(t_old+h, q_new, this->args());
-
+        K[Nstages] = this->f(t_old+h, q_new);
         return q_new;
 
     };
@@ -146,7 +147,7 @@ private:
 
     Tt _error_norm(const StageContainer& K, const Tt& h, const Ty& scale) const{
         Ty f = _error(K, h) / scale;
-        return sqrt(norm(f) / f.size());
+        return rms_norm(f);
     }
 
 };
@@ -164,7 +165,7 @@ class RK45 : public RungeKutta<Tt, Ty, 6, 5>{
 
 public:
 
-    RK45(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK45(const SolverArgs<Tt, Ty>& S) : RKbase(S, 4, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RK45(const RK45<Tt, Ty>& other) : RKbase(other) {}
 
@@ -235,7 +236,7 @@ class RK23 : public RungeKutta<Tt, Ty, 3, 3> {
     using RKbase = RungeKutta<Tt, Ty, Nstages, Norder>;
     
 public:
-    RK23(const SolverArgs<Tt, Ty>& S) : RKbase(S, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK23(const SolverArgs<Tt, Ty>& S) : RKbase(S, 2, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RK23(const RK23<Tt, Ty>& other) : RKbase(other) {}
 

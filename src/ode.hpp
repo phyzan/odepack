@@ -45,11 +45,10 @@ public:
         _copy_data(other);
     }
 
-    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt stepsize, const Tt rtol, const Tt atol, const Tt min_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step=0., const Tt& max_step=inf<Tt>(), const Tt first_step=0, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
 
-        const SolverArgs<Tt, Ty> S = {f, t0, t0, q0, stepsize, rtol, atol, min_step, args, events, event_tol, savedir, save_events_only};
+        const SolverArgs<Tt, Ty> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, event_tol, args, events, savedir, save_events_only};
         _solver = getSolver(S, method);
-
         _register_state();
     }
 

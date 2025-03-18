@@ -65,6 +65,13 @@
         "format": "cpp",
         "__hash_table": "cpp",
         "__node_handle": "cpp",
-        "__verbose_abort": "cpp"
+        "__verbose_abort": "cpp",
+        "bitset": "cpp",
+        "__split_buffer": "cpp",
+        "__tree": "cpp",
+        "queue": "cpp",
+        "stack": "cpp",
+        "unordered_set": "cpp",
+        "locale": "cpp"
     }
 }

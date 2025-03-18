@@ -28,10 +28,19 @@ using complex = std::complex<T>;
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
 
+template <typename T>
+constexpr T inf() {
+    return std::numeric_limits<T>::infinity();
+}
 
 template<class T, int Nr, int Nc>
-T norm(const Eigen::Array<T, Nr, Nc>& f){
+T norm_squared(const Eigen::Array<T, Nr, Nc>& f){
     return (f*f).sum();
+}
+
+template<class T, int Nr, int Nc>
+T rms_norm(const Eigen::Array<T, Nr, Nc>& f){
+    return sqrt(norm_squared(f) / f.size());
 }
 
 template<class T, int Nr, int Nc>
