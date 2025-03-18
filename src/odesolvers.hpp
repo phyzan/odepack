@@ -542,6 +542,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& e
             _clear_checkpoint();
         }
         t_new = event.t_event();
+        std::cout << std::endl << "NEXTtt: " << t_new << std::endl;
         q_new = event.q_masked();
         next = {t_new, q_new, next.h_next};
         if (event.hide_mask()){

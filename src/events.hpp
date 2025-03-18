@@ -209,7 +209,6 @@ public:
             _np_previous = _np;
             _np += direction;
             this->_realloc();
-            std::cout << std::endl << "NEXT: " << next << std::endl;
             this->_set(next, q(next), args);
             return true;
         }
