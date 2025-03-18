@@ -479,7 +479,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         else if (_current_event_index != -1){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
-            std::cout << std::endl << "Hi  " << std::setprecision(15) << _t << " "<< std::setprecision(15) << t_new << std::endl;
+            std::cout << std::endl << "Hi  " << std::setprecision(15) << _t << " " << std::setprecision(15) << _t-t_new << std::endl;
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
             _q = this->step(_t, _q, _tmax-_t);
