@@ -478,9 +478,9 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
+            _q = this->step(_t, _q, _tmax-_t);
         }
         stop("T_max goal reached");
-        _q = this->step(_t, _q, _tmax-_t);
         _t = _tmax;
         _habs = h_next;
         _N++;
