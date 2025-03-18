@@ -25,7 +25,7 @@ public:
 
     const Ty& q_event()const{ return *_q_event;}
 
-    const Ty& q_masked()const{ return *_q_masked;}
+    const Ty& q_true_event()const{ return *_q_masked;}
 
     const std::string& name()const{ return _name;}
 

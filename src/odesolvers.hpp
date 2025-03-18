@@ -541,7 +541,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& e
             _clear_checkpoint();
         }
         t_new = event.t_event();
-        q_new = event.q_masked();
+        q_new = event.q_true_event();
         next = {t_new, q_new, next.h_next};
         if (event.hide_mask()){
             _q_exposed = &event.q_event();
