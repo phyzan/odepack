@@ -481,7 +481,7 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
             _q = this->step(_t, _q, _tmax-_t);
         }
         else{
-            _q = y_new
+            _q = y_new;
         }
         stop("T_max goal reached");
         _t = _tmax;
