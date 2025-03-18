@@ -473,14 +473,21 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 
 
     if (t_new*_direction >= _tmax*_direction){
-        if ( (t_new*_direction > _tmax*_direction) && (_current_event_index != -1) ){
+        if (t_new == _tmax){
+            std::cout << std::endl << y_new-this->step(_t, _q, _tmax-_t) << std::endl;
+            _q = y_new;
+        }
+        else if ( _current_event_index != -1 ){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
+            _q = this->step(_t, _q, _tmax-_t);
+        }
+        else{
+            _q = this->step(_t, _q, _tmax-_t);
         }
         stop("T_max goal reached");
-        _q = this->step(_t, _q, _tmax-_t);
         _t = _tmax;
         _habs = h_next;
         _N++;
