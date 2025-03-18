@@ -385,13 +385,20 @@ void define_ode_module(py::module& m) {
             py::arg("events")=py::none(),
             py::arg("savedir")="",
             py::arg("save_events_only")=false)
-        .def("integrate", [](PyODE<Tt, Ty>& self, const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const bool& display){return PyOdeResult<Tt, Ty>(self.integrate(interval, max_frames, max_events, terminate, display), self.q0_shape);},
+        .def("integrate", [](PyODE<Tt, Ty>& self, const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){return PyOdeResult<Tt, Ty>(self.integrate(interval, max_frames, max_events, terminate, max_prints), self.q0_shape);},
             py::arg("interval"),
             py::kw_only(),
             py::arg("max_frames")=-1,
             py::arg("max_events")=-1,
             py::arg("terminate")=true,
-            py::arg("display")=false)
+            py::arg("max_prints")=0)
+        .def("go_to", [](PyODE<Tt, Ty>& self, const Tt& t, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){return PyOdeResult<Tt, Ty>(self.go_to(t, max_frames, max_events, terminate, max_prints), self.q0_shape);},
+        py::arg("t"),
+        py::kw_only(),
+        py::arg("max_frames")=-1,
+        py::arg("max_events")=-1,
+        py::arg("terminate")=true,
+        py::arg("max_prints")=0)
         .def("copy", [](const PyODE<Tt, Ty>& self){return PyODE<Tt, Ty>(self);})
         .def("advance", [](PyODE<Tt, Ty>& self){return self.advance();})
         .def("resume", [](PyODE<Tt, Ty>& self){return self.resume();})
@@ -408,13 +415,13 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("is_dead", &PyODE<Tt, Ty>::is_dead);
 
 
-    m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& threads, const bool& display){
+    m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& threads, const int& max_prints){
         std::vector<ODE<Tt, Ty>*> array;
         for (const py::handle& item : list){
             array.push_back(&(item.cast<PyODE<Tt, Ty>&>()));
         }
-        integrate_all(array, interval, max_frames, max_events, terminate, threads, display);
-    }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=-1, py::arg("terminate")=true, py::arg("threads")=-1, py::arg("display")=false);
+        integrate_all(array, interval, max_frames, max_events, terminate, threads, max_prints);
+    }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=-1, py::arg("terminate")=true, py::arg("threads")=-1, py::arg("max_prints")=0);
 }
 
 

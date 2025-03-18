@@ -62,7 +62,9 @@ public:
 
     ~ODE(){delete _solver;}
 
-    const OdeResult<Tt, Ty> integrate(const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const bool& display = false);
+    const OdeResult<Tt, Ty> integrate(const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0);
+
+    const OdeResult<Tt, Ty> go_to(const Tt& t, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0);
 
     const SolverState<Tt, Ty> state() const {return _solver->state();}
 
@@ -162,11 +164,11 @@ private:
 };
 
 template<class Tt, class Ty>
-void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate=true, const int& threads=-1, const bool& display = false){
+void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate=true, const int& threads=-1, const int& max_prints = 0){
     const int num = (threads <= 0) ? omp_get_thread_num() : threads;
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (ODE<Tt, Ty>* ode : list){
-        ode->integrate(interval, max_frames, max_events, terminate, display);
+        ode->integrate(interval, max_frames, max_events, terminate, max_prints);
     }
 }
 
@@ -179,22 +181,30 @@ void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, co
 -----------------------------------------------------------------------
 */
 
+template<class Tt, class Ty>
+const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints){
+
+    return this->go_to(_solver->t()+interval, max_frames, max_events, terminate, max_prints);
+
+}
+
 
 template<class Tt, class Ty>
-const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const bool& display){
+const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints){
     
     auto t1 = std::chrono::high_resolution_clock::now();
 
     const Tt t0 = _solver->t();
+    const Tt interval = t-t0;
     const size_t N = _t_arr.size();
     long int event_counter = 0;
     long int frame_counter = 0;
     size_t i = N;
-    int MAX_PRINTS = 100;
+    const int MAX_PRINTS = max_prints;
     int prints = 0;
 
     _solver->reopen_file();
-    _solver->set_goal(t0+interval);
+    _solver->set_goal(t);
     
     while (_solver->is_running()){
         if (_solver->advance()){
@@ -215,7 +225,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
                 ++i;
             }
         }
-        if (display){
+        if (max_prints > 0){
             Tt percentage = (_solver->t() - t0)/(_solver->tmax()-t0);
             if (percentage*MAX_PRINTS >= prints){
                 #pragma omp critical
@@ -228,7 +238,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
         }
     }
-    if (display){
+    if (max_prints > 0){
         std::cout << std::endl;
     }
 
