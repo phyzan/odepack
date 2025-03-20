@@ -235,8 +235,9 @@ protected:
         }
         if (S.mask != nullptr){
             Func<Tt, Ty> f_tmp = S.f;
-            _f = [mask, f_tmp](const Tt& t, const Ty& q, const std::vector<Tt>& args)->Ty {
-                return mask(t, f_tmp(t, q, args), args);
+            Func<Tt, Ty> msk = S.mask;
+            _f = [msk, f_tmp](const Tt& t, const Ty& q, const std::vector<Tt>& args)->Ty {
+                return msk(t, f_tmp(t, q, args), args);
             };
         }
         _q_exposed = &_q;

@@ -27,10 +27,10 @@ template<class Scalar, class ArrayType>
 py::array_t<Scalar> to_numpy(const ArrayType& array, const _Shape& q0_shape={});
 
 template<class Tt, class Ty>
-event_f<Tt, Ty> to_event(py::object py_event, const _Shape& shape);
+event_f<Tt, Ty> to_event(py::object py_event, const _Shape& shape, py::tuple args);
 
 template<class Tt, class Ty>
-is_event_f<Tt, Ty> to_event_check(py::object py_event_check, const _Shape& shape);
+is_event_f<Tt, Ty> to_event_check(py::object py_event_check, const _Shape& shape, py::tuple py_args);
 
 py::dict to_PyDict(const std::map<std::string, std::vector<size_t>>& _map);
 
@@ -174,7 +174,7 @@ public:
 
     PyODE(py::object f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0), args), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<Tt, Ty>(events, shape(q0), args), to_Func<Tt, Ty>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
 
-    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only), q0_shape({q0.size()}){}
+    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only), q0_shape({q0.size()}){}
 
     PyODE(PyODE<Tt, Ty>&& other):ODE<Tt, Ty>(std::move(other)), q0_shape(other.q0_shape){}
 
@@ -244,7 +244,7 @@ event_f<Tt, Ty> to_event(py::object py_event, const _Shape& shape, py::tuple py_
         return nullptr;
     }
     event_f<Tt, Ty> g;
-    if (args.empty()){
+    if (py_args.empty()){
         g = [py_event, shape](const Tt& t, const Ty& f, const std::vector<Tt>& args) -> Tt {
             return py_event(t, to_numpy<Tt>(f, shape), *to_tuple(args)).template cast<Tt>();
         };
