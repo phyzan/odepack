@@ -9,8 +9,9 @@
 
 namespace py = pybind11;
 
+//assumes empty args given as std::vector, use only for ODE instanciated from python directly
 template<class Tt, class Ty>
-Func<Tt, Ty> to_Func(py::object f, const _Shape& shape);
+Func<Tt, Ty> to_Func(py::object f, const _Shape& shape, py::tuple args=py::tuple());
 
 _Shape shape(const py::array& arr);
 
@@ -46,7 +47,7 @@ template<class T>
 py::tuple to_tuple(const std::vector<T>& vec);
 
 template<class Tt, class Ty>
-std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape);
+std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args);
 
 
 
@@ -64,7 +65,7 @@ public:
         this->_event_ptr = nullptr;
     }
 
-    virtual AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) = 0;
+    virtual AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) = 0;
 
     py::str name()const{
         return py::str(_name);
@@ -89,9 +90,9 @@ class PyEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
 
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args=py::tuple()) override{
         delete this->_event_ptr;
-        this->_event_ptr = new Event<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape), to_event_check<Tt, Ty>(this->py_check_if, shape), to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
+        this->_event_ptr = new Event<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask);
         return this->_event_ptr;
     }
 
@@ -104,9 +105,9 @@ class PyPerEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyPerEvent(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask), _period(period), _start(start){}
 
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
         delete this->_event_ptr;
-        this->_event_ptr = new PeriodicEvent<Tt, Ty>(this->_name, this->_period, this->_start, to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
+        this->_event_ptr = new PeriodicEvent<Tt, Ty>(this->_name, this->_period, this->_start, to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask);
         return this->_event_ptr;
     }
 
@@ -134,9 +135,9 @@ class PyStopEvent : public PyAnyEvent<Tt, Ty>{
 public:
     PyStopEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
 
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape) override{
+    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
         delete this->_event_ptr;
-        this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape), to_event_check<Tt, Ty>(this->py_check_if, shape), to_Func<Tt, Ty>(this->py_mask, shape), this->hide_mask);
+        this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask);
         return this->_event_ptr;
     }
 };
@@ -168,7 +169,7 @@ template<class Tt, class Ty>
 class PyODE : public ODE<Tt, Ty>{
 public:
 
-    PyODE(py::object f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0)), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), event_tol, to_Events<Tt, Ty>(events, shape(q0)), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
+    PyODE(py::object f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, const Tt event_tol, py::object events, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0), args), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), event_tol, to_Events<Tt, Ty>(events, shape(q0), args), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
 
     PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, event_tol, events, savedir, save_events_only), q0_shape({q0.size()}){}
 
@@ -213,39 +214,65 @@ public:
 -----------------------------------------------------------------------
 */
 
-
 template<class Tt, class Ty>
-Func<Tt, Ty> to_Func(py::object f, const _Shape& shape){
+Func<Tt, Ty> to_Func(py::object f, const _Shape& shape, py::tuple py_args){
     if (f.is_none()){
         return nullptr;
     }
 
-    Func<Tt, Ty> g = [f, shape](const Tt& t, const Ty& y, const std::vector<Tt>& args) -> Ty {
-        return fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *to_tuple(args)));
-    };
+    Func<Tt, Ty> g;
+    if (py_args.empty()){
+        g = [f, shape](const Tt& t, const Ty& y, const std::vector<Tt>& args) -> Ty {
+            return fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *to_tuple(args)));
+        };
+    }
+    else{
+        g = [f, shape, py_args](const Tt& t, const Ty& y, const std::vector<Tt>& _) -> Ty {
+            return fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *py_args));
+        };
+    }
+
     return g;
 }
 
 template<class Tt, class Ty>
-event_f<Tt, Ty> to_event(py::object py_event, const _Shape& shape){
+event_f<Tt, Ty> to_event(py::object py_event, const _Shape& shape, py::tuple py_args){
     if (py_event.is_none()){
         return nullptr;
     }
-    event_f<Tt, Ty> g = [py_event, shape](const Tt& t, const Ty& f, const std::vector<Tt>& args) -> Tt {
-        return py_event(t, to_numpy<Tt>(f, shape), *to_tuple(args)).template cast<Tt>();
-    };
+    event_f<Tt, Ty> g;
+    if (args.empty()){
+        g = [py_event, shape](const Tt& t, const Ty& f, const std::vector<Tt>& args) -> Tt {
+            return py_event(t, to_numpy<Tt>(f, shape), *to_tuple(args)).template cast<Tt>();
+        };
+    }
+    else{
+        g = [py_event, shape, py_args](const Tt& t, const Ty& f, const std::vector<Tt>& _) -> Tt {
+            return py_event(t, to_numpy<Tt>(f, shape), *py_args).template cast<Tt>();
+        };
+    }
+
     return g;
 }
 
 template<class Tt, class Ty>
-is_event_f<Tt, Ty> to_event_check(py::object py_event_check, const _Shape& shape){
+is_event_f<Tt, Ty> to_event_check(py::object py_event_check, const _Shape& shape, py::tuple py_args){
     if (py_event_check.is_none()){
         return nullptr;
     }
 
-    is_event_f<Tt, Ty> g = [py_event_check, shape](const Tt& t, const Ty& f, const std::vector<Tt>& args) -> bool {
-        return py_event_check(t, to_numpy<Tt>(f, shape), *to_tuple(args)).equal(py::bool_(true));
-    };
+    is_event_f<Tt, Ty> g;
+    if (py_args.empty()){
+        g = [py_event_check, shape](const Tt& t, const Ty& f, const std::vector<Tt>& args) -> bool {
+            return py_event_check(t, to_numpy<Tt>(f, shape), *to_tuple(args)).equal(py::bool_(true));
+        };
+    }
+    else{
+        g = [py_event_check, shape, py_args](const Tt& t, const Ty& f, const std::vector<Tt>& _) -> bool {
+            return py_event_check(t, to_numpy<Tt>(f, shape), *py_args).equal(py::bool_(true));
+        };
+    }
+
     return g;
 }
 
@@ -332,13 +359,13 @@ py::tuple to_tuple(const std::vector<T>& arr) {
 }
 
 template<class Tt, class Ty>
-std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape){   
+std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args){   
     if (events.is_none()){
         return {};
     }
     std::vector<AnyEvent<Tt, Ty>*> res;
     for (const py::handle& item : events){
-        res.push_back(item.cast<PyAnyEvent<Tt, Ty>&>().toEvent(shape));
+        res.push_back(item.cast<PyAnyEvent<Tt, Ty>&>().toEvent(shape, args));
     }
     return res;
 }
