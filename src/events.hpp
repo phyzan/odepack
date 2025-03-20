@@ -15,7 +15,7 @@ class AnyEvent{
 
 public:
 
-    virtual bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q, const Tt& tol) = 0;
+    virtual bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) = 0;
 
     virtual void go_back(){ _clear();}
 
@@ -131,16 +131,15 @@ class Event : public AnyEvent<Tt, Ty>{
 
 public:
 
-    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false): AnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){
+    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false, const Tt& event_tol=1e-12): AnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){
         _assert_func(when);
     }
 
-    Event(const Event<Tt, Ty>& other):AnyEvent<Tt, Ty>(other){}
-
-
+    Event(const Event<Tt, Ty>& other):AnyEvent<Tt, Ty>(other), _event_tol(other._event_tol){}
 
     Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other){
         if (&other == this) return *this;
+        _event_tol = other._event_tol;
         return AnyEvent<Tt, Ty>::operator=(other);
     }
 
@@ -148,7 +147,7 @@ public:
         return new Event<Tt, Ty>(*this);
     }
 
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q, const Tt& tol) override {
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
         this->_clear();
         Tt t_determined = t2;
         bool determined = false;
@@ -159,7 +158,7 @@ public:
             Tt val1 = this->_when(t1, q1, args);
             Tt val2 = this->_when(t2, q2, args);
             if (val1 * val2 <= 0 && val1 != 0){
-                t_determined = bisect(obj_fun, t1, t2, tol)[2];
+                t_determined = bisect(obj_fun, t1, t2, this->_event_tol)[2];
                 determined = true;
             }
         }
@@ -171,6 +170,10 @@ public:
         return determined;
 
     }
+
+private:
+
+    Tt _event_tol;
 
 };
 
@@ -201,7 +204,7 @@ public:
         return new PeriodicEvent<Tt, Ty>(*this);
     }
 
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q, const Tt& tol) override {
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
         this->_clear();
         const int direction = (t2 > t1) ? 1 : -1;
         const Tt next = _start+(_np+direction)*_period;
@@ -253,7 +256,7 @@ public:
         return new StopEvent<Tt, Ty>(*this);
     }
 
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q, const Tt& tol) override {
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
         this->_clear();
         if (this->_check_if == nullptr || (this->_check_if(t1, q1, args) && this->_check_if(t2, q2, args))){
             Tt val1 = this->_when(t1, q1, args);

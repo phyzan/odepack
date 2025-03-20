@@ -20,9 +20,9 @@ struct SolverArgs{
     const Tt h_min;
     const Tt h_max;
     const Tt first_step;
-    const Tt event_tol;
     const std::vector<Tt> args;
     const std::vector<AnyEvent<Tt, Ty>*> events;
+    const Func<Tt, Ty> mask;
     const std::string save_dir;
     const bool save_events_only;
 };
@@ -80,7 +80,6 @@ public:
     const Tt& atol() const { return _atol; }
     const Tt& h_min() const { return _h_min; }
     const Tt& h_max() const { return _h_max; }
-    const Tt& event_tol() const { return _event_tol; }
     const std::vector<Tt>& args() const { return _args; }
     const size_t& Nsys() const { return _n; }
     const bool& diverges() const {return _diverges;}
@@ -224,7 +223,7 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _f(S.f), _t(S.t0), _q(S.q0), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _event_tol(S.event_tol), _args(S.args), _n(S.q0.size()), _filename(S.save_dir), _save_events_only(S.save_events_only){
+    OdeSolver(const SolverArgs<Tt, Ty>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _f(S.f), _t(S.t0), _q(S.q0), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _args(S.args), _n(S.q0.size()), _filename(S.save_dir), _save_events_only(S.save_events_only){
         if (_h_max < _h_min){
             throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
         }
@@ -233,6 +232,12 @@ protected:
         }
         else{
             _habs = (S.first_step < _h_min) ? _h_min : S.first_step;
+        }
+        if (S.mask != nullptr){
+            Func<Tt, Ty> f_tmp = S.f;
+            _f = [mask, f_tmp](const Tt& t, const Ty& q, const std::vector<Tt>& args)->Ty {
+                return mask(t, f_tmp(t, q, args), args);
+            };
         }
         _q_exposed = &_q;
         _make_new_events(S.events);
@@ -287,7 +292,6 @@ private:
     Tt _h_min;
     Tt _h_max;
     Tt _habs;
-    Tt _event_tol;
     std::vector<Tt> _args;
 
     size_t _n; //size of ode system
@@ -342,7 +346,6 @@ private:
         _h_min = other._h_min;
         _h_max = other._h_max;
         _habs = other._habs;
-        _event_tol = other._event_tol;
         _args = other._args;
         _n = other._n;
         _tmax = other._tmax;
@@ -590,7 +593,7 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& e
     // otherwise, it is modified to depict the event with high accuracy
     std::function<Ty(Tt)> qfunc = [this](const Tt& t_next) -> Ty { return _q_step(t_next);};
     
-    if (event.determine(this->_t, this->_q, next.t, next.q, this->_args, qfunc, this->_event_tol)){
+    if (event.determine(this->_t, this->_q, next.t, next.q, this->_args, qfunc)){
         if (_current_event_index == -1 && event.allows_checkpoint()){
             _make_checkpoint(next.t, next.q, next.h_next);
         }

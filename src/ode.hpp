@@ -45,9 +45,9 @@ public:
         _copy_data(other);
     }
 
-    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step=0., const Tt& max_step=inf<Tt>(), const Tt first_step=0, const std::vector<Tt> args = {}, const std::string& method = "RK45", const Tt event_tol = 1e-10, const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step=0., const Tt& max_step=inf<Tt>(), const Tt first_step=0, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
 
-        const SolverArgs<Tt, Ty> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, event_tol, args, events, savedir, save_events_only};
+        const SolverArgs<Tt, Ty> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only};
         _solver = getSolver(S, method);
         _register_state();
     }
@@ -61,9 +61,9 @@ public:
 
     ~ODE(){delete _solver;}
 
-    const OdeResult<Tt, Ty> integrate(const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0);
+    const OdeResult<Tt, Ty> integrate(const Tt& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0, const bool& include_first=false);
 
-    const OdeResult<Tt, Ty> go_to(const Tt& t, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0);
+    const OdeResult<Tt, Ty> go_to(const Tt& t, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0, const bool& include_first=false);
 
     const SolverState<Tt, Ty> state() const {return _solver->state();}
 
@@ -181,15 +181,15 @@ void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, co
 */
 
 template<class Tt, class Ty>
-const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints){
+const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
 
-    return this->go_to(_solver->t()+interval, max_frames, max_events, terminate, max_prints);
+    return this->go_to(_solver->t()+interval, max_frames, max_events, terminate, max_prints, include_first);
 
 }
 
 
 template<class Tt, class Ty>
-const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints){
+const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
     
     auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -245,7 +245,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     
     std::chrono::duration<double> rt = t2-t1;
 
-    OdeResult<Tt, Ty> res = {subvec(_t_arr, N), subvec(_q_arr, N), event_map(N), _solver->diverges(), _solver->is_stiff(), !_solver->is_dead(), rt.count(), _solver->message()};
+    OdeResult<Tt, Ty> res = {subvec(_t_arr, N-include_first), subvec(_q_arr, N-include_first), event_map(N-include_first), _solver->diverges(), _solver->is_stiff(), !_solver->is_dead(), rt.count(), _solver->message()};
 
     _runtime += res.runtime;
     _solver->release_file();
