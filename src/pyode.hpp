@@ -181,6 +181,26 @@ public:
         return PySolverState<Tt, Ty>(s.t, s.q, s.habs, s.event, s.diverges, s.is_stiff, s.is_running, s.is_dead, s.N, s.message, q0_shape); 
     }
 
+    PyOdeResult<Tt, Ty> py_integrate(const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){
+        OdeResult<Tt, Ty> res = this->integrate(interval, max_frames, max_events, terminate, max_prints);
+        PyOdeResult<Tt, Ty> py_res = PyOdeResult<Tt, Ty>(res, this->q0_shape);
+        return py_res;
+    }
+
+    PyOdeResult<Tt, Ty> py_go_to(const Tt& t, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){
+        return this->py_integrate(t, max_frames, max_events, terminate, max_prints);
+    }
+
+    py::array_t<Tt> t_array()const{
+        py::array_t<Tt> res = to_numpy<Tt>(this->t());
+        return res;
+    }
+
+    py::array_t<Tt> q_array()const{
+        py::array_t<Tt> res = to_numpy<Tt>(flatten<Tt, Ty>(this->q()), getShape(this->t().size(), this->q0_shape));
+        return res;
+    }
+
     const _Shape q0_shape;
 };
 
@@ -423,14 +443,14 @@ void define_ode_module(py::module& m) {
             py::arg("events")=py::none(),
             py::arg("savedir")="",
             py::arg("save_events_only")=false)
-        .def("integrate", [](PyODE<Tt, Ty>& self, const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){return PyOdeResult<Tt, Ty>(self.integrate(interval, max_frames, max_events, terminate, max_prints), self.q0_shape);},
+        .def("integrate", &PyODE<Tt, Ty>::py_integrate,
             py::arg("interval"),
             py::kw_only(),
             py::arg("max_frames")=-1,
             py::arg("max_events")=-1,
             py::arg("terminate")=true,
             py::arg("max_prints")=0)
-        .def("go_to", [](PyODE<Tt, Ty>& self, const Tt& t, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints){return PyOdeResult<Tt, Ty>(self.go_to(t, max_frames, max_events, terminate, max_prints), self.q0_shape);},
+        .def("go_to", &PyODE<Tt, Ty>::py_go_to,
         py::arg("t"),
         py::kw_only(),
         py::arg("max_frames")=-1,
@@ -443,8 +463,8 @@ void define_ode_module(py::module& m) {
         .def("free", [](PyODE<Tt, Ty>& self){return self.free();})
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def("save_data", [](PyODE<Tt, Ty>& self, py::str savedir){return self.save_data(savedir.cast<std::string>());}, py::arg("savedir"))
-        .def_property_readonly("t", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(self.t());})
-        .def_property_readonly("q", [](const PyODE<Tt, Ty>& self){return to_numpy<Tt>(flatten<Tt, Ty>(self.q()), getShape(self.t().size(), self.q0_shape));})
+        .def_property_readonly("t", &PyODE<Tt, Ty>::t_array)
+        .def_property_readonly("q", &PyODE<Tt, Ty>::q_array)
         .def_property_readonly("event_map", [](const PyODE<Tt, Ty>& self){return to_PyDict(self.event_map());})
         .def_property_readonly("solver_filename", [](const PyODE<Tt, Ty>& self){return py::str(self.solver_filename());})
         .def_property_readonly("runtime", &PyODE<Tt, Ty>::runtime)

@@ -49,5 +49,16 @@ int main(){
     // }
 
     // ode.examine();
+            //g++ -O3 -Wall -march=native -std=c++20 -fopenmp -fPIC test.cpp -o test -lmpfr -lgmp
+    //sudo /opt/rocm-6.3.4/llvm/bin/clang -O3 -g -Wall -std=c++20 -fopenmp --offload=gfx1100 -fPIC test.cpp -o test -lmpfr -lgmp -lstdc++ -lm
+
+    //g++ -O3 -Wall -std=c++20 -fopenmp -foffload=amdgcn-amdhsa -fno-lto -fPIC -fcf-protection=none -fno-stack-protector test.cpp -o test -lmpfr -lgmp
+
+
+    //sudo /opt/rocm-6.3.4/llvm/bin/clang -O3 -g -Wall -std=c++20 -fopenmp --offload-arch=gfx1100 -fPIC -fcf-protection=none -fno-stack-protector test.cpp -o test -lmpfr -lgmp -lstdc++ -lm
+
+    // sudo /opt/rocm-6.3.4/llvm/bin/clang++ -O3 -g -Wall -std=c++20 -fopenmp -fopenmp-targets=amdgcn-amd-amdhsa -Xopenmp-target=amdgcn-amd-amdhsa -march=gfx1100 -fPIC -fcf-protection=none -fno-stack-protector test.cpp -o test -lmpfr -lgmp -lstdc++ -lm
+
+    //#pragma omp target teams distribute parallel for map(to: list_data[:s])
 
 }

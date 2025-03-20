@@ -72,6 +72,12 @@
         "queue": "cpp",
         "stack": "cpp",
         "unordered_set": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "__config": "cpp",
+        "ranges": "cpp",
+        "mutex": "cpp",
+        "__assert": "cpp",
+        "__availability": "cpp",
+        "__locale": "cpp"
     }
 }
