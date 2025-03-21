@@ -302,6 +302,7 @@ Ty fast_convert(const py::array_t<Tt>& A){
     size_t n = A.size();
     Ty res(1, n);
     const Tt* data = static_cast<const Tt*>(A.data());
+    #pragma omp parallel for
     for (size_t i=0; i<n; i++){
         res(0, i) = data[i];
     }
