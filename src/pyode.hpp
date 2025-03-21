@@ -303,7 +303,7 @@ Ty fast_convert(const py::array_t<Tt>& A){
     Ty res(1, n);
     std::cout << "ddddddd" <<std::endl;
     for (size_t i=0; i<n; i++){
-        std::cout << A.at(i) << " " << res(0, i) <<std::endl;
+        std::cout << " " << res(0, i) <<std::endl;
         res(0, i) = A.at(i);
     }
 
