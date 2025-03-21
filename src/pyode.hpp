@@ -231,8 +231,9 @@ Func<Tt, Ty> to_Func(py::object f, const _Shape& shape, py::tuple py_args){
     }
     else{
         g = [f, shape, py_args](const Tt& t, const Ty& y, const std::vector<Tt>& _) -> Ty {
-            std::cout << shape[0] << " " << shape[1] << " ";
-            return fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *py_args));
+            Ty res = fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *py_args));
+            std::cout << res.rows() << " " << res.cols() << std::endl;
+            return res;
         };
     }
 
