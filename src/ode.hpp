@@ -182,7 +182,6 @@ void integrate_all(const std::vector<ODE<Tt, Ty>*>& list, const Tt& interval, co
 
 template<class Tt, class Ty>
 const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
-    throw std::runtime_error("sdfgsdfsdsdfg");
     return this->go_to(_solver->t()+interval, max_frames, max_events, terminate, max_prints, include_first);
 
 }
@@ -190,7 +189,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
 template<class Tt, class Ty>
 const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
-    
+    throw std::runtime_error("sdfgsdfsdsdfg");
     auto t1 = std::chrono::high_resolution_clock::now();
 
     const Tt t0 = _solver->t();
