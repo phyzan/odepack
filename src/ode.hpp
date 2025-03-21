@@ -190,7 +190,6 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 template<class Tt, class Ty>
 const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
     auto t1 = std::chrono::high_resolution_clock::now();
-    std::cout << "hiii11" << std::endl;
     const Tt t0 = _solver->t();
     const Tt interval = t-t0;
     const size_t N = _t_arr.size();
@@ -199,12 +198,12 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     size_t i = N;
     const int MAX_PRINTS = max_prints;
     int prints = 0;
-    std::cout << "hiii" << std::endl;
     _solver->reopen_file();
     _solver->set_goal(t);
     while (_solver->is_running()){
+        std::cout << "hiii11" << std::endl;
         if (_solver->advance()){
-
+            std::cout << "hiii2" << std::endl;
             if ((event_counter != max_events) && _solver->at_event()){
                 _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
                 if (!_solver->current_event()->is_stop_event()){
@@ -213,8 +212,10 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
                     }
                 }
                 ++i;
+                std::cout << "hiii3" << std::endl;
                 _register_state();
             }
+            std::cout << "hiii4" << std::endl;
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
                 ++frame_counter;
