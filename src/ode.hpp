@@ -204,7 +204,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
 
     _solver->reopen_file();
     _solver->set_goal(t);
-    
+    throw std::runtime_error("sdfgsdfsdsdfg");
     while (_solver->is_running()){
         if (_solver->advance()){
 
@@ -240,7 +240,6 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     if (max_prints > 0){
         std::cout << std::endl;
     }
-    throw std::runtime_error("sdfgsdfsdsdfg");
     auto t2 = std::chrono::high_resolution_clock::now();
     
     std::chrono::duration<double> rt = t2-t1;
