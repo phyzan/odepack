@@ -192,7 +192,6 @@ template<class Tt, class Ty>
 const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
     
     auto t1 = std::chrono::high_resolution_clock::now();
-    throw std::runtime_error("sdfgsdfg");
 
     const Tt t0 = _solver->t();
     const Tt interval = t-t0;
@@ -241,7 +240,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     if (max_prints > 0){
         std::cout << std::endl;
     }
-
+    throw std::runtime_error("sdfgsdfg");
     auto t2 = std::chrono::high_resolution_clock::now();
     
     std::chrono::duration<double> rt = t2-t1;
