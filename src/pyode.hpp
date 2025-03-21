@@ -299,12 +299,10 @@ Ty toCPP_Array(const py::array& A) {
 
 template<class Tt, class Ty>
 Ty fast_convert(const py::array_t<Tt>& A){
-    std::cout << "fref" << std::endl;
     size_t n = A.size();
     Ty res(1, n);
-    std::cout << n << std::endl;
     for (size_t i=0; i<n; i++){
-        res[i] = A.at(i);
+        res(1, i) = A.at(i);
     }
     return res;
 }
