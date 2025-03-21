@@ -215,12 +215,12 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
                 std::cout << "hiii3" << std::endl;
                 _register_state();
             }
-            std::cout << "hiii4" << std::endl;
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
                 ++frame_counter;
                 ++i;
             }
+            std::cout << "hiii3" << std::endl;
         }
         if (max_prints > 0){
             Tt percentage = (_solver->t() - t0)/(_solver->tmax()-t0);
