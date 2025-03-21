@@ -301,10 +301,9 @@ template<class Tt, class Ty>
 Ty fast_convert(const py::array_t<Tt>& A){
     size_t n = A.size();
     Ty res(1, n);
-    std::cout << "ddddddd" <<std::endl;
+    Tt* data = A.data();
     for (size_t i=0; i<n; i++){
-        std::cout << " " << res(0, i) <<std::endl;
-        res(0, i) = A.at(i);
+        res(0, i) = data[i];
     }
 
     return res;
