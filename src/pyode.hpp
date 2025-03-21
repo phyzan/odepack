@@ -187,7 +187,6 @@ public:
 
     PyOdeResult<Tt, Ty> py_integrate(const Tt& interval, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
         OdeResult<Tt, Ty> res = this->integrate(interval, max_frames, max_events, terminate, max_prints, include_first);
-        throw std::runtime_error("sdfgssadfsadfdfg");
         PyOdeResult<Tt, Ty> py_res = PyOdeResult<Tt, Ty>(res, this->q0_shape);
         return py_res;
     }
