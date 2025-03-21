@@ -231,9 +231,7 @@ Func<Tt, Ty> to_Func(py::object f, const _Shape& shape, py::tuple py_args){
     }
     else{
         g = [f, shape, py_args](const Tt& t, const Ty& y, const std::vector<Tt>& _) -> Ty {
-            std::cout << "ssss" << std::endl;
             Ty res = fast_convert<Tt, Ty>(f(t, to_numpy<Tt>(y, shape), *py_args));
-            std::cout << res.rows() << " " << res.cols() << std::endl;
             return res;
         };
     }
@@ -301,9 +299,10 @@ Ty toCPP_Array(const py::array& A) {
 
 template<class Tt, class Ty>
 Ty fast_convert(const py::array_t<Tt>& A){
+    std::cout << "fref" << std::endl;
     size_t n = A.size();
     Ty res(1, n);
-
+    std::cout << n << std::endl;
     for (size_t i=0; i<n; i++){
         res[i] = A.at(i);
     }
