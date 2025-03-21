@@ -189,9 +189,8 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::integrate(const Tt& interval, const int& ma
 
 template<class Tt, class Ty>
 const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
-    throw std::runtime_error("sdfgsdfsdsdfg");
     auto t1 = std::chrono::high_resolution_clock::now();
-
+    std::cout << "hiii11" << std::endl;
     const Tt t0 = _solver->t();
     const Tt interval = t-t0;
     const size_t N = _t_arr.size();
@@ -200,7 +199,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     size_t i = N;
     const int MAX_PRINTS = max_prints;
     int prints = 0;
-
+    std::cout << "hiii" << std::endl;
     _solver->reopen_file();
     _solver->set_goal(t);
     while (_solver->is_running()){
