@@ -78,6 +78,8 @@
         "mutex": "cpp",
         "__assert": "cpp",
         "__availability": "cpp",
-        "__locale": "cpp"
+        "__locale": "cpp",
+        "filesystem": "cpp",
+        "ios": "cpp"
     }
 }

@@ -138,6 +138,12 @@ public:
         }
     }
 
+    void clear(){
+        _t_arr = {_solver->t()};
+        _q_arr = {_solver->q()};
+        _Nevents = {};
+    }
+
 protected:
 
     OdeSolver<Tt, Ty>* _solver;
