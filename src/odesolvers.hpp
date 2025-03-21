@@ -196,7 +196,9 @@ public:
         Tt h0, d2, h1;
         Ty y1, f1;
         Ty scale = _atol + cwise_abs(_q)*_rtol;
+        std::cout << "hi0" << std::endl;
         Ty _dq = _f(_t, _q, _args);
+        std::cout << "hi1" << std::endl;
         Tt d0 = rms_norm((_q/scale).eval());
         Tt d1 = rms_norm((_dq/scale).eval());
         if (d0 < 1e-5 || d1 < 1e-5){
