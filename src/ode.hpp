@@ -201,6 +201,7 @@ const OdeResult<Tt, Ty> ODE<Tt, Ty>::go_to(const Tt& t, const int& max_frames, c
     int prints = 0;
     std::cout << "hiii1122" << std::endl;
     _solver->reopen_file();
+    std::cout << "hiii114444" << std::endl;
     _solver->set_goal(t);
     std::cout << "hiii11333" << std::endl;
     while (_solver->is_running()){
