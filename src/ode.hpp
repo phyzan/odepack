@@ -148,7 +148,11 @@ public:
         _q_arr.clear();
         _q_arr.shrink_to_fit();
         _q_arr.push_back(q);
-        _Nevents = {};
+        
+        for (size_t i=0; i<_Nevents.size(); i++){
+            _Nevents[i].clear();
+            _Nevents[i].shrink_to_fit();
+        }
     }
 
 protected:
