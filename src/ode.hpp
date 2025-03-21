@@ -139,8 +139,15 @@ public:
     }
 
     void clear(){
-        _t_arr = {_solver->t()};
-        _q_arr = {_solver->q()};
+        Tt t = _t_arr[_t_arr.size()-1];
+        Ty q = _q_arr[_q_arr.size()-1];
+        _t_arr.clear();
+        _t_arr.shrink_to_fit();
+        _t_arr.push_back(t);
+
+        _q_arr.clear();
+        _q_arr.shrink_to_fit();
+        _q_arr.push_back(q);
         _Nevents = {};
     }
 
