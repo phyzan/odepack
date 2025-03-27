@@ -1,3 +1,12 @@
+The ODE parameters and code philosophy closely resemble that of scipy's ODE and OdeSolver class on purpose, as some parts of
+the code (like the Runge-Kutta classes) have simply been translated from python to c++.
+However this c++ implementation targets performance, parallelization, higher flexibility, progress displaying, and better support for Event encouters
+during an ode integration.
+
+
+
+
+
 # Installation and Compilation Guide
 
 ## Single-Command Installation to `/usr/include` Folder
