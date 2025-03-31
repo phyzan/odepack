@@ -210,7 +210,7 @@ public:
         d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
         
         if (d1 <= 1e-15 && d2 <= 1e-15){
-            h1 = std::max(1e-6, 1e-3*h0);
+            h1 = std::max(Tt(1e-6), 1e-3*h0);
         }
         else{
             h1 = pow(100*std::max(d1, d2), -Tt(1)/Tt(ERR_EST_ORDER+1));
