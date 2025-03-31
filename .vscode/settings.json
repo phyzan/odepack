@@ -80,6 +80,8 @@
         "__availability": "cpp",
         "__locale": "cpp",
         "filesystem": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "cinttypes": "cpp",
+        "typeindex": "cpp"
     }
 }

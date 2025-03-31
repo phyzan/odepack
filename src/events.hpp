@@ -57,7 +57,9 @@ protected:
 
 
     AnyEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if, Func<Tt, Ty> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
-        _assert_valid_name(name);
+        if (name == ""){
+            throw std::runtime_error("Please provide a non empty name when instanciating an Event-related class");
+        }
     }
 
     AnyEvent(const AnyEvent<Tt, Ty>& other): _name(other._name), _when(other._when), _check_if(other._check_if), _mask(other._mask), _hide_mask(other._hide_mask){

@@ -114,12 +114,6 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
     return {_a, c, _b};
 }
 
-void _assert_valid_name(const std::string& name){
-    if (name == ""){
-        throw std::runtime_error("Please provide a non empty name when instanciating an Event-related class");
-    }
-}
-
 template<class T>
 void _assert_func(T&& f){
     if (f == nullptr){
