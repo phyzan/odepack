@@ -1,6 +1,15 @@
 #ifndef EVENTS_HPP
 #define EVENTS_HPP
 
+/*
+
+@brief Header file dealing with Event encouters during an ODE integration.
+
+During an ode integration, we might want to save specific events that are encoutered. For instance, we might want to specify at exactly what time the function that is integrated reached a spacific value. The Event classes handle such events, and are responsible for determining them with a desired accuracy.
+
+
+*/
+
 #include "tools.hpp"
 
 template<class Tt, class Ty>
@@ -13,9 +22,18 @@ using is_event_f = std::function<bool(const Tt&, const Ty&, const std::vector<Tt
 template<class Tt, class Ty>
 class AnyEvent{
 
+/**
+ * @brief Base class representing an event that might be encoutered during the integration of an ODE.
+ */
+
 public:
 
     virtual bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) = 0;
+    /**
+     * @brief If an event is encoutered between two integration steps, this member function determines exactly when that occurs. The event time and function value
+     * 
+     * 
+     */
 
     virtual void go_back(){ _clear();}
 
@@ -199,6 +217,7 @@ public:
         _start = other._start;
         _np = other._np;
         _np_previous = other._np_previous;
+        _has_started = other._has_started;
         return AnyEvent<Tt, Ty>::operator=(other);
     }
 
@@ -209,8 +228,9 @@ public:
     bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
         this->_clear();
         const int direction = (t2 > t1) ? 1 : -1;
-        const Tt next = _start+(_np+direction)*_period;
+        const Tt next = _has_started ? _start+(_np+direction)*_period : _start;
         if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
+            _has_started = true;
             _np_previous = _np;
             _np += direction;
             this->_realloc();
@@ -226,6 +246,9 @@ public:
         this->_clear();
         if (_np != _np_previous){
             _np = _np_previous;
+            if (_np_previous == 0){
+                _has_started = false;
+            }
         }
     }
 
@@ -234,6 +257,7 @@ private:
     Tt _start;
     long int _np = 0;
     long int _np_previous = 0;
+    bool _has_started = false;
 
 };
 
