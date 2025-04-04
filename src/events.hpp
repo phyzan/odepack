@@ -230,11 +230,11 @@ public:
         const int direction = (t2 > t1) ? 1 : -1;
         const Tt next = _has_started ? _start+(_np+direction)*_period : _start;
         if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
-            _has_started = true;
             _np_previous = _np;
-            _np += direction;
+            _np += direction*this->_has_started;
             this->_realloc();
             this->_set(next, q(next), args);
+            this->_has_started = true;
             return true;
         }
         else{
