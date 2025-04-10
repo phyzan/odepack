@@ -97,6 +97,7 @@ protected:
         _mask = other._mask;
         _hide_mask = other._hide_mask;
         _copy_event_data(other);
+        return *this;
     }
 
     void _clear(){
@@ -158,9 +159,11 @@ public:
     Event(const Event<Tt, Ty>& other):AnyEvent<Tt, Ty>(other), _event_tol(other._event_tol){}
 
     Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other){
-        if (&other == this) return *this;
-        _event_tol = other._event_tol;
-        return AnyEvent<Tt, Ty>::operator=(other);
+        if (&other != this){
+            _event_tol = other._event_tol;
+            AnyEvent<Tt, Ty>::operator=(other);
+        }
+        return *this;
     }
 
     Event<Tt, Ty>* clone() const override{
@@ -212,13 +215,16 @@ public:
     }
 
     PeriodicEvent<Tt, Ty>& operator=(const PeriodicEvent<Tt, Ty>& other){
-        if (&other == this) return *this;
-        _period = other._period;
-        _start = other._start;
-        _np = other._np;
-        _np_previous = other._np_previous;
-        _has_started = other._has_started;
-        return AnyEvent<Tt, Ty>::operator=(other);
+        if (&other != this){
+            _period = other._period;
+            _start = other._start;
+            _np = other._np;
+            _np_previous = other._np_previous;
+            _has_started = other._has_started;
+            AnyEvent<Tt, Ty>::operator=(other);
+        }
+        return *this;
+
     }
 
     PeriodicEvent<Tt, Ty>* clone() const override{
@@ -274,8 +280,11 @@ public:
     }
 
     StopEvent<Tt, Ty>& operator=(const StopEvent<Tt, Ty>& other){
-        if (&other == this) return *this;
-        return AnyEvent<Tt, Ty>::operator=(other);
+        if (&other != this){
+            AnyEvent<Tt, Ty>::operator=(other);
+        }
+        return *this;
+
     }
 
     StopEvent<Tt, Ty>* clone() const override{
