@@ -134,6 +134,9 @@ class LowLevelODE:
     def clear(self):...
 
     @property
+    def dim(self)->int:...
+
+    @property
     def t(self)->np.ndarray:...
 
     @property
@@ -156,6 +159,10 @@ class LowLevelODE:
 
     @property
     def is_dead(self)->float:...
+
+
+class OdeBase(LowLevelODE):
+    pass
 
 
 def integrate_all(ode_array, interval, max_frames=-1, max_events=-1, terminate=True, threads=-1, max_prints=0):...

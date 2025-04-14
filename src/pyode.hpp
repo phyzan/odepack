@@ -50,9 +50,26 @@ template<class Tt, class Ty>
 std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args);
 
 
+template<typename T>
+T open_capsule(py::capsule f){
+    void* ptr = f.get_pointer();
+    if (ptr == nullptr){
+        return nullptr;
+    }
+    else{
+        return reinterpret_cast<T>(ptr);
+    }
+}
+
 
 #pragma GCC visibility push(hidden)
 
+
+template<class Tt, class Ty>
+struct OdeFunc{
+
+    Ty(*f)(const Tt&, const Ty&, const std::vector<Tt>&);
+};
 
 template<class Tt, class Ty>
 class PyAnyEvent{
@@ -172,7 +189,7 @@ template<class Tt, class Ty>
 class PyODE : public ODE<Tt, Ty>{
 public:
 
-    PyODE(py::object f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0), args), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<Tt, Ty>(events, shape(q0), args), to_Func<Tt, Ty>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
+    PyODE(const py::object& f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0), args), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<Tt, Ty>(events, shape(q0), args), to_Func<Tt, Ty>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
 
     PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only), q0_shape({q0.size()}){}
 
@@ -206,6 +223,15 @@ public:
     }
 
     const _Shape q0_shape;
+};
+
+template<class Tt, class Ty>
+class PyODE2 : public PyODE<Tt, Ty>{
+
+public:
+    PyODE2(const py::capsule& f, const Tt t0, const py::array q0, const py::capsule& mask, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<AnyEvent<Tt, Ty>*>*>(events), open_capsule<Fptr<Tt, Ty>>(mask), savedir.cast<std::string>(), save_events_only){}
+
+    PyODE2(const py::capsule& f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<AnyEvent<Tt, Ty>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only){}
 };
 
 #pragma GCC visibility pop
@@ -282,7 +308,6 @@ is_event_f<Tt, Ty> to_event_check(py::object py_event_check, const _Shape& shape
 
 template<class Tt, class Ty>
 Ty toCPP_Array(const py::array& A) {
-    // Convert A to a numpy array of type Tt, ensuring proper type conversion
     py::array_t<Tt> converted_A = py::array_t<Tt>(A);
 
     size_t n = converted_A.size();
@@ -507,7 +532,40 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("is_stiff", &PyODE<Tt, Ty>::is_stiff)
         .def_property_readonly("diverges", &PyODE<Tt, Ty>::diverges)
         .def_property_readonly("is_dead", &PyODE<Tt, Ty>::is_dead);
+    
+    py::class_<PyODE2<Tt, Ty>, PyODE<Tt, Ty>>(m, "OdeBase", py::module_local())
+        .def(py::init<py::capsule, Tt, py::array, py::capsule, Tt, Tt, Tt, Tt, Tt, py::tuple, py::str, py::capsule, py::str, py::bool_>(),
+        py::arg("f"),
+        py::arg("t0"),
+        py::arg("q0"),
+        py::arg("mask"),
+        py::kw_only(),
+        py::arg("rtol")=1e-6,
+        py::arg("atol")=1e-12,
+        py::arg("min_step")=0.,
+        py::arg("max_step")=inf<Tt>(),
+        py::arg("first_step")=0.,
+        py::arg("args")=py::tuple(),
+        py::arg("method")="RK45",
+        py::arg("events")=py::none(),
+        py::arg("savedir")="",
+        py::arg("save_events_only")=false)
 
+        .def(py::init<py::capsule, Tt, py::array, Tt, Tt, Tt, Tt, Tt, py::tuple, py::str, py::capsule, py::str, py::bool_>(),
+        py::arg("f"),
+        py::arg("t0"),
+        py::arg("q0"),
+        py::kw_only(),
+        py::arg("rtol")=1e-6,
+        py::arg("atol")=1e-12,
+        py::arg("min_step")=0.,
+        py::arg("max_step")=inf<Tt>(),
+        py::arg("first_step")=0.,
+        py::arg("args")=py::tuple(),
+        py::arg("method")="RK45",
+        py::arg("events")=py::none(),
+        py::arg("savedir")="",
+        py::arg("save_events_only")=false);
 
     m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& threads, const int& max_prints){
         std::vector<ODE<Tt, Ty>*> array;

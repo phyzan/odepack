@@ -18,6 +18,9 @@ using vec = Eigen::Array<Tt, 1, N>;
 template<class Tt, class Ty>
 using Func = std::function<Ty(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
+template<class Tt, class Ty>
+using Fptr = Ty(*)(const Tt&, const Ty&, const std::vector<Tt>&);
+
 template<class Tt>
 using _ObjFun = std::function<Tt(const Tt&)>;
 
