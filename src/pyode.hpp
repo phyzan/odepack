@@ -507,6 +507,7 @@ void define_ode_module(py::module& m) {
         .def("show", [](const PySolverState<Tt, Ty>& self){return self.show();});
 
     py::class_<PyOdeBase>(m, "ODE", py::module_local())
+        .def(py::init<>())
         .def("integrate", &PyOdeBase::none)
         .def("go_to", &PyOdeBase::none)
         .def("copy", &PyOdeBase::none)
@@ -614,7 +615,6 @@ void define_ode_module(py::module& m) {
     m.def("integrate_all", [](py::object list, const Tt& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& threads, const int& max_prints){
             std::vector<ODE<Tt, Ty>*> array;
             for (const py::handle& item : list) {
-                PyODE<Tt, Ty>& ode_obj = item.cast<PyODE<Tt, Ty>&>();
                 array.push_back(&item.attr("_ode_obj").cast<PyODE<Tt, Ty>&>());
             }
             integrate_all(array, interval, max_frames, max_events, terminate, threads, max_prints);
