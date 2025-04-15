@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable
+from typing import Callable, Iterable
 
 Func = Callable[[float, np.ndarray], np.ndarray] #f(t, q, *args) -> q
 ObjFunc = Callable[[float, np.ndarray], float] #  f(t, q, *args) -> float
@@ -27,6 +27,7 @@ class Event(AnyEvent):
 
     @property
     def check_if(self)->BoolFunc:...
+
 
 class PeriodicEvent(AnyEvent):
 
@@ -88,7 +89,7 @@ class SolverState:
     def q(self)->np.ndarray:...
 
     @property
-    def event_map(self)->bool:...
+    def event(self)->str:...
 
     @property
     def diverges(self)->bool:...
@@ -111,9 +112,7 @@ class SolverState:
     def show(self):...
 
 
-class LowLevelODE:
-
-    def __init__(self, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[AnyEvent]=None, mask=None, savedir="", save_events_only=False):...
+class ODE:
 
     def integrate(self, interval, *, max_frames=-1, max_events=-1, terminate=True, max_prints=0, include_first=False)->OdeResult:...
 
@@ -127,7 +126,7 @@ class LowLevelODE:
 
     def state(self)->SolverState:...
 
-    def copy(self)->LowLevelODE:...
+    def copy(self)->ODE:...
 
     def save_data(self, savedir: str):...
 
@@ -161,8 +160,14 @@ class LowLevelODE:
     def is_dead(self)->float:...
 
 
-class OdeBase(LowLevelODE):
+class LowLevelODE(ODE):
+
+    def __init__(self, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[AnyEvent]=None, mask=None, savedir="", save_events_only=False):...
+
+
+class _DynamicODE(LowLevelODE):
     pass
 
 
-def integrate_all(ode_array, interval, max_frames=-1, max_events=-1, terminate=True, threads=-1, max_prints=0):...
+
+def integrate_all(ode_array: Iterable[_DynamicODE], interval, max_frames=-1, max_events=-1, terminate=True, threads=-1, max_prints=0):...
