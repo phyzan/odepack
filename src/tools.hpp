@@ -86,6 +86,9 @@ std::vector<T> subvec(const std::vector<T>& x, const size_t& start) {
 }
 
 
+template<class T>
+std::vector<T> _event_data(const std::vector<T>& q, const std::map<std::string, std::vector<size_t>>& event_map, const std::string& event);
+
 //BISECTION USED FOR EVENTS IN ODES
 
 template<class T>
@@ -133,7 +136,7 @@ struct OdeResult{
 
     const std::vector<Tt> t;
     const std::vector<Ty> q;
-    const std::map<std::string, std::vector<size_t>> events;
+    const std::map<std::string, std::vector<size_t>> event_map;
     const bool diverges;
     const bool is_stiff;
     const bool success;// if the OdeSolver didnt die during the integration
@@ -154,11 +157,19 @@ struct OdeResult{
     std::string event_log() const{
         std::string res = "";
         res += "\tEvents:\n\t----------\n";
-        for (const auto& [name, array] : events){
+        for (const auto& [name, array] : event_map){
             res += "\t    " + name + " : " + std::to_string(array.size()) + "\n";
         }
         res += "\n\t----------\n";
         return res;
+    }
+
+    std::vector<Tt> t_filtered(const std::string& event) const {
+        return _event_data(this->t, this->event_map, event);
+    }
+
+    std::vector<Ty> q_filtered(const std::string& event) const {
+        return _event_data(this->q, this->event_map, event);
     }
     
 };
@@ -210,6 +221,17 @@ struct State{
     Ty q;
     Tt h_next;
 };
+
+
+template<class T>
+std::vector<T> _event_data(const std::vector<T>& q, const std::map<std::string, std::vector<size_t>>& event_map, const std::string& event){
+    std::vector<size_t> ind = event_map.at(event);
+    std::vector<T> data(ind.size());
+    for (size_t i=0; i<data.size(); i++){
+        data[i] = q[ind[i]];
+    }
+    return data;
+}
 
 
 #endif

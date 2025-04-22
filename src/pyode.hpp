@@ -153,13 +153,16 @@ template<class Tt, class Ty>
 class PyStopEvent : public PyAnyEvent<Tt, Ty>{
 
 public:
-    PyStopEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
+    PyStopEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask, py::bool_ kill):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask), _kill(kill){}
 
     AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
         delete this->_event_ptr;
-        this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask);
+        this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask, this->_kill);
         return this->_event_ptr;
     }
+
+private:
+    bool _kill;
 };
 
 
@@ -178,6 +181,14 @@ template<class Tt, class Ty>
 struct PyOdeResult{
 
     PyOdeResult(const OdeResult<Tt, Ty>& r, const _Shape& q0_shape): res(r), q0_shape(q0_shape){}
+
+    py::tuple event_data(const py::str& event)const{
+        std::vector<Tt> t_data = this->res.t_filtered(event.cast<std::string>());
+        py::array_t<Tt> t_res = to_numpy<Tt>(t_data);
+        std::vector<Ty> q_data = this->res.q_filtered(event.cast<std::string>());
+        py::array_t<Tt> q_res = to_numpy<Tt>(flatten<Tt, Ty>(q_data), getShape(q_data.size(), this->q0_shape));
+        return py::make_tuple(t_data, q_data);
+    }
 
     const OdeResult<Tt, Ty> res;
     const _Shape& q0_shape;
@@ -243,6 +254,14 @@ public:
     py::array_t<Tt> q_array()const{
         py::array_t<Tt> res = to_numpy<Tt>(flatten<Tt, Ty>(this->q()), getShape(this->t().size(), this->q0_shape));
         return res;
+    }
+
+    py::tuple event_data(const py::str& event)const{
+        std::vector<Tt> t_data = this->t_filtered(event.cast<std::string>());
+        py::array_t<Tt> t_res = to_numpy<Tt>(t_data);
+        std::vector<Ty> q_data = this->q_filtered(event.cast<std::string>());
+        py::array_t<Tt> q_res = to_numpy<Tt>(flatten<Tt, Ty>(q_data), getShape(q_data.size(), this->q0_shape));
+        return py::make_tuple(t_data, q_data);
     }
 
     const _Shape q0_shape;
@@ -465,12 +484,13 @@ void define_ode_module(py::module& m) {
                 return self.start();});
 
         py::class_<PyStopEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
-            .def(py::init<py::str, py::object, py::object, py::object, py::bool_>(),
+            .def(py::init<py::str, py::object, py::object, py::object, py::bool_, py::bool_>(),
                 py::arg("name"),
                 py::arg("when"),
                 py::arg("check_if")=py::none(),
                 py::arg("mask")=py::none(),
-                py::arg("hide_mask")=false)
+                py::arg("hide_mask")=false,
+                py::arg("kill")=false)
             .def_property_readonly("when", [](const PyStopEvent<Tt, Ty>& self){
                 return self.py_when;})
             .def_property_readonly("check_if", [](const PyStopEvent<Tt, Ty>& self){
@@ -483,9 +503,10 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("q", [](const PyOdeResult<Tt, Ty>& self){
             return to_numpy<Tt>(flatten<Tt, Ty>(self.res.q), getShape(self.res.t.size(), self.q0_shape));
         })
-        .def_property_readonly("events", [](const PyOdeResult<Tt, Ty>& self){
-            return to_PyDict(self.res.events);
+        .def_property_readonly("event_map", [](const PyOdeResult<Tt, Ty>& self){
+            return to_PyDict(self.res.event_map);
         })
+        .def("event_data", &PyOdeResult<Tt, Ty>::event_data, py::arg("event"))
         .def_property_readonly("diverges", [](const PyOdeResult<Tt, Ty>& self){return self.res.diverges;})
         .def_property_readonly("is_stiff", [](const PyOdeResult<Tt, Ty>& self){return self.res.is_stiff;})
         .def_property_readonly("success", [](const PyOdeResult<Tt, Ty>& self){return self.res.success;})
@@ -517,6 +538,7 @@ void define_ode_module(py::module& m) {
         .def("state", &PyOdeBase::none)
         .def("save_data", &PyOdeBase::none)
         .def("clear", &PyOdeBase::none)
+        .def("event_data", &PyOdeBase::none)
         .def_property_readonly("dim", &PyOdeBase::none)
         .def_property_readonly("t", &PyOdeBase::none)
         .def_property_readonly("q", &PyOdeBase::none)
@@ -567,6 +589,7 @@ void define_ode_module(py::module& m) {
         .def("state", &PyODE<Tt, Ty>::py_state)
         .def("save_data", [](PyODE<Tt, Ty>& self, py::str savedir){return self.save_data(savedir.cast<std::string>());}, py::arg("savedir"))
         .def("clear", &PyODE<Tt, Ty>::clear)
+        .def("event_data", &PyODE<Tt, Ty>::event_data, py::arg("event"))
         .def_property_readonly("dim", [](const PyODE<Tt, Ty>& self){return self.solver().Nsys();})
         .def_property_readonly("t", &PyODE<Tt, Ty>::t_array)
         .def_property_readonly("q", &PyODE<Tt, Ty>::q_array)

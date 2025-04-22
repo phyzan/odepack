@@ -53,6 +53,8 @@ public:
 
     virtual bool is_stop_event()const {return false;}
 
+    virtual bool is_leathal() const {return false;}
+
     bool allows_checkpoint() const{
         //!is_stop_event() is not a strict condition, but saves time
         //by not making a checkpoint since the odesolver will step on the
@@ -273,14 +275,15 @@ class StopEvent : public AnyEvent<Tt, Ty>{
 
 public:
 
-    StopEvent(const StopEvent<Tt, Ty>& other) : AnyEvent<Tt, Ty>(other){}
+    StopEvent(const StopEvent<Tt, Ty>& other) : AnyEvent<Tt, Ty>(other), _kill(other._kill){}
 
-    StopEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false): AnyEvent<Tt ,Ty>(name, when, check_if, mask, hide_mask){
+    StopEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false, const bool& kill = false): AnyEvent<Tt ,Ty>(name, when, check_if, mask, hide_mask), _kill(kill){
         _assert_func(when);
     }
 
     StopEvent<Tt, Ty>& operator=(const StopEvent<Tt, Ty>& other){
         if (&other != this){
+            _kill = other._kill;
             AnyEvent<Tt, Ty>::operator=(other);
         }
         return *this;
@@ -308,6 +311,14 @@ public:
     bool is_stop_event() const override{
         return true;
     }
+
+    bool is_leathal() const override{
+        return _kill;
+    }
+
+private:
+
+    bool _kill;
 
 };
 

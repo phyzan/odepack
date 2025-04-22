@@ -52,6 +52,11 @@ public:
         _register_state();
     }
 
+    ODE(const OdeSolver<Tt, Ty>& solver) : _Nevents(solver.events_size()){
+        _solver = solver.clone();
+        _register_state();
+    }
+
     ODE<Tt, Ty>& operator=(const ODE<Tt, Ty>& other){
         if (&other == this) return *this;
         delete _solver;
@@ -96,6 +101,14 @@ public:
             }
         }
         return res;
+    }
+
+    std::vector<Tt> t_filtered(const std::string& event) const {
+        return _event_data(this->t(), this->event_map(), event);
+    }
+
+    std::vector<Ty> q_filtered(const std::string& event) const {
+        return _event_data(this->q(), this->event_map(), event);
     }
 
     bool diverges()const{

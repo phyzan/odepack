@@ -526,8 +526,9 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         success = false;
     }
     else if (h_next == 0){
-        _is_stiff = true;
         kill("Required stepsize was smaller than machine precision");
+        _is_stiff = true;
+        success = false;
     }
 
     //make or clear checkpoint first
@@ -578,10 +579,15 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
         }
     }
 
-    if (at_event() && current_event()->is_stop_event()){
-        stop(current_event()->name());
+    if (at_event()){
+        if (current_event()->is_leathal()){
+            kill(current_event()->name());
+            success = false;
+        }
+        else if (current_event()->is_stop_event()){
+            stop(current_event()->name());
+        }
     }
-
 
     return success;
 }
