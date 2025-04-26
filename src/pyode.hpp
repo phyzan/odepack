@@ -7,6 +7,7 @@
 #include <functional>
 #include "ode.hpp"
 
+
 namespace py = pybind11;
 
 //assumes empty args given as std::vector, use only for ODE instanciated from python directly
@@ -157,7 +158,7 @@ struct PyOdeResult{
         py::array_t<Tt> t_res = to_numpy<Tt>(t_data);
         std::vector<Ty> q_data = this->res.q_filtered(event.cast<std::string>());
         py::array_t<Tt> q_res = to_numpy<Tt>(flatten<Tt, Ty>(q_data), getShape(q_data.size(), this->q0_shape));
-        return py::make_tuple(t_data, q_data);
+        return py::make_tuple(t_res, q_res);
     }
 
     const OdeResult<Tt, Ty> res;
@@ -231,7 +232,7 @@ public:
         py::array_t<Tt> t_res = to_numpy<Tt>(t_data);
         std::vector<Ty> q_data = this->q_filtered(event.cast<std::string>());
         py::array_t<Tt> q_res = to_numpy<Tt>(flatten<Tt, Ty>(q_data), getShape(q_data.size(), this->q0_shape));
-        return py::make_tuple(t_data, q_data);
+        return py::make_tuple(t_res, q_res);
     }
 
     const _Shape q0_shape;
