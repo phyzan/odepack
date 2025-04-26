@@ -32,14 +32,14 @@ int main(){
 
     Tt tmax = 10001*pi/2;
 
-    Event<Tt, Ty> ps("Poincare Section", ps_func, check);
-    PeriodicEvent<Tt, Ty> ev2("periodic", 10, 0);
-    StopEvent<Tt, Ty> stopev("stop", stopfunc);
-    PeriodicEvent<Tt, Ty> ev3("periodic2", 10, 0.001);
+    // Event<Tt, Ty> ps("Poincare Section", ps_func, check);
+    // PeriodicEvent<Tt, Ty> ev2("periodic", 10, 0);
+    // StopEvent<Tt, Ty> stopev("stop", stopfunc);
+    // PeriodicEvent<Tt, Ty> ev3("periodic2", 10, 0.001);
 
-    ODE<Tt, Ty> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", 1e-10);
-    ode.integrate(tmax, 100).examine();
-    ode.state().show();
+    // ODE<Tt, Ty> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", 1e-10);
+    // ode.integrate(tmax, 100).examine();
+    // ode.state().show();
     // ode.free();
     // while (true){
     //     ode.state().show();

@@ -45,7 +45,7 @@ public:
         _copy_data(other);
     }
 
-    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step=0., const Tt& max_step=inf<Tt>(), const Tt first_step=0, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+    ODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step=0., const Tt& max_step=inf<Tt>(), const Tt first_step=0, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<Event<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
 
         const SolverArgs<Tt, Ty> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only};
         _solver = getSolver(S, method);
@@ -90,7 +90,7 @@ public:
         std::map<std::string, std::vector<size_t>> res;
         size_t index;
         for (size_t i=0; i<_solver->events_size(); i++){
-            const AnyEvent<Tt, Ty>& ev = *_solver->event(i);
+            const Event<Tt, Ty>& ev = *_solver->event(i);
             res[ev.name()] = {};
             std::vector<size_t>& list = res[ev.name()];
             for (size_t j=0; j<_Nevents[i].size(); j++){

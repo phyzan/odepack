@@ -120,13 +120,6 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
     return {_a, c, _b};
 }
 
-template<class T>
-void _assert_func(T&& f){
-    if (f == nullptr){
-        throw std::runtime_error("Function cannot be null in an Event class");
-    }
-}
-
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 

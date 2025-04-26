@@ -6,8 +6,10 @@ ObjFunc = Callable[[float, np.ndarray], float] #  f(t, q, *args) -> float
 BoolFunc = Callable[[float, np.ndarray], bool] #  f(t, q, *args) -> bool
 
 
-class AnyEvent:
-    
+class Event:
+
+    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False, event_tol=1e-12):...
+
     @property
     def name(self)->str:...
     
@@ -18,10 +20,6 @@ class AnyEvent:
     def hide_mask(self)->BoolFunc:...
 
 
-class Event(AnyEvent):
-
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False, event_tol=1e-12):...
-
     @property
     def when(self)->ObjFunc:...
 
@@ -29,7 +27,7 @@ class Event(AnyEvent):
     def check_if(self)->BoolFunc:...
 
 
-class PeriodicEvent(AnyEvent):
+class PeriodicEvent(Event):
 
     def __init__(self, name: str, period=0., start=0., mask: Func=None, hide_mask=False):...
 
@@ -38,17 +36,6 @@ class PeriodicEvent(AnyEvent):
 
     @property
     def start(self)->float:...
-
-
-class StopEvent(AnyEvent):
-
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False, kill=False):...
-
-    @property
-    def when(self)->ObjFunc:...
-
-    @property
-    def check_if(self)->BoolFunc:...
 
 
 class OdeResult:
@@ -166,7 +153,7 @@ class ODE:
 
 class LowLevelODE(ODE):
 
-    def __init__(self, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[AnyEvent]=None, mask=None, savedir="", save_events_only=False):...
+    def __init__(self, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[Event]=None, mask=None, savedir="", save_events_only=False):...
 
 
 class _DynamicODE(LowLevelODE):

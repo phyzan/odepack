@@ -20,7 +20,7 @@ struct SolverArgs{
     const Tt h_max;
     const Tt first_step;
     const std::vector<Tt> args;
-    const std::vector<AnyEvent<Tt, Ty>*> events;
+    const std::vector<Event<Tt, Ty>*> events;
     const Func<Tt, Ty> mask;
     const std::string save_dir;
     const bool save_events_only;
@@ -158,7 +158,7 @@ public:
         return {_t, q(), _habs, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
     }
 
-    const AnyEvent<Tt, Ty>* current_event() const{
+    const Event<Tt, Ty>* current_event() const{
         //we need pointer and not reference, because it might be null
         return at_event() ? _events[_current_event_index] : nullptr;
     }
@@ -168,7 +168,7 @@ public:
         return _current_event_index;
     }
 
-    const AnyEvent<Tt, Ty>* event(const size_t& i){
+    const Event<Tt, Ty>* event(const size_t& i){
         return _events[i];
     }
 
@@ -303,7 +303,7 @@ private:
     size_t _N=0;//total number of solution updates
     std::string _message; //different from "running".
     int _direction;
-    std::vector<AnyEvent<Tt, Ty>*> _events;
+    std::vector<Event<Tt, Ty>*> _events;
     int _current_event_index = -1;
     std::string _filename;
     std::ofstream _file;
@@ -318,7 +318,7 @@ private:
         return this->step(this->_t, this->_q, t_next-this->_t);
     }
 
-    bool _adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& event);
+    bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
 
     bool _go_to_state(State<Tt, Ty>& next);
 
@@ -371,7 +371,7 @@ private:
             _q_exposed = &_q;
         }
         else{
-            _q_exposed = &current_event()->q_event();
+            _q_exposed = &current_event()->data().q();
         }
     }
 
@@ -393,27 +393,31 @@ private:
         _habs_check = nullptr;
     }
 
-    void _make_new_events(const std::vector<AnyEvent<Tt, Ty>*>& events){
+    void _make_new_events(const std::vector<Event<Tt, Ty>*>& events){
 
         //FIRST create a new vector with new allocated objects, because "events" might be
         //our current _events vector. We sort the vector to contain normal events first,
         //and stop_events after to improve runtime performance and not miss out on any stop_events
         //if a single step encouters multiple events.
-        std::vector<AnyEvent<Tt, Ty>*> new_events;
-        std::vector<AnyEvent<Tt, Ty>*> new_stop_events;
+        std::vector<Event<Tt, Ty>*> new_precise_events;
+        std::vector<Event<Tt, Ty>*> new_rough_events;
         for (size_t i=0; i<events.size(); i++){
-            if (events[i]->is_stop_event()){
-                new_stop_events.push_back(events[i]->clone());
+            if (events[i]->is_precise()){
+                new_precise_events.push_back(events[i]->clone());
             }
             else{
-                new_events.push_back(events[i]->clone());
+                new_rough_events.push_back(events[i]->clone());
             }
         }
 
         //push the pointers into a new (sorted) array
-        std::vector<AnyEvent<Tt, Ty>*> result(events.size());
-        std::copy(new_events.begin(), new_events.end(), result.begin());
-        std::copy(new_stop_events.begin(), new_stop_events.end(), result.begin() + new_events.size());
+        std::vector<Event<Tt, Ty>*> result(events.size());
+        std::copy(new_precise_events.begin(), new_precise_events.end(), result.begin());
+        std::copy(new_rough_events.begin(), new_rough_events.end(), result.begin() + new_precise_events.size());
+
+        for (Event<Tt, Ty>* ev : result){
+            ev->set_args(this->_args);
+        }
 
         //NOW we can delete our current events
         _delete_events();
@@ -593,22 +597,22 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
 }
 
 template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, AnyEvent<Tt, Ty>& event){
+bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event){
     // takes next state (which means tnew, hnew, and hnext_new)
     // if it is not an event or smth it is left unchanged.
     // otherwise, it is modified to depict the event with high accuracy
     std::function<Ty(Tt)> qfunc = [this](const Tt& t_next) -> Ty { return _q_step(t_next);};
     
-    if (event.determine(this->_t, this->_q, next.t, next.q, this->_args, qfunc)){
+    if (event.determine(this->_t, this->_q, next.t, next.q, qfunc)){
         if (_current_event_index == -1 && event.allows_checkpoint()){
             _make_checkpoint(next.t, next.q, next.h_next);
         }
         else if ( _t_check != nullptr && event.has_mask()){
             _clear_checkpoint();
         }
-        next = {event.t_event(), event.q_true_event(), next.h_next};
+        next = {event.data().t(), event.data().q_true(), next.h_next};
         if (event.hide_mask()){
-            _q_exposed = &event.q_event();
+            _q_exposed = &event.data().q();
         }
         return true;
     }
@@ -639,7 +643,7 @@ bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
                     _events[_current_event_index]->go_back();
                 }
                 _current_event_index = i;
-                if (current_event()->is_stop_event()){
+                if (!current_event()->is_precise()){
                     break;
                 }
             }

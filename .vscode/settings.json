@@ -82,6 +82,7 @@
         "filesystem": "cpp",
         "ios": "cpp",
         "cinttypes": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "__bit_reference": "cpp"
     }
 }

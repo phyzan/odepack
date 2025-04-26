@@ -18,183 +18,119 @@ using event_f = std::function<Tt(const Tt&, const Ty&, const std::vector<Tt>&)>;
 template<class Tt, class Ty>
 using is_event_f = std::function<bool(const Tt&, const Ty&, const std::vector<Tt>&)>;
 
+template<class Tt, class Ty>
+struct EventData{
+
+    const Tt& t() const {return _t;}
+    const Ty& q() const {return _q;}
+    const Ty& q_true() const {return _q_masked;}
+
+    EventData(){};
+
+    EventData(const Tt& t, const Ty& q):_t(t), _q(q), _q_masked(q), _masked(false){}
+
+    EventData(const Tt& t, const Ty& q, const Ty& q_true):_t(t), _q(q), _q_masked(q_true), _masked(true){}
+
+private:
+    Tt _t;
+    Ty _q;
+    Ty _q_masked;
+    bool _masked;
+};
+
 
 template<class Tt, class Ty>
-class AnyEvent{
-
-/**
- * @brief Base class representing an event that might be encoutered during the integration of an ODE.
- */
+class Event{
 
 public:
 
-    virtual bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) = 0;
-    /**
-     * @brief If an event is encoutered between two integration steps, this member function determines exactly when that occurs. The event time and function value
-     * 
-     * 
-     */
+    virtual bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) = 0;
 
-    virtual void go_back(){ _clear();}
+    virtual bool is_stop_event() const {return false;}
 
-    virtual AnyEvent<Tt, Ty>* clone() const = 0;
+    virtual bool is_leathal() const { return false;}
 
-    const Tt& t_event()const{ return *_t_event;}
+    virtual bool check(const Tt& t, const Ty& q) const {return (_check_if == nullptr) ? true : _check_if(t, q, _args);}
 
-    const Ty& q_event()const{ return *_q_event;}
+    virtual void go_back();
 
-    const Ty& q_true_event()const{ return *_q_masked;}
+    inline void set_args(const std::vector<Tt>& args){ _args = args;}
 
-    const std::string& name()const{ return _name;}
+    virtual Event<Tt, Ty>* clone() const = 0;
 
-    const bool& hide_mask()const{ return _hide_mask;}
+    const EventData<Tt, Ty>& data() const;
 
-    bool has_mask()const{ return _mask != nullptr;}
+    inline const std::string& name()const{ return _name;}
 
-    virtual bool is_stop_event()const {return false;}
+    inline const bool& hide_mask()const{ return _hide_mask;}
 
-    virtual bool is_leathal() const {return false;}
+    inline bool has_mask()const{ return _mask != nullptr;}
 
-    bool allows_checkpoint() const{
-        //!is_stop_event() is not a strict condition, but saves time
-        //by not making a checkpoint since the odesolver will step on the
-        //next step anyway.
-        return !has_mask() && !is_stop_event();
-    }
+    virtual bool allows_checkpoint() const{ return !has_mask(); }
 
-    virtual ~AnyEvent(){ _clear();}
+    inline const size_t& counter() const{ return _counter; }
 
-protected:
+    virtual bool is_precise() const = 0;
+
+    virtual ~Event(){delete _data;}
+
+
+private:
 
     std::string _name;
     event_f<Tt, Ty> _when = nullptr;
     is_event_f<Tt, Ty> _check_if = nullptr;
     Func<Tt, Ty> _mask = nullptr;
     bool _hide_mask; // variable that is only used externally for odesolvers to determine when and whether to call q_event or q_masked.
-    Tt* _t_event = nullptr;
-    Ty* _q_event = nullptr;
-    Ty* _q_masked = nullptr;
+    size_t _counter = 0;
+    std::vector<Tt> _args = {};
+    EventData<Tt, Ty>* _data = nullptr;
+    
 
+protected:
 
-    AnyEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if, Func<Tt, Ty> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
+    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if, Func<Tt, Ty> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
         if (name == ""){
-            throw std::runtime_error("Please provide a non empty name when instanciating an Event-related class");
+            throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
         }
     }
 
-    AnyEvent(const AnyEvent<Tt, Ty>& other): _name(other._name), _when(other._when), _check_if(other._check_if), _mask(other._mask), _hide_mask(other._hide_mask){
+    Event(const Event<Tt, Ty>& other): _name(other._name), _when(other._when), _check_if(other._check_if), _mask(other._mask), _hide_mask(other._hide_mask), _counter(other._counter), _args(other._args){
         _copy_event_data(other);
     }
 
-    AnyEvent(AnyEvent<Tt, Ty>&& other): _name(std::move(other._name)), _when(std::move(other._when)), _check_if(std::move(other._check_if)), _mask(std::move(other._mask)), _hide_mask(other._hide_mask), _t_event(other._t_event), _q_event(other._q_event), _q_masked(other._q_masked){
-        other._t_event = nullptr;
-        other._q_event = nullptr;
-        other._q_masked = nullptr;
-    }
+    Event(Event<Tt, Ty>&& other): _name(std::move(other._name)), _when(std::move(other._when)), _check_if(std::move(other._check_if)), _mask(std::move(other._mask)), _hide_mask(other._hide_mask), _counter(other._counter), _args(std::move(other._args)), _data(other._data){other._data = nullptr;}
 
-    AnyEvent<Tt, Ty>& operator=(const AnyEvent<Tt, Ty>& other){
-        _name = other._name;
-        _when = other._when;
-        _check_if = other._check_if;
-        _mask = other._mask;
-        _hide_mask = other._hide_mask;
-        _copy_event_data(other);
-        return *this;
-    }
+    Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other);
 
-    void _clear(){
-        delete _t_event;
-        delete _q_event;
-        if (_q_masked != _q_event){
-            delete _q_masked;
-        }
-        _t_event = nullptr;
-        _q_event = nullptr;
-        _q_masked = nullptr;
-    }
+    inline Tt obj_fun(const Tt& t, const Ty& q) const { return _when(t, q, _args); }
 
-    void _realloc(){
-        //always used after _clear();
-        _t_event = new Tt;
-        _q_event = new Ty;
-        if (_mask != nullptr){
-            _q_masked = new Ty;
-        }
-        else{
-            _q_masked = _q_event;
-        }
-    }
+    void _set(const Tt& t, const Ty& q);
 
-    void _set(const Tt& t, const Ty& q, const std::vector<Tt>& args){
-        //always called right after _realloc(), before calling _clear() e.g.;
-        *_t_event = t;
-        *_q_event = q;
-        if (_mask != nullptr){
-            //this also means that _q_masked already points to a different memory location from _realloc();
-            *_q_masked = _mask(*_t_event, q, args);
-        }
-    }
+    void _copy_event_data(const Event<Tt, Ty>& other);
 
-    void _copy_event_data(const AnyEvent<Tt, Ty>& other){
-        _clear();
-        if (other._t_event != nullptr){
-            _realloc();
-            *_t_event = *other._t_event;
-            *_q_event = *other._q_event;
-            if (_mask != nullptr){
-                *_q_masked = *other._q_masked;
-            }
-        }
-    }
+    void _clear();
 
 };
 
 template<class Tt, class Ty>
-class Event : public AnyEvent<Tt, Ty>{
+class PreciseEvent : public Event<Tt, Ty>{
 
 public:
 
-    Event(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false, const Tt& event_tol=1e-12): AnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){
-        _assert_func(when);
+    PreciseEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false, const Tt& event_tol=1e-12): Event<Tt, Ty>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+
+    PreciseEvent(const PreciseEvent<Tt, Ty>& other):Event<Tt, Ty>(other), _event_tol(other._event_tol){}
+
+    PreciseEvent<Tt, Ty>& operator=(const PreciseEvent<Tt, Ty>& other);
+
+    PreciseEvent<Tt, Ty>* clone() const override{
+        return new PreciseEvent<Tt, Ty>(*this);
     }
 
-    Event(const Event<Tt, Ty>& other):AnyEvent<Tt, Ty>(other), _event_tol(other._event_tol){}
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) override;
 
-    Event<Tt, Ty>& operator=(const Event<Tt, Ty>& other){
-        if (&other != this){
-            _event_tol = other._event_tol;
-            AnyEvent<Tt, Ty>::operator=(other);
-        }
-        return *this;
-    }
-
-    Event<Tt, Ty>* clone() const override{
-        return new Event<Tt, Ty>(*this);
-    }
-
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
-        this->_clear();
-        Tt t_determined = t2;
-        bool determined = false;
-        if (this->_check_if == nullptr || (this->_check_if(t1, q1, args) && this->_check_if(t2, q2, args))){
-            _ObjFun<Tt> obj_fun = [this, q, args](const Tt& t) ->Tt {
-                return this->_when(t, q(t), args);
-            };
-            Tt val1 = this->_when(t1, q1, args);
-            Tt val2 = this->_when(t2, q2, args);
-            if (val1 * val2 <= 0 && val1 != 0){
-                t_determined = bisect(obj_fun, t1, t2, this->_event_tol)[2];
-                determined = true;
-            }
-        }
-
-        if (determined){
-            this->_realloc();
-            this->_set(t_determined, q(t_determined), args);
-        }
-        return determined;
-
-    }
+    inline bool is_precise() const final { return true;}
 
 private:
 
@@ -204,61 +140,27 @@ private:
 
 
 template<class Tt, class Ty>
-class PeriodicEvent : public AnyEvent<Tt, Ty>{
+class PeriodicEvent : public PreciseEvent<Tt, Ty>{
 
 public:
 
-    PeriodicEvent(const PeriodicEvent<Tt, Ty>& other):AnyEvent<Tt, Ty>(other), _period(other._period), _start(other._start), _np(other._np), _np_previous(other._np_previous){}
+    PeriodicEvent(const PeriodicEvent<Tt, Ty>& other):PreciseEvent<Tt, Ty>(other), _period(other._period), _start(other._start), _np(other._np), _np_previous(other._np_previous){}
 
-    PeriodicEvent(const std::string& name, const Tt& period, const Tt& start=0, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false): AnyEvent<Tt ,Ty>(name, nullptr, nullptr, mask, hide_mask), _period(period), _start(start){
+    PeriodicEvent(const std::string& name, const Tt& period, const Tt& start=0, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false): PreciseEvent<Tt ,Ty>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
         if (period <= 0){
-            throw std::runtime_error("Period in periodic event must be positive. If integrating backwards, events are still counted.");
+            throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
         }
     }
 
-    PeriodicEvent<Tt, Ty>& operator=(const PeriodicEvent<Tt, Ty>& other){
-        if (&other != this){
-            _period = other._period;
-            _start = other._start;
-            _np = other._np;
-            _np_previous = other._np_previous;
-            _has_started = other._has_started;
-            AnyEvent<Tt, Ty>::operator=(other);
-        }
-        return *this;
-
-    }
+    PeriodicEvent<Tt, Ty>& operator=(const PeriodicEvent<Tt, Ty>& other);
 
     PeriodicEvent<Tt, Ty>* clone() const override{
         return new PeriodicEvent<Tt, Ty>(*this);
     }
 
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
-        this->_clear();
-        const int direction = (t2 > t1) ? 1 : -1;
-        const Tt next = _has_started ? _start+(_np+direction)*_period : _start;
-        if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
-            _np_previous = _np;
-            _np += direction*this->_has_started;
-            this->_realloc();
-            this->_set(next, q(next), args);
-            this->_has_started = true;
-            return true;
-        }
-        else{
-            return false;
-        }
-    }
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) override;
 
-    void go_back() override {
-        this->_clear();
-        if (_np != _np_previous){
-            _np = _np_previous;
-            if (_np_previous == 0){
-                _has_started = false;
-            }
-        }
-    }
+    void go_back() override;
 
 private:
     Tt _period;
@@ -271,56 +173,227 @@ private:
 
 
 template<class Tt, class Ty>
-class StopEvent : public AnyEvent<Tt, Ty>{
+class RoughEvent : public Event<Tt, Ty>{
 
 public:
 
-    StopEvent(const StopEvent<Tt, Ty>& other) : AnyEvent<Tt, Ty>(other), _kill(other._kill){}
+    RoughEvent(const RoughEvent<Tt, Ty>& other) : Event<Tt, Ty>(other){}
 
-    StopEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false, const bool& kill = false): AnyEvent<Tt ,Ty>(name, when, check_if, mask, hide_mask), _kill(kill){
-        _assert_func(when);
+    RoughEvent(const std::string& name, event_f<Tt, Ty> when, is_event_f<Tt, Ty> check_if=nullptr, Func<Tt, Ty> mask=nullptr, const bool& hide_mask=false): Event<Tt ,Ty>(name, when, check_if, mask, hide_mask){}
+
+    RoughEvent<Tt, Ty>& operator=(const RoughEvent<Tt, Ty>& other);
+
+    RoughEvent<Tt, Ty>* clone() const override{
+        return new RoughEvent<Tt, Ty>(*this);
     }
 
-    StopEvent<Tt, Ty>& operator=(const StopEvent<Tt, Ty>& other){
-        if (&other != this){
-            _kill = other._kill;
-            AnyEvent<Tt, Ty>::operator=(other);
-        }
-        return *this;
+    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) final ;
 
-    }
+    inline bool allows_checkpoint() const override {return false; }
 
-    StopEvent<Tt, Ty>* clone() const override{
-        return new StopEvent<Tt, Ty>(*this);
-    }
-
-    bool determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::vector<Tt>& args, const std::function<Ty(const Tt&)>& q) override {
-        this->_clear();
-        if (this->_check_if == nullptr || (this->_check_if(t1, q1, args) && this->_check_if(t2, q2, args))){
-            Tt val1 = this->_when(t1, q1, args);
-            Tt val2 = this->_when(t2, q2, args);
-            if (val1 * val2 <= 0 && val1 != 0){
-                this->_realloc();
-                this->_set(t2, q2, args);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool is_stop_event() const override{
-        return true;
-    }
-
-    bool is_leathal() const override{
-        return _kill;
-    }
-
-private:
-
-    bool _kill;
+    inline bool is_precise() const final { return false;}
 
 };
 
+
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+//----------------------------------IMPLEMENTATIONS--------------------------------------
+//---------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+//Event CLASS
+
+template<class Tt, class Ty>
+void Event<Tt, Ty>::go_back(){
+    if (_data != nullptr){
+        _clear();
+        _counter--;
+    }
+}
+
+template<class Tt, class Ty>
+const EventData<Tt, Ty>& Event<Tt, Ty>::data() const {
+    if (_data == nullptr){
+        throw std::runtime_error("Event has not been determined");
+    }
+    return *_data;
+}
+
+template<class Tt, class Ty>
+Event<Tt, Ty>& Event<Tt, Ty>::operator=(const Event<Tt, Ty>& other){
+    _name = other._name;
+    _when = other._when;
+    _check_if = other._check_if;
+    _mask = other._mask;
+    _hide_mask = other._hide_mask;
+    _counter = other._counter;
+    _args = other._args;
+    _copy_event_data(other);
+    return *this;
+}
+
+template<class Tt, class Ty>
+void Event<Tt, Ty>::_set(const Tt& t, const Ty& q){
+    delete _data;
+    if (_mask != nullptr){
+        _data = new EventData<Tt, Ty>(t, q, _mask(t, q, _args));
+    }
+    else{
+        _data = new EventData<Tt, Ty>(t, q);
+    }
+    _counter++;
+}
+
+template<class Tt, class Ty>
+void Event<Tt, Ty>::_copy_event_data(const Event<Tt, Ty>& other){
+    delete _data;
+    if (other._data != nullptr){
+        _data = new EventData<Tt, Ty>;
+        *_data = *other._data;
+    }
+    else{
+        _data = nullptr;
+    }
+}
+
+template<class Tt, class Ty>
+void Event<Tt, Ty>::_clear(){
+    delete _data;
+    _data = nullptr;
+}
+
+
+
+
+//PreciseEvent CLASS
+
+template<class Tt, class Ty>
+PreciseEvent<Tt, Ty>& PreciseEvent<Tt, Ty>::operator=(const PreciseEvent<Tt, Ty>& other){
+    if (&other != this){
+        _event_tol = other._event_tol;
+        Event<Tt, Ty>::operator=(other);
+    }
+    return *this;
+}
+
+template<class Tt, class Ty>
+bool PreciseEvent<Tt, Ty>::determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) {
+    this->_clear();
+    Tt t_determined = t2;
+    bool determined = false;
+    if (this->check(t1, q1)){
+        _ObjFun<Tt> f = [this, q](const Tt& t) ->Tt {
+            return this->obj_fun(t, q(t));
+        };
+        Tt val1 = this->obj_fun(t1, q1);
+        Tt val2 = this->obj_fun(t2, q2);
+        if (val1 * val2 <= 0 && val1 != 0){
+            t_determined = bisect(f, t1, t2, this->_event_tol)[2];
+            determined = this->check(t_determined, q(t_determined));
+        }
+    }
+
+    if (determined){
+        this->_set(t_determined, q(t_determined));
+    }
+    return determined;
+
+}
+
+
+
+//PeriodicEvent CLASS
+
+
+template<class Tt, class Ty>
+PeriodicEvent<Tt, Ty>& PeriodicEvent<Tt, Ty>::operator=(const PeriodicEvent<Tt, Ty>& other){
+    if (&other != this){
+        _period = other._period;
+        _start = other._start;
+        _np = other._np;
+        _np_previous = other._np_previous;
+        _has_started = other._has_started;
+        PreciseEvent<Tt, Ty>::operator=(other);
+    }
+    return *this;
+}
+
+
+template<class Tt, class Ty>
+bool PeriodicEvent<Tt, Ty>::determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) {
+    this->_clear();
+    const int direction = (t2 > t1) ? 1 : -1;
+    const Tt next = _has_started ? _start+(_np+direction)*_period : _start;
+    if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
+        _np_previous = _np;
+        _np += direction*this->_has_started;
+        this->_set(next, q(next));
+        this->_has_started = true;
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+
+template<class Tt, class Ty>
+void PeriodicEvent<Tt, Ty>::go_back() {
+    PreciseEvent<Tt, Ty>::go_back();
+    if (_np != _np_previous){
+        _np = _np_previous;
+        if (_np_previous == 0){
+            _has_started = false;
+        }
+    }
+}
+
+
+
+
+//RoughEvent CLASS
+
+
+
+template<class Tt, class Ty>
+RoughEvent<Tt, Ty>& RoughEvent<Tt, Ty>::operator=(const RoughEvent<Tt, Ty>& other){
+    if (&other != this){
+        Event<Tt, Ty>::operator=(other);
+    }
+    return *this;
+}
+
+
+template<class Tt, class Ty>
+bool RoughEvent<Tt, Ty>::determine(const Tt& t1, const Ty& q1, const Tt& t2, const Ty& q2, const std::function<Ty(const Tt&)>& q) {
+    this->_clear();
+    if (this->check(t1, q1) && this->check(t2, q2)){
+        Tt val1 = this->obj_fun(t1, q1);
+        Tt val2 = this->obj_fun(t2, q2);
+        if (val1 * val2 <= 0 && val1 != 0){
+            this->_set(t2, q2);
+            return true;
+        }
+    }
+    return false;
+}
 
 #endif

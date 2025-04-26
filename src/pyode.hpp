@@ -47,7 +47,7 @@ template<class T>
 py::tuple to_tuple(const std::vector<T>& vec);
 
 template<class Tt, class Ty>
-std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args);
+std::vector<Event<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args);
 
 
 template<typename T>
@@ -71,61 +71,51 @@ struct OdeFunc{
     Ty(*f)(const Tt&, const Ty&, const std::vector<Tt>&);
 };
 
+
+
+
 template<class Tt, class Ty>
-class PyAnyEvent{
+class PyEvent{
 
 public:
-    PyAnyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask): _name(name.cast<std::string>()), py_when(when), py_check_if(check_if), py_mask(mask), hide_mask(hide_mask){}
+    PyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask, Tt event_tol):_name(name.cast<std::string>()), py_when(when), py_check_if(check_if), py_mask(mask), hide_mask(hide_mask), _event_tol(event_tol){}
 
-    virtual ~PyAnyEvent(){
+    virtual PreciseEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args=py::tuple()) {
         delete this->_event_ptr;
-        this->_event_ptr = nullptr;
+        this->_event_ptr = new PreciseEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask, this->_event_tol);
+        return this->_event_ptr;
     }
-
-    virtual AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) = 0;
 
     py::str name()const{
         return py::str(_name);
     }
 
-protected:
+    virtual ~PyEvent(){
+        delete this->_event_ptr;
+        this->_event_ptr = nullptr;
+    }
+
     std::string _name;
 
-public:
     py::object py_when;
     py::object py_check_if;
     py::object py_mask;
     bool hide_mask;
     
-    AnyEvent<Tt, Ty>* _event_ptr = nullptr;
-};
+    PreciseEvent<Tt, Ty>* _event_ptr = nullptr;
 
-
-template<class Tt, class Ty>
-class PyEvent : public PyAnyEvent<Tt, Ty>{
-
-public:
-    PyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask, Tt event_tol):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask){}
-
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args=py::tuple()) override{
-        delete this->_event_ptr;
-        this->_event_ptr = new Event<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask, this->_event_tol);
-        return this->_event_ptr;
-    }
-
-private:
     Tt _event_tol;
 
 };
 
 
 template<class Tt, class Ty>
-class PyPerEvent : public PyAnyEvent<Tt, Ty>{
+class PyPerEvent : public PyEvent<Tt, Ty>{
 
 public:
-    PyPerEvent(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyAnyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask), _period(period), _start(start){}
+    PyPerEvent(py::str name, const Tt& period, const Tt& start, py::object mask, py::bool_ hide_mask):PyEvent<Tt, Ty>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(start){}
 
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
+    PreciseEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
         delete this->_event_ptr;
         this->_event_ptr = new PeriodicEvent<Tt, Ty>(this->_name, this->_period, this->_start, to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask);
         return this->_event_ptr;
@@ -143,26 +133,6 @@ private:
     Tt _period;
     Tt _start;
 
-};
-
-
-
-
-
-template<class Tt, class Ty>
-class PyStopEvent : public PyAnyEvent<Tt, Ty>{
-
-public:
-    PyStopEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask, py::bool_ kill):PyAnyEvent<Tt, Ty>(name, when, check_if, mask, hide_mask), _kill(kill){}
-
-    AnyEvent<Tt, Ty>* toEvent(const _Shape& shape, py::tuple args) override{
-        delete this->_event_ptr;
-        this->_event_ptr = new StopEvent<Tt, Ty>(this->_name, to_event<Tt, Ty>(this->py_when, shape, args), to_event_check<Tt, Ty>(this->py_check_if, shape, args), to_Func<Tt, Ty>(this->py_mask, shape, args), this->hide_mask, this->_kill);
-        return this->_event_ptr;
-    }
-
-private:
-    bool _kill;
 };
 
 
@@ -225,7 +195,7 @@ public:
 
     PyODE(const py::object& f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str savedir, const bool save_events_only) : ODE<Tt, Ty>(to_Func<Tt, Ty>(f, shape(q0), args), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<Tt, Ty>(events, shape(q0), args), to_Func<Tt, Ty>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only), q0_shape(shape(q0)){}
 
-    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<AnyEvent<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only), q0_shape({static_cast<size_t>(q0.size())}){}
+    PyODE(const Func<Tt, Ty> f, const Tt t0, const Ty q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const std::vector<Tt> args = {}, const std::string& method = "RK45", const std::vector<Event<Tt, Ty>*>& events = {}, const Func<Tt, Ty> mask=nullptr, const std::string& savedir = "", const bool& save_events_only=false) : ODE<Tt, Ty>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only), q0_shape({static_cast<size_t>(q0.size())}){}
 
     PyODE(PyODE<Tt, Ty>&& other):ODE<Tt, Ty>(std::move(other)), q0_shape(other.q0_shape){}
 
@@ -272,9 +242,9 @@ class DynamicPyOde : public PyODE<Tt, Ty>{
 
 
 public:
-    DynamicPyOde(const py::capsule& f, const Tt t0, const py::array q0, const py::capsule& mask, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<AnyEvent<Tt, Ty>*>*>(events), open_capsule<Fptr<Tt, Ty>>(mask), savedir.cast<std::string>(), save_events_only){}
+    DynamicPyOde(const py::capsule& f, const Tt t0, const py::array q0, const py::capsule& mask, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<Tt, Ty>*>*>(events), open_capsule<Fptr<Tt, Ty>>(mask), savedir.cast<std::string>(), save_events_only){}
 
-    DynamicPyOde(const py::capsule& f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<AnyEvent<Tt, Ty>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only){}
+    DynamicPyOde(const py::capsule& f, const Tt t0, const py::array q0, const Tt rtol, const Tt atol, const Tt min_step, const Tt max_step, const Tt first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only) : PyODE<Tt, Ty>(open_capsule<Fptr<Tt, Ty>>(f), t0, toCPP_Array<Tt, Ty>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<Tt, std::vector<Tt>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<Tt, Ty>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only){}
 };
 
 
@@ -433,13 +403,13 @@ py::tuple to_tuple(const std::vector<T>& arr) {
 }
 
 template<class Tt, class Ty>
-std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args){   
+std::vector<Event<Tt, Ty>*> to_Events(py::object events, const _Shape& shape, py::tuple args){   
     if (events.is_none()){
         return {};
     }
-    std::vector<AnyEvent<Tt, Ty>*> res;
+    std::vector<Event<Tt, Ty>*> res;
     for (const py::handle& item : events){
-        res.push_back(item.cast<PyAnyEvent<Tt, Ty>&>().toEvent(shape, args));
+        res.push_back(item.cast<PyEvent<Tt, Ty>&>().toEvent(shape, args));
     }
     return res;
 }
@@ -447,54 +417,39 @@ std::vector<AnyEvent<Tt, Ty>*> to_Events(py::object events, const _Shape& shape,
 template<class Tt, class Ty>
 void define_ode_module(py::module& m) {
 
-    py::class_<PyAnyEvent<Tt, Ty>>(m, "AnyEvent", py::module_local())
-        .def_property_readonly("name", [](const PyAnyEvent<Tt, Ty>& self){
+    py::class_<PyEvent<Tt, Ty>>(m, "Event", py::module_local())
+        .def(py::init<py::str, py::object, py::object, py::object, py::bool_, Tt>(),
+        py::arg("name"),
+        py::arg("when"),
+        py::arg("check_if")=py::none(),
+        py::arg("mask")=py::none(),
+        py::arg("hide_mask")=false,
+        py::arg("event_tol")=1e-12)
+        .def_property_readonly("name", [](const PyEvent<Tt, Ty>& self){
             return self.name();
         })
-        .def_property_readonly("mask", [](const PyAnyEvent<Tt, Ty>& self){
+        .def_property_readonly("mask", [](const PyEvent<Tt, Ty>& self){
             return self.py_mask;
         })
-        .def_property_readonly("hide_mask", [](const PyAnyEvent<Tt, Ty>& self){
+        .def_property_readonly("hide_mask", [](const PyEvent<Tt, Ty>& self){
             return self.hide_mask;
-        });
-
-    py::class_<PyEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "Event", py::module_local())
-        .def(py::init<py::str, py::object, py::object, py::object, py::bool_, Tt>(),
-            py::arg("name"),
-            py::arg("when"),
-            py::arg("check_if")=py::none(),
-            py::arg("mask")=py::none(),
-            py::arg("hide_mask")=false,
-            py::arg("event_tol")=1e-12)
+        })
         .def_property_readonly("when", [](const PyEvent<Tt, Ty>& self){
             return self.py_when;})
         .def_property_readonly("check_if", [](const PyEvent<Tt, Ty>& self){
             return self.py_check_if;});
-
-        py::class_<PyPerEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "PeriodicEvent", py::module_local())
-            .def(py::init<py::str, Tt, Tt, py::object, py::bool_>(),
-                py::arg("name"),
-                py::arg("period"),
-                py::arg("start")=0,
-                py::arg("mask")=py::none(),
-                py::arg("hide_mask")=false)
-            .def_property_readonly("period", [](const PyPerEvent<Tt, Ty>& self){
-                    return self.period();})
-            .def_property_readonly("start", [](const PyPerEvent<Tt, Ty>& self){
-                return self.start();});
-
-        py::class_<PyStopEvent<Tt, Ty>, PyAnyEvent<Tt, Ty>>(m, "StopEvent", py::module_local())
-            .def(py::init<py::str, py::object, py::object, py::object, py::bool_, py::bool_>(),
-                py::arg("name"),
-                py::arg("when"),
-                py::arg("check_if")=py::none(),
-                py::arg("mask")=py::none(),
-                py::arg("hide_mask")=false,
-                py::arg("kill")=false)
-            .def_property_readonly("when", [](const PyStopEvent<Tt, Ty>& self){
-                return self.py_when;})
-            .def_property_readonly("check_if", [](const PyStopEvent<Tt, Ty>& self){
-                return self.py_check_if;});
+        
+    py::class_<PyPerEvent<Tt, Ty>, PyEvent<Tt, Ty>>(m, "PeriodicEvent", py::module_local())
+        .def(py::init<py::str, Tt, Tt, py::object, py::bool_>(),
+            py::arg("name"),
+            py::arg("period"),
+            py::arg("start")=0,
+            py::arg("mask")=py::none(),
+            py::arg("hide_mask")=false)
+        .def_property_readonly("period", [](const PyPerEvent<Tt, Ty>& self){
+                return self.period();})
+        .def_property_readonly("start", [](const PyPerEvent<Tt, Ty>& self){
+            return self.start();});
 
     py::class_<PyOdeResult<Tt, Ty>>(m, "OdeResult", py::module_local())
         .def_property_readonly("t", [](const PyOdeResult<Tt, Ty>& self){
