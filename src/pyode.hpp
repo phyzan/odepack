@@ -7,7 +7,6 @@
 #include <functional>
 #include "ode.hpp"
 
-
 namespace py = pybind11;
 
 //assumes empty args given as std::vector, use only for ODE instanciated from python directly
@@ -168,11 +167,33 @@ struct PyOdeResult{
 
 
 
-class PyOdeBase{
-
+class PyOdeBase {
 public:
 
-    void none() const{}
+    PyOdeResult<double, vec<double>>* integrate_none(const double& interval, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
+        none();
+        return nullptr;
+    }
+
+    PyOdeResult<double, vec<double>>* go_to_none(const double& t, const int max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
+        none();
+        return nullptr;
+    }
+
+    py::none save_data_none(py::str savedir) const {
+        return none();
+    }
+
+    py::tuple event_data_none(py::str event) const{
+        return none();
+    }
+
+
+    py::object none() const {
+        PyErr_SetString(PyExc_NotImplementedError, "Method not implemented.");
+        throw py::error_already_set();
+    }
+
 /*
 Empty class to expose to python.
 Although this is empty, python methods will be exposed
@@ -483,18 +504,39 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("message", [](const PySolverState<Tt, Ty>& self){return self.message;})
         .def("show", [](const PySolverState<Tt, Ty>& self){return self.show();});
 
+
+
+
+
+
+
+
     py::class_<PyOdeBase>(m, "ODE", py::module_local())
         .def(py::init<>())
-        .def("integrate", &PyOdeBase::none)
-        .def("go_to", &PyOdeBase::none)
+        .def("integrate", &PyOdeBase::integrate_none,
+            py::arg("interval"),
+            py::kw_only(),
+            py::arg("max_frames")=-1,
+            py::arg("max_events")=-1,
+            py::arg("terminate")=true,
+            py::arg("max_prints")=0,
+            py::arg("include_first")=false)
+        .def("go_to", &PyOdeBase::go_to_none,
+            py::arg("t"),
+            py::kw_only(),
+            py::arg("max_frames")=-1,
+            py::arg("max_events")=-1,
+            py::arg("terminate")=true,
+            py::arg("max_prints")=0,
+            py::arg("include_first")=false)
         .def("copy", &PyOdeBase::none)
         .def("advance", &PyOdeBase::none)
         .def("resume", &PyOdeBase::none)
         .def("free", &PyOdeBase::none)
         .def("state", &PyOdeBase::none)
-        .def("save_data", &PyOdeBase::none)
+        .def("save_data", &PyOdeBase::save_data_none, py::arg("savedir"))
         .def("clear", &PyOdeBase::none)
-        .def("event_data", &PyOdeBase::none)
+        .def("event_data", &PyOdeBase::save_data_none, py::arg("event"))
         .def_property_readonly("dim", &PyOdeBase::none)
         .def_property_readonly("t", &PyOdeBase::none)
         .def_property_readonly("q", &PyOdeBase::none)
