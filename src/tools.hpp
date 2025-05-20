@@ -5,26 +5,23 @@
 #include <iostream>
 #include <map>
 #include <iomanip>
-#include <eigen3/Eigen/Dense>
-#include <eigen3/unsupported/Eigen/MPRealSupport>
 #include <fstream>
+#include "tensors.hpp"
 
 
 // USEFUL ALIASES
 
-template<class Tt, int N=-1>
-using vec = Eigen::Array<Tt, 1, N>;
+template<class S>
+using Jac = std::function<void(Tensor<S>&, const S&, const Tensor<S>&, const std::vector<S>&)>;
 
-template<class Tt, class Ty>
-using Func = std::function<Ty(const Tt&, const Ty&, const std::vector<Tt>&)>;
+template<class S>
+using Func = std::function<Ty(const S&, const Tensor<S>&, const std::vector<S>&)>;
 
-template<class Tt, class Ty>
-using Fptr = Ty(*)(const Tt&, const Ty&, const std::vector<Tt>&);
+template<class S>
+using Fptr = Tensor<S>(*)(const S&, const Tensor<S>&, const std::vector<S>&);
 
-template<class Tt>
-using _ObjFun = std::function<Tt(const Tt&)>;
-
-using _Shape = std::vector<size_t>;
+template<class S>
+using _ObjFun = std::function<S(const S&)>;
 
 template<class T>
 using complex = std::complex<T>;
@@ -34,46 +31,6 @@ using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
 template <typename T>
 constexpr T inf() {
     return std::numeric_limits<T>::infinity();
-}
-
-template<class T, int Nr, int Nc>
-T norm_squared(const Eigen::Array<T, Nr, Nc>& f){
-    return (f*f).sum();
-}
-
-template<class T, int Nr, int Nc>
-T rms_norm(const Eigen::Array<T, Nr, Nc>& f){
-    return sqrt(norm_squared(f) / f.size());
-}
-
-template<class T, int Nr, int Nc>
-Eigen::Array<T, Nr, Nc> cwise_abs(const Eigen::Array<T, Nr, Nc>& f){
-    return f.cwiseAbs();
-}
-
-template<class T, int Nr, int Nc>
-Eigen::Array<T, Nr, Nc> cwise_max(const Eigen::Array<T, Nr, Nc>& a, const Eigen::Array<T, Nr, Nc>& b){
-    return a.cwiseMax(b);
-}
-
-template<class T>
-T abs(const T& x){
-    return (x > 0) ? x : -x;
-}
-
-template<class T, int Nr, int Nc>
-bool All_isFinite(const Eigen::Array<T, Nr, Nc>& arr){
-    return arr.isFinite().all();
-}
-
-template<class T, int Nr, int Nc>
-std::vector<size_t> shape(const Eigen::Array<T, Nr, Nc>& arr){
-    return {size_t(arr.rows()), size_t(arr.cols())};
-}
-
-template<class T>
-std::vector<size_t> shape(const std::vector<T>& arr){
-    return {arr.size()};
 }
 
 
@@ -123,12 +80,12 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
-template<class Tt, class Ty>
+template<class S>
 struct OdeResult{
 
 
-    const std::vector<Tt> t;
-    const std::vector<Ty> q;
+    const std::vector<S> t;
+    const std::vector<Tensor<S>> q;
     const std::map<std::string, std::vector<size_t>> event_map;
     const bool diverges;
     const bool is_stiff;
@@ -157,24 +114,26 @@ struct OdeResult{
         return res;
     }
 
-    std::vector<Tt> t_filtered(const std::string& event) const {
+    std::vector<S> t_filtered(const std::string& event) const {
         return _event_data(this->t, this->event_map, event);
     }
 
-    std::vector<Ty> q_filtered(const std::string& event) const {
+    std::vector<Tensor<S>> q_filtered(const std::string& event) const {
         return _event_data(this->q, this->event_map, event);
     }
     
 };
 
 
-template<class Tt, class Ty>
+template<class S>
 class SolverState{
 
+using Ty = Tensor<S>;
+
 public:
-    const Tt t;
+    const S t;
     const Ty q;
-    const Tt habs;
+    const S habs;
     const std::string event;
     const bool diverges;
     const bool is_stiff;
@@ -183,7 +142,7 @@ public:
     const size_t N;
     const std::string message;
 
-    SolverState(const Tt& t, const Ty& q, const Tt& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& N, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), N(N), message(message) {}
+    SolverState(const S& t, const Ty& q, const S& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& N, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), N(N), message(message) {}
 
     void show(const int& precision = 15) const{
 
@@ -200,19 +159,15 @@ public:
         "\tDead       : " << (is_dead ? "true" : "false") << "\n" <<
         "\tState      : " << message << "\n";
     }
-
-
-
-
 };
 
 
-template<class Tt, class Ty>
+template<class S>
 struct State{
 
-    Tt t;
-    Ty q;
-    Tt h_next;
+    S t;
+    Tensor<S> q;
+    S h_next;
 };
 
 

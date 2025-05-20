@@ -55,7 +55,7 @@ int main() {
         std::cout << R[i] << " ";
     }
     std::cout << std::endl;
-    R.apply_pow(A, B);
+    R.apply_pow(R.apply_add(A, B), B);
     for (size_t i=0; i<R.size(); i++){
         std::cout << R[i] << " ";
     }

@@ -390,17 +390,18 @@ public:
         return *this;
     }
 
-    Tensor<S>& set_max(const Tensor<S>& other){
-        _check_shape(other);
+    Tensor<S>& apply_max(const Tensor<S>& a, const Tensor<S>& b){
+        _check_shape(a);
+        _check_shape(b);
         for (size_t i = 0; i < _size; i++){
-            _array[i] = (_array[i] > other._array[i]) ? _array[i] : other._array[i];
+            _array[i] = (a[i] > b[i]) ? a[i] : b[i];
         }
         return *this;
     }
 
     S norm_squared() const{
         S res = 0;
-        for (const size_t& i=0; i<_size; i++){
+        for (size_t& i=0; i<_size; i++){
             res += _array[i]*_array[i];
         }
         return res;
