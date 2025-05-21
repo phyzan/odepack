@@ -40,7 +40,7 @@ struct _MutableData{
 
 
 template<class T, int N>
-void write_chechpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
+void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
 
 
 template<class T, int N>
@@ -151,9 +151,7 @@ private:
     std::ofstream _file;
     bool _autosave = false;
     bool _save_events_only = false;
-    T* _t_check = nullptr;
-    vec<T, N>* _q_check = nullptr;
-    T* _habs_check = nullptr;
+    State<T, N>* _checkpoint = nullptr;
     const vec<T, N>* _q_exposed = nullptr; //view_only pointer
     mutable _MutableData<T, N> _mut;
 
@@ -171,10 +169,6 @@ private:
 
     void _copy_data(const OdeSolver<T, N>& other);
 
-    void _make_checkpoint(const T& t, const vec<T, N>& q, const T& habs);
-
-    void _clear_checkpoint();
-
     void _make_new_events(const std::vector<Event<T, N>*>& events);
 
     void _delete_events();
@@ -190,7 +184,8 @@ private:
 
 template<class T, int N>
 OdeSolver<T, N>::~OdeSolver(){
-    _clear_checkpoint();
+    delete _checkpoint;
+    _checkpoint = nullptr;
     _delete_events();
     if (_autosave){
         _file.close();
@@ -467,7 +462,7 @@ OdeSolver<T, N>::OdeSolver(const SolverArgs<T, N>& S, const int& order, const in
             throw std::runtime_error("Could not open file in OdeSolver for automatic saving: " + _filename + "\n");
         }
         _autosave = true;
-        write_chechpoint(_file, _t, _q, -1);
+        write_checkpoint(_file, _t, _q, -1);
     }
 }
 
@@ -542,9 +537,8 @@ bool OdeSolver<T, N>::advance_by(const T& habs){
         return false;
     }
 
-    if (_t_check != nullptr){
-        _clear_checkpoint();
-    }
+    delete _checkpoint;
+    _checkpoint = nullptr;
 
     bool _set_non_stiff = false;
     if (habs <= _h_min && !_is_stiff){
@@ -563,9 +557,8 @@ bool OdeSolver<T, N>::advance_by(const T& habs){
 
 template<class T, int N>
 bool OdeSolver<T, N>::advance_by_any(const T& h){
-    if (_t_check != nullptr){
-        _clear_checkpoint();
-    }
+    delete _checkpoint;
+    _checkpoint = nullptr;
 
     set_goal(_t+h);
     State<T, N>& state = _mut.state;
@@ -596,8 +589,9 @@ bool OdeSolver<T, N>::_update(const T& t_new, const vec<T, N>& y_new, const T& h
     }
 
     //make or clear checkpoint first
-    if (_current_event_index == -1 && _t_check != nullptr){
-        _clear_checkpoint();
+    if (_current_event_index == -1 && _checkpoint != nullptr){
+        delete _checkpoint;
+        _checkpoint = nullptr;
     }
 
 
@@ -639,7 +633,7 @@ bool OdeSolver<T, N>::_update(const T& t_new, const vec<T, N>& y_new, const T& h
 
     if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
-            write_chechpoint(_file, _t, q(), _current_event_index);
+            write_checkpoint(_file, _t, q(), _current_event_index);
         }
     }
 
@@ -667,10 +661,11 @@ bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
     
     if (event.determine(this->_t, this->_q, next.t, next.q, qfunc)){
         if (_current_event_index == -1 && event.allows_checkpoint()){
-            _make_checkpoint(next.t, next.q, next.h_next);
+            _checkpoint = new State<T, N>{next.t, next.q, next.h_next};
         }
-        else if ( _t_check != nullptr && event.has_mask()){
-            _clear_checkpoint();
+        else if ( _checkpoint != nullptr && event.has_mask()){
+            delete _checkpoint;
+            _checkpoint = nullptr;
         }
         next.t = event.data().t();
         next.q = event.data().q_true();
@@ -697,10 +692,8 @@ bool OdeSolver<T, N>::_go_to_state(){
         _current_event_index = -1;
         _q_exposed = &_q;
         State<T, N>& next = _mut.state;
-        if (_t_check != nullptr){
-            next.t = *_t_check;
-            next.q = *_q_check;
-            next.h_next = *_habs_check;
+        if (_checkpoint != nullptr){
+            next = *_checkpoint;
         }
 
         for (int i=0; i<static_cast<int>(_events.size()); i++){
@@ -765,9 +758,10 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     _autosave = other._autosave;
 
     _make_new_events(other._events);
-    _clear_checkpoint();
-    if (other._t_check != nullptr){
-        _make_checkpoint(*other._t_check, *other._q_check, *other._habs_check);
+    delete _checkpoint;
+    _checkpoint = nullptr;
+    if (other._checkpoint != nullptr){
+       _checkpoint = new State<T, N>(*other._checkpoint);
     }
     if (other._q_exposed == &other._q){
         _q_exposed = &_q;
@@ -778,25 +772,6 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     _mut = other._mut;
 }
 
-template<typename T, int N>
-void OdeSolver<T, N>::_make_checkpoint(const T& t, const vec<T, N>& q, const T& habs) {
-    _t_check = new T;
-    _q_check = new vec<T, N>;
-    _habs_check = new T;
-    *_t_check = t;
-    *_q_check = q;
-    *_habs_check = habs;
-}
-
-template<typename T, int N>
-void OdeSolver<T, N>::_clear_checkpoint() {
-    delete _t_check;
-    delete _q_check;
-    delete _habs_check;
-    _t_check = nullptr;
-    _q_check = nullptr;
-    _habs_check = nullptr;
-}
 
 template<typename T, int N>
 void OdeSolver<T, N>::_make_new_events(const std::vector<Event<T, N>*>& events) {
@@ -842,7 +817,7 @@ void OdeSolver<T, N>::_delete_events() {
 
 
 template<class T, int N>
-void write_chechpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
+void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
     file << event_index << " " << std::setprecision(16) << t;
     for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
         file << " " << std::setprecision(16) << q[i];
