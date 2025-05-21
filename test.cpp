@@ -69,4 +69,6 @@ int main(){
 
     //#pragma omp target teams distribute parallel for map(to: list_data[:s])
 
+    //g++ -g -O3 -Wall -std=c++20 test.cpp -o test -lmpfr -lgmp
+
 }
