@@ -524,7 +524,7 @@ bool OdeSolver<T, N>::_update(const T& t_new, const vec<T, N>& y_new, const T& h
         throw std::runtime_error("Bug detected: Absolute stepsize < 0");
     }
 
-    if (!All_isFinite(y_new)){
+    if (!y_new.isFinite().all()){
         kill("Ode solution diverges");
         _diverges = true;
         success = false;

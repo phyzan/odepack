@@ -51,20 +51,11 @@ Eigen::Array<T, Nr, Nc> cwise_abs(const Eigen::Array<T, Nr, Nc>& f){
     return f.cwiseAbs();
 }
 
-template<class T, int Nr, int Nc>
-Eigen::Array<T, Nr, Nc> cwise_max(const Eigen::Array<T, Nr, Nc>& a, const Eigen::Array<T, Nr, Nc>& b){
-    return a.cwiseMax(b);
-}
-
 template<class T>
 T abs(const T& x){
     return (x > 0) ? x : -x;
 }
 
-template<class T, int Nr, int Nc>
-bool All_isFinite(const Eigen::Array<T, Nr, Nc>& arr){
-    return arr.isFinite().all();
-}
 
 template<class T, int Nr, int Nc>
 std::vector<size_t> shape(const Eigen::Array<T, Nr, Nc>& arr){

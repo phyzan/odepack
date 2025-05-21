@@ -61,7 +61,7 @@ public:
             t_new = t+h;
 
             q_new = step(t, q, h);
-            scale = atol + cwise_max(qabs, cwise_abs(q_new))*rtol;
+            scale = atol + qabs.cwiseMax(cwise_abs(q_new))*rtol;
             err_norm = _error_norm(_K, h, scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
             if (err_norm < 1){
