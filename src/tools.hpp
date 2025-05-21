@@ -5,23 +5,29 @@
 #include <iostream>
 #include <map>
 #include <iomanip>
+#include <eigen3/Eigen/Dense>
+#include <eigen3/unsupported/Eigen/MPRealSupport>
 #include <fstream>
-#include "tensors.hpp"
 
 
 // USEFUL ALIASES
 
-template<class S>
-using Jac = std::function<void(Tensor<S>&, const S&, const Tensor<S>&, const std::vector<S>&)>;
+template<class T, int N=-1>
+using vec = Eigen::Array<T, 1, N>;
 
-template<class S>
-using Func = std::function<Ty(const S&, const Tensor<S>&, const std::vector<S>&)>;
+template<class T, int N>
+using Jac = std::function<void(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
 
-template<class S>
-using Fptr = Tensor<S>(*)(const S&, const Tensor<S>&, const std::vector<S>&);
+template<class T, int N=-1>
+using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
-template<class S>
-using _ObjFun = std::function<S(const S&)>;
+template<class T, int N>
+using Fptr = vec<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
+
+template<class T>
+using _ObjFun = std::function<T(const T&)>;
+
+using _Shape = std::vector<size_t>;
 
 template<class T>
 using complex = std::complex<T>;
@@ -31,6 +37,37 @@ using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
 template <typename T>
 constexpr T inf() {
     return std::numeric_limits<T>::infinity();
+}
+
+template<class T, int Nr, int Nc>
+T norm_squared(const Eigen::Array<T, Nr, Nc>& f){
+    return (f*f).sum();
+}
+
+template<class T, int Nr, int Nc>
+T rms_norm(const Eigen::Array<T, Nr, Nc>& f){
+    return sqrt(norm_squared(f) / f.size());
+}
+
+template<class T, int Nr, int Nc>
+Eigen::Array<T, Nr, Nc> cwise_abs(const Eigen::Array<T, Nr, Nc>& f){
+    return f.cwiseAbs();
+}
+
+template<class T>
+T abs(const T& x){
+    return (x > 0) ? x : -x;
+}
+
+
+template<class T, int Nr, int Nc>
+std::vector<size_t> shape(const Eigen::Array<T, Nr, Nc>& arr){
+    return {size_t(arr.rows()), size_t(arr.cols())};
+}
+
+template<class T>
+std::vector<size_t> shape(const std::vector<T>& arr){
+    return {arr.size()};
 }
 
 
@@ -80,12 +117,12 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
-template<class S>
+template<class T, int N>
 struct OdeResult{
 
 
-    const std::vector<S> t;
-    const std::vector<Tensor<S>> q;
+    const std::vector<T> t;
+    const std::vector<vec<T, N>> q;
     const std::map<std::string, std::vector<size_t>> event_map;
     const bool diverges;
     const bool is_stiff;
@@ -114,35 +151,33 @@ struct OdeResult{
         return res;
     }
 
-    std::vector<S> t_filtered(const std::string& event) const {
+    std::vector<T> t_filtered(const std::string& event) const {
         return _event_data(this->t, this->event_map, event);
     }
 
-    std::vector<Tensor<S>> q_filtered(const std::string& event) const {
+    std::vector<vec<T, N>> q_filtered(const std::string& event) const {
         return _event_data(this->q, this->event_map, event);
     }
     
 };
 
 
-template<class S>
+template<class T, int N>
 class SolverState{
 
-using Ty = Tensor<S>;
-
 public:
-    const S t;
-    const Ty q;
-    const S habs;
+    const T t;
+    const vec<T, N> q;
+    const T habs;
     const std::string event;
     const bool diverges;
     const bool is_stiff;
     const bool is_running; //if tmax or breakcond are met or is dead, it is set to false. It can be set to true if new tmax goal is set
     const bool is_dead; //e.g. if stiff or diverges. This is irreversible.
-    const size_t N;
+    const size_t Nt;
     const std::string message;
 
-    SolverState(const S& t, const Ty& q, const S& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& N, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), N(N), message(message) {}
+    SolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), Nt(Nt), message(message) {}
 
     void show(const int& precision = 15) const{
 
@@ -155,19 +190,23 @@ public:
         "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
         "\tStiff      : " << (is_stiff ? "true" : "false") << "\n" <<
         "\tRunning    : " << (is_running ? "true" : "false") << "\n" <<
-        "\tUpdates    : " << N << "\n" <<
+        "\tUpdates    : " << Nt << "\n" <<
         "\tDead       : " << (is_dead ? "true" : "false") << "\n" <<
         "\tState      : " << message << "\n";
     }
+
+
+
+
 };
 
 
-template<class S>
+template<class T, int N>
 struct State{
 
-    S t;
-    Tensor<S> q;
-    S h_next;
+    T t;
+    vec<T, N> q;
+    T h_next;
 };
 
 
