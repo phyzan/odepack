@@ -12,17 +12,17 @@
 
 // USEFUL ALIASES
 
-template<class Tt, int N=-1>
-using vec = Eigen::Array<Tt, 1, N>;
+template<class T, int N=-1>
+using vec = Eigen::Array<T, 1, N>;
 
-template<class Tt, class Ty>
-using Func = std::function<Ty(const Tt&, const Ty&, const std::vector<Tt>&)>;
+template<class T, int N=-1>
+using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
-template<class Tt, class Ty>
-using Fptr = Ty(*)(const Tt&, const Ty&, const std::vector<Tt>&);
+template<class T, int N>
+using Fptr = vec<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
 
-template<class Tt>
-using _ObjFun = std::function<Tt(const Tt&)>;
+template<class T>
+using _ObjFun = std::function<T(const T&)>;
 
 using _Shape = std::vector<size_t>;
 
@@ -123,12 +123,12 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
-template<class Tt, class Ty>
+template<class T, int N>
 struct OdeResult{
 
 
-    const std::vector<Tt> t;
-    const std::vector<Ty> q;
+    const std::vector<T> t;
+    const std::vector<vec<T, N>> q;
     const std::map<std::string, std::vector<size_t>> event_map;
     const bool diverges;
     const bool is_stiff;
@@ -157,33 +157,33 @@ struct OdeResult{
         return res;
     }
 
-    std::vector<Tt> t_filtered(const std::string& event) const {
+    std::vector<T> t_filtered(const std::string& event) const {
         return _event_data(this->t, this->event_map, event);
     }
 
-    std::vector<Ty> q_filtered(const std::string& event) const {
+    std::vector<vec<T, N>> q_filtered(const std::string& event) const {
         return _event_data(this->q, this->event_map, event);
     }
     
 };
 
 
-template<class Tt, class Ty>
+template<class T, int N>
 class SolverState{
 
 public:
-    const Tt t;
-    const Ty q;
-    const Tt habs;
+    const T t;
+    const vec<T, N> q;
+    const T habs;
     const std::string event;
     const bool diverges;
     const bool is_stiff;
     const bool is_running; //if tmax or breakcond are met or is dead, it is set to false. It can be set to true if new tmax goal is set
     const bool is_dead; //e.g. if stiff or diverges. This is irreversible.
-    const size_t N;
+    const size_t Nt;
     const std::string message;
 
-    SolverState(const Tt& t, const Ty& q, const Tt& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& N, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), N(N), message(message) {}
+    SolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), Nt(Nt), message(message) {}
 
     void show(const int& precision = 15) const{
 
@@ -196,7 +196,7 @@ public:
         "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
         "\tStiff      : " << (is_stiff ? "true" : "false") << "\n" <<
         "\tRunning    : " << (is_running ? "true" : "false") << "\n" <<
-        "\tUpdates    : " << N << "\n" <<
+        "\tUpdates    : " << Nt << "\n" <<
         "\tDead       : " << (is_dead ? "true" : "false") << "\n" <<
         "\tState      : " << message << "\n";
     }
@@ -207,12 +207,12 @@ public:
 };
 
 
-template<class Tt, class Ty>
+template<class T, int N>
 struct State{
 
-    Tt t;
-    Ty q;
-    Tt h_next;
+    T t;
+    vec<T, N> q;
+    T h_next;
 };
 
 

@@ -8,27 +8,27 @@
 
 
 
-template<class Tt, class Ty>
+template<class T, int N>
 struct SolverArgs{
 
-    const Func<Tt, Ty> f;
-    const Tt t0;
-    const Ty q0;
-    const Tt rtol;
-    const Tt atol;
-    const Tt h_min;
-    const Tt h_max;
-    const Tt first_step;
-    const std::vector<Tt> args;
-    const std::vector<Event<Tt, Ty>*> events;
-    const Func<Tt, Ty> mask;
+    const Func<T, N> f;
+    const T t0;
+    const vec<T, N> q0;
+    const T rtol;
+    const T atol;
+    const T h_min;
+    const T h_max;
+    const T first_step;
+    const std::vector<T> args;
+    const std::vector<Event<T, N>*> events;
+    const Func<T, N> mask;
     const std::string save_dir;
     const bool save_events_only;
 };
 
 
-template<class Tt, class Ty>
-void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q, const int& event_index){
+template<class T, int N>
+void write_chechpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
     file << event_index << " " << std::setprecision(16) << t;
     for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
         file << " " << std::setprecision(16) << q[i];
@@ -37,16 +37,16 @@ void write_chechpoint(std::ofstream& file, const Tt& t, const Ty& q, const int& 
 }
 
 
-template<class Tt, class Ty>
+template<class T, int N>
 class OdeSolver{
 
 
 public:
 
-    using Callable = Func<Tt, Ty>;
-    const Tt MAX_FACTOR = Tt(10);
-    const Tt SAFETY = Tt(9)/10;
-    const Tt MIN_FACTOR = Tt(2)/10;
+    using Callable = Func<T, N>;
+    const T MAX_FACTOR = T(10);
+    const T SAFETY = T(9)/10;
+    const T MIN_FACTOR = T(2)/10;
     const int ORDER;
     const int ERR_EST_ORDER;
 
@@ -62,24 +62,24 @@ public:
     //MODIFIERS
     void stop(const std::string& text = "") {_is_running = false; _message = (text == "") ? "Stopped by user" : text;}
     void kill(const std::string& text = "") {_is_running = false; _is_dead = true; _message = (text == "") ? "Killed by user" : text;}
-    bool advance_by(const Tt& habs);
-    bool advance_by_any(const Tt& h);
+    bool advance_by(const T& habs);
+    bool advance_by_any(const T& h);
     bool advance();
-    bool set_goal(const Tt& t_max);
+    bool set_goal(const T& t_max);
 
     //ACCESSORS
-    const Tt& t() const { return _t; }
-    const Ty& q() const { return *_q_exposed; }
-    const Ty& q_true() const { return _q; }
+    const T& t() const { return _t; }
+    const vec<T, N>& q() const { return *_q_exposed; }
+    const vec<T, N>& q_true() const { return _q; }
 
-    const Tt& stepsize() const { return _habs; }
-    const Tt& tmax() const { return _tmax; }
+    const T& stepsize() const { return _habs; }
+    const T& tmax() const { return _tmax; }
     const int& direction() const { return _direction; }
-    const Tt& rtol() const { return _rtol; }
-    const Tt& atol() const { return _atol; }
-    const Tt& h_min() const { return _h_min; }
-    const Tt& h_max() const { return _h_max; }
-    const std::vector<Tt>& args() const { return _args; }
+    const T& rtol() const { return _rtol; }
+    const T& atol() const { return _atol; }
+    const T& h_min() const { return _h_min; }
+    const T& h_max() const { return _h_max; }
+    const std::vector<T>& args() const { return _args; }
     const size_t& Nsys() const { return _n; }
     const bool& diverges() const {return _diverges;}
     const bool& is_stiff() const {return _is_stiff;}
@@ -138,10 +138,10 @@ public:
 
     bool free(){
         if (_direction == -1){
-            return set_goal(-inf<Tt>());
+            return set_goal(-inf<T>());
         }
         else{
-            return set_goal(inf<Tt>());
+            return set_goal(inf<T>());
         }
 
     }
@@ -154,11 +154,11 @@ public:
         return at_event() ? current_event()->name() : "";
     }
 
-    const SolverState<Tt, Ty> state() const {
+    const SolverState<T, N> state() const {
         return {_t, q(), _habs, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
     }
 
-    const Event<Tt, Ty>* current_event() const{
+    const Event<T, N>* current_event() const{
         //we need pointer and not reference, because it might be null
         return at_event() ? _events[_current_event_index] : nullptr;
     }
@@ -168,7 +168,7 @@ public:
         return _current_event_index;
     }
 
-    const Event<Tt, Ty>* event(const size_t& i){
+    const Event<T, N>* event(const size_t& i){
         return _events[i];
     }
 
@@ -180,24 +180,24 @@ public:
     //MEMBER FUNCTIONS BELOW IMPLEMENTED BY CUSTOM DERIVED CLASSES
     //THEY FIRST 2 MUST NOT DEPEND ON THE CURRENT STATE
 
-    virtual Ty step(const Tt& t_old, const Ty& q_old, const Tt& h) const = 0;
+    virtual vec<T, N> step(const T& t_old, const vec<T, N>& q_old, const T& h) const = 0;
 
-    virtual State<Tt, Ty> adaptive_step() const = 0; //derived implementation must account for h_min
+    virtual State<T, N> adaptive_step() const = 0; //derived implementation must account for h_min
 
-    virtual OdeSolver<Tt, Ty>* clone() const = 0;
+    virtual OdeSolver<T, N>* clone() const = 0;
 
-    Tt auto_step()const{
+    T auto_step()const{
         //returns absolute value of emperically determined first step.
         if (_direction == 0){
             //needed even if the resulting stepsize will have a positive value.
             throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
         }
-        Tt h0, d2, h1;
-        Ty y1, f1;
-        Ty scale = _atol + cwise_abs(_q)*_rtol;
-        Ty _dq = _f(_t, _q, _args);
-        Tt d0 = rms_norm((_q/scale).eval());
-        Tt d1 = rms_norm((_dq/scale).eval());
+        T h0, d2, h1;
+        vec<T, N> y1, f1;
+        vec<T, N> scale = _atol + cwise_abs(_q)*_rtol;
+        vec<T, N> _dq = _f(_t, _q, _args);
+        T d0 = rms_norm((_q/scale).eval());
+        T d1 = rms_norm((_dq/scale).eval());
         if (d0 < 1e-5 || d1 < 1e-5){
             h0 = 1e-6;
         }
@@ -209,10 +209,10 @@ public:
         d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
         
         if (d1 <= 1e-15 && d2 <= 1e-15){
-            h1 = std::max(Tt(1e-6), 1e-3*h0);
+            h1 = std::max(T(1e-6), 1e-3*h0);
         }
         else{
-            h1 = pow(100*std::max(d1, d2), -Tt(1)/Tt(ERR_EST_ORDER+1));
+            h1 = pow(100*std::max(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
         }
 
         return std::min({100*h0, h1, _h_max});
@@ -222,7 +222,7 @@ public:
 
 protected:
 
-    OdeSolver(const SolverArgs<Tt, Ty>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _f(S.f), _t(S.t0), _q(S.q0), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _args(S.args), _n(S.q0.size()), _filename(S.save_dir), _save_events_only(S.save_events_only){
+    OdeSolver(const SolverArgs<T, N>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _f(S.f), _t(S.t0), _q(S.q0), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _args(S.args), _n(S.q0.size()), _filename(S.save_dir), _save_events_only(S.save_events_only){
         if (_h_max < _h_min){
             throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
         }
@@ -233,9 +233,9 @@ protected:
             _habs = (S.first_step < _h_min) ? _h_min : S.first_step;
         }
         if (S.mask != nullptr){
-            Func<Tt, Ty> f_tmp = S.f;
-            Func<Tt, Ty> msk = S.mask;
-            _f = [msk, f_tmp](const Tt& t, const Ty& q, const std::vector<Tt>& args)->Ty {
+            Func<T, N> f_tmp = S.f;
+            Func<T, N> msk = S.mask;
+            _f = [msk, f_tmp](const T& t, const vec<T, N>& q, const std::vector<T>& args)->vec<T, N> {
                 return msk(t, f_tmp(t, q, args), args);
             };
         }
@@ -243,7 +243,7 @@ protected:
         _make_new_events(S.events);
         set_goal(_t);
         if (!_filename.empty()){
-            if (typeid(Tt) != typeid(_q[0])){
+            if (typeid(T) != typeid(_q[0])){
                 throw std::runtime_error("Cannot turn on autosaving to OdeSolver whose step is not 1D");
             }
             _file.open(_filename, std::ios::out);
@@ -255,13 +255,13 @@ protected:
         }
     }
 
-    OdeSolver(const OdeSolver<Tt, Ty>& other) : ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER){
+    OdeSolver(const OdeSolver<T, N>& other) : ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER){
         _copy_data(other);
         _filename = "";
         _autosave = false;
     };
 
-    OdeSolver(OdeSolver<Tt, Ty>&& other): ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER), _file(std::move(other._file)){
+    OdeSolver(OdeSolver<T, N>&& other): ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER), _file(std::move(other._file)){
         //not the most efficient, but the most readable :)
         //besides the time scale of a copy is insignificant to the timescale of
         //solving an ode.
@@ -269,14 +269,14 @@ protected:
     }
 
 
-    OdeSolver<Tt, Ty>& operator=(const OdeSolver<Tt, Ty>& other){
+    OdeSolver<T, N>& operator=(const OdeSolver<T, N>& other){
         _copy_data(other);
         _filename = "";
         _autosave = false;
         return *this;
     }
 
-    inline Ty f(const Tt& t, const Ty& q)const{
+    inline vec<T, N> f(const T& t, const vec<T, N>& q)const{
         return _f(t, q, _args);
     }
 
@@ -285,17 +285,17 @@ protected:
 private:
 
     Callable _f;
-    Tt _t;
-    Ty _q;
-    Tt _rtol;
-    Tt _atol;
-    Tt _h_min;
-    Tt _h_max;
-    Tt _habs;
-    std::vector<Tt> _args;
+    T _t;
+    vec<T, N> _q;
+    T _rtol;
+    T _atol;
+    T _h_min;
+    T _h_max;
+    T _habs;
+    std::vector<T> _args;
 
     size_t _n; //size of ode system
-    Tt _tmax;
+    T _tmax;
     bool _diverges = false;
     bool _is_stiff = false;
     bool _is_running = true;
@@ -303,26 +303,26 @@ private:
     size_t _N=0;//total number of solution updates
     std::string _message; //different from "running".
     int _direction;
-    std::vector<Event<Tt, Ty>*> _events;
+    std::vector<Event<T, N>*> _events;
     int _current_event_index = -1;
     std::string _filename;
     std::ofstream _file;
     bool _autosave = false;
     bool _save_events_only = false;
-    Tt* _t_check = nullptr;
-    Ty* _q_check = nullptr;
-    Tt* _habs_check = nullptr;
-    const Ty* _q_exposed = nullptr; //view_only pointer
+    T* _t_check = nullptr;
+    vec<T, N>* _q_check = nullptr;
+    T* _habs_check = nullptr;
+    const vec<T, N>* _q_exposed = nullptr; //view_only pointer
 
-    Ty _q_step(const Tt& t_next)const{
+    vec<T, N> _q_step(const T& t_next)const{
         return this->step(this->_t, this->_q, t_next-this->_t);
     }
 
-    bool _adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event);
+    bool _adapt_to_event(State<T, N>& next, Event<T, N>& event);
 
-    bool _go_to_state(State<Tt, Ty>& next);
+    bool _go_to_state(State<T, N>& next);
 
-    bool _update(const Tt& t_new, const Ty& y_new, const Tt& h_next);
+    bool _update(const T& t_new, const vec<T, N>& y_new, const T& h_next);
 
     void _warn_dead(){
         std::cout << std::endl << "Solver has permanently stop integrating. Termination cause:\n\t" << _message << "\n";
@@ -336,7 +336,7 @@ private:
         std::cout << std::endl << "Solver has not been specified an integration direction, possibly because the Tmax goal was reached. Please set a new Tmax goal first or free() the solver.\n";
     }
 
-    void _copy_data(const OdeSolver<Tt, Ty>& other){
+    void _copy_data(const OdeSolver<T, N>& other){
         //does not copy _file, this has to be managed outside this function
         _f = other._f;
         _t = other._t;
@@ -375,10 +375,10 @@ private:
         }
     }
 
-    void _make_checkpoint(const Tt& t, const Ty& q, const Tt& habs){
-        _t_check = new Tt;
-        _q_check = new Ty;
-        _habs_check = new Tt;
+    void _make_checkpoint(const T& t, const vec<T, N>& q, const T& habs){
+        _t_check = new T;
+        _q_check = new vec<T, N>;
+        _habs_check = new T;
         *_t_check = t;
         *_q_check = q;
         *_habs_check = habs;
@@ -393,14 +393,14 @@ private:
         _habs_check = nullptr;
     }
 
-    void _make_new_events(const std::vector<Event<Tt, Ty>*>& events){
+    void _make_new_events(const std::vector<Event<T, N>*>& events){
 
         //FIRST create a new vector with new allocated objects, because "events" might be
         //our current _events vector. We sort the vector to contain normal events first,
         //and stop_events after to improve runtime performance and not miss out on any stop_events
         //if a single step encouters multiple events.
-        std::vector<Event<Tt, Ty>*> new_precise_events;
-        std::vector<Event<Tt, Ty>*> new_rough_events;
+        std::vector<Event<T, N>*> new_precise_events;
+        std::vector<Event<T, N>*> new_rough_events;
         for (size_t i=0; i<events.size(); i++){
             if (events[i]->is_precise()){
                 new_precise_events.push_back(events[i]->clone());
@@ -411,11 +411,11 @@ private:
         }
 
         //push the pointers into a new (sorted) array
-        std::vector<Event<Tt, Ty>*> result(events.size());
+        std::vector<Event<T, N>*> result(events.size());
         std::copy(new_precise_events.begin(), new_precise_events.end(), result.begin());
         std::copy(new_rough_events.begin(), new_rough_events.end(), result.begin() + new_precise_events.size());
 
-        for (Event<Tt, Ty>* ev : result){
+        for (Event<T, N>* ev : result){
             ev->set_args(this->_args);
         }
 
@@ -441,8 +441,8 @@ private:
 ------------------------------------------------------------------------------
 */
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
+template<class T, int N>
+bool OdeSolver<T, N>::set_goal(const T& t_max_new){
     //if the solver was stopped (but not killed) earlier,
     //then setting a new goal successfully will resume the solver
     if ((_diverges) && (!_is_dead || _is_running) ){
@@ -471,16 +471,16 @@ bool OdeSolver<Tt, Ty>::set_goal(const Tt& t_max_new){
 }
 
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::advance(){
-    State<Tt, Ty> next = adaptive_step();
+template<class T, int N>
+bool OdeSolver<T, N>::advance(){
+    State<T, N> next = adaptive_step();
     return _go_to_state(next);
 }
 
 
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
+template<class T, int N>
+bool OdeSolver<T, N>::advance_by(const T& habs){
     if (habs <= 0){
         std::cout << std::endl << "Please provide a positive stepsize in .advance_by(habs)\n";
         return false;
@@ -494,8 +494,8 @@ bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
     if (habs <= _h_min && !_is_stiff){
         _set_non_stiff = true;
     }
-    Ty q_next = step(_t, _q, habs*_direction);
-    State<Tt, Ty> next = {_t+habs*_direction, q_next, habs};
+    vec<T, N> q_next = step(_t, _q, habs*_direction);
+    State<T, N> next = {_t+habs*_direction, q_next, habs};
     bool success = _go_to_state(next);
     if (success && _set_non_stiff){
         _is_stiff = false;
@@ -503,20 +503,20 @@ bool OdeSolver<Tt, Ty>::advance_by(const Tt& habs){
     return success;
 }
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::advance_by_any(const Tt& h){
+template<class T, int N>
+bool OdeSolver<T, N>::advance_by_any(const T& h){
     if (_t_check != nullptr){
         _clear_checkpoint();
     }
 
     set_goal(_t+h);
-    Ty q_next = step(_t, _q, h);
-    State<Tt, Ty> next = {_t+h, q_next, h*_direction};
+    vec<T, N> q_next = step(_t, _q, h);
+    State<T, N> next = {_t+h, q_next, h*_direction};
     return _go_to_state(next);
 }
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_next){
+template<class T, int N>
+bool OdeSolver<T, N>::_update(const T& t_new, const vec<T, N>& y_new, const T& h_next){
     
     bool success = true;
     if (h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
@@ -596,12 +596,12 @@ bool OdeSolver<Tt, Ty>::_update(const Tt& t_new, const Ty& y_new, const Tt& h_ne
     return success;
 }
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& event){
+template<class T, int N>
+bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
     // takes next state (which means tnew, hnew, and hnext_new)
     // if it is not an event or smth it is left unchanged.
     // otherwise, it is modified to depict the event with high accuracy
-    std::function<Ty(Tt)> qfunc = [this](const Tt& t_next) -> Ty { return _q_step(t_next);};
+    std::function<vec<T, N>(T)> qfunc = [this](const T& t_next) -> vec<T, N> { return _q_step(t_next);};
     
     if (event.determine(this->_t, this->_q, next.t, next.q, qfunc)){
         if (_current_event_index == -1 && event.allows_checkpoint()){
@@ -619,8 +619,8 @@ bool OdeSolver<Tt, Ty>::_adapt_to_event(State<Tt, Ty>& next, Event<Tt, Ty>& even
     return false;
 }
 
-template<class Tt, class Ty>
-bool OdeSolver<Tt, Ty>::_go_to_state(State<Tt, Ty>& next){
+template<class T, int N>
+bool OdeSolver<T, N>::_go_to_state(State<T, N>& next){
 
     if (_is_dead){
         _warn_dead();
