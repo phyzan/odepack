@@ -1,7 +1,7 @@
 #include "src/ode.hpp"
 
 using Tt = double;
-using Ty = vec<Tt, -1>;
+using Ty = vec<Tt, 4>;
 
 void f(Ty& df, const Tt& t, const Ty& q, const std::vector<Tt>& args){
     df[0] = q[2];
@@ -36,13 +36,13 @@ int main(){
 
     Tt tmax = 10001*pi/2;
 
-    PreciseEvent<Tt, -1> ps("Poincare Section", ps_func, check);
+    PreciseEvent<Tt, 4> ps("Poincare Section", ps_func, check);
     // Event<Tt, Ty> ps("Poincare Section", ps_func, check);
     // PeriodicEvent<Tt, Ty> ev2("periodic", 10, 0);
     // StopEvent<Tt, Ty> stopev("stop", stopfunc);
     // PeriodicEvent<Tt, Ty> ev3("periodic2", 10, 0.001);
 
-    ODE<Tt, -1> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", {});
+    ODE<Tt, 4> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", {&ps});
     ode.integrate(tmax);
     std::cout << ode.runtime() << std::endl;
     ode.solver().state().show();

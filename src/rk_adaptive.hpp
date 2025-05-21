@@ -36,8 +36,10 @@ public:
     virtual Ctype Cmatrix() const = 0;
     virtual Etype Ematrix() const = 0;
 
-    void apply_step(vec<T, N>& q_new, const T& t_old, const vec<T, N>& q_old, const T& h) const override{
-        _step_impl(q_new, t_old, q_old, h, this->_K);
+    vec<T, N> step(const T& t_old, const vec<T, N>& q_old, const T& h) const override{
+        vec<T, N> tmp;
+        _step_impl(tmp, t_old, q_old, h, this->_K);
+        return tmp;
     }
 
     State<T, N> adaptive_step() const override {
@@ -60,7 +62,7 @@ public:
             h = habs * this->direction();
             t_new = t+h;
 
-            apply_step(q_new, t, q, h);
+            _step_impl(q_new, t, q, h, _K);
             scale = atol + qabs.cwiseMax(cwise_abs(q_new))*rtol;
             err_norm = _error_norm(_K, h, scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
@@ -71,7 +73,7 @@ public:
                 }
                 step_accepted = true;
             }
-            else {
+            else{
                 factor = std::max(this->MIN_FACTOR, _factor);
                 step_rejected = true;
             }
