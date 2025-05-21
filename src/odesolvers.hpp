@@ -28,7 +28,7 @@ struct SolverArgs{
 
 
 template<class T, int N>
-void write_chechpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
+void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
     file << event_index << " " << std::setprecision(16) << t;
     for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
         file << " " << std::setprecision(16) << q[i];
@@ -251,7 +251,7 @@ protected:
                 throw std::runtime_error("Could not open file in OdeSolver for automatic saving: " + _filename + "\n");
             }
             _autosave = true;
-            write_chechpoint(_file, _t, _q, -1);
+            write_checkpoint(_file, _t, _q, -1);
         }
     }
 
@@ -579,7 +579,7 @@ bool OdeSolver<T, N>::_update(const T& t_new, const vec<T, N>& y_new, const T& h
 
     if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
-            write_chechpoint(_file, _t, q(), _current_event_index);
+            write_checkpoint(_file, _t, q(), _current_event_index);
         }
     }
 
