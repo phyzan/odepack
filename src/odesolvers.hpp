@@ -8,7 +8,6 @@
 #include <unordered_set>
 
 
-
 template<class T, int N>
 struct SolverArgs{
 
@@ -41,6 +40,33 @@ struct SolverArgs{
                const std::string& save_dir,
                bool save_events_only)
     : jac(jac),
+        t0(t0),
+        q0(q0),
+        rtol(rtol),
+        atol(atol),
+        h_min(h_min),
+        h_max(h_max),
+        first_step(first_step),
+        args(args),
+        events(events),
+        mask(mask),
+        save_dir(save_dir),
+        save_events_only(save_events_only) {}
+
+    SolverArgs(Fptr<T, N> f,
+        const T& t0,
+        const vec<T, N>& q0,
+        const T& rtol,
+        const T& atol,
+        const T& h_min,
+        const T& h_max,
+        const T& first_step,
+        const std::vector<T>& args,
+        const std::vector<Event<T, N>*>& events,
+        const Func<T, N>& mask,
+        const std::string& save_dir,
+        bool save_events_only)
+    : jac([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }),
         t0(t0),
         q0(q0),
         rtol(rtol),

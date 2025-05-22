@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <functional>
+#include <pybind11/stl.h>
 #include "variational.hpp"
 
 namespace py = pybind11;
@@ -63,15 +64,6 @@ T open_capsule(py::capsule f){
 
 
 #pragma GCC visibility push(hidden)
-
-
-template<class T, int N>
-struct OdeFunc{
-
-    vec<T, N>(*f)(const T&, const vec<T, N>&, const std::vector<T>&);
-};
-
-
 
 
 template<class T, int N>
@@ -179,7 +171,8 @@ public:
     }
 
     PyODE(const py::capsule& f, const T t0, const py::array q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only){
-        ode = new ODE<T, N>(open_capsule<Fptr<T, N>>(f), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<T, N>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only);
+        Fptr<T, N> g = open_capsule<Fptr<T, N>>(f);
+        ode = new ODE<T, N>(g, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<T, N>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only);
         q0_shape = {ode->q().size()};
     }
 
