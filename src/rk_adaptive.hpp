@@ -36,33 +36,36 @@ public:
     virtual Ctype Cmatrix() const = 0;
     virtual Etype Ematrix() const = 0;
 
-    vec<T, N> step(const T& t_old, const vec<T, N>& q_old, const T& h) const override{
-        return _step(t_old, q_old, h, this->_K);
+
+    inline void step_impl(vec<T, N>& result, const T& t_old, const vec<T, N>& q_old, const T& h) const override{
+        this->_step_impl(result, t_old, q_old, h, _K);
     }
 
-    State<T, N> adaptive_step() const override {
+    void adapt_impl(State<T, N>& result, const State<T, N>& state) const override {
         const T& t = this->t();
         const T& h_min = this->h_min();
         const T& h_max = this->h_max();
         const T& atol = this->atol();
         const T& rtol = this->rtol();
-        const vec<T, N>& q = this->q_true();
-        const vec<T, N> qabs = cwise_abs(q);
-        T habs = this->stepsize();
-        T h, t_new, err_norm, factor, _factor;
-        vec<T, N> q_new, scale;
+        const vec<T, N>& q = state.q;
+        _qabs = q.cwiseAbs();
+        _scale.resize(q.size());
+        T& t_new = result.t;
+        vec<T, N>& q_new = result.q;
+        T& habs = result.h_next;
+        habs = state.h_next;
+        T h, err_norm, factor, _factor;
 
         bool step_accepted = false;
         bool step_rejected = false;
-        
-        while (!step_accepted){
 
+        while (!step_accepted){
             h = habs * this->direction();
             t_new = t+h;
 
-            q_new = step(t, q, h);
-            scale = atol + qabs.cwiseMax(cwise_abs(q_new))*rtol;
-            err_norm = _error_norm(_K, h, scale);
+            step_impl(q_new, t, q, h);
+            _scale = atol + _qabs.cwiseMax(q_new.cwiseAbs())*rtol;
+            err_norm = _error_norm(_K, h, _scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
             if (err_norm < 1){
                 factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
@@ -71,7 +74,7 @@ public:
                 }
                 step_accepted = true;
             }
-            else {
+            else{
                 factor = std::max(this->MIN_FACTOR, _factor);
                 step_rejected = true;
             }
@@ -85,8 +88,6 @@ public:
             }
             
         }
-
-        return {t_new, q_new,  habs};
     }
 
     const Atype A;
@@ -109,46 +110,48 @@ protected:
 
 private:
 
-    mutable StageContainer _K;//always holds the value given to it by the last "step" call
-    const T err_exp;
+    void _step_impl(vec<T, N>& q_new, const T& t_old, const vec<T, N>& q_old, const T& h, StageContainer& K) const{
 
+        K[0] = this->_jac(t_old, q_old);
 
-    vec<T, N> _step(const T& t_old, const vec<T, N>& q_old, const T& h, StageContainer& K) const{
-
-        vec<T, N> dq;
-        K[0] = this->f(t_old, q_old);
-
-        vec<T, N> temp = B(0)*K[0];
+        q_new = B(0)*K[0]*h;
 
         for (size_t s = 1; s < Nstages; s++){
             //calculate df
-            dq = K[0] * this->A(s, 0) * h;
+            _dq = K[0] * this->A(s, 0) * h;
             for (size_t j=1; j<s; j++){
-                dq += this->A(s, j) * K[j] * h;
+                _dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            K[s] = this->f(t_old+this->C(s)*h, q_old+dq);
-            temp += B(s)*K[s];
+            K[s] = this->_jac(t_old+this->C(s)*h, q_old+_dq);
+            q_new += B(s)*K[s]*h;
         }
 
-        vec<T, N> q_new = q_old + temp*h;
-        K[Nstages] = this->f(t_old+h, q_new);
-        return q_new;
-
-    };
-
-    vec<T, N> _error(const StageContainer& K, const T& h) const{
-        vec<T, N> res = K[0] * this->E(0);
-        for (size_t s = 1; s<Nstages+1; s++){
-            res += K[s] * this->E(s);
-        }
-        return res * h;
+        q_new += q_old;
+        K[Nstages] = this->_jac(t_old+h, q_new);
     }
 
     T _error_norm(const StageContainer& K, const T& h, const vec<T, N>& scale) const{
-        vec<T, N> f = _error(K, h) / scale;
-        return rms_norm(f);
+
+        //error calc
+        _err_sum = K[0] * this->E(0)*h;
+        for (size_t s = 1; s<Nstages+1; s++){
+            _err_sum += K[s] * this->E(s)*h;
+        }
+
+        //error norm calc
+        _err = _err_sum / scale;
+        return rms_norm(_err);
     }
+
+    mutable StageContainer _K;//always holds the value given to it by the last "step" call
+    const T err_exp;
+
+    mutable vec<T, N> _qabs;
+    mutable vec<T, N> _scale;
+    mutable vec<T, N> _dq;
+    mutable vec<T, N> _err_sum;
+    mutable vec<T, N> _err;
 
 };
 

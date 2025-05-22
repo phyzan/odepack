@@ -45,9 +45,16 @@ public:
         _copy_data(other);
     }
 
-    ODE(const Func<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+    ODE(const Jac<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
 
         const SolverArgs<T, N> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only};
+        _solver = getSolver(S, method);
+        _register_state();
+    }
+
+    ODE(const Func<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
+
+        const SolverArgs<T, N> S(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only);
         _solver = getSolver(S, method);
         _register_state();
     }
@@ -144,7 +151,7 @@ public:
             }
 
             for (size_t i = 0; i < _t_arr.size(); ++i) {
-                write_chechpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
+                write_checkpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
             }
             file.close(); // Close the file
             return true;

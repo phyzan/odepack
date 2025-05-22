@@ -15,6 +15,9 @@
 template<class T, int N=-1>
 using vec = Eigen::Array<T, 1, N>;
 
+template<class T, int N>
+using Jac = std::function<void(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
+
 template<class T, int N=-1>
 using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
@@ -44,11 +47,6 @@ T norm_squared(const Eigen::Array<T, Nr, Nc>& f){
 template<class T, int Nr, int Nc>
 T rms_norm(const Eigen::Array<T, Nr, Nc>& f){
     return sqrt(norm_squared(f) / f.size());
-}
-
-template<class T, int Nr, int Nc>
-Eigen::Array<T, Nr, Nc> cwise_abs(const Eigen::Array<T, Nr, Nc>& f){
-    return f.cwiseAbs();
 }
 
 template<class T>
@@ -111,6 +109,69 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
     return {_a, c, _b};
 }
 
+
+template<class T>
+void mat_vec_prod(T* result, const T* mat, const T* vec, const size_t& rows, const size_t& cols, const T& factor=1){
+    /*
+    result[i] = sum_j mat[i, j] * vec[j]
+    */
+    for (size_t i=0; i<rows; i++){
+        T _sum = 0;
+        for (size_t j=0; j<cols; j++){
+            _sum += mat[i*cols+j]*vec[j];
+        }
+        result[i] = _sum*factor;
+    }
+}
+
+template<class T>
+void mat_T_vec_prod(T* result, const T* mat, const T* vec, const size_t& rows, const size_t& cols, const T& factor=1){
+    /*
+    The same as above but the transpose matrix is used
+    */
+    for (size_t i=0; i<cols; i++){
+        T _sum = 0;
+        for (size_t j=0; j<rows; j++){
+            _sum += mat[j*cols+i]*vec[j];
+        }
+        result[i] = _sum*factor;
+    }
+}
+
+template<class S>
+void mat_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t& s, const size_t& n, const S& factor=1){
+    /*
+    a : (m x s)
+    b : (s x n)
+    */
+    for (size_t k=0; k<m*n; k++){
+        size_t i = k/n;
+        size_t j = k % n;
+        S _sum = 0;
+        for (size_t q=0; q<s; q++){
+            _sum += a[i*s + q] * b[q*n + j];
+        }
+        r[i*n+j] = _sum*factor;
+    }
+}
+
+
+template<class S>
+void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t& s, const size_t& n, const S& factor=1){
+    /*
+    a : (s x m)
+    b : (s x n)
+    */
+    for (size_t k=0; k<m*n; k++){
+        size_t i = k/n;
+        size_t j = k % n;
+        S _sum = 0;
+        for (size_t q=0; q<s; q++){
+            _sum += a[q*n+j] * b[q*n + j];
+        }
+        r[i*n+j] = _sum*factor;
+    }
+}
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 

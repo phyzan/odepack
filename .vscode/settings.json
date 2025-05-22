@@ -84,6 +84,9 @@
         "cinttypes": "cpp",
         "typeindex": "cpp",
         "__bit_reference": "cpp",
-        "mprealsupport": "cpp"
+        "mprealsupport": "cpp",
+        "core": "cpp",
+        "geometry": "cpp",
+        "print": "cpp"
     }
 }

@@ -301,7 +301,7 @@ bool PreciseEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2
     T t_determined = t2;
     bool determined = false;
     if (this->check(t1, q1)){
-        _ObjFun<T> f = [this, q](const T& t) ->T {
+        _ObjFun<T> f = [this, &q](const T& t) ->T {
             return this->obj_fun(t, q(t));
         };
         T val1 = this->obj_fun(t1, q1);
