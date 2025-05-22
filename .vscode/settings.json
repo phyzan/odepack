@@ -87,6 +87,7 @@
         "mprealsupport": "cpp",
         "core": "cpp",
         "geometry": "cpp",
-        "print": "cpp"
+        "print": "cpp",
+        "lu": "cpp"
     }
 }

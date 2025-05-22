@@ -162,9 +162,11 @@ public:
 
     void go_back() override;
 
-private:
+protected:
     T _period;
     T _start;
+
+private:
     long int _np = 0;
     long int _np_previous = 0;
     bool _has_started = false;
@@ -343,7 +345,7 @@ bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t
     this->_clear();
     const int direction = (t2 > t1) ? 1 : -1;
     const T next = _has_started ? _start+(_np+direction)*_period : _start;
-    if ( (t2*direction >= next*direction) && (next*direction > t1*direction) ){
+    if ( (t2*direction >= next*direction) && ((next*direction > t1*direction) || (!_has_started && (next==t1))) ){
         _np_previous = _np;
         _np += direction*this->_has_started;
         this->_set(next, q(next));

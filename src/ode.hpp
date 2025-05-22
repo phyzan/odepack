@@ -3,29 +3,68 @@
 
 #include <variant>
 #include <span>
-#include "rk_adaptive.hpp"
 #include <unordered_map>
 #include <chrono>
 #include <omp.h>
+#include "get_solvers.hpp"
 
 
 template<class T, int N>
-OdeSolver<T, N>* getSolver(const SolverArgs<T, N>& S, const std::string& method) {
+class EventCounter{
 
-    OdeSolver<T, N>* solver = nullptr;
+public:
 
-    if (method == "RK23") {
-        solver = new RK23<T, N>(S);
-    }
-    else if (method == "RK45") {
-        solver = new RK45<T, N>(S);
-    }
-    else {
-        throw std::runtime_error("Unknown solver method: "+method);
+    EventCounter(const std::vector<int>& max_events) : _max_events(max_events), _counter(max_events.size(), 0) {
+        _max_total = 0;
+        for (size_t i=0; i<_counter.size(); i++){
+            _max_total += (_max_events[i] > 0) ? _max_events[i] : 0;
+        }
     }
 
-    return solver;
-}
+    inline const int& operator[](const size_t& i) const{
+        return _counter[i];
+    }
+
+    void count_it(const size_t& i){
+        if (_counter[i] != _max_events[i]){
+            _counter[i] ++;
+            _total++;
+        }
+        else{
+            throw std::runtime_error("Cannot register more events");
+        }
+    }
+
+    bool still_counting()const{
+        for (size_t i=0; i<_counter.size(); i++){
+            if (_counter[i] != _max_events[i]){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline bool can_fit(const size_t& event)const{
+        return _counter[event] != _max_events[event];
+    }
+
+    inline const size_t& total()const{
+        return _total;
+    }
+
+    inline const size_t& max_total()const{
+        return _max_total;
+    }
+
+private:
+
+    std::vector<int> _max_events;
+    std::vector<int> _counter;
+    size_t _max_total;
+    size_t _total=0;
+};
+
+
 
 template<class T, int N>
 class ODE{
@@ -71,11 +110,15 @@ public:
         return *this;
     }
 
-    ~ODE(){delete _solver;}
+    virtual ~ODE(){delete _solver;}
 
-    const OdeResult<T, N> integrate(const T& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0, const bool& include_first=false);
+    virtual ODE<T, N>* clone() const{
+        return new ODE<T, N>(*this);
+    }
 
-    const OdeResult<T, N> go_to(const T& t, const int& max_frames=-1, const int& max_events=-1, const bool& terminate = true, const int& max_prints = 0, const bool& include_first=false);
+    const OdeResult<T, N> integrate(const T& interval, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& max_prints = 0, const bool& include_first=false);
+
+    const OdeResult<T, N> go_to(const T& t, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& max_prints = 0, const bool& include_first=false);
 
     const SolverState<T, N> state() const {return _solver->state();}
 
@@ -183,12 +226,13 @@ protected:
     std::vector<std::vector<size_t>> _Nevents;
     double _runtime = 0.;
 
-private:
+
     void _register_state(){
         _t_arr.push_back(_solver->t());
         _q_arr.push_back(_solver->q());
     }
 
+private:
     void _copy_data(const ODE<T, N>& other){
         _solver = other._solver->clone();
         _t_arr = other._t_arr;
@@ -200,11 +244,11 @@ private:
 };
 
 template<class T, int N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const int& max_events=-1, const bool& terminate=true, const int& threads=-1, const int& max_prints = 0){
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& threads=-1, const int& max_prints = 0){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (ODE<T, N>* ode : list){
-        ode->integrate(interval, max_frames, max_events, terminate, max_prints);
+        ode->integrate(interval, max_frames, max_events, max_prints);
     }
 }
 
@@ -218,31 +262,40 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
 */
 
 template<class T, int N>
-const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
-    return this->go_to(_solver->t()+interval, max_frames, max_events, terminate, max_prints, include_first);
-
+const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::map<std::string, int>& max_events, const int& max_prints, const bool& include_first){
+    return this->go_to(_solver->t()+interval, max_frames, max_events, max_prints, include_first);
 }
 
 
 template<class T, int N>
-const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const int& max_events, const bool& terminate, const int& max_prints, const bool& include_first){
+const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::map<std::string, int>& max_events, const int& max_prints, const bool& include_first){
     auto t1 = std::chrono::high_resolution_clock::now();
     const T t0 = _solver->t();
     const T interval = t-t0;
     const size_t Nt = _t_arr.size();
-    long int event_counter = 0;
     long int frame_counter = 0;
     size_t i = Nt;
     const int MAX_PRINTS = max_prints;
     int prints = 0;
     _solver->reopen_file();
     _solver->set_goal(t);
+
+    //manage max events
+    std::vector<int> _max_ev(_solver->events_size());
+    for (size_t i=0; i<_solver->events_size(); i++){
+        _max_ev[i] = max_events.contains(_solver->event(i)->name()) ? std::max(max_events.at(_solver->event(i)->name()), -1) : -1;
+    }
+    EventCounter<T, N> event_counter(_max_ev);
+
+
     while (_solver->is_running()){
         if (_solver->advance()){
-            if ((event_counter != max_events) && _solver->at_event()){
-                _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
+            const int& ev = _solver->current_event_index();
+            if (_solver->at_event() && event_counter.can_fit(ev)){
+                _Nevents[ev].push_back(_t_arr.size());
+                event_counter.count_it(ev);
                 if (!_solver->current_event()->is_stop_event()){
-                    if ( (++event_counter == max_events) && terminate){
+                    if (!event_counter.still_counting()){
                         _solver->stop("Max events reached");
                     }
                 }
@@ -260,7 +313,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
             if (percentage*MAX_PRINTS >= prints){
                 #pragma omp critical
                 {
-                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter << " / " << max_events << std::flush;
+                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter.total() << " / " << event_counter.max_total() << std::flush;
                     prints++;
                 }
 

@@ -5,6 +5,7 @@
 #include <string>
 #include "events.hpp"
 #include <limits>
+#include <unordered_set>
 
 
 
@@ -148,7 +149,7 @@ public:
     inline const SolverState<T, N> state() const;
     inline const Event<T, N>* current_event() const;
     inline const int& current_event_index() const;
-    inline const Event<T, N>* event(const size_t& i);
+    inline const Event<T, N>* event(const size_t& i)const;
     inline size_t events_size() const;
     bool resume();
     bool release_file();
@@ -417,7 +418,7 @@ inline const int& OdeSolver<T, N>::current_event_index() const {
 }
 
 template<class T, int N>
-inline const Event<T, N>* OdeSolver<T, N>::event(const size_t& i) {
+inline const Event<T, N>* OdeSolver<T, N>::event(const size_t& i)const{
     return _events[i];
 }
 
@@ -479,6 +480,13 @@ bool OdeSolver<T, N>::set_goal(const T& t_max_new){
 
 template<typename T, int N>
 OdeSolver<T, N>::OdeSolver(const SolverArgs<T, N>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _fill_jac(S.jac), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _args(S.args), _n(S.q0.size()), _state({S.t0, S.q0, S.first_step}), _filename(S.save_dir), _save_events_only(S.save_events_only), _mut(S.q0){
+
+    std::unordered_set<std::string> seen;
+    for (const Event<T, N>* ev : S.events) {
+        if (!seen.insert(ev->name()).second) {
+            throw std::runtime_error("Duplicate Event name not allowed: " + ev->name());
+        }
+    }
     if (_h_max < _h_min){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
@@ -600,8 +608,9 @@ bool OdeSolver<T, N>::advance_by_any(const T& h){
 template<class T, int N>
 void OdeSolver<T, N>::_next_state(State<T, N>& result, const T& h) const {
     result.t += h;
-    step_impl(result.q, _state.t, _state.q, h);
+    step_impl(_mut.q, _state.t, _state.q, h);
     result.h_next = h*_direction;
+    result.q = _mut.q;
 }
 
 template<class T, int N>
@@ -636,7 +645,6 @@ bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
 template<class T, int N>
 bool OdeSolver<T, N>::_update(State<T, N>& next){
 
-    //const T& t_new, const vec<T, N>& y_new, const T& h_next
     if (_is_dead){
         _warn_dead();
         return false;
@@ -665,11 +673,6 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
     }
 
 
-    
-
-
-
-
     bool success = true;
     if (next.h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
         success = false;
@@ -695,6 +698,7 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
 
 
     if (next.t*_direction >= _tmax*_direction){
+
         if (next.t == _tmax){
             _state = next;
         }
@@ -724,7 +728,6 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         }
         _state = next;
         _N++;
-
     }
 
     if (_autosave && success){
@@ -857,6 +860,7 @@ void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const
     }
     file << "\n";
 }
+
 
 
 #endif
