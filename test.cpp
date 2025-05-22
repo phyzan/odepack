@@ -1,7 +1,8 @@
 #include "src/ode.hpp"
 
+const int N = -1;
 using Tt = double;
-using Ty = vec<Tt, 4>;
+using Ty = vec<Tt, N>;
 
 void f(Ty& df, const Tt& t, const Ty& q, const std::vector<Tt>& args){
     df[0] = q[2];
@@ -9,6 +10,16 @@ void f(Ty& df, const Tt& t, const Ty& q, const std::vector<Tt>& args){
     df[2] = -q[0];
     df[3] = -q[1];
 }
+
+// Ty f(const Tt& t, const Ty& q, const std::vector<Tt>& args){
+//     return {q[2], q[3], -q[0], -q[1]};
+// }
+
+// Ty f(const Tt& t, const Ty& q, const std::vector<Tt>& args){
+//     Ty res(4);
+//     res << q[2], q[3], -q[0], -q[1];
+//     return res;
+// }
 
 Tt ps_func(const Tt& t, const Ty& q, const std::vector<Tt>& args){
     return q[1];
@@ -36,14 +47,14 @@ int main(){
 
     Tt tmax = 10001*pi/2;
 
-    PreciseEvent<Tt, 4> ps("Poincare Section", ps_func, check);
+    PreciseEvent<Tt, N> ps("Poincare Section", ps_func, check);
     // Event<Tt, Ty> ps("Poincare Section", ps_func, check);
-    // PeriodicEvent<Tt, Ty> ev2("periodic", 10, 0);
+    PeriodicEvent<Tt, N> ev2("periodic", 10, 1);
     // StopEvent<Tt, Ty> stopev("stop", stopfunc);
     // PeriodicEvent<Tt, Ty> ev3("periodic2", 10, 0.001);
 
-    ODE<Tt, 4> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", {&ps});
-    ode.integrate(tmax);
+    ODE<Tt, N> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, "RK45", {&ps, &ev2});
+    ode.integrate(tmax).examine();
     std::cout << ode.runtime() << std::endl;
     ode.solver().state().show();
     // ode.integrate(tmax, 100).examine();

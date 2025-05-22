@@ -24,7 +24,63 @@ struct SolverArgs{
     const Func<T, N> mask;
     const std::string save_dir;
     const bool save_events_only;
+
+    // Constructor
+    SolverArgs(const Jac<T, N>& jac,
+               const T& t0,
+               const vec<T, N>& q0,
+               const T& rtol,
+               const T& atol,
+               const T& h_min,
+               const T& h_max,
+               const T& first_step,
+               const std::vector<T>& args,
+               const std::vector<Event<T, N>*>& events,
+               const Func<T, N>& mask,
+               const std::string& save_dir,
+               bool save_events_only)
+    : jac(jac),
+        t0(t0),
+        q0(q0),
+        rtol(rtol),
+        atol(atol),
+        h_min(h_min),
+        h_max(h_max),
+        first_step(first_step),
+        args(args),
+        events(events),
+        mask(mask),
+        save_dir(save_dir),
+        save_events_only(save_events_only) {}
+
+    SolverArgs(const Func<T, N>& f,
+        const T& t0,
+        const vec<T, N>& q0,
+        const T& rtol,
+        const T& atol,
+        const T& h_min,
+        const T& h_max,
+        const T& first_step,
+        const std::vector<T>& args,
+        const std::vector<Event<T, N>*>& events,
+        const Func<T, N>& mask,
+        const std::string& save_dir,
+        bool save_events_only)
+    : jac([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){ res = f(t, q, args);}),
+        t0(t0),
+        q0(q0),
+        rtol(rtol),
+        atol(atol),
+        h_min(h_min),
+        h_max(h_max),
+        first_step(first_step),
+        args(args),
+        events(events),
+        mask(mask),
+        save_dir(save_dir),
+        save_events_only(save_events_only) {}
 };
+
 
 template<class T, int N>
 struct _MutableData{
@@ -99,9 +155,9 @@ public:
     bool reopen_file();
     bool free();
 
-    virtual vec<T, N> step(const T& t_old, const vec<T, N>& q_old, const T& h) const = 0;
+    virtual void step_impl(vec<T, N>& result, const T& t_old, const vec<T, N>& q_old, const T& h) const = 0;
 
-    virtual State<T, N> adaptive_step() const = 0; //derived class implementation must account for h_min
+    virtual void adapt_impl(State<T, N>& result, const State<T, N>& state) const = 0; //derived class implementation must account for h_min
 
     virtual OdeSolver<T, N>* clone() const = 0;
 
@@ -149,7 +205,7 @@ private:
     const vec<T, N>* _q_exposed = nullptr; //view_only pointer
     mutable _MutableData<T, N> _mut;
 
-    const State<T, N>& _next_state(const T& h) const;
+    void _next_state(State<T, N>& result, const T& h) const;
 
     bool _adapt_to_event(State<T, N>& next, Event<T, N>& event);
 
@@ -250,7 +306,7 @@ T OdeSolver<T, N>::auto_step()const{
     }
     T h0, d2, h1;
     vec<T, N> y1, f1;
-    vec<T, N> scale = _atol + cwise_abs(_state.q)*_rtol;
+    vec<T, N> scale = _atol + _state.q.cwiseAbs()*_rtol;
     vec<T, N> _dq = this->_jac(_state.t, _state.q);
     T d0 = rms_norm((_state.q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
@@ -501,7 +557,7 @@ inline const vec<T, N>& OdeSolver<T, N>::_jac(const T& t, const vec<T, N>& q) co
 
 template<class T, int N>
 bool OdeSolver<T, N>::advance(){
-    _mut.state = adaptive_step();
+    adapt_impl(_mut.state, _state);
     return _update(_mut.state);
 }
 
@@ -522,8 +578,8 @@ bool OdeSolver<T, N>::advance_by(const T& habs){
         _set_non_stiff = true;
     }
     
-    State<T, N> _tmp = _next_state(habs*_direction);
-    bool success = _update(_tmp);
+    _next_state(_mut.state, habs*_direction);
+    bool success = _update(_mut.state);
     if (success && _set_non_stiff){
         _is_stiff = false;
     }
@@ -537,16 +593,15 @@ bool OdeSolver<T, N>::advance_by_any(const T& h){
 
     set_goal(_state.t+h);
     
-    State<T, N> _tmp = _next_state(h);
-    return _update(_tmp);
+    _next_state(_mut.state, h);
+    return _update(_mut.state);
 }
 
 template<class T, int N>
-const State<T, N>& OdeSolver<T, N>::_next_state(const T& h) const {
-    _mut.state.t += h;
-    _mut.state.q = step(_state.t, _state.q, h);
-    _mut.state.h_next = h*_direction;
-    return _mut.state;
+void OdeSolver<T, N>::_next_state(State<T, N>& result, const T& h) const {
+    result.t += h;
+    step_impl(result.q, _state.t, _state.q, h);
+    result.h_next = h*_direction;
 }
 
 template<class T, int N>
@@ -555,7 +610,9 @@ bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
     // if it is not an event or smth it is left unchanged.
     // otherwise, it is modified to depict the event with high accuracy
     std::function<vec<T, N>(T)> qfunc = [this](const T& t_next) -> vec<T, N> {
-        return this->step(this->_state.t, this->_state.q, t_next-this->_state.t);
+        vec<T, N> tmp;
+        this->step_impl(tmp, this->_state.t, this->_state.q, t_next-this->_state.t);
+        return tmp;
     };
     
     if (event.determine(this->_state.t, this->_state.q, next.t, next.q, qfunc)){
@@ -636,8 +693,7 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         _checkpoint = nullptr;
     }
 
-    // "next" might be _mut.state. However _next_state is called below that alters it.
-    // This is ok as long as "next" is not used after that.
+
     if (next.t*_direction >= _tmax*_direction){
         if (next.t == _tmax){
             _state = next;
@@ -647,10 +703,10 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
-            _state = _next_state(_tmax-_state.t);
+            _next_state(_state, _tmax-_state.t);
         }
         else{
-            _state = _next_state(_tmax-_state.t);
+            _next_state(_state, _tmax-_state.t);
         }
         stop("T_max goal reached");
         _state.t = _tmax;
