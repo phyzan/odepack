@@ -171,9 +171,9 @@ public:
     }
 
     PyODE(const py::capsule& f, const T t0, const py::array q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only){
-        Fptr<T, N> g = open_capsule<Fptr<T, N>>(f);
+        Jacptr<T, N> g = open_capsule<Jacptr<T, N>>(f);
         ode = new ODE<T, N>(g, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<T, N>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only);
-        q0_shape = {ode->q().size()};
+        q0_shape = {static_cast<size_t>(ode->q()[0].size())};
     }
 
     PyODE(const Func<T, N>& f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir = "", const bool& save_events_only=false){
@@ -576,10 +576,10 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("q", &PyODE<T, N>::q_array)
         .def_property_readonly("event_map", [](const PyODE<T, N>& self){return to_PyDict(self.ode->event_map());})
         .def_property_readonly("solver_filename", [](const PyODE<T, N>& self){return py::str(self.ode->solver_filename());})
-        .def_property_readonly("runtime", [](const PyODE<T, N>& self){self.ode->runtime();})
-        .def_property_readonly("is_stiff", [](const PyODE<T, N>& self){self.ode->is_stiff();})
-        .def_property_readonly("diverges", [](const PyODE<T, N>& self){self.ode->diverges();})
-        .def_property_readonly("is_dead", [](const PyODE<T, N>& self){self.ode->is_dead();})
+        .def_property_readonly("runtime", [](const PyODE<T, N>& self){return self.ode->runtime();})
+        .def_property_readonly("is_stiff", [](const PyODE<T, N>& self){return self.ode->is_stiff();})
+        .def_property_readonly("diverges", [](const PyODE<T, N>& self){return self.ode->diverges();})
+        .def_property_readonly("is_dead", [](const PyODE<T, N>& self){return self.ode->is_dead();})
         .def_property_readonly("_ode_obj", [](PyODE<T, N>& self){return self.ode;});
     
     py::class_<PyVarODE<T, N>, PyODE<T, N>>(m, "VariationalLowLevelODE", py::module_local())
@@ -631,10 +631,5 @@ void define_ode_module(py::module& m) {
         }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=py::dict(), py::arg("threads")=-1, py::arg("max_prints")=0);
         
 }
-
-
-//g++ -O3 -Wall -shared -std=c++20 -fopenmp -I/usr/include/python3.12 -I/usr/include/pybind11 -fPIC $(python3 -m pybind11 --includes) pyode.cpp -o odepack$(python3-config --extension-suffix)
-
-//g++ -O3 -Wall -shared -std=c++20 -fopenmp -fPIC $(python3 -m pybind11 --includes) pyode.cpp -o odepack$(python3-config --extension-suffix)
 
 #endif
