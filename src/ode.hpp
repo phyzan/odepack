@@ -285,6 +285,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     const int MAX_PRINTS = max_prints;
     int prints = 0;
     _solver->reopen_file();
+
     _solver->set_goal(t);
 
     //manage max events
@@ -293,7 +294,6 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
         _max_ev[i] = max_events.contains(_solver->event(i)->name()) ? std::max(max_events.at(_solver->event(i)->name()), -1) : -1;
     }
     EventCounter<T, N> event_counter(_max_ev);
-
 
     while (_solver->is_running()){
         if (_solver->advance()){

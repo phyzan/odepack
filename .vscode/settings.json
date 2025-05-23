@@ -88,6 +88,8 @@
         "core": "cpp",
         "geometry": "cpp",
         "print": "cpp",
-        "lu": "cpp"
+        "lu": "cpp",
+        "list": "cpp",
+        "valarray": "cpp"
     }
 }

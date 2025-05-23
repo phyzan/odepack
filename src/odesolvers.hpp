@@ -335,6 +335,7 @@ T OdeSolver<T, N>::auto_step()const{
     vec<T, N> y1, f1;
     vec<T, N> scale = _atol + _state.q.cwiseAbs()*_rtol;
     vec<T, N> _dq = this->_jac(_state.t, _state.q);
+
     T d0 = rms_norm((_state.q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
     if (d0 < 1e-5 || d1 < 1e-5){
@@ -343,8 +344,10 @@ T OdeSolver<T, N>::auto_step()const{
     else{
         h0 = 0.01*d0/d1;
     }
+
     y1 = _state.q+h0*_direction*_dq;
     f1 = _jac(_state.t+h0*_direction, y1);
+
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
     if (d1 <= 1e-15 && d2 <= 1e-15){

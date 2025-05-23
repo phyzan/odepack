@@ -255,8 +255,8 @@ public:
     }
 
     PyVarODE(const T& period, const T& start, const py::capsule& f, const T t0, const py::array q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, py::capsule events, py::str savedir, const bool save_events_only){
-        this->ode = new VariationalODE<T, N>(period, start, open_capsule<Fptr<T, N>>(f), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<T, N>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only);
-        this->q0_shape = {this->ode->q().size()};
+        this->ode = new VariationalODE<T, N>(period, start, open_capsule<Jacptr<T, N>>(f), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), *open_capsule<std::vector<Event<T, N>*>*>(events), nullptr, savedir.cast<std::string>(), save_events_only);
+        this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
     }
 
     VariationalODE<T, N>& varode(){
@@ -277,7 +277,7 @@ public:
     }
 
     py::array_t<T> py_lyap() const{
-        return to_numpy<T>(varode().lyap(), this->q0_shape);
+        return to_numpy<T>(varode().lyap());
     }
 
 };
