@@ -630,6 +630,13 @@ void define_ode_module(py::module& m) {
             integrate_all(array, interval, max_frames, max_events, threads, max_prints);
         }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("max_events")=py::dict(), py::arg("threads")=-1, py::arg("max_prints")=0);
         
+    m.def("var_integrate_all", [](py::object list, const T& interval, const T& lyap_period, const int& threads=-1, const int& max_prints = 0){
+        std::vector<VariationalODE<T, N>*> array;
+        for (const py::handle& item : list) {
+            array.push_back(&item.attr("_ode_obj").cast<VariationalODE<T, N>&>());
+        }
+        var_integrate_all(array, interval, lyap_period, threads, max_prints);
+    }, py::arg("varode_array"), py::arg("interval"), py::arg("lyap_period"), py::arg("threads")=-1, py::arg("max_prints")=0);
 }
 
 #endif

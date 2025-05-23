@@ -200,6 +200,15 @@ private:
 
 
 
+template<class T, int N>
+void var_integrate_all(const std::vector<VariationalODE<T, N>*>& list, const T& interval, const T& lyap_period, const int& threads=-1, const int& max_prints = 0){
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (VariationalODE<T, N>* ode : list){
+        ode->var_integrate(interval, lyap_period, max_prints);
+    }
+}
+
 
 
 #endif
