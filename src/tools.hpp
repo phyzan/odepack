@@ -24,6 +24,9 @@ using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vect
 template<class T, int N>
 using Fptr = vec<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
 
+template<class T, int N>
+using Jacptr = void(*)(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
+
 template<class T>
 using _ObjFun = std::function<T(const T&)>;
 
