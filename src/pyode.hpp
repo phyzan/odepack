@@ -149,14 +149,13 @@ struct PyJacobianWrapper{
 
     PyJacobianWrapper(const py::capsule& obj, size_t qsize, size_t args_size) : jac(open_capsule<Jacptr<T, N>>(obj)), q_size(qsize), args_size(args_size) {}
 
-    py::array_t<T> call(const T& t, const py::object& py_q, const py::object& py_args){
+    py::array_t<T> call(const T& t, const py::object& py_q, const std::vector<T>& args) const {
         vec<T, N> q = toCPP_Array<T, vec<T, N>>(py_q);
-        std::vector<T> args = toCPP_Array<T, std::vector<T>>(py_args);
-        vec<T, N> res(q.size());
-        this->jac(res, t, q, args);
+        vec<T, N> res(q_size);
         if (static_cast<size_t>(q.size()) != q_size || args.size() != args_size){
             throw py::value_error("Invalid array sizes in Jacobian call");
         }
+        this->jac(res, t, q, args);
         return to_numpy<T>(res);
     }
 };
@@ -675,7 +674,9 @@ void define_ode_module(py::module& m) {
 
     py::class_<PyJacobianWrapper<T, N>>(m, "LowLevelJacobian", py::module_local())
         .def(py::init<py::capsule, size_t, size_t>(), py::arg("pointer"), py::arg("q_size"), py::arg("args_size"))
-        .def("__call__", &PyJacobianWrapper<T, N>::call, py::arg("t"), py::arg("q"), py::arg("args"));
+        .def("__call__", [](const PyJacobianWrapper<T, N>& self, const T& t, const py::object& q, py::args py_args){
+            return self.call(t, q, toCPP_Array<T, std::vector<T>>(py_args));
+        }, py::arg("t"), py::arg("q"));
 
     m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, const std::map<std::string, int>& max_events, const int& threads, const int& max_prints){
             std::vector<ODE<T, N>*> array;
