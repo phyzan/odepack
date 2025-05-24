@@ -110,12 +110,12 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(const T& period, const T& start, const Jac<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, start).solver){
+    VariationalODE(const Jac<T, N> f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, t0).solver){
         _assert_event(q0);
         _ind = _position_of_main_event();
     }
 
-    VariationalODE(const T& period, const T& start, const Func<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, start).solver){
+    VariationalODE(const Func<T, N> f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, t0).solver){
         _assert_event(q0);
         _ind = _position_of_main_event();
     }
@@ -132,16 +132,17 @@ public:
         T t0 = this->_solver->t();
         while (t_total < interval){
             t_total = std::min(t_total+lyap_period, interval); //we could just add lyap_period, but a roundoff error is slowly added up
-            this->go_to(t0+t_total, 0, {{"Normalization", 10}}, max_prints, false);
+            this->go_to(t0+t_total, 0, {{"Normalization", 0}}, max_prints, false);
             if (this->is_dead()){
                 break;
             }
-            this->_register_lyap();
-            if (this->_t_arr.back() != this->_solver->t()){
-                this->_register_state();
+            else if (this->_solver->t()==t0+t_total){
+                this->_register_lyap();
+                if (this->_t_arr.back() != this->_solver->t()){
+                    this->_register_state();
+                }
             }
         }
-
         auto t2 = std::chrono::high_resolution_clock::now();
     
         std::chrono::duration<double> rt = t2-t1;

@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable, Iterable
+from typing import Callable, Iterable, overload, Any
 
 Func = Callable[[float, np.ndarray], np.ndarray] #f(t, q, *args) -> q
 ObjFunc = Callable[[float, np.ndarray], float] #  f(t, q, *args) -> float
@@ -100,9 +100,25 @@ class SolverState:
     def show(self):...
 
 
+class LowLevelEventArray:
+
+    def __init__(self, pointer, q_size: int, args_size: int):...
+
+
+class LowLevelJacobian:
+
+    def __init__(self, pointer, q_size: int, args_size: int):...
+
+    def __call__(self, t: float, q: np.ndarray, args: tuple=()): ...
+
+
 class LowLevelODE:
 
-    def __init__(self, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[Event]=None, mask=None, savedir="", save_events_only=False):...
+    @overload
+    def __init__(self, f: LowLevelJacobian, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: LowLevelEventArray=None, savedir="", save_events_only=False):...
+
+    @overload
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[Event]=None, mask=None, savedir="", save_events_only=False):...
 
     def integrate(self, interval, *, max_frames=-1, max_events: dict[str, int]={}, max_prints=0, include_first=False)->OdeResult:...
 
@@ -150,7 +166,11 @@ class LowLevelODE:
 
 class VariationalLowLevelODE(LowLevelODE):
 
-    def __init__(self, period: float, start: float, f, t0, q0, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[Event]=None, mask=None, savedir="", save_events_only=False):...
+    @overload
+    def __init__(self, f: LowLevelJacobian, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: LowLevelEventArray=None, savedir="", save_events_only=False):...
+
+    @overload
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45", events: list[Event]=None, mask=None, savedir="", save_events_only=False):...
 
     def var_integrate(self, interval: float, lyap_period: float, max_prints=0)->OdeResult:...
 
@@ -159,6 +179,8 @@ class VariationalLowLevelODE(LowLevelODE):
 
     @property
     def lyap(self)->np.ndarray:...
+
+    def copy(self)->VariationalLowLevelODE:...
 
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval, max_frames=-1, max_events: dict[str, int]={}, threads=-1, max_prints=0):...

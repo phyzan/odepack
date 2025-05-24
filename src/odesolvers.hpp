@@ -274,7 +274,8 @@ template<class T, int N>
 inline const T& OdeSolver<T, N>::t() const { return _state.t; }
 
 template<class T, int N>
-inline const vec<T, N>& OdeSolver<T, N>::q() const { return *_q_exposed; }
+inline const vec<T, N>& OdeSolver<T, N>::q() const {
+    return *_q_exposed; }
 
 template<class T, int N>
 inline const vec<T, N>& OdeSolver<T, N>::q_true() const { return _state.q; }
@@ -563,6 +564,8 @@ OdeSolver<T, N>::OdeSolver(OdeSolver<T, N>&& other): ORDER(other.ORDER), ERR_EST
     // besides the time scale of a copy is insignificant to the timescale of
     // solving an ode.
     _copy_data(other);
+    other._checkpoint = nullptr;
+
 }
 
 template<typename T, int N>
@@ -736,6 +739,7 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
+            _q_exposed = &_state.q;
             _next_state(_state, _tmax-_state.t);
         }
         else{
