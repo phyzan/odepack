@@ -212,6 +212,11 @@ public:
         _assert_sizes(jac_wrap, ev_wrap);
     }
 
+    PyODE(const Jacptr<T, N>& f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false){
+        ode = new ODE<T, N>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only);
+        q0_shape = {static_cast<size_t>(ode->q()[0].size())};
+    }
+
     void _assert_sizes(const PyJacobianWrapper<T, N>& jac_wrap, const PyEventWrapper<T, N>* ev_wrap){
         if (jac_wrap.q_size != q0_shape[0] || (ev_wrap != nullptr && ev_wrap->q_size != q0_shape[0])){
             throw py::value_error("Initial conditions, jacobian input array and event input array must all have the same size");
@@ -300,6 +305,12 @@ public:
         this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
         this->_assert_sizes(jac_wrap, ev_wrap);
     }
+
+    PyVarODE(const Jacptr<T, N>& f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : PyODE<T, N>() {
+        this->ode = new VariationalODE<T, N>(f, t0, q0, period, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only);
+        this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
+    }
+
 
     VariationalODE<T, N>& varode(){
         return *static_cast<VariationalODE<T, N>*>(this->ode);
