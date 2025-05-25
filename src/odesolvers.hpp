@@ -676,7 +676,6 @@ bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
 
 template<class T, int N>
 bool OdeSolver<T, N>::_update(State<T, N>& next){
-
     if (_is_dead){
         _warn_dead();
         return false;
@@ -747,6 +746,7 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         }
         stop("T_max goal reached");
         _state.t = _tmax;
+        _state.h_next = next.h_next;
         _N++;
     }
     else{
