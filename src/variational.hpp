@@ -4,18 +4,6 @@
 
 #include "ode.hpp"
 
-
-template<class T, int N>
-struct _TempSolverHolder{
-
-    OdeSolver<T, N>* solver;
-
-    ~_TempSolverHolder(){
-        delete solver;
-        solver = nullptr;
-    }
-};
-
 template<class T, int N>
 vec<T, N> normalize(const T& t, const vec<T, N>& q, const std::vector<T>& args){
     vec<T, N> res(q);
@@ -91,18 +79,20 @@ private:
 
 
 template<class T, int N>
-_TempSolverHolder<T, N> variational_solver(const SolverArgs<T, N>& S, const std::string& method, const T& period, const T& start){
-    std::vector<Event<T, N>*> new_events(S.events);
-    Event<T, N>* event = new NormalizationEvent<T, N>("Normalization", period, start);
-    new_events.push_back(event);
-    SolverArgs<T, N> new_S(S.jac, S.t0, S.q0, S.rtol, S.atol, S.h_min, S.h_max, S.first_step, S.args, new_events, S.mask, S.save_dir, S.save_events_only);
-    OdeSolver<T, N>* solver = getSolver(new_S, method);
-    delete event;
-    event = nullptr;
-    return {solver};
+std::unique_ptr<OdeSolver<T, N>> as_variational(const OdeSolver<T, N>& solver, const T& period){
+    size_t Nev = solver.events_size()+1;
+    std::vector<Event<T, N>*> new_events(Nev, nullptr);
+    NormalizationEvent<T, N> extra_event("Normalization", period, solver.t()+period);
+    for (size_t i=0; i<Nev-1; i++){
+        new_events[i] = solver.event(i)->clone();
+    }
+    new_events[Nev-1] = extra_event.clone();
+    std::unique_ptr<OdeSolver<T, N>> res = solver.with_new_events(new_events);
+    for (size_t i=0; i<Nev; i++){
+        delete new_events[i];
+    }
+    return res;
 }
-
-
 
 
 template<class T, int N>
@@ -110,20 +100,14 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(const Jac<T, N> f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, t0+period).solver){
-        _assert_event(q0);
-        _ind = _position_of_main_event();
-    }
-
-    VariationalODE(const Func<T, N> f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : ODE<T, N>(*variational_solver(SolverArgs<T, N>(f, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only), method, period, t0+period).solver){
-        _assert_event(q0);
+    VariationalODE(const OdeSolver<T, N>& solver, T period) : ODE<T, N>(*as_variational(solver, period)){
+        _assert_event(solver.q());
         _ind = _position_of_main_event();
     }
 
     ODE<T, N>* clone() const override{
         return new VariationalODE<T, N>(*this);
     }
-
 
     OdeResult<T, N> var_integrate(const T& interval, const T& lyap_period, const int& max_prints=0){
         auto t1 = std::chrono::high_resolution_clock::now();

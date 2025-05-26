@@ -59,8 +59,8 @@ public:
 
     void adapt_impl(State<T, N>& result, const State<T, N>& state) const override {
         const T& t = this->t();
-        const T& h_min = this->h_min();
-        const T& h_max = this->h_max();
+        const T& h_min = this->min_step();
+        const T& max_step = this->max_step();
         const T& atol = this->atol();
         const T& rtol = this->rtol();
         const vec<T, N>& q = state.q;
@@ -94,8 +94,8 @@ public:
                 step_rejected = true;
             }
             habs *= factor;
-            if (habs > h_max){
-                habs = h_max;
+            if (habs > max_step){
+                habs = max_step;
             }
             if (habs < h_min){
                 habs = h_min;
@@ -112,7 +112,7 @@ public:
 
 protected:
 
-    RungeKutta(const SolverArgs<T, N>& S, const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(S.q0) {}
+    RungeKutta(MAIN_CONSTRUCTOR(T, N), const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(ARGS, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(q0) {}
 
 
 private:
@@ -172,11 +172,14 @@ class RK45 : public RungeKutta<T, N, 6, 5>{
 
 public:
 
-    RK45(const SolverArgs<T, N>& S) : RKbase(S, 4, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
-
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase(ARGS, 4, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RK45<T, N>* clone() const override{
         return new RK45<T, N>(*this);
+    }
+
+    std::unique_ptr<OdeSolver<T, N>> safe_clone() const override{
+        return std::make_unique<RK45<T, N>>(*this);
     }
     
 
@@ -238,10 +241,14 @@ class RK23 : public RungeKutta<T, N, 3, 3> {
     using RKbase = RungeKutta<T, N, Nstages, Norder>;
     
 public:
-    RK23(const SolverArgs<T, N>& S) : RKbase(S, 2, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase(ARGS, 2, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
     RK23<T, N>* clone() const override{
         return new RK23<T, N>(*this);
+    }
+
+    std::unique_ptr<OdeSolver<T, N>> safe_clone() const override{
+        return std::make_unique<RK23<T, N>>(*this);
     }
 
     RKbase::Atype Amatrix() const override{

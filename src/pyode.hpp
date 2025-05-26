@@ -7,6 +7,7 @@
 #include <functional>
 #include <pybind11/stl.h>
 #include "variational.hpp"
+#include "solvers.hpp"
 
 namespace py = pybind11;
 
@@ -201,19 +202,21 @@ class PyODE{
 public:
 
 
-    PyODE(const py::object& f, const T t0, const py::object& q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str savedir, const bool save_events_only){
-        ode = new ODE<T, N>(to_Func<T, N>(f, shape(q0), args), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only);
+    PyODE(const py::object& f, const T t0, const py::object& q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, py::object events, py::object mask, py::str save_dir, const bool save_events_only){
+        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), to_Func<T, N>(f, shape(q0), args), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), save_dir.cast<std::string>(), save_events_only);
+        ode = new ODE<T, N>(*solver);
         q0_shape = shape(q0);
     }
 
-    PyODE(const PyJacobianWrapper<T, N>& jac_wrap, const T t0, const py::object& q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const PyEventWrapper<T, N>* ev_wrap, py::str savedir, const bool save_events_only){
-        ode = new ODE<T, N>(jac_wrap.jac, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, savedir.cast<std::string>(), save_events_only);
+    PyODE(const PyJacobianWrapper<T, N>& jac_wrap, const T t0, const py::object& q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const PyEventWrapper<T, N>* ev_wrap, py::str save_dir, const bool save_events_only){
+        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), jac_wrap.jac, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, save_dir.cast<std::string>(), save_events_only);
+        ode = new ODE<T, N>(*solver);
         q0_shape = {static_cast<size_t>(ode->q()[0].size())};
         _assert_sizes(jac_wrap, ev_wrap);
     }
 
-    PyODE(const Jacptr<T, N>& f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false){
-        ode = new ODE<T, N>(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only);
+    PyODE(ODE_CONSTRUCTOR(T, N)){
+        ode = new ODE<T, N>(get_solver<T, N>(method, ARGS));
         q0_shape = {static_cast<size_t>(ode->q()[0].size())};
     }
 
@@ -295,19 +298,21 @@ class PyVarODE : public PyODE<T, N>{
 
 public:
 
-    PyVarODE(const py::object& f, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const py::object& events, py::object mask, py::str savedir, const bool& save_events_only):PyODE<T, N>(){
-        this->ode = new VariationalODE<T, N>(to_Func<T, N>(f, shape(q0), args), t0, toCPP_Array<T, vec<T, N>>(q0), period, rtol, atol, min_step, max_step, first_step, {}, method.cast<std::string>(), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), savedir.cast<std::string>(), save_events_only);
+    PyVarODE(const py::object& f, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const py::object& events, py::object mask, py::str save_dir, const bool& save_events_only):PyODE<T, N>(){
+        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), to_Func<T, N>(f, shape(q0), args), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), save_dir.cast<std::string>(), save_events_only);
+        this->ode = new VariationalODE<T, N>(*solver, period);
         this->q0_shape = shape(q0);
     }
 
-    PyVarODE(const PyJacobianWrapper<T, N>& jac_wrap, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const PyEventWrapper<T, N>* ev_wrap, py::str savedir, const bool save_events_only):PyODE<T, N>(){
-        this->ode = new VariationalODE<T, N>(jac_wrap.jac, t0, toCPP_Array<T, vec<T, N>>(q0), period, rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method.cast<std::string>(), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, savedir.cast<std::string>(), save_events_only);
+    PyVarODE(const PyJacobianWrapper<T, N>& jac_wrap, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const PyEventWrapper<T, N>* ev_wrap, py::str save_dir, const bool save_events_only):PyODE<T, N>(){
+        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), jac_wrap.jac, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, save_dir.cast<std::string>(), save_events_only);
+        this->ode = new VariationalODE<T, N>(*solver, period);
         this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
         this->_assert_sizes(jac_wrap, ev_wrap);
     }
 
-    PyVarODE(const Jacptr<T, N>& f, const T t0, const vec<T, N> q0, const T& period, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : PyODE<T, N>() {
-        this->ode = new VariationalODE<T, N>(f, t0, q0, period, rtol, atol, min_step, max_step, first_step, args, method, events, mask, savedir, save_events_only);
+    PyVarODE(ODE_CONSTRUCTOR(T, N)) : PyODE<T, N>() {
+        this->ode = new ODE<T, N>(get_solver<T, N>(method, ARGS));
         this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
     }
 
@@ -593,7 +598,7 @@ void define_ode_module(py::module& m) {
             py::arg("args")=py::tuple(),
             py::arg("method")="RK45",
             py::arg("events")=nullptr,
-            py::arg("savedir")="",
+            py::arg("save_dir")="",
             py::arg("save_events_only")=false)
         .def(py::init<py::object, T, py::object, T, T, T, T, T, py::tuple, py::str, py::object, py::object, py::str, py::bool_>(),
             py::arg("f"),
@@ -609,7 +614,7 @@ void define_ode_module(py::module& m) {
             py::arg("method")="RK45",
             py::arg("events")=py::none(),
             py::arg("mask")=py::none(),
-            py::arg("savedir")="",
+            py::arg("save_dir")="",
             py::arg("save_events_only")=false)
         .def("integrate", &PyODE<T, N>::py_integrate,
             py::arg("interval"),
@@ -628,7 +633,7 @@ void define_ode_module(py::module& m) {
         .def("copy", [](const PyODE<T, N>& self){return PyODE<T, N>(self);})
         .def("advance", [](PyODE<T, N>& self){return self.ode->advance();})
         .def("state", &PyODE<T, N>::py_state)
-        .def("save_data", [](PyODE<T, N>& self, py::str savedir){return self.ode->save_data(savedir.cast<std::string>());}, py::arg("savedir"))
+        .def("save_data", [](PyODE<T, N>& self, py::str save_dir){return self.ode->save_data(save_dir.cast<std::string>());}, py::arg("save_dir"))
         .def("clear", [](PyODE<T, N>& self){self.ode->clear();})
         .def("event_data", &PyODE<T, N>::event_data, py::arg("event"))
         .def_property_readonly("dim", [](const PyODE<T, N>& self){return self.ode->solver().Nsys();})
@@ -656,7 +661,7 @@ void define_ode_module(py::module& m) {
             py::arg("args")=py::tuple(),
             py::arg("method")="RK45",
             py::arg("events")=nullptr,
-            py::arg("savedir")="",
+            py::arg("save_dir")="",
             py::arg("save_events_only")=false)
         .def(py::init<py::object, T, py::object, T, T, T, T, T, T, py::tuple, py::str, py::object, py::object, py::str, py::bool_>(),
             py::arg("f"),
@@ -673,7 +678,7 @@ void define_ode_module(py::module& m) {
             py::arg("method")="RK45",
             py::arg("events")=py::none(),
             py::arg("mask")=py::none(),
-            py::arg("savedir")="",
+            py::arg("save_dir")="",
             py::arg("save_events_only")=false)
         .def("var_integrate", &PyVarODE<T, N>::py_var_integrate, py::arg("interval"), py::arg("lyap_period"), py::arg("max_prints")=0)
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)

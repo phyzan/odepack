@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <chrono>
 #include <omp.h>
-#include "get_solvers.hpp"
+#include "solvers.hpp"
 
 
 template<class T, int N>
@@ -61,38 +61,14 @@ class ODE{
 
 public:
 
+    ODE(ODE_CONSTRUCTOR(T, N)) : ODE(*get_solver(method, ARGS)){}
+
     ODE(ODE<T, N>&& other): _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_arr(std::move(other._q_arr)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
         other._solver = nullptr;
     }
 
-    ODE(const SolverArgs<T, N>& S, const std::string& method) : _Nevents(S.events.size()){
-        _solver = getSolver(S, method);
-        _register_state();
-    }
-
     ODE(const ODE<T, N>& other){
         _copy_data(other);
-    }
-
-    ODE(const Jac<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
-
-        const SolverArgs<T, N> S = {f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only};
-        _solver = getSolver(S, method);
-        _register_state();
-    }
-
-    ODE(const Func<T, N>& f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
-
-        const SolverArgs<T, N> S(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only);
-        _solver = getSolver(S, method);
-        _register_state();
-    }
-
-    ODE(Fptr<T, N> f, const T t0, const vec<T, N> q0, const T rtol, const T atol, const T min_step=0., const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Func<T, N> mask=nullptr, const std::string& savedir="", const bool& save_events_only=false) : _Nevents(events.size()) {
-
-        const SolverArgs<T, N> S(f, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, savedir, save_events_only);
-        _solver = getSolver(S, method);
-        _register_state();
     }
 
     ODE(const OdeSolver<T, N>& solver) : _Nevents(solver.events_size()){
