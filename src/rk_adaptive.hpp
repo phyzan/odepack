@@ -17,7 +17,23 @@ using C_matrix = B_matrix<T, Norder, Nstages>;
 template<typename T, int Norder, int Nstages> 
 using E_matrix = Eigen::Array<T, Nstages+1, 1>;
 
+template<class T, int N, int Nstages>
+struct _RK_mutable{
 
+    _RK_mutable(const vec<T, N>& q):qabs(q), scale(q), dq(q), err_sum(q), err(q) {
+        for (int i=0; i<Nstages+1; i++){
+            K[i] = q;
+        }
+    }
+
+    vec<T, N> qabs;
+    vec<T, N> scale;
+    vec<T, N> dq;
+    vec<T, N> err_sum;
+    vec<T, N> err;
+    std::array<vec<T, N>, Nstages+1> K;
+
+};
 
 template<class T, int N, int Nstages, int Norder>
 class RungeKutta : public OdeSolver<T, N>{
@@ -38,7 +54,7 @@ public:
 
 
     inline void step_impl(vec<T, N>& result, const T& t_old, const vec<T, N>& q_old, const T& h) const override{
-        this->_step_impl(result, t_old, q_old, h, _K);
+        this->_step_impl(result, t_old, q_old, h, _rk_mut.K);
     }
 
     void adapt_impl(State<T, N>& result, const State<T, N>& state) const override {
@@ -48,8 +64,7 @@ public:
         const T& atol = this->atol();
         const T& rtol = this->rtol();
         const vec<T, N>& q = state.q;
-        _qabs = q.cwiseAbs();
-        _scale.resize(q.size());
+        _rk_mut.qabs = q.cwiseAbs();
         T& t_new = result.t;
         vec<T, N>& q_new = result.q;
         T& habs = result.h_next;
@@ -64,8 +79,8 @@ public:
             t_new = t+h;
 
             step_impl(q_new, t, q, h);
-            _scale = atol + _qabs.cwiseMax(q_new.cwiseAbs())*rtol;
-            err_norm = _error_norm(_K, h, _scale);
+            _rk_mut.scale = atol + _rk_mut.qabs.cwiseMax(q_new.cwiseAbs())*rtol;
+            err_norm = _error_norm(_rk_mut.K, h, _rk_mut.scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
             if (err_norm < 1){
                 factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
@@ -97,16 +112,8 @@ public:
 
 protected:
 
-    RungeKutta(const SolverArgs<T, N>& S, const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)) {}
+    RungeKutta(const SolverArgs<T, N>& S, const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(S, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(S.q0) {}
 
-    RungeKutta(const RungeKutta<T, N, Nstages, Norder>& other) : OdsBase(other), A(other.A), B(other.B), C(other.C), E(other.E), _K(other._K), err_exp(other.err_exp){}
-
-    RungeKutta<T, N, Nstages, Norder> operator=(const RungeKutta<T, N, Nstages, Norder>& other){
-        if (&other == this) return *this;
-        _K = other._K;
-        OdsBase::operator=(other);
-        return *this;
-    }
 
 private:
 
@@ -118,12 +125,12 @@ private:
 
         for (size_t s = 1; s < Nstages; s++){
             //calculate df
-            _dq = K[0] * this->A(s, 0) * h;
+            _rk_mut.dq = K[0] * this->A(s, 0) * h;
             for (size_t j=1; j<s; j++){
-                _dq += this->A(s, j) * K[j] * h;
+                _rk_mut.dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            this->_apply_jac(K[s], t_old+this->C(s)*h, q_old+_dq);
+            this->_apply_jac(K[s], t_old+this->C(s)*h, q_old+_rk_mut.dq);
             // K[s] = this->_jac(t_old+this->C(s)*h, q_old+_dq);
             q_new += B(s)*K[s]*h;
         }
@@ -136,24 +143,19 @@ private:
     T _error_norm(const StageContainer& K, const T& h, const vec<T, N>& scale) const{
 
         //error calc
-        _err_sum = K[0] * this->E(0)*h;
+        _rk_mut.err_sum = K[0] * this->E(0)*h;
         for (size_t s = 1; s<Nstages+1; s++){
-            _err_sum += K[s] * this->E(s)*h;
+            _rk_mut.err_sum += K[s] * this->E(s)*h;
         }
 
         //error norm calc
-        _err = _err_sum / scale;
-        return rms_norm(_err);
+        _rk_mut.err = _rk_mut.err_sum / scale;
+        return rms_norm(_rk_mut.err);
     }
 
-    mutable StageContainer _K;//always holds the value given to it by the last "step" call
+    ;//always holds the value given to it by the last "step" call
     const T err_exp;
-
-    mutable vec<T, N> _qabs;
-    mutable vec<T, N> _scale;
-    mutable vec<T, N> _dq;
-    mutable vec<T, N> _err_sum;
-    mutable vec<T, N> _err;
+    mutable _RK_mutable<T, N, Nstages> _rk_mut;
 
 };
 
@@ -172,11 +174,6 @@ public:
 
     RK45(const SolverArgs<T, N>& S) : RKbase(S, 4, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
 
-    RK45(const RK45<T, N>& other) : RKbase(other) {}
-
-    RK45<T, N>& operator=(const RK45<T, N>& other){
-        return RungeKutta<T, N, Nstages, Norder>::operator=(other);
-    }
 
     RK45<T, N>* clone() const override{
         return new RK45<T, N>(*this);
@@ -242,12 +239,6 @@ class RK23 : public RungeKutta<T, N, 3, 3> {
     
 public:
     RK23(const SolverArgs<T, N>& S) : RKbase(S, 2, Amatrix(), Bmatrix(), Cmatrix(), Ematrix()){}
-
-    RK23(const RK23<T, N>& other) : RKbase(other) {}
-
-    RK23<T, N>& operator=(const RK23<T, N>& other){
-        return RKbase::operator=(other);
-    }
 
     RK23<T, N>* clone() const override{
         return new RK23<T, N>(*this);

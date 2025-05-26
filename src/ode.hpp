@@ -238,6 +238,23 @@ private:
         _runtime = other._runtime;
     }
 
+    void _assert_valid_event_map(const std::map<std::string, int>& m)const{
+        bool found;
+        for (std::map<std::string, int>::const_iterator it = m.begin(); it != m.end(); ++it) {
+            found = false;
+            std::string key = it->first;
+            for (size_t j=0; j<_solver->events_size(); j++){
+                if (_solver->event(j)->name() == key){
+                    found = true;
+                    break;
+                }
+            }
+            if (!found){
+                throw std::logic_error("Event name \""+key+"\" is invalid");
+            }
+        }
+    }
+
 };
 
 template<class T, int N>
@@ -277,6 +294,10 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     _solver->reopen_file();
 
     _solver->set_goal(t);
+
+    //check that all names in max_events are valid
+    _assert_valid_event_map(max_events);
+
 
     //manage max events
     std::vector<int> _max_ev(_solver->events_size());

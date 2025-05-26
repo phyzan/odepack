@@ -85,7 +85,6 @@ private:
     size_t _counter = 0;
     std::vector<T> _args = {};
     EventData<T, N>* _data = nullptr;
-    
 
 protected:
 
@@ -386,6 +385,8 @@ RoughEvent<T, N>& RoughEvent<T, N>::operator=(const RoughEvent<T, N>& other){
 
 template<class T, int N>
 bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {
+
+
     this->_clear();
     if (this->check(t1, q1) && this->check(t2, q2)){
         T val1 = this->obj_fun(t1, q1);

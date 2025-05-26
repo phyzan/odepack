@@ -511,7 +511,6 @@ bool OdeSolver<T, N>::set_goal(const T& t_max_new){
 
 template<typename T, int N>
 OdeSolver<T, N>::OdeSolver(const SolverArgs<T, N>& S, const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _fill_jac(S.jac), _rtol(S.rtol), _atol(S.atol), _h_min(S.h_min), _h_max(S.h_max), _args(S.args), _n(S.q0.size()), _state({S.t0, S.q0, S.first_step}), _filename(S.save_dir), _save_events_only(S.save_events_only), _mut(S.q0){
-
     std::unordered_set<std::string> seen;
     for (const Event<T, N>* ev : S.events) {
         if (!seen.insert(ev->name()).second) {
@@ -784,7 +783,6 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
             stop(current_event()->name());
         }
     }
-
     return success;
 
 }
