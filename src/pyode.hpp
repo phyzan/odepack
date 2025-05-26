@@ -189,7 +189,7 @@ struct PyOdeResult{
     }
 
     const OdeResult<T, N> res;
-    const _Shape& q0_shape;
+    const _Shape q0_shape;
 
 };
 

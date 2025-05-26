@@ -14,12 +14,7 @@ class EventCounter{
 
 public:
 
-    EventCounter(const std::vector<int>& max_events) : _max_events(max_events), _counter(max_events.size(), 0) {
-        _max_total = 0;
-        for (size_t i=0; i<_counter.size(); i++){
-            _max_total += (_max_events[i] > 0) ? _max_events[i] : 0;
-        }
-    }
+    EventCounter(const std::vector<int>& max_events) : _max_events(max_events), _counter(max_events.size(), 0) {}
 
     inline const int& operator[](const size_t& i) const{
         return _counter[i];
@@ -52,15 +47,10 @@ public:
         return _total;
     }
 
-    inline const size_t& max_total()const{
-        return _max_total;
-    }
-
 private:
 
     std::vector<int> _max_events;
     std::vector<int> _counter;
-    size_t _max_total;
     size_t _total=0;
 };
 
@@ -320,7 +310,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
             if (percentage*MAX_PRINTS >= prints){
                 #pragma omp critical
                 {
-                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter.total() << " / " << event_counter.max_total() << std::flush;
+                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter.total() << std::flush;
                     prints++;
                 }
 

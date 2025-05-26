@@ -58,8 +58,8 @@ public:
 
         bool step_accepted = false;
         bool step_rejected = false;
-
         while (!step_accepted){
+
             h = habs * this->direction();
             t_new = t+h;
 
@@ -112,7 +112,7 @@ private:
 
     void _step_impl(vec<T, N>& q_new, const T& t_old, const vec<T, N>& q_old, const T& h, StageContainer& K) const{
 
-        K[0] = this->_jac(t_old, q_old);
+        this->_apply_jac(K[0], t_old, q_old);
 
         q_new = B(0)*K[0]*h;
 
@@ -123,12 +123,14 @@ private:
                 _dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            K[s] = this->_jac(t_old+this->C(s)*h, q_old+_dq);
+            this->_apply_jac(K[s], t_old+this->C(s)*h, q_old+_dq);
+            // K[s] = this->_jac(t_old+this->C(s)*h, q_old+_dq);
             q_new += B(s)*K[s]*h;
         }
 
         q_new += q_old;
-        K[Nstages] = this->_jac(t_old+h, q_new);
+        this->_apply_jac(K[Nstages], t_old+h, q_new);
+        // K[Nstages] = this->_jac(t_old+h, q_new);
     }
 
     T _error_norm(const StageContainer& K, const T& h, const vec<T, N>& scale) const{

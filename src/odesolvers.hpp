@@ -202,6 +202,7 @@ protected:
 
     const vec<T, N>& _jac(const T& t, const vec<T, N>& q) const;
 
+    void _apply_jac(vec<T, N>& result, const T& t, const vec<T, N>& q) const;
 
 private:
 
@@ -592,6 +593,11 @@ inline const vec<T, N>& OdeSolver<T, N>::_jac(const T& t, const vec<T, N>& q) co
     */
     _fill_jac(_mut.jac, t, q, _args);
     return _mut.jac;
+}
+
+template<typename T, int N>
+inline void OdeSolver<T, N>::_apply_jac(vec<T, N>& result, const T& t, const vec<T, N>& q) const{
+    _fill_jac(result, t, q, _args);
 }
 
 
