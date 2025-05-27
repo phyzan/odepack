@@ -14,7 +14,7 @@ class EventCounter{
 
 public:
 
-    EventCounter(const std::vector<int>& max_events) : _max_events(max_events), _counter(max_events.size(), 0) {}
+    EventCounter(const std::vector<int>& max_events, const Event<T, N>*const* events) : _max_events(max_events), _counter(max_events.size(), 0), _events(events) {}
 
     inline const int& operator[](const size_t& i) const{
         return _counter[i];
@@ -32,6 +32,9 @@ public:
 
     bool still_counting()const{
         for (size_t i=0; i<_counter.size(); i++){
+            if (_events[i]->is_leathal() || _events[i]->is_stop_event()){
+                _max_events[i] = _counter[i];
+            }
             if (_counter[i] != _max_events[i]){
                 return true;
             }
@@ -49,9 +52,10 @@ public:
 
 private:
 
-    std::vector<int> _max_events;
+    mutable std::vector<int> _max_events;
     std::vector<int> _counter;
     size_t _total=0;
+    const Event<T, N>*const* _events;
 };
 
 
@@ -280,7 +284,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     for (size_t i=0; i<_solver->events_size(); i++){
         _max_ev[i] = max_events.contains(_solver->event(i)->name()) ? std::max(max_events.at(_solver->event(i)->name()), -1) : -1;
     }
-    EventCounter<T, N> event_counter(_max_ev);
+    EventCounter<T, N> event_counter(_max_ev, _solver->event_array());
 
     while (_solver->is_running()){
         if (_solver->advance()){

@@ -80,7 +80,7 @@ private:
     std::string _name;
     event_f<T, N> _when = nullptr;
     is_event_f<T, N> _check_if = nullptr;
-    Func<T, N> _mask = nullptr;
+    Functor<T, N> _mask = nullptr;
     bool _hide_mask; // variable that is only used externally for odesolvers to determine when and whether to call q_event or q_masked.
     size_t _counter = 0;
     std::vector<T> _args = {};
@@ -88,7 +88,7 @@ private:
 
 protected:
 
-    Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Func<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
+    Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
         if (name == ""){
             throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
         }
@@ -117,7 +117,7 @@ class PreciseEvent : public Event<T, N>{
 
 public:
 
-    PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Func<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+    PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
 
     PreciseEvent(const PreciseEvent<T, N>& other):Event<T, N>(other), _event_tol(other._event_tol){}
 
@@ -145,7 +145,7 @@ public:
 
     PeriodicEvent(const PeriodicEvent<T, N>& other):PreciseEvent<T, N>(other), _period(other._period), _start(other._start), _np(other._np), _np_previous(other._np_previous){}
 
-    PeriodicEvent(const std::string& name, const T& period, const T& start=0, Func<T, N> mask=nullptr, const bool& hide_mask=false): PreciseEvent<T, N>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
+    PeriodicEvent(const std::string& name, const T& period, const T& start=0, Functor<T, N> mask=nullptr, const bool& hide_mask=false): PreciseEvent<T, N>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
         if (period <= 0){
             throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
         }
@@ -180,7 +180,7 @@ public:
 
     RoughEvent(const RoughEvent<T, N>& other) : Event<T, N>(other){}
 
-    RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Func<T, N> mask=nullptr, const bool& hide_mask=false): Event<T, N>(name, when, check_if, mask, hide_mask){}
+    RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false): Event<T, N>(name, when, check_if, mask, hide_mask){}
 
     RoughEvent<T, N>& operator=(const RoughEvent<T, N>& other);
 

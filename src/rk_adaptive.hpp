@@ -112,14 +112,14 @@ public:
 
 protected:
 
-    RungeKutta(MAIN_CONSTRUCTOR(T, N), const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(ARGS, Norder, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(q0) {}
+    RungeKutta(MAIN_CONSTRUCTOR(T, N), const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(ARGS, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(q0) {}
 
 
 private:
 
     void _step_impl(vec<T, N>& q_new, const T& t_old, const vec<T, N>& q_old, const T& h, StageContainer& K) const{
 
-        this->_apply_jac(K[0], t_old, q_old);
+        this->_rhs(K[0], t_old, q_old);
 
         q_new = B(0)*K[0]*h;
 
@@ -130,14 +130,12 @@ private:
                 _rk_mut.dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            this->_apply_jac(K[s], t_old+this->C(s)*h, q_old+_rk_mut.dq);
-            // K[s] = this->_jac(t_old+this->C(s)*h, q_old+_dq);
+            this->_rhs(K[s], t_old+this->C(s)*h, q_old+_rk_mut.dq);
             q_new += B(s)*K[s]*h;
         }
 
         q_new += q_old;
-        this->_apply_jac(K[Nstages], t_old+h, q_new);
-        // K[Nstages] = this->_jac(t_old+h, q_new);
+        this->_rhs(K[Nstages], t_old+h, q_new);
     }
 
     T _error_norm(const StageContainer& K, const T& h, const vec<T, N>& scale) const{

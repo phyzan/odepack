@@ -7,55 +7,30 @@
 #include <limits>
 #include <unordered_set>
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) const OdeRhs<T, N>& jac, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const std::vector<Event<T, N>*> events={}, const Func<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
+#define MAIN_DEFAULT_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const std::vector<Event<T, N>*> events={}, const Functor<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
 
-#define MAIN_CONSTRUCTOR(T, N) const OdeRhs<T, N>& jac, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events, const Func<T, N>& mask, std::string save_dir, bool save_events_only
+#define MAIN_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events, const Functor<T, N>& mask, std::string save_dir, bool save_events_only
 
-#define ODE_CONSTRUCTOR(T, N) const OdeRhs<T, N>& jac, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, std::string method="RK45", const std::vector<Event<T, N>*> events={}, const Func<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
-
-
-#define ARGS jac, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, save_dir, save_events_only
+#define ODE_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, std::string method="RK45", const std::vector<Event<T, N>*> events={}, const Functor<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
 
 
-template<class T, int N>
-struct OdeRhs{
+#define ARGS rhs, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, save_dir, save_events_only
 
-    OdeRhs(){}
+template<class Any, class T, int N>
+bool operator==(const Any& a, const Functor<T, N>& b){
+    return b.func == a;
+}
 
-    OdeRhs(const Jac<T, N>& jac):jac(jac){}
-
-    OdeRhs(const Func<T, N>& f): jac([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
-
-    OdeRhs(const Jacptr<T, N>& jac):jac(jac){}
-
-    OdeRhs(const Fptr<T, N>& f): OdeRhs([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
-
-    inline void operator()(vec<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
-        jac(result, t, q, args);
-    }
-
-    inline OdeRhs<T, N>& operator=(const Jac<T, N>& new_jac){
-        jac = new_jac;
-        return *this;
-    }
-
-    inline OdeRhs<T, N>& operator=(const Func<T, N>& f){
-        jac = [f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
-        return *this;
-    }
-
-    Jac<T, N> jac=nullptr;
-};
 
 template<class T, int N>
 struct _MutableData{
 
-    _MutableData(const vec<T, N>& q) : q(q), jac(q), state({0, q, 0}){}
+    _MutableData(const vec<T, N>& q) : q(q), qdiff(q), state({0, q, 0}){}
 
     _MutableData(){}
 
     vec<T, N> q;
-    vec<T, N> jac;
+    vec<T, N> qdiff;
     State<T, N> state;
 };
 
@@ -73,8 +48,7 @@ public:
     const T MAX_FACTOR = T(10);
     const T SAFETY = T(9)/10;
     const T MIN_FACTOR = T(2)/10;
-    const int ORDER;
-    const int ERR_EST_ORDER;
+    const T ERR_EST_ORDER;
 
 
     virtual ~OdeSolver();
@@ -114,6 +88,7 @@ public:
     inline const Event<T, N>* current_event() const;
     inline const int& current_event_index() const;
     inline const Event<T, N>* event(const size_t& i)const;
+    inline const Event<T, N>*const* event_array()const;
     inline size_t events_size() const;
     bool resume();
     bool release_file();
@@ -138,7 +113,7 @@ public:
 
 protected:
 
-    OdeSolver(MAIN_CONSTRUCTOR(T, N), const int& order, const int& err_est_order);
+    OdeSolver(MAIN_CONSTRUCTOR(T, N), int err_est_order);
 
     OdeSolver(const OdeSolver<T, N>& other);
 
@@ -146,13 +121,13 @@ protected:
 
     OdeSolver<T, N>& operator=(const OdeSolver<T, N>& other);
 
-    const vec<T, N>& _jac(const T& t, const vec<T, N>& q) const;
+    const vec<T, N>& _rhs(const T& t, const vec<T, N>& q) const;
 
-    void _apply_jac(vec<T, N>& result, const T& t, const vec<T, N>& q) const;
+    void _rhs(vec<T, N>& result, const T& t, const vec<T, N>& q) const;
 
 private:
 
-    OdeRhs<T, N> _fill_jac;
+    Functor<T, N> _ode_rhs;
     T _rtol;
     T _atol;
     T _min_step;
@@ -177,6 +152,7 @@ private:
     bool _save_events_only = false;
     State<T, N>* _checkpoint = nullptr;
     const vec<T, N>* _q_exposed = nullptr; //view_only pointer
+    Functor<T, N> _mask = nullptr;
     mutable _MutableData<T, N> _mut;
 
     void _next_state(State<T, N>& result, const T& h) const;
@@ -282,7 +258,7 @@ T OdeSolver<T, N>::auto_step()const{
     T h0, d2, h1;
     vec<T, N> y1, f1;
     vec<T, N> scale = _atol + _state.q.cwiseAbs()*_rtol;
-    vec<T, N> _dq = this->_jac(_state.t, _state.q);
+    vec<T, N> _dq = this->_rhs(_state.t, _state.q);
 
     T d0 = rms_norm((_state.q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
@@ -294,7 +270,7 @@ T OdeSolver<T, N>::auto_step()const{
     }
 
     y1 = _state.q+h0*_direction*_dq;
-    f1 = _jac(_state.t+h0*_direction, y1);
+    f1 = _rhs(_state.t+h0*_direction, y1);
 
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
@@ -305,7 +281,7 @@ T OdeSolver<T, N>::auto_step()const{
         h1 = pow(100*std::max(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
     }
 
-    return std::min({100*h0, h1, _max_step});
+    return std::min({100*h0, h1, this->_max_step});
 }
 
 template<class T, int N>
@@ -400,6 +376,11 @@ inline const Event<T, N>* OdeSolver<T, N>::event(const size_t& i)const{
 }
 
 template<class T, int N>
+inline const Event<T, N>*const* OdeSolver<T, N>::event_array()const{
+    return _events.data();
+}
+
+template<class T, int N>
 inline size_t OdeSolver<T, N>::events_size() const {
     return _events.size();
 }
@@ -456,7 +437,7 @@ bool OdeSolver<T, N>::set_goal(const T& t_max_new){
 
 
 template<typename T, int N>
-OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), const int& order, const int& err_est_order): ORDER(order), ERR_EST_ORDER(err_est_order), _fill_jac(jac), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _state({t0, q0, first_step}), _filename(save_dir), _save_events_only(save_events_only), _mut(q0){
+OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), int err_est_ord): ERR_EST_ORDER(err_est_ord), _ode_rhs(rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _state({t0, q0, first_step}), _filename(save_dir), _save_events_only(save_events_only), _mask(mask), _mut(q0){
     std::unordered_set<std::string> seen;
     for (const Event<T, N>* ev : events) {
         if (!seen.insert(ev->name()).second) {
@@ -473,15 +454,7 @@ OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), const int& order, const int& 
     else{
         _state.h_next = (first_step < _min_step) ? _min_step : first_step;
     }
-
-    if (mask != nullptr){
-        Jac<T, N> f_tmp = jac.jac;
-        _fill_jac = [mask, f_tmp](vec<T, N>& dq, const T& t, const vec<T, N>& q, const std::vector<T>& args) {
-            f_tmp(dq, t, q, args);
-            dq = mask(t, dq, args);
-        };
-    }
-
+    
     _q_exposed = &_state.q;
     _make_new_events(events);
     set_goal(_state.t);
@@ -497,14 +470,14 @@ OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), const int& order, const int& 
 }
 
 template<typename T, int N>
-OdeSolver<T, N>::OdeSolver(const OdeSolver<T, N>& other): ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER){
+OdeSolver<T, N>::OdeSolver(const OdeSolver<T, N>& other):ERR_EST_ORDER(other.ERR_EST_ORDER){
     _copy_data(other);
     _filename = "";
     _autosave = false;
 }
 
 template<typename T, int N>
-OdeSolver<T, N>::OdeSolver(OdeSolver<T, N>&& other): ORDER(other.ORDER), ERR_EST_ORDER(other.ERR_EST_ORDER), _file(std::move(other._file)){
+OdeSolver<T, N>::OdeSolver(OdeSolver<T, N>&& other):ERR_EST_ORDER(other.ERR_EST_ORDER), _file(std::move(other._file)){
     // not the most efficient, but the most readable :)
     // besides the time scale of a copy is insignificant to the timescale of
     // solving an ode.
@@ -522,7 +495,7 @@ OdeSolver<T, N>& OdeSolver<T, N>::operator=(const OdeSolver<T, N>& other){
 }
 
 template<typename T, int N>
-inline const vec<T, N>& OdeSolver<T, N>::_jac(const T& t, const vec<T, N>& q) const {
+inline const vec<T, N>& OdeSolver<T, N>::_rhs(const T& t, const vec<T, N>& q) const {
     /*
     only assign a copy:
         e.g. vec<T, N> r = this->_jac(...); allowed
@@ -535,13 +508,13 @@ inline const vec<T, N>& OdeSolver<T, N>::_jac(const T& t, const vec<T, N>& q) co
     the underlying mutable object will change value, which will lead to unexpected behavior
     when using the first const& defined.
     */
-    _fill_jac(_mut.jac, t, q, _args);
-    return _mut.jac;
+    _ode_rhs(_mut.qdiff, t, q, _args);
+    return _mut.qdiff;
 }
 
 template<typename T, int N>
-inline void OdeSolver<T, N>::_apply_jac(vec<T, N>& result, const T& t, const vec<T, N>& q) const{
-    _fill_jac(result, t, q, _args);
+inline void OdeSolver<T, N>::_rhs(vec<T, N>& result, const T& t, const vec<T, N>& q) const{
+    _ode_rhs(result, t, q, _args);
 }
 
 
@@ -713,6 +686,10 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         _N++;
     }
 
+    if (_mask != nullptr){
+        _state.q = _mask(_state.t, _state.q, _args);
+    }
+
     if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
             write_checkpoint(_file, _state.t, q(), _current_event_index);
@@ -722,7 +699,6 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
     if (at_event()){
         if (current_event()->is_leathal()){
             kill(current_event()->name());
-            success = false;
         }
         else if (current_event()->is_stop_event()){
             stop(current_event()->name());
@@ -752,7 +728,7 @@ inline void OdeSolver<T, N>::_warn_travolta() {
 template<typename T, int N>
 void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     //does not copy _file, this has to be managed outside this function
-    _fill_jac = other._fill_jac;
+    _ode_rhs = other._ode_rhs;
     _rtol = other._rtol;
     _atol = other._atol;
     _min_step = other._min_step;
@@ -774,6 +750,7 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
 
     _filename = other._filename;
     _autosave = other._autosave;
+    _mask = other._mask;
 
     _make_new_events(other._events);
     delete _checkpoint;

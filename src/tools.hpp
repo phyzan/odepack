@@ -15,9 +15,6 @@
 template<class T, int N=-1>
 using vec = Eigen::Array<T, 1, N>;
 
-template<class T, int N>
-using Jac = std::function<void(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
-
 template<class T, int N=-1>
 using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
@@ -25,7 +22,7 @@ template<class T, int N>
 using Fptr = vec<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
 
 template<class T, int N>
-using Jacptr = void(*)(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
+using Fvoidptr = void(*)(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
 
 template<class T>
 using _ObjFun = std::function<T(const T&)>;
@@ -176,6 +173,57 @@ void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t&
     }
 }
 
+
+template<class T, int N>
+struct Functor{
+
+    using Fvoid = std::function<void(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
+
+    Functor(){}
+
+    Functor(std::nullptr_t ptr) : func(nullptr){}
+
+    Functor(const Fvoid& f):func(f){}
+
+    Functor(const Func<T, N>& f): func([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+
+    Functor(const Fvoidptr<T, N>& f):func(f){}
+
+    Functor(const Fptr<T, N>& f): Functor([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+
+    inline void operator()(vec<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
+        func(result, t, q, args);
+    }
+
+    inline vec<T, N> operator()(const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
+        vec<T, N> res(q.size());
+        func(res, t, q, args);
+        return res;
+    }
+
+    Functor<T, N>& operator=(const Fvoid& new_func){
+        func = new_func;
+        return *this;
+    }
+
+    Functor<T, N>& operator=(const Func<T, N>& f){
+        func = [f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
+        return *this;
+    }
+
+    bool operator==(const Functor<T, N>& other){
+        return (this == &other) ? true : other.func == func;
+    }
+
+    template<class Any>
+    bool operator==(const Any& other){
+        return func == other;
+    }
+
+    Fvoid func=nullptr;
+};
+
+
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
 template<class T, int N>
@@ -268,6 +316,7 @@ struct State{
     T t;
     vec<T, N> q;
     T h_next;
+    
 };
 
 
