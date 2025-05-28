@@ -498,10 +498,10 @@ template<typename T, int N>
 inline const vec<T, N>& OdeSolver<T, N>::_rhs(const T& t, const vec<T, N>& q) const {
     /*
     only assign a copy:
-        e.g. vec<T, N> r = this->_jac(...); allowed
+        e.g. vec<T, N> r = this->_rhs(...); allowed
 
         do NOT do this:
-            const vec<T, N>& r = this->_jac(...);
+            const vec<T, N>& r = this->_rhs(...);
 
     This is because a reference to a mutable object is returned
     to improve efficiency. If the function is called with different arguments,

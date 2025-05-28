@@ -13,16 +13,19 @@
 // USEFUL ALIASES
 
 template<class T, int N=-1>
-using vec = Eigen::Array<T, 1, N>;
+using vec = Eigen::Array<T, N, 1>;
 
-template<class T, int N=-1>
-using Func = std::function<vec<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
+template<class T, int N, template<class, int> typename VecLike=vec>
+using Func = std::function<VecLike<T, N>(const T&, const VecLike<T, N>&, const std::vector<T>&)>;
 
-template<class T, int N>
-using Fptr = vec<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
+template<class T, int N, template<class, int> typename VecLike=vec>
+using Fvoid = std::function<void(VecLike<T, N>&, const T&, const VecLike<T, N>&, const std::vector<T>&)>;
 
-template<class T, int N>
-using Fvoidptr = void(*)(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
+template<class T, int N, template<class, int> typename VecLike=vec>
+using Fptr = VecLike<T, N>(*)(const T&, const VecLike<T, N>&, const std::vector<T>&);
+
+template<class T, int N, template<class, int> typename VecLike=vec>
+using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const VecLike<T, N>&, const std::vector<T>&);
 
 template<class T>
 using _ObjFun = std::function<T(const T&)>;
@@ -39,30 +42,19 @@ constexpr T inf() {
     return std::numeric_limits<T>::infinity();
 }
 
-template<class T, int Nr, int Nc>
-T norm_squared(const Eigen::Array<T, Nr, Nc>& f){
+template<class T, int N>
+T norm_squared(const vec<T, N>& f){
     return (f*f).sum();
 }
 
-template<class T, int Nr, int Nc>
-T rms_norm(const Eigen::Array<T, Nr, Nc>& f){
+template<class T, int N>
+T rms_norm(const vec<T, N>& f){
     return sqrt(norm_squared(f) / f.size());
 }
 
 template<class T>
 T abs(const T& x){
     return (x > 0) ? x : -x;
-}
-
-
-template<class T, int Nr, int Nc>
-std::vector<size_t> shape(const Eigen::Array<T, Nr, Nc>& arr){
-    return {size_t(arr.rows()), size_t(arr.cols())};
-}
-
-template<class T>
-std::vector<size_t> shape(const std::vector<T>& arr){
-    return {arr.size()};
 }
 
 
@@ -174,44 +166,42 @@ void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t&
 }
 
 
-template<class T, int N>
+template<class T, int N, template<class, int> typename VecLike=vec>
 struct Functor{
-
-    using Fvoid = std::function<void(vec<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
 
     Functor(){}
 
     Functor(std::nullptr_t ptr) : func(nullptr){}
 
-    Functor(const Fvoid& f):func(f){}
+    Functor(const Fvoid<T, N, VecLike>& f):func(f){}
 
-    Functor(const Func<T, N>& f): func([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+    Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
-    Functor(const Fvoidptr<T, N>& f):func(f){}
+    Functor(const Fvoidptr<T, N, VecLike>& f):func(f){}
 
-    Functor(const Fptr<T, N>& f): Functor([f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
-    inline void operator()(vec<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
+    inline void operator()(VecLike<T, N>& result, const T& t, const VecLike<T, N>& q, const std::vector<T>& args)const{
         func(result, t, q, args);
     }
 
-    inline vec<T, N> operator()(const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
-        vec<T, N> res(q.size());
+    inline VecLike<T, N> operator()(const T& t, const VecLike<T, N>& q, const std::vector<T>& args)const{
+        VecLike<T, N> res(q.size());
         func(res, t, q, args);
         return res;
     }
 
-    Functor<T, N>& operator=(const Fvoid& new_func){
+    Functor<T, N, VecLike>& operator=(const Fvoid<T, N, VecLike>& new_func){
         func = new_func;
         return *this;
     }
 
-    Functor<T, N>& operator=(const Func<T, N>& f){
-        func = [f](vec<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
+    Functor<T, N, VecLike>& operator=(const Func<T, N, VecLike>& f){
+        func = [f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
         return *this;
     }
 
-    bool operator==(const Functor<T, N>& other){
+    bool operator==(const Functor<T, N, VecLike>& other){
         return (this == &other) ? true : other.func == func;
     }
 
@@ -220,7 +210,7 @@ struct Functor{
         return func == other;
     }
 
-    Fvoid func=nullptr;
+    Fvoid<T, N, VecLike> func=nullptr;
 };
 
 

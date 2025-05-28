@@ -9,41 +9,44 @@
 #include "solvers.hpp"
 
 
+struct EventOptions{
+    std::string name;
+    int max_events=-1;
+    bool terminate=false;
+};
+
+
+
 template<class T, int N>
 class EventCounter{
 
 public:
 
-    EventCounter(const std::vector<int>& max_events, const Event<T, N>*const* events) : _max_events(max_events), _counter(max_events.size(), 0), _events(events) {}
+    EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0) {}
 
     inline const int& operator[](const size_t& i) const{
         return _counter[i];
     }
 
     void count_it(const size_t& i){
-        if (_counter[i] != _max_events[i]){
-            _counter[i] ++;
+        if ((_counter[i] != _options[i].max_events) && _is_running){
+            _counter[i]++;
             _total++;
+            if ((_counter[i] == _options[i].max_events) && _options[i].terminate){
+                _is_running = false;
+            }
         }
         else{
             throw std::runtime_error("Cannot register more events");
         }
     }
 
-    bool still_counting()const{
-        for (size_t i=0; i<_counter.size(); i++){
-            if (_events[i]->is_leathal() || _events[i]->is_stop_event()){
-                _max_events[i] = _counter[i];
-            }
-            if (_counter[i] != _max_events[i]){
-                return true;
-            }
-        }
-        return false;
+    const bool& is_running()const{
+        return _is_running;
     }
 
     inline bool can_fit(const size_t& event)const{
-        return _counter[event] != _max_events[event];
+        return (_counter[event] != _options[event].max_events) && _is_running;
     }
 
     inline const size_t& total()const{
@@ -52,10 +55,10 @@ public:
 
 private:
 
-    mutable std::vector<int> _max_events;
+    std::vector<EventOptions> _options;
     std::vector<int> _counter;
     size_t _total=0;
-    const Event<T, N>*const* _events;
+    bool _is_running = true;
 };
 
 
@@ -93,9 +96,9 @@ public:
         return new ODE<T, N>(*this);
     }
 
-    const OdeResult<T, N> integrate(const T& interval, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& max_prints = 0, const bool& include_first=false);
+    const OdeResult<T, N> integrate(const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
 
-    const OdeResult<T, N> go_to(const T& t, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& max_prints = 0, const bool& include_first=false);
+    const OdeResult<T, N> go_to(const T& t, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
 
     const SolverState<T, N> state() const {return _solver->state();}
 
@@ -218,31 +221,47 @@ private:
         _runtime = other._runtime;
     }
 
-    void _assert_valid_event_map(const std::map<std::string, int>& m)const{
+    std::vector<EventOptions> _validate_events(const std::vector<EventOptions>& options)const{
+        std::vector<EventOptions> res(_solver->events_size());
         bool found;
-        for (std::map<std::string, int>::const_iterator it = m.begin(); it != m.end(); ++it) {
+        for (size_t i=0; i< options.size(); i++) {
             found = false;
-            std::string key = it->first;
             for (size_t j=0; j<_solver->events_size(); j++){
-                if (_solver->event(j)->name() == key){
+                if (_solver->event(j)->name() == options[i].name){
                     found = true;
                     break;
                 }
             }
             if (!found){
-                throw std::logic_error("Event name \""+key+"\" is invalid");
+                throw std::logic_error("Event name \""+options[i].name+"\" is invalid");
             }
         }
+
+        for (size_t i=0; i<_solver->events_size(); i++){
+            found = false;
+            for (size_t j=0; j<options.size(); j++){
+                if (options[j].name == _solver->event(i)->name()){
+                    found = true;
+                    res[i] = options[j];
+                    res[i].max_events = std::max(options[j].max_events, -1);
+                    break;
+                }
+            }
+            if (!found){
+                res[i] = {_solver->event(i)->name()};
+            }
+        }
+        return res;
     }
 
 };
 
 template<class T, int N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::map<std::string, int>& max_events={}, const int& threads=-1, const int& max_prints = 0){
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const int& max_prints = 0){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (ODE<T, N>* ode : list){
-        ode->integrate(interval, max_frames, max_events, max_prints);
+        ode->integrate(interval, max_frames, event_options, max_prints);
     }
 }
 
@@ -256,13 +275,13 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
 */
 
 template<class T, int N>
-const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::map<std::string, int>& max_events, const int& max_prints, const bool& include_first){
-    return this->go_to(_solver->t()+interval, max_frames, max_events, max_prints, include_first);
+const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
+    return this->go_to(_solver->t()+interval, max_frames, event_options, max_prints, include_first);
 }
 
 
 template<class T, int N>
-const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::map<std::string, int>& max_events, const int& max_prints, const bool& include_first){
+const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
     auto t1 = std::chrono::high_resolution_clock::now();
     const T t0 = _solver->t();
     const T interval = t-t0;
@@ -276,15 +295,9 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     _solver->set_goal(t);
 
     //check that all names in max_events are valid
-    _assert_valid_event_map(max_events);
+    const std::vector<EventOptions> options = this->_validate_events(event_options);
 
-
-    //manage max events
-    std::vector<int> _max_ev(_solver->events_size());
-    for (size_t i=0; i<_solver->events_size(); i++){
-        _max_ev[i] = max_events.contains(_solver->event(i)->name()) ? std::max(max_events.at(_solver->event(i)->name()), -1) : -1;
-    }
-    EventCounter<T, N> event_counter(_max_ev, _solver->event_array());
+    EventCounter<T, N> event_counter(options);
 
     while (_solver->is_running()){
         if (_solver->advance()){
@@ -292,10 +305,11 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
             if (_solver->at_event() && event_counter.can_fit(ev)){
                 _Nevents[ev].push_back(_t_arr.size());
                 event_counter.count_it(ev);
-                if (!_solver->current_event()->is_stop_event()){
-                    if (!event_counter.still_counting()){
-                        _solver->stop("Max events reached");
-                    }
+
+                //if the solver stopped for any other reason, that takes priority.
+                //only if it is still running but max events have been reached, the solver will display "max events reached".
+                if (_solver->is_running() && !event_counter.is_running()){
+                    _solver->stop("Max events reached");
                 }
                 ++i;
                 _register_state();
