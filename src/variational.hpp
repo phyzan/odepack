@@ -131,7 +131,7 @@ public:
     
         std::chrono::duration<double> rt = t2-t1;
 
-        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), this->_solver->is_stiff(), !this->_solver->is_dead(), rt.count(), this->_solver->message()};
+        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), rt.count(), this->_solver->message()};
         return res;
     }
 

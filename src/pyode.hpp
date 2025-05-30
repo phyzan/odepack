@@ -199,7 +199,7 @@ template<class T, int N>
 class PySolverState : public SolverState<T, N>{
 
 public:
-    PySolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message, const _Shape& shape): SolverState<T, N>(t, q, habs, event, diverges, is_stiff, is_running, is_dead, Nt, message), shape(shape) {}
+    PySolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message, const _Shape& shape): SolverState<T, N>(t, q, habs, event, diverges, is_running, is_dead, Nt, message), shape(shape) {}
 
     const std::vector<size_t> shape;
 
@@ -288,7 +288,7 @@ public:
 
     PySolverState<T, N> py_state() const{
         SolverState<T, N> s = ode->state();
-        return PySolverState<T, N>(s.t, s.q, s.habs, s.event, s.diverges, s.is_stiff, s.is_running, s.is_dead, s.Nt, s.message, q0_shape); 
+        return PySolverState<T, N>(s.t, s.q, s.habs, s.event, s.diverges, s.is_running, s.is_dead, s.Nt, s.message, q0_shape); 
     }
 
     PyOdeResult<T, N> py_integrate(const T& interval, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
@@ -594,7 +594,6 @@ void define_ode_module(py::module& m) {
         })
         .def("event_data", &PyOdeResult<T, N>::event_data, py::arg("event"))
         .def_property_readonly("diverges", [](const PyOdeResult<T, N>& self){return self.res.diverges;})
-        .def_property_readonly("is_stiff", [](const PyOdeResult<T, N>& self){return self.res.is_stiff;})
         .def_property_readonly("success", [](const PyOdeResult<T, N>& self){return self.res.success;})
         .def_property_readonly("runtime", [](const PyOdeResult<T, N>& self){return self.res.runtime;})
         .def_property_readonly("message", [](const PyOdeResult<T, N>& self){return self.res.message;})
@@ -606,7 +605,6 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("q", [](const PySolverState<T, N>& self){return to_numpy<T>(self.q, self.shape);})
         .def_property_readonly("event", [](const PySolverState<T, N>& self){return self.event;})
         .def_property_readonly("diverges", [](const PySolverState<T, N>& self){return self.diverges;})
-        .def_property_readonly("is_stiff", [](const PySolverState<T, N>& self){return self.is_stiff;})
         .def_property_readonly("is_running", [](const PySolverState<T, N>& self){return self.is_running;})
         .def_property_readonly("is_dead", [](const PySolverState<T, N>& self){return self.is_dead;})
         .def_property_readonly("N", [](const PySolverState<T, N>& self){return self.Nt;})
@@ -672,7 +670,6 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("event_map", [](const PyODE<T, N>& self){return to_PyDict(self.ode->event_map());})
         .def_property_readonly("solver_filename", [](const PyODE<T, N>& self){return py::str(self.ode->solver_filename());})
         .def_property_readonly("runtime", [](const PyODE<T, N>& self){return self.ode->runtime();})
-        .def_property_readonly("is_stiff", [](const PyODE<T, N>& self){return self.ode->is_stiff();})
         .def_property_readonly("diverges", [](const PyODE<T, N>& self){return self.ode->diverges();})
         .def_property_readonly("is_dead", [](const PyODE<T, N>& self){return self.ode->is_dead();});
     

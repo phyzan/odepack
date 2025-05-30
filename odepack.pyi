@@ -52,9 +52,6 @@ class OdeResult:
     def diverges(self)->bool:...
 
     @property
-    def is_stiff(self)->bool:...
-
-    @property
     def success(self)->bool:...
 
     @property
@@ -81,9 +78,6 @@ class SolverState:
 
     @property
     def diverges(self)->bool:...
-
-    @property
-    def is_stiff(self)->bool:...
 
     @property
     def is_running(self)->bool:...
@@ -156,9 +150,6 @@ class LowLevelODE:
 
     @property
     def diverges(self)->bool:...
-
-    @property
-    def is_stiff(self)->float:...
 
     @property
     def is_dead(self)->float:...

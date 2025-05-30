@@ -52,23 +52,28 @@ public:
     virtual Ctype Cmatrix() const = 0;
     virtual Etype Ematrix() const = 0;
 
+    const Atype A;
+    const Btype B;
+    const Ctype C;
+    const Etype E;
 
-    inline void step_impl(vec<T, N>& result, const T& t_old, const vec<T, N>& q_old, const T& h) const override{
-        this->_step_impl(result, t_old, q_old, h, _rk_mut.K);
-    }
+protected:
 
-    void adapt_impl(State<T, N>& result, const State<T, N>& state) const override {
+    RungeKutta(MAIN_CONSTRUCTOR(T, N), const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(rhs, rtol, atol, min_step, max_step, args, events, mask, save_dir, save_events_only, err_est_ord, new State<T, N>(t0, q0, first_step)), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(q0) {}
+
+private:
+    void _adapt_impl() override {
         const T& t = this->t();
         const T& h_min = this->min_step();
         const T& max_step = this->max_step();
         const T& atol = this->atol();
         const T& rtol = this->rtol();
-        const vec<T, N>& q = state.q;
+        const vec<T, N>& q = this->_state->q;
         _rk_mut.qabs = q.cwiseAbs();
-        T& t_new = result.t;
-        vec<T, N>& q_new = result.q;
-        T& habs = result.h_next;
-        habs = state.h_next;
+        T& t_new = this->_old_state->t;
+        vec<T, N>& q_new = this->_old_state->q;
+        T& habs = this->_old_state->habs;
+        habs = this->_state->habs;
         T h, err_norm, factor, _factor;
 
         bool step_accepted = false;
@@ -78,7 +83,7 @@ public:
             h = habs * this->direction();
             t_new = t+h;
 
-            step_impl(q_new, t, q, h);
+            _step_impl(*this->_old_state, *this->_state, h);
             _rk_mut.scale = atol + _rk_mut.qabs.cwiseMax(q_new.cwiseAbs())*rtol;
             err_norm = _error_norm(_rk_mut.K, h, _rk_mut.scale);
             _factor = this->SAFETY*pow(err_norm, err_exp);
@@ -105,23 +110,14 @@ public:
         }
     }
 
-    const Atype A;
-    const Btype B;
-    const Ctype C;
-    const Etype E;
-
-protected:
-
-    RungeKutta(MAIN_CONSTRUCTOR(T, N), const int& err_est_ord, const Atype& A, const Btype& B, const Ctype& C, const Etype& E) : OdsBase(ARGS, err_est_ord), A(A), B(B), C(C), E(E), err_exp(T(-1)/T(err_est_ord+1)), _rk_mut(q0) {}
 
 
-private:
 
-    void _step_impl(vec<T, N>& q_new, const T& t_old, const vec<T, N>& q_old, const T& h, StageContainer& K) const{
+    void _step_impl(State<T, N>& result, const State<T, N>& state, const T& h) override{
+        StageContainer& K = _rk_mut.K;
+        this->_rhs(K[0], state.t, state.q);
 
-        this->_rhs(K[0], t_old, q_old);
-
-        q_new = B(0)*K[0]*h;
+        result.q = B(0)*K[0]*h;
 
         for (size_t s = 1; s < Nstages; s++){
             //calculate df
@@ -130,12 +126,12 @@ private:
                 _rk_mut.dq += this->A(s, j) * K[j] * h;
             }
             //calculate _K
-            this->_rhs(K[s], t_old+this->C(s)*h, q_old+_rk_mut.dq);
-            q_new += B(s)*K[s]*h;
+            this->_rhs(K[s], state.t+this->C(s)*h, state.q+_rk_mut.dq);
+            result.q += B(s)*K[s]*h;
         }
 
-        q_new += q_old;
-        this->_rhs(K[Nstages], t_old+h, q_new);
+        result.q += state.q;
+        this->_rhs(K[Nstages], state.t+h, result.q);
     }
 
     T _error_norm(const StageContainer& K, const T& h, const vec<T, N>& scale) const{
@@ -151,7 +147,6 @@ private:
         return rms_norm(_rk_mut.err);
     }
 
-    ;//always holds the value given to it by the last "step" call
     const T err_exp;
     mutable _RK_mutable<T, N, Nstages> _rk_mut;
 
@@ -180,7 +175,6 @@ public:
         return std::make_unique<RK45<T, N>>(*this);
     }
     
-
     RKbase::Atype Amatrix() const override{
         typename RKbase::Atype A;
         A << T(0),        T(0),        T(0),        T(0),        T(0),

@@ -90,6 +90,8 @@
         "print": "cpp",
         "lu": "cpp",
         "list": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "any": "cpp",
+        "codecvt": "cpp"
     }
 }

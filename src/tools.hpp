@@ -58,6 +58,11 @@ T abs(const T& x){
 }
 
 
+template<class T, int N>
+void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
+
+
+
 template<class T>
 std::vector<T> subvec(const std::vector<T>& x, const size_t& start) {
     if (start >= x.size()) {
@@ -224,7 +229,6 @@ struct OdeResult{
     const std::vector<vec<T, N>> q;
     const std::map<std::string, std::vector<size_t>> event_map;
     const bool diverges;
-    const bool is_stiff;
     const bool success;// if the OdeSolver didnt die during the integration
     const double runtime;
     const std::string message;
@@ -233,7 +237,6 @@ struct OdeResult{
         std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n" <<
         "\tPoints           : " << t.size() << "\n" <<
         "\tDiverges         : " << (diverges ? "true" : "false") << "\n" << 
-        "\tStiff            : " << (is_stiff ? "true" : "false") << "\n" <<
         "\tSuccess          : " << (success ? "true" : "false") << "\n" <<
         "\tRuntime          : " << runtime << "\n" <<
         "\tTermination cause: " << message << "\n" <<
@@ -270,13 +273,12 @@ public:
     const T habs;
     const std::string event;
     const bool diverges;
-    const bool is_stiff;
     const bool is_running; //if tmax or breakcond are met or is dead, it is set to false. It can be set to true if new tmax goal is set
-    const bool is_dead; //e.g. if stiff or diverges. This is irreversible.
+    const bool is_dead; //This is irreversible.
     const size_t Nt;
     const std::string message;
 
-    SolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_stiff, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_stiff(is_stiff), is_running(is_running), is_dead(is_dead), Nt(Nt), message(message) {}
+    SolverState(const T& t, const vec<T, N>& q, const T& habs, const std::string& event, const bool& diverges, const bool& is_running, const bool& is_dead, const size_t& Nt, const std::string& message): t(t), q(q), habs(habs), event(event), diverges(diverges), is_running(is_running), is_dead(is_dead), Nt(Nt), message(message) {}
 
     void show(const int& precision = 15) const{
 
@@ -287,7 +289,6 @@ public:
         "\th          : " << habs << "\n\n";
         std::cout << ((event == "") ? "\tNo event" : "\tEvent      : " + (event) )<< "\n" <<
         "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
-        "\tStiff      : " << (is_stiff ? "true" : "false") << "\n" <<
         "\tRunning    : " << (is_running ? "true" : "false") << "\n" <<
         "\tUpdates    : " << Nt << "\n" <<
         "\tDead       : " << (is_dead ? "true" : "false") << "\n" <<
@@ -303,10 +304,29 @@ public:
 template<class T, int N>
 struct State{
 
-    T t;
-    vec<T, N> q;
-    T h_next;
-    
+    T t; //current time
+    vec<T, N> q; //current vector
+    T habs; //absolute stepsize to be used for the next step
+
+    virtual ~State(){}
+
+    State(const T& t, const vec<T, N>& q, const T& habs):t(t), q(q), habs(habs){}
+
+    State(const State<T, N>& other):t(other.t), q(other.q), habs(other.habs){}
+
+    virtual State<T, N>* clone() const{
+        return new State<T, N>(*this);
+    }
+
+    virtual State<T, N>& assign(const State<T, N>& other){
+        if (&other == this){
+            return *this;
+        }
+        return this->operator=(other);
+    }
+
+protected:
+    State<T, N>& operator=(const State<T, N>& other) = default;
 };
 
 
@@ -319,6 +339,141 @@ std::vector<T> _event_data(const std::vector<T>& q, const std::map<std::string, 
     }
     return data;
 }
+
+
+template<class T, int N>
+void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
+    file << event_index << " " << std::setprecision(16) << t;
+    for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
+        file << " " << std::setprecision(16) << q[i];
+    }
+    file << "\n";
+}
+
+
+template<class Any, class T, int N>
+bool operator==(const Any& a, const Functor<T, N>& b){
+    return b.func == a;
+}
+
+
+template<class T, int N>
+struct _MutableData{
+
+    _MutableData(const State<T, N>& state) : q(state.q), qdiff(state.q), state(state.clone()){}
+
+    _MutableData(const _MutableData<T, N>& other): q(other.q), qdiff(other.qdiff){
+        state = other.state.clone();
+    }
+
+    _MutableData(_MutableData<T, N>&& other):q(std::move(other.q)), qdiff(std::move(other.qdiff)), state(other.state){
+        other.state = nullptr;
+    }
+
+    _MutableData(){}
+
+
+    ~_MutableData(){
+        delete state;
+        state = nullptr;
+    }
+
+    _MutableData<T, N>& operator=(const _MutableData<T, N>& other){
+        if (&other == this) return *this;
+        q = other.q;
+        qdiff = other.qdiff;
+        delete state;
+        state = nullptr;
+        if (other.state != nullptr){
+            state = other.state->clone();
+        }
+        return *this;
+    }
+
+    vec<T, N> q;
+    vec<T, N> qdiff;
+    State<T, N>* state=nullptr;
+};
+
+
+
+template<class T, int N>
+class Checkpoint{
+
+    //once the checkpoint has been initialized with a state,
+    //then the same type of state be reassigned, otherwise object slicing might occur.
+    //However if a different type of state is needed, then a new checkpoint
+    //has to be created (which can safely be assigned to the original without internal object slicing.)
+
+public:
+    Checkpoint(const State<T, N>& state): _state(state.clone()){
+        _is_set = true;
+    }
+
+    Checkpoint(const Checkpoint<T, N>& other){
+        _copy_checkpoint(other);
+    }
+
+    Checkpoint(Checkpoint<T, N>&& other) : _state(other._state){
+        other._state = nullptr;
+    }
+
+    Checkpoint(){}
+
+    ~Checkpoint(){
+        delete _state;
+    }
+
+    Checkpoint<T, N>& operator=(const Checkpoint<T, N>& other){
+        if (&other == this) return *this;
+        _copy_checkpoint(other);
+        return *this;
+    }
+
+    const State<T, N>& state()const{
+
+        if (!is_set()){
+            throw std::runtime_error("Checkpoint has not been set.");
+        }
+        return *_state;
+    }
+
+    inline bool is_set()const{
+        return _is_set;
+    }
+
+    void set(const State<T, N>& state){
+        if (_state == nullptr){
+            _state = state.clone();
+        }
+        else{
+            _state->assign(state);
+        }
+        _is_set = true;
+    }
+
+    inline void remove(){
+        _is_set = false;
+    }
+
+
+
+private:
+
+    State<T, N>* _state = nullptr;
+    bool _is_set = false;
+
+    void _copy_checkpoint(const Checkpoint<T, N>& other){
+        delete _state;
+        _state = nullptr;
+        if (other._state != nullptr){
+            _state = other._state->clone();
+        }
+
+        _is_set = other._is_set;
+    }
+
+};
 
 
 #endif

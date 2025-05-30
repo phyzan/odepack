@@ -145,10 +145,6 @@ public:
         return _solver->diverges();
     }
 
-    bool is_stiff()const{
-        return _solver->is_stiff();
-    }
-
     bool is_dead() const{
         return _solver->is_dead();
     }
@@ -288,7 +284,6 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     const size_t Nt = _t_arr.size();
     long int frame_counter = 0;
     size_t i = Nt;
-    const int MAX_PRINTS = max_prints;
     int prints = 0;
     _solver->reopen_file();
 
@@ -322,10 +317,10 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
         }
         if (max_prints > 0){
             T percentage = (_solver->t() - t0)/(_solver->tmax()-t0);
-            if (percentage*MAX_PRINTS >= prints){
+            if (percentage*max_prints >= prints){
                 #pragma omp critical
                 {
-                    std::cout << std::setprecision(3) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter.total() << std::flush;
+                    std::cout << std::setprecision(std::log10(max_prints)+1) << "\033[2K\rProgress: " << 100*percentage << "%" <<   "    Events: " << event_counter.total() << std::flush;
                     prints++;
                 }
 
@@ -340,7 +335,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     
     std::chrono::duration<double> rt = t2-t1;
 
-    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), _solver->is_stiff(), !_solver->is_dead(), rt.count(), _solver->message()};
+    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), rt.count(), _solver->message()};
 
     _runtime += res.runtime;
     _solver->release_file();

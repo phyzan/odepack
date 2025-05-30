@@ -11,32 +11,15 @@
 
 #define MAIN_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events, const Functor<T, N>& mask, std::string save_dir, bool save_events_only
 
-#define ODE_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, std::string method="RK45", const std::vector<Event<T, N>*> events={}, const Functor<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
+#define SOLVER_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, T rtol, T atol, T min_step, T max_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events, const Functor<T, N>& mask, std::string save_dir, bool save_events_only, int err_est_ord, State<T, N>* initial_state
 
+#define ODE_CONSTRUCTOR(T, N) const Functor<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, std::string method="RK45", const std::vector<Event<T, N>*> events={}, const Functor<T, N>& mask=nullptr, std::string save_dir="", bool save_events_only=false
 
 #define ARGS rhs, t0, q0, rtol, atol, min_step, max_step, first_step, args, events, mask, save_dir, save_events_only
 
-template<class Any, class T, int N>
-bool operator==(const Any& a, const Functor<T, N>& b){
-    return b.func == a;
-}
 
 
-template<class T, int N>
-struct _MutableData{
 
-    _MutableData(const vec<T, N>& q) : q(q), qdiff(q), state({0, q, 0}){}
-
-    _MutableData(){}
-
-    vec<T, N> q;
-    vec<T, N> qdiff;
-    State<T, N> state;
-};
-
-
-template<class T, int N>
-void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
 
 
 template<class T, int N>
@@ -56,8 +39,6 @@ public:
     //MODIFIERS
     void stop(const std::string& text = "");
     void kill(const std::string& text = "");
-    bool advance_by(const T& habs);
-    bool advance_by_any(const T& h);
     bool advance();
     bool set_goal(const T& t_max);
 
@@ -75,7 +56,6 @@ public:
     inline const std::vector<T>& args() const;
     inline const size_t& Nsys() const;
     inline const bool& diverges() const;
-    inline const bool& is_stiff() const;
     inline const bool& is_running() const;
     inline const bool& is_dead() const;
     inline const std::string& message();
@@ -101,10 +81,6 @@ public:
         return new_solver;
     }
 
-    virtual void step_impl(vec<T, N>& result, const T& t_old, const vec<T, N>& q_old, const T& h) const = 0;
-
-    virtual void adapt_impl(State<T, N>& result, const State<T, N>& state) const = 0; //derived class implementation must account for min_step
-
     virtual OdeSolver<T, N>* clone() const = 0;
 
     virtual std::unique_ptr<OdeSolver<T, N>> safe_clone() const = 0;
@@ -113,7 +89,7 @@ public:
 
 protected:
 
-    OdeSolver(MAIN_CONSTRUCTOR(T, N), int err_est_order);
+    OdeSolver(SOLVER_CONSTRUCTOR(T, N));
 
     OdeSolver(const OdeSolver<T, N>& other);
 
@@ -125,8 +101,69 @@ protected:
 
     void _rhs(vec<T, N>& result, const T& t, const vec<T, N>& q) const;
 
+    virtual void _step_impl(State<T, N>& result, const State<T, N>& state, const T& h) = 0;
+
+    virtual void _adapt_impl() = 0; //changes _old_state to the new one, not _state
+
+    virtual void _set_direction(const int& dir){
+        _direction = dir;
+    }
+
+    virtual void _adjust_stepsize(const T& h_abs){
+        _state->habs = h_abs;
+    }
+
+    void _partially_advance_to(const T& t_new){
+        _step_impl(*_state, *_old_state, t_new - _old_state->t);
+        _state->t = t_new;
+    }
+    
 private:
 
+    bool _adapt_to_event(Event<T, N>& event);
+
+    bool _validate_state();
+
+    void _reverse_states(){
+        //_old_state becomes _state, and _state becomes _old_state
+        State<T, N>* old_tmp = _old_state;
+        _old_state = _state;
+        _state = old_tmp;
+    }
+
+    void _copy_data(const OdeSolver<T, N>& other);
+
+    void _make_new_events(const std::vector<Event<T, N>*>& events);
+
+    void _warn_dead();
+
+    void _warn_paused();
+
+    void _warn_travolta();
+
+    void _delete_events();
+
+    void _clear_states(){
+        delete _state;
+        delete _old_state;
+        delete _initial_state;
+        _state = nullptr;
+        _old_state = nullptr;
+        _initial_state = nullptr;
+    }
+
+
+protected:
+    //the two below, delete only in destructor, nowhere else
+    //because derived classes might have their own pointers that
+    //point to the same location, and deleting these two without
+    //"notifying" the derived class will lead to undefined behavior
+    State<T, N>* _state;
+    State<T, N>* _old_state;
+
+private:
+
+    State<T, N>* _initial_state;
     Functor<T, N> _ode_rhs;
     T _rtol;
     T _atol;
@@ -135,10 +172,8 @@ private:
     std::vector<T> _args;
     size_t _n; //size of ode system
 
-    State<T, N> _state;
     T _tmax;
     bool _diverges = false;
-    bool _is_stiff = false;
     bool _is_running = true;
     bool _is_dead = false;
     size_t _N=0;//total number of solution updates
@@ -150,29 +185,11 @@ private:
     std::ofstream _file;
     bool _autosave = false;
     bool _save_events_only = false;
-    State<T, N>* _checkpoint = nullptr;
     const vec<T, N>* _q_exposed = nullptr; //view_only pointer
     Functor<T, N> _mask = nullptr;
+    Checkpoint<T, N> _checkpoint;
     mutable _MutableData<T, N> _mut;
-
-    void _next_state(State<T, N>& result, const T& h) const;
-
-    bool _adapt_to_event(State<T, N>& next, Event<T, N>& event);
-
-    bool _update(State<T, N>& next);
-
-    void _warn_dead();
-
-    void _warn_paused();
-
-    void _warn_travolta();
-
-    void _copy_data(const OdeSolver<T, N>& other);
-
-    void _make_new_events(const std::vector<Event<T, N>*>& events);
-
-    void _delete_events();
-
+    
 };
 
 
@@ -184,8 +201,7 @@ private:
 
 template<class T, int N>
 OdeSolver<T, N>::~OdeSolver(){
-    delete _checkpoint;
-    _checkpoint = nullptr;
+    _clear_states();
     _delete_events();
     if (_autosave){
         _file.close();
@@ -194,17 +210,17 @@ OdeSolver<T, N>::~OdeSolver(){
 
 
 template<class T, int N>
-inline const T& OdeSolver<T, N>::t() const { return _state.t; }
+inline const T& OdeSolver<T, N>::t() const { return _state->t; }
 
 template<class T, int N>
 inline const vec<T, N>& OdeSolver<T, N>::q() const {
     return *_q_exposed; }
 
 template<class T, int N>
-inline const vec<T, N>& OdeSolver<T, N>::q_true() const { return _state.q; }
+inline const vec<T, N>& OdeSolver<T, N>::q_true() const { return _state->q; }
 
 template<class T, int N>
-inline const T& OdeSolver<T, N>::stepsize() const { return _state.h_next; }
+inline const T& OdeSolver<T, N>::stepsize() const { return _state->habs; }
 
 template<class T, int N>
 inline const T& OdeSolver<T, N>::tmax() const { return _tmax; }
@@ -234,9 +250,6 @@ template<class T, int N>
 inline const bool& OdeSolver<T, N>::diverges() const { return _diverges; }
 
 template<class T, int N>
-inline const bool& OdeSolver<T, N>::is_stiff() const { return _is_stiff; }
-
-template<class T, int N>
 inline const bool& OdeSolver<T, N>::is_running() const { return _is_running; }
 
 template<class T, int N>
@@ -257,10 +270,10 @@ T OdeSolver<T, N>::auto_step()const{
     }
     T h0, d2, h1;
     vec<T, N> y1, f1;
-    vec<T, N> scale = _atol + _state.q.cwiseAbs()*_rtol;
-    vec<T, N> _dq = this->_rhs(_state.t, _state.q);
+    vec<T, N> scale = _atol + _state->q.cwiseAbs()*_rtol;
+    vec<T, N> _dq = this->_rhs(_state->t, _state->q);
 
-    T d0 = rms_norm((_state.q/scale).eval());
+    T d0 = rms_norm((_state->q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
     if (d0 < 1e-5 || d1 < 1e-5){
         h0 = 1e-6;
@@ -269,8 +282,8 @@ T OdeSolver<T, N>::auto_step()const{
         h0 = 0.01*d0/d1;
     }
 
-    y1 = _state.q+h0*_direction*_dq;
-    f1 = _rhs(_state.t+h0*_direction, y1);
+    y1 = _state->q+h0*_direction*_dq;
+    f1 = _rhs(_state->t+h0*_direction, y1);
 
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
@@ -337,10 +350,11 @@ inline const std::string& OdeSolver<T, N>::filename() const {
 
 template<class T, int N>
 bool OdeSolver<T, N>::free() {
-    if (_direction == -1){
+    if (_direction < 0){
         return set_goal(-inf<T>());
     }
     else{
+        //default direction is positive
         return set_goal(inf<T>());
     }
 }
@@ -357,7 +371,7 @@ inline std::string OdeSolver<T, N>::event_name() const {
 
 template<class T, int N>
 inline const SolverState<T, N> OdeSolver<T, N>::state() const {
-    return {_state.t, q(), _state.h_next, event_name(), _diverges, _is_stiff, _is_running, _is_dead, _N, _message};
+    return {_state->t, q(), _state->habs, event_name(), _diverges, _is_running, _is_dead, _N, _message};
 }
 
 template<class T, int N>
@@ -405,26 +419,21 @@ template<class T, int N>
 bool OdeSolver<T, N>::set_goal(const T& t_max_new){
     //if the solver was stopped (but not killed) earlier,
     //then setting a new goal successfully will resume the solver
-    if ((_diverges) && (!_is_dead || _is_running) ){
-        //sanity check. 
-        throw std::runtime_error("Bug detected: Solver half alive");
-    }
-
     if (_is_dead){
         _warn_dead();
         return false;
     }
-    else if (t_max_new == _state.t){
-        _direction = 0;
+    else if (t_max_new == _state->t){
+        _set_direction(0);
         _tmax = t_max_new;
         stop("Waiting for new Tmax");
         return true;
     }
     else{
         _tmax = t_max_new;
-        _direction = ( t_max_new > _state.t) ? 1 : -1;
-        if (_state.h_next == 0){
-            _state.h_next = auto_step();
+        _set_direction( ( t_max_new > _state->t) ? 1 : -1);
+        if (_state->habs == 0){
+            _adjust_stepsize(this->auto_step());
         }
         return resume();
     }
@@ -437,27 +446,30 @@ bool OdeSolver<T, N>::set_goal(const T& t_max_new){
 
 
 template<typename T, int N>
-OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), int err_est_ord): ERR_EST_ORDER(err_est_ord), _ode_rhs(rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _state({t0, q0, first_step}), _filename(save_dir), _save_events_only(save_events_only), _mask(mask), _mut(q0){
+OdeSolver<T, N>::OdeSolver(SOLVER_CONSTRUCTOR(T, N)): ERR_EST_ORDER(err_est_ord), _ode_rhs(rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(initial_state->q.size()), _filename(save_dir), _save_events_only(save_events_only), _mask(mask), _mut(*initial_state){
     std::unordered_set<std::string> seen;
     for (const Event<T, N>* ev : events) {
         if (!seen.insert(ev->name()).second) {
             throw std::runtime_error("Duplicate Event name not allowed: " + ev->name());
         }
     }
+    if (_min_step < 0){
+        throw std::runtime_error("Minimum stepsize must be a non negative number");
+    }
     if (_max_step < _min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
 
-    if (first_step <= 0){
-        _state.h_next = 0;
-    }
-    else{
-        _state.h_next = (first_step < _min_step) ? _min_step : first_step;
-    }
-    
-    _q_exposed = &_state.q;
+    _set_direction(0);
+    //any "history" data in any implicit solvers will be overwritten anyway when a tmax goal is set,
+    //because the direcion has been set to 0, so all that matters now is t0, q0, habs.
+    _initial_state = initial_state;
+    _initial_state->habs = std::max(std::min(_initial_state->habs, _max_step), _min_step);
+    _state = _initial_state->clone();
+    _old_state = initial_state->clone();
+    _q_exposed = &(_state->q);
     _make_new_events(events);
-    set_goal(_state.t);
+    set_goal(_state->t);
 
     if (!_filename.empty()){
         _file.open(_filename, std::ios::out);
@@ -465,24 +477,30 @@ OdeSolver<T, N>::OdeSolver(MAIN_CONSTRUCTOR(T, N), int err_est_ord): ERR_EST_ORD
             throw std::runtime_error("Could not open file in OdeSolver for automatic saving: " + _filename + "\n");
         }
         _autosave = true;
-        write_checkpoint(_file, _state.t, _state.q, -1);
+        write_checkpoint(_file, _state->t, _state->q, -1);
     }
 }
 
 template<typename T, int N>
 OdeSolver<T, N>::OdeSolver(const OdeSolver<T, N>& other):ERR_EST_ORDER(other.ERR_EST_ORDER){
+    _initial_state = other._initial_state->clone();
+    _state = other._state->clone();
+    _old_state = other._old_state->clone();
     _copy_data(other);
     _filename = "";
     _autosave = false;
+
 }
 
 template<typename T, int N>
-OdeSolver<T, N>::OdeSolver(OdeSolver<T, N>&& other):ERR_EST_ORDER(other.ERR_EST_ORDER), _file(std::move(other._file)){
+OdeSolver<T, N>::OdeSolver(OdeSolver<T, N>&& other):ERR_EST_ORDER(other.ERR_EST_ORDER), _state(other._state), _old_state(other._old_state), _initial_state(other._initial_state), _file(std::move(other._file)){
     // not the most efficient, but the most readable :)
     // besides the time scale of a copy is insignificant to the timescale of
     // solving an ode.
     _copy_data(other);
-    other._checkpoint = nullptr;
+    other._state = nullptr;
+    other._old_state = nullptr;
+    other._initial_state = nullptr;
 
 }
 
@@ -520,75 +538,29 @@ inline void OdeSolver<T, N>::_rhs(vec<T, N>& result, const T& t, const vec<T, N>
 
 template<class T, int N>
 bool OdeSolver<T, N>::advance(){
-    adapt_impl(_mut.state, _state);
-    return _update(_mut.state);
+    _adapt_impl(); //_old_state changed, not _state
+    return _validate_state(); //called after any 
 }
 
 
-
 template<class T, int N>
-bool OdeSolver<T, N>::advance_by(const T& habs){
-    if (habs <= 0){
-        std::cout << std::endl << "Please provide a positive stepsize in .advance_by(habs)\n";
-        return false;
-    }
-
-    delete _checkpoint;
-    _checkpoint = nullptr;
-
-    bool _set_non_stiff = false;
-    if (habs <= _min_step && !_is_stiff){
-        _set_non_stiff = true;
-    }
-    
-    _next_state(_mut.state, habs*_direction);
-    bool success = _update(_mut.state);
-    if (success && _set_non_stiff){
-        _is_stiff = false;
-    }
-    return success;
-}
-
-template<class T, int N>
-bool OdeSolver<T, N>::advance_by_any(const T& h){
-    delete _checkpoint;
-    _checkpoint = nullptr;
-
-    set_goal(_state.t+h);
-    
-    _next_state(_mut.state, h);
-    return _update(_mut.state);
-}
-
-template<class T, int N>
-void OdeSolver<T, N>::_next_state(State<T, N>& result, const T& h) const {
-    result.t += h;
-    step_impl(_mut.q, _state.t, _state.q, h);
-    result.h_next = h*_direction;
-    result.q = _mut.q;
-}
-
-template<class T, int N>
-bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
-    // takes next state (which means tnew, hnew, and hnext_new)
-    // if it is not an event or smth it is left unchanged.
-    // otherwise, it is modified to depict the event with high accuracy
-    std::function<vec<T, N>(T)> qfunc = [this](const T& t_next) -> vec<T, N> {
-        vec<T, N> tmp;
-        this->step_impl(tmp, this->_state.t, this->_state.q, t_next-this->_state.t);
-        return tmp;
+bool OdeSolver<T, N>::_adapt_to_event(Event<T, N>& event){
+    //adapting to event must happend only after states have been reversed,
+    //because _partiall_advance_to below changes _state wrt to _old_state,
+    //and _old_state is the stable one, while _state still needs work.
+    std::function<vec<T, N>(T)> qfunc = [this](const T& t){
+        this->_step_impl(*this->_mut.state, *this->_old_state, t-this->_old_state->t);
+        return _mut.state->q;
     };
     
-    if (event.determine(this->_state.t, this->_state.q, next.t, next.q, qfunc)){
-        if (_current_event_index == -1 && event.allows_checkpoint()){
-            _checkpoint = new State<T, N>{next.t, next.q, next.h_next};
+    if (event.determine(_old_state->t, _old_state->q, _state->t, _state->q, qfunc)){
+        if (!at_event() && event.allows_checkpoint()){
+            _checkpoint.set(*_state);
         }
-        else if ( _checkpoint != nullptr && event.has_mask()){
-            delete _checkpoint;
-            _checkpoint = nullptr;
+        else if ( _checkpoint.is_set() && event.has_mask()){
+            _checkpoint.remove();
         }
-        next.t = event.data().t();
-        next.q = event.data().q_true();
+        _partially_advance_to(event.data().t()); //_state advances, not old state
         if (event.hide_mask()){
             _q_exposed = &event.data().q();
         }
@@ -598,7 +570,8 @@ bool OdeSolver<T, N>::_adapt_to_event(State<T, N>& next, Event<T, N>& event){
 }
 
 template<class T, int N>
-bool OdeSolver<T, N>::_update(State<T, N>& next){
+bool OdeSolver<T, N>::_validate_state(){
+    //called immediately after any advance step that changed _old_state
     if (_is_dead){
         _warn_dead();
         return false;
@@ -608,14 +581,17 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         return false;
     }
     
-    _current_event_index = -1;
-    _q_exposed = &_state.q;
-    if (_checkpoint != nullptr){
-        next = *_checkpoint;
+    //register state
+    _reverse_states();
+    _q_exposed = &_state->q;
+    if (_checkpoint.is_set()){
+        _state->assign(_checkpoint.state());
     }
 
+    //change _state if any events are between _old_state and _state
+    _current_event_index = -1;
     for (int i=0; i<static_cast<int>(_events.size()); i++){
-        if (_adapt_to_event(next, *_events[i])){
+        if (_adapt_to_event(*_events[i])){
             if (_current_event_index != -1){
                 _events[_current_event_index]->go_back();
             }
@@ -626,73 +602,50 @@ bool OdeSolver<T, N>::_update(State<T, N>& next){
         }
     }
 
-
+    //below we fall back to _old_state if needed
     bool success = true;
-    if (next.h_next < 0){//h_next is always positive, it is the absolute value of the true stepsize
-        success = false;
-        throw std::runtime_error("Bug detected: Absolute stepsize < 0");
-    }
-
-    if (!next.q.isFinite().all()){
+    if (!_state->q.isFinite().all()){
+        _reverse_states();
         kill("Ode solution diverges");
         _diverges = true;
         success = false;
     }
-    else if (next.h_next == 0){
+    else if (_state->habs == 0){
+        _reverse_states();
         kill("Required stepsize was smaller than machine precision");
-        _is_stiff = true;
         success = false;
     }
 
     //make or clear checkpoint first
-    if (_current_event_index == -1 && _checkpoint != nullptr){
-        delete _checkpoint;
-        _checkpoint = nullptr;
+    if (!at_event() && _checkpoint.is_set()){
+        _checkpoint.remove();
     }
 
+    if (_state->t*_direction >= _tmax*_direction){
 
-    if (next.t*_direction >= _tmax*_direction){
-
-        if (next.t == _tmax){
-            _state = next;
-        }
-        else if (_current_event_index != -1){
+        if (_state->t==_tmax){}
+        else if (at_event()){
             //sometimes an event might appear a bit ahead of the tmax. This has already been registered
             //so we need to un-register it before stopping. It will be encoutered anyway when the solver is resumed.
             _events[_current_event_index]->go_back();
             _current_event_index = -1;
-            _q_exposed = &_state.q;
-            _next_state(_state, _tmax-_state.t);
+            _q_exposed = &_state->q;
+            _partially_advance_to(_tmax);
         }
         else{
-            _next_state(_state, _tmax-_state.t);
+            _partially_advance_to(_tmax);
         }
         stop("T_max goal reached");
-        _state.t = _tmax;
-        _state.h_next = next.h_next;
-        _N++;
     }
-    else{
-        if ( next.h_next == _min_step){
-            _is_stiff = true;
-            if (next.h_next > _state.h_next){
-                throw std::runtime_error("Bug detected in min_step implementation (1).");
-            }
-        }
-        else if (next.h_next < _min_step){
-            throw std::runtime_error("Bug detected in min_step implementation (2).");
-        }
-        _state = next;
-        _N++;
-    }
+    _N++;
 
     if (_mask != nullptr){
-        _state.q = _mask(_state.t, _state.q, _args);
+        _state->q = _mask(_state->t, _state->q, _args);
     }
 
     if (_autosave && success){
         if (!_save_events_only || (_current_event_index != -1)){
-            write_checkpoint(_file, _state.t, q(), _current_event_index);
+            write_checkpoint(_file, _state->t, q(), _current_event_index);
         }
     }
 
@@ -728,6 +681,10 @@ inline void OdeSolver<T, N>::_warn_travolta() {
 template<typename T, int N>
 void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     //does not copy _file, this has to be managed outside this function
+    _state->assign(*other._state);
+    _old_state->assign(*other._old_state);
+    _initial_state->assign(*other._initial_state);
+
     _ode_rhs = other._ode_rhs;
     _rtol = other._rtol;
     _atol = other._atol;
@@ -736,10 +693,8 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     _args = other._args;
     _n = other._n;
 
-    _state = other._state;
     _tmax = other._tmax;
     _diverges = other._diverges;
-    _is_stiff = other._is_stiff;
     _is_running = other._is_running;
     _is_dead = other._is_dead;
     _N = other._N;
@@ -751,15 +706,10 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     _filename = other._filename;
     _autosave = other._autosave;
     _mask = other._mask;
-
     _make_new_events(other._events);
-    delete _checkpoint;
-    _checkpoint = nullptr;
-    if (other._checkpoint != nullptr){
-       _checkpoint = new State<T, N>(*other._checkpoint);
-    }
-    if (other._q_exposed == &other._state.q){
-        _q_exposed = &_state.q;
+    _checkpoint = other._checkpoint;
+    if (other._q_exposed == &other._state->q){
+        _q_exposed = &_state->q;
     }
     else{
         _q_exposed = &current_event()->data().q();
@@ -811,14 +761,7 @@ void OdeSolver<T, N>::_delete_events() {
 
 
 
-template<class T, int N>
-void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index){
-    file << event_index << " " << std::setprecision(16) << t;
-    for (size_t i=0; i<static_cast<size_t>(q.size()); i++){
-        file << " " << std::setprecision(16) << q[i];
-    }
-    file << "\n";
-}
+
 
 
 #endif
