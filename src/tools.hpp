@@ -16,16 +16,16 @@ template<class T, int N=-1>
 using vec = Eigen::Array<T, N, 1>;
 
 template<class T, int N, template<class, int> typename VecLike=vec>
-using Func = std::function<VecLike<T, N>(const T&, const VecLike<T, N>&, const std::vector<T>&)>;
+using Func = std::function<VecLike<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
 template<class T, int N, template<class, int> typename VecLike=vec>
-using Fvoid = std::function<void(VecLike<T, N>&, const T&, const VecLike<T, N>&, const std::vector<T>&)>;
+using Fvoid = std::function<void(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
 
 template<class T, int N, template<class, int> typename VecLike=vec>
-using Fptr = VecLike<T, N>(*)(const T&, const VecLike<T, N>&, const std::vector<T>&);
+using Fptr = VecLike<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
 
 template<class T, int N, template<class, int> typename VecLike=vec>
-using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const VecLike<T, N>&, const std::vector<T>&);
+using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
 
 template<class T>
 using _ObjFun = std::function<T(const T&)>;
@@ -307,25 +307,39 @@ struct State{
     T t; //current time
     vec<T, N> q; //current vector
     T habs; //absolute stepsize to be used for the next step
+    int direction = 0;
 
     virtual ~State(){}
 
     State(const T& t, const vec<T, N>& q, const T& habs):t(t), q(q), habs(habs){}
 
-    State(const State<T, N>& other):t(other.t), q(other.q), habs(other.habs){}
+    State() = delete;
 
     virtual State<T, N>* clone() const{
         return new State<T, N>(*this);
     }
 
     virtual State<T, N>& assign(const State<T, N>& other){
-        if (&other == this){
-            return *this;
-        }
         return this->operator=(other);
     }
 
+    inline void set_direction(const T& dir){
+        direction = (dir == 0) ? 0 : ( (dir > 0) ? 1 : -1);
+    }
+    
+    virtual void adjust(const T& h_abs, const T& dir, const vec<T, N>& diff){
+        habs = h_abs;
+        set_direction(dir);
+    }
+
+    T h() const{
+        return habs*direction;
+    }
+
 protected:
+
+    State(const State<T, N>& other):t(other.t), q(other.q), habs(other.habs){}
+
     State<T, N>& operator=(const State<T, N>& other) = default;
 };
 

@@ -85,7 +85,7 @@ public:
 
     virtual std::unique_ptr<OdeSolver<T, N>> safe_clone() const = 0;
 
-    T auto_step()const;
+    T auto_step(T direction=0)const;
 
 protected:
 
@@ -104,14 +104,6 @@ protected:
     virtual void _step_impl(State<T, N>& result, const State<T, N>& state, const T& h) = 0;
 
     virtual void _adapt_impl() = 0; //changes _old_state to the new one, not _state
-
-    virtual void _set_direction(const int& dir){
-        _direction = dir;
-    }
-
-    virtual void _adjust_stepsize(const T& h_abs){
-        _state->habs = h_abs;
-    }
 
     void _partially_advance_to(const T& t_new){
         _step_impl(*_state, *_old_state, t_new - _old_state->t);
@@ -160,10 +152,10 @@ protected:
     //"notifying" the derived class will lead to undefined behavior
     State<T, N>* _state;
     State<T, N>* _old_state;
+    State<T, N>* _initial_state;
 
 private:
 
-    State<T, N>* _initial_state;
     Functor<T, N> _ode_rhs;
     T _rtol;
     T _atol;
@@ -178,7 +170,6 @@ private:
     bool _is_dead = false;
     size_t _N=0;//total number of solution updates
     std::string _message; //different from "running".
-    int _direction;
     std::vector<Event<T, N>*> _events;
     int _current_event_index = -1;
     std::string _filename;
@@ -226,7 +217,7 @@ template<class T, int N>
 inline const T& OdeSolver<T, N>::tmax() const { return _tmax; }
 
 template<class T, int N>
-inline const int& OdeSolver<T, N>::direction() const { return _direction; }
+inline const int& OdeSolver<T, N>::direction() const { return _state->direction; }
 
 template<class T, int N>
 inline const T& OdeSolver<T, N>::rtol() const { return _rtol; }
@@ -262,9 +253,11 @@ template<class T, int N>
 inline const bool& OdeSolver<T, N>::autosave() const { return _autosave; }
 
 template<class T, int N>
-T OdeSolver<T, N>::auto_step()const{
+T OdeSolver<T, N>::auto_step(T direction)const{
     //returns absolute value of emperically determined first step.
-    if (_direction == 0){
+    const int dir = (direction == 0) ? _state->direction : ( (direction > 0) ? 1 : -1);
+
+    if (dir == 0){
         //needed even if the resulting stepsize will have a positive value.
         throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
     }
@@ -282,8 +275,8 @@ T OdeSolver<T, N>::auto_step()const{
         h0 = 0.01*d0/d1;
     }
 
-    y1 = _state->q+h0*_direction*_dq;
-    f1 = _rhs(_state->t+h0*_direction, y1);
+    y1 = _state->q+h0*dir*_dq;
+    f1 = _rhs(_state->t+h0*dir, y1);
 
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
@@ -302,7 +295,7 @@ bool OdeSolver<T, N>::resume() {
     if (_is_dead){
         _warn_dead();
     }
-    else if (_direction == 0){
+    else if (_state->direction == 0){
         _warn_travolta();
     }
     else{
@@ -350,7 +343,7 @@ inline const std::string& OdeSolver<T, N>::filename() const {
 
 template<class T, int N>
 bool OdeSolver<T, N>::free() {
-    if (_direction < 0){
+    if (_state->direction < 0){
         return set_goal(-inf<T>());
     }
     else{
@@ -424,17 +417,16 @@ bool OdeSolver<T, N>::set_goal(const T& t_max_new){
         return false;
     }
     else if (t_max_new == _state->t){
-        _set_direction(0);
+        _state->set_direction(0);
         _tmax = t_max_new;
         stop("Waiting for new Tmax");
         return true;
     }
     else{
         _tmax = t_max_new;
-        _set_direction( ( t_max_new > _state->t) ? 1 : -1);
-        if (_state->habs == 0){
-            _adjust_stepsize(this->auto_step());
-        }
+        const T dir = t_max_new-_state->t;
+        const T habs = _state->habs==0 ? this->auto_step(dir) : _state->habs;
+        _state->adjust(habs, dir, this->_rhs(_state->t, _state->q));
         return resume();
     }
 }
@@ -460,7 +452,7 @@ OdeSolver<T, N>::OdeSolver(SOLVER_CONSTRUCTOR(T, N)): ERR_EST_ORDER(err_est_ord)
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
 
-    _set_direction(0);
+    initial_state->set_direction(0);
     //any "history" data in any implicit solvers will be overwritten anyway when a tmax goal is set,
     //because the direcion has been set to 0, so all that matters now is t0, q0, habs.
     _initial_state = initial_state;
@@ -621,7 +613,7 @@ bool OdeSolver<T, N>::_validate_state(){
         _checkpoint.remove();
     }
 
-    if (_state->t*_direction >= _tmax*_direction){
+    if (_state->t*_state->direction >= _tmax*_state->direction){
 
         if (_state->t==_tmax){}
         else if (at_event()){
@@ -699,7 +691,6 @@ void OdeSolver<T, N>::_copy_data(const OdeSolver<T, N>& other) {
     _is_dead = other._is_dead;
     _N = other._N;
     _message = other._message;
-    _direction = other._direction;
     _current_event_index = other._current_event_index;
     _save_events_only = other._save_events_only;
 

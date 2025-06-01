@@ -69,6 +69,7 @@ private:
         const T& atol = this->atol();
         const T& rtol = this->rtol();
         const vec<T, N>& q = this->_state->q;
+        this->_old_state->direction = this->_state->direction;
         _rk_mut.qabs = q.cwiseAbs();
         T& t_new = this->_old_state->t;
         vec<T, N>& q_new = this->_old_state->q;
