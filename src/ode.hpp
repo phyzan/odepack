@@ -332,7 +332,6 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
         std::cout << std::endl;
     }
     auto t2 = std::chrono::high_resolution_clock::now();
-    
     std::chrono::duration<double> rt = t2-t1;
 
     OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), rt.count(), _solver->message()};

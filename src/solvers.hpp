@@ -2,6 +2,7 @@
 #define SOLVERS_HPP
 
 #include "rk_adaptive.hpp"
+// #include "stiff.hpp"
 
 template<class T, int N>
 std::unique_ptr<OdeSolver<T, N>> get_solver(std::string name, MAIN_DEFAULT_CONSTRUCTOR(T, N)) {

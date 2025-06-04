@@ -77,7 +77,6 @@ private:
 };
 
 
-
 template<class T, int N>
 std::unique_ptr<OdeSolver<T, N>> as_variational(const OdeSolver<T, N>& solver, const T& period){
     size_t Nev = solver.events_size()+1;
@@ -94,14 +93,13 @@ std::unique_ptr<OdeSolver<T, N>> as_variational(const OdeSolver<T, N>& solver, c
     return res;
 }
 
-
 template<class T, int N>
 class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(const OdeSolver<T, N>& solver, T period) : ODE<T, N>(*as_variational(solver, period)){
-        _assert_event(solver.q());
+    VariationalODE(const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::string& method = "RK45", const std::vector<Event<T, N>*>& events = {}, const Functor<T, N> mask=nullptr, const std::string& save_dir="", const bool& save_events_only=false) : ODE<T, N>(*as_variational(*get_solver(method, rhs, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events, mask, save_dir, save_events_only), period)) {
+        _assert_event(this->solver().q());
         _ind = _position_of_main_event();
     }
 

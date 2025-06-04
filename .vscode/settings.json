@@ -92,6 +92,8 @@
         "list": "cpp",
         "valarray": "cpp",
         "any": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "version": "cpp",
+        "dense": "cpp"
     }
 }

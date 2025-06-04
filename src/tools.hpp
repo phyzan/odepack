@@ -16,6 +16,9 @@ template<class T, int N=-1>
 using vec = Eigen::Array<T, N, 1>;
 
 template<class T, int N, template<class, int> typename VecLike=vec>
+struct Functor;
+
+template<class T, int N, template<class, int> typename VecLike=vec>
 using Func = std::function<VecLike<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
 template<class T, int N, template<class, int> typename VecLike=vec>
@@ -26,6 +29,12 @@ using Fptr = VecLike<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&)
 
 template<class T, int N, template<class, int> typename VecLike=vec>
 using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
+
+template<class T, int N>
+using JacMat = Eigen::Matrix<T, N, N>;
+
+template<class T, int N>
+using Jac = Functor<T, N, JacMat>;
 
 template<class T>
 using _ObjFun = std::function<T(const T&)>;
@@ -171,7 +180,7 @@ void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t&
 }
 
 
-template<class T, int N, template<class, int> typename VecLike=vec>
+template<class T, int N, template<class, int> typename VecLike>
 struct Functor{
 
     Functor(){}
@@ -216,6 +225,20 @@ struct Functor{
     }
 
     Fvoid<T, N, VecLike> func=nullptr;
+};
+
+
+template<class T, int N>
+struct OdeRhs{
+
+    Functor<T, N> ode_rhs=nullptr;
+    Jac<T, N> jacobian=nullptr;
+
+    template<class A>
+    OdeRhs(const A& rhs) : ode_rhs(rhs), jacobian(nullptr){}
+
+    template<class A, class B>
+    OdeRhs(const A& rhs, const B& jac) : ode_rhs(rhs), jacobian(jac){}
 };
 
 
@@ -285,7 +308,7 @@ public:
         std::cout << std::endl << std::setprecision(precision) << 
         "OdeSolver current state:\n---------------------------\n"
         "\tt          : " << t << "\n" <<
-        "\tq          : " << q << "\n" <<
+        "\tq          : " << q.transpose() << "\n" <<
         "\th          : " << habs << "\n\n";
         std::cout << ((event == "") ? "\tNo event" : "\tEvent      : " + (event) )<< "\n" <<
         "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
@@ -298,49 +321,6 @@ public:
 
 
 
-};
-
-
-template<class T, int N>
-struct State{
-
-    T t; //current time
-    vec<T, N> q; //current vector
-    T habs; //absolute stepsize to be used for the next step
-    int direction = 0;
-
-    virtual ~State(){}
-
-    State(const T& t, const vec<T, N>& q, const T& habs):t(t), q(q), habs(habs){}
-
-    State() = delete;
-
-    virtual State<T, N>* clone() const{
-        return new State<T, N>(*this);
-    }
-
-    virtual State<T, N>& assign(const State<T, N>& other){
-        return this->operator=(other);
-    }
-
-    inline void set_direction(const T& dir){
-        direction = (dir == 0) ? 0 : ( (dir > 0) ? 1 : -1);
-    }
-    
-    virtual void adjust(const T& h_abs, const T& dir, const vec<T, N>& diff){
-        habs = h_abs;
-        set_direction(dir);
-    }
-
-    T h() const{
-        return habs*direction;
-    }
-
-protected:
-
-    State(const State<T, N>& other):t(other.t), q(other.q), habs(other.habs){}
-
-    State<T, N>& operator=(const State<T, N>& other) = default;
 };
 
 
@@ -371,16 +351,16 @@ bool operator==(const Any& a, const Functor<T, N>& b){
 }
 
 
-template<class T, int N>
+template<class T, int N, class StateDerived>
 struct _MutableData{
 
-    _MutableData(const State<T, N>& state) : q(state.q), qdiff(state.q), state(state.clone()){}
+    _MutableData(const StateDerived& state) : q(state.vector()), qdiff(state.vector()), state(static_cast<StateDerived*>(state.clone())){}
 
-    _MutableData(const _MutableData<T, N>& other): q(other.q), qdiff(other.qdiff){
-        state = other.state.clone();
+    _MutableData(const _MutableData<T, N, StateDerived>& other): q(other.q), qdiff(other.qdiff){
+        state = static_cast<StateDerived*>(other.state->clone());
     }
 
-    _MutableData(_MutableData<T, N>&& other):q(std::move(other.q)), qdiff(std::move(other.qdiff)), state(other.state){
+    _MutableData(_MutableData<T, N, StateDerived>&& other):q(std::move(other.q)), qdiff(std::move(other.qdiff)), state(other.state){
         other.state = nullptr;
     }
 
@@ -392,7 +372,7 @@ struct _MutableData{
         state = nullptr;
     }
 
-    _MutableData<T, N>& operator=(const _MutableData<T, N>& other){
+    _MutableData<T, N, StateDerived>& operator=(const _MutableData<T, N, StateDerived>& other){
         if (&other == this) return *this;
         q = other.q;
         qdiff = other.qdiff;
@@ -406,12 +386,12 @@ struct _MutableData{
 
     vec<T, N> q;
     vec<T, N> qdiff;
-    State<T, N>* state=nullptr;
+    StateDerived* state=nullptr;
 };
 
 
 
-template<class T, int N>
+template<class STATE>
 class Checkpoint{
 
     //once the checkpoint has been initialized with a state,
@@ -420,15 +400,15 @@ class Checkpoint{
     //has to be created (which can safely be assigned to the original without internal object slicing.)
 
 public:
-    Checkpoint(const State<T, N>& state): _state(state.clone()){
+    Checkpoint(const STATE& state): _state(state.clone()){
         _is_set = true;
     }
 
-    Checkpoint(const Checkpoint<T, N>& other){
+    Checkpoint(const Checkpoint<STATE>& other){
         _copy_checkpoint(other);
     }
 
-    Checkpoint(Checkpoint<T, N>&& other) : _state(other._state){
+    Checkpoint(Checkpoint<STATE>&& other) : _state(other._state){
         other._state = nullptr;
     }
 
@@ -438,13 +418,13 @@ public:
         delete _state;
     }
 
-    Checkpoint<T, N>& operator=(const Checkpoint<T, N>& other){
+    Checkpoint<STATE>& operator=(const Checkpoint<STATE>& other){
         if (&other == this) return *this;
         _copy_checkpoint(other);
         return *this;
     }
 
-    const State<T, N>& state()const{
+    const STATE& state()const{
 
         if (!is_set()){
             throw std::runtime_error("Checkpoint has not been set.");
@@ -456,16 +436,16 @@ public:
         return _is_set;
     }
 
-    void set(const State<T, N>& state){
+    void set(const STATE& state){
         if (_state == nullptr){
-            _state = state.clone();
+            _state = new STATE(state);
         }
         else{
-            _state->assign(state);
+            *_state = state;
         }
         _is_set = true;
     }
-
+    
     inline void remove(){
         _is_set = false;
     }
@@ -474,14 +454,14 @@ public:
 
 private:
 
-    State<T, N>* _state = nullptr;
+    STATE* _state = nullptr;
     bool _is_set = false;
 
-    void _copy_checkpoint(const Checkpoint<T, N>& other){
+    void _copy_checkpoint(const Checkpoint<STATE>& other){
         delete _state;
         _state = nullptr;
         if (other._state != nullptr){
-            _state = other._state->clone();
+            _state = new STATE(*other._state);
         }
 
         _is_set = other._is_set;

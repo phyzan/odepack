@@ -329,14 +329,16 @@ class PyVarODE : public PyODE<T, N>{
 public:
 
     PyVarODE(const py::object& f, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const py::object& events, py::object mask, py::str save_dir, const bool& save_events_only):PyODE<T, N>(){
-        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), to_Func<T, N>(f, shape(q0), args), t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), save_dir.cast<std::string>(), save_events_only);
-        this->ode = new VariationalODE<T, N>(*solver, period);
+        
+        vec<T, N> q0_ = toCPP_Array<T, vec<T, N>>(q0);
+        std::vector<T> args_ = toCPP_Array<T, std::vector<T>>(args);
+        this->ode = new VariationalODE<T, N>(to_Func<T, N>(f, shape(q0), args), t0, q0_, period, rtol, atol, min_step, max_step, first_step, args_, method.cast<std::string>(), to_Events<T, N>(events, shape(q0), args), to_Func<T, N>(mask, shape(q0), args), save_dir.cast<std::string>(), save_events_only);
         this->q0_shape = shape(q0);
     }
 
     PyVarODE(const PyFuncWrapper<T, N>& func_wrap, const T t0, const py::object& q0, const T& period, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const py::str method, const PyEventWrapper<T, N>* ev_wrap, py::str save_dir, const bool save_events_only):PyODE<T, N>(){
-        std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), func_wrap.rhs, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, save_dir.cast<std::string>(), save_events_only);
-        this->ode = new VariationalODE<T, N>(*solver, period);
+
+        this->ode = new VariationalODE<T, N>(func_wrap.rhs, t0, toCPP_Array<T, vec<T, N>>(q0), period, rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), method, ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)), nullptr, save_dir.cast<std::string>(), save_events_only);
         this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
         this->_assert_sizes(func_wrap, ev_wrap);
     }
