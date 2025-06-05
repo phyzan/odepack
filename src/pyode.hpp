@@ -723,21 +723,21 @@ void define_ode_module(py::module& m) {
             return self.call(t, q, toCPP_Array<T, std::vector<T>>(py_args));
         }, py::arg("t"), py::arg("q"));
 
-    m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, const py::dict& event_options, const int& threads, const int& max_prints){
+    m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, const py::dict& event_options, const int& threads, const bool& display_progress){
             std::vector<ODE<T, N>*> array;
             for (const py::handle& item : list) {
                 array.push_back(item.cast<PyODE<T, N>&>().ode);
             }
-            integrate_all(array, interval, max_frames, to_Options(event_options), threads, max_prints);
-        }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::dict(), py::arg("threads")=-1, py::arg("max_prints")=0);
+            integrate_all(array, interval, max_frames, to_Options(event_options), threads, display_progress);
+        }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::dict(), py::arg("threads")=-1, py::arg("display_progress")=false);
     
-    m.def("var_integrate_all", [](py::object list, const T& interval, const T& lyap_period, const int& threads=-1, const int& max_prints = 0){
+    m.def("var_integrate_all", [](py::object list, const T& interval, const T& lyap_period, const int& threads, const bool& display_progress){
         std::vector<VariationalODE<T, N>*> array;
         for (const py::handle& item : list) {
             array.push_back(&item.cast<PyVarODE<T, N>&>().varode());
         }
-        var_integrate_all(array, interval, lyap_period, threads, max_prints);
-    }, py::arg("varode_array"), py::arg("interval"), py::arg("lyap_period"), py::arg("threads")=-1, py::arg("max_prints")=0);
+        var_integrate_all(array, interval, lyap_period, threads, display_progress);
+    }, py::arg("varode_array"), py::arg("interval"), py::arg("lyap_period"), py::arg("threads")=-1, py::arg("display_progress")=false);
 }
 
 #endif

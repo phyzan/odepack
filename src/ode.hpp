@@ -4,7 +4,6 @@
 #include <variant>
 #include <span>
 #include <unordered_map>
-#include <chrono>
 #include <omp.h>
 #include "solvers.hpp"
 
@@ -253,12 +252,23 @@ private:
 };
 
 template<class T, int N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const int& max_prints = 0){
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const bool& display_progress){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = list.size();
+    Clock clock;
+    clock.start();
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (ODE<T, N>* ode : list){
-        ode->integrate(interval, max_frames, event_options, max_prints);
+        ode->integrate(interval, max_frames, event_options);
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
     }
+    std::cout << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
 
@@ -278,7 +288,7 @@ const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_fra
 
 template<class T, int N>
 const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
-    auto t1 = std::chrono::high_resolution_clock::now();
+    TimePoint t1 = now();
     const T t0 = _solver->t();
     const T interval = t-t0;
     const size_t Nt = _t_arr.size();
@@ -331,10 +341,9 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     if (max_prints > 0){
         std::cout << std::endl;
     }
-    auto t2 = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> rt = t2-t1;
+    TimePoint t2 = now();
 
-    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), rt.count(), _solver->message()};
+    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), timeit(t1, t2), _solver->message()};
 
     _runtime += res.runtime;
     _solver->release_file();

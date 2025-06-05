@@ -579,7 +579,6 @@ OdeSolver<T, N>::OdeSolver(SOLVER_CONSTRUCTOR(T, N)): ERR_EST_ORDER(err_est_ord)
     //any "history" data in any implicit solvers will be overwritten anyway when a tmax goal is set,
     //because the direcion has been set to 0, so all that matters now is t0, q0, habs.
     _initial_state = initial_state;
-    _initial_state->resize_step(1, min_step, max_step);
     _state = _initial_state->clone();
     _old_state = initial_state->clone();
     _q_exposed = &(_state->vector());
@@ -682,8 +681,7 @@ bool DerivedSolver<T, N, StateDerived>::_adapt_to_event(Event<T, N>& event){
         else if ( _checkpoint.is_set() && event.has_mask()){
             _checkpoint.remove();
         }
-        _partially_advance_to(event.data().t()); //_state advances, not old state
-        _state_ptr()->_q = event.data().q_true();
+        this->_state->assign(event.data().t(), event.data().q_true());
         if (event.hide_mask()){
             this->_q_exposed = &event.data().q();
         }

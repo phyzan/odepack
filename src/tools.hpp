@@ -8,7 +8,7 @@
 #include <eigen3/Eigen/Dense>
 #include <eigen3/unsupported/Eigen/MPRealSupport>
 #include <fstream>
-
+#include <chrono>
 
 // USEFUL ALIASES
 
@@ -45,6 +45,17 @@ template<class T>
 using complex = std::complex<T>;
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
+
+using TimePoint = std::chrono::_V2::system_clock::time_point;
+
+TimePoint now(){
+    return std::chrono::high_resolution_clock::now();
+}
+
+double timeit(const TimePoint& t1, const TimePoint& t2){
+    std::chrono::duration<double> duration = t2-t1;
+    return duration.count();
+}
 
 template <typename T>
 constexpr T inf() {
@@ -177,6 +188,44 @@ void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t&
         }
         r[i*n+j] = _sum*factor;
     }
+}
+
+
+std::string format_duration(const double& t){
+    int h = t/3600;
+    int m = (t - h*3600)/60;
+    int s = (t - h*3600 - m*60);
+
+    return std::to_string(h) + " h, " + std::to_string(m) + " m, " + std::to_string(s) + " s";  
+}
+
+
+class Clock{
+
+public:
+
+    Clock(){}
+
+    void start(){
+        _start = now();
+    }
+
+    double seconds() const{
+        return timeit(_start, now());
+    }
+
+    std::string message() const{
+        return format_duration(seconds());     
+    }
+
+private:
+
+    TimePoint _start;
+};
+
+
+void show_progress(const int& n, const int& target, const Clock& clock){
+    std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << format_duration(target*clock.seconds()/n) << std::flush;
 }
 
 

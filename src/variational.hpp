@@ -108,7 +108,8 @@ public:
     }
 
     OdeResult<T, N> var_integrate(const T& interval, const T& lyap_period, const int& max_prints=0){
-        auto t1 = std::chrono::high_resolution_clock::now();
+        TimePoint t1 = now();
+        TimePoint t2;
         const size_t Nt = this->_t_arr.size();
         T t_total = 0;
         T t0 = this->_solver->t();
@@ -125,11 +126,9 @@ public:
                 }
             }
         }
-        auto t2 = std::chrono::high_resolution_clock::now();
-    
-        std::chrono::duration<double> rt = t2-t1;
+        t2 = now();
 
-        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), rt.count(), this->_solver->message()};
+        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), timeit(t1, t2), this->_solver->message()};
         return res;
     }
 
@@ -184,12 +183,23 @@ private:
 
 
 template<class T, int N>
-void var_integrate_all(const std::vector<VariationalODE<T, N>*>& list, const T& interval, const T& lyap_period, const int& threads=-1, const int& max_prints = 0){
+void var_integrate_all(const std::vector<VariationalODE<T, N>*>& list, const T& interval, const T& lyap_period, const int& threads=-1, const bool& display_progress = false){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    int target = list.size();
+    Clock clock;
+    clock.start();
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (VariationalODE<T, N>* ode : list){
-        ode->var_integrate(interval, lyap_period, max_prints);
+        ode->var_integrate(interval, lyap_period);
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
     }
+    std::cout << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
 

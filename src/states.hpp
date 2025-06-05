@@ -40,6 +40,12 @@ public:
         _q = mask(_t, _q, args);
     }
 
+    virtual void assign(const T& t, const vec<T, N>& q){
+        //ideally should also assign a new error
+        _t = t;
+        _q = q;
+    }
+
     virtual ~State(){}
 
 
