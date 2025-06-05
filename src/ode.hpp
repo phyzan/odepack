@@ -252,7 +252,7 @@ private:
 };
 
 template<class T, int N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const bool& display_progress){
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const bool& display_progress=false){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
     int tot = 0;
     const int target = list.size();
