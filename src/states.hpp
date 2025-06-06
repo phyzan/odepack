@@ -14,8 +14,8 @@ public:
     
     virtual void adjust(const T& h_abs, const T& dir, const vec<T, N>& diff);
 
-    virtual bool resize_step(const T& factor, const T& min_step=0, const T& max_step=inf<T>()){
-        return _validate_step_resize(_habs, factor, min_step, max_step);
+    virtual bool resize_step(T& factor, const T& min_step=0, const T& max_step=inf<T>()){
+        return _validate_step_resize(factor, min_step, max_step);
     }
 
     inline T h() const;
@@ -36,14 +36,12 @@ public:
         return _error.cwiseAbs(); //might need to be divided by sqrt(vector size)
     }
 
-    inline virtual void apply_mask(const Func<T, N>& mask, const std::vector<T>& args){
-        _q = mask(_t, _q, args);
-    }
-
-    virtual void assign(const T& t, const vec<T, N>& q){
+    virtual void assign(const T& t, const vec<T, N>& q, const T& habs, const T& dir, const vec<T, N>& diff){
         //ideally should also assign a new error
         _t = t;
         _q = q;
+        _habs = habs;
+        set_direction(dir);
     }
 
     virtual ~State(){}
@@ -57,7 +55,7 @@ protected:
 
     State<T, N>& operator=(const State<T, N>& other) = default;
 
-    bool _validate_step_resize(T& new_habs, const T& factor, const T& min_step, const T& max_step);
+    bool _validate_step_resize(T& factor, const T& min_step, const T& max_step);
 
     T _t; //current time
     vec<T, N> _q; //current vector
@@ -132,16 +130,18 @@ inline const vec<T, N>& State<T, N>::vector()const{
 
 
 template<class T, int N>
-bool State<T, N>::_validate_step_resize(T& new_habs, const T& factor, const T& min_step, const T& max_step){
+bool State<T, N>::_validate_step_resize(T& factor, const T& min_step, const T& max_step){
     bool res = false;
     if (_habs*factor < min_step){
-        new_habs = min_step;
+        factor = min_step/_habs;
+        _habs = min_step;
     }
     else if (_habs*factor > max_step){
-        new_habs = max_step;
+        factor = max_step/_habs;
+        _habs = max_step;
     }
     else{
-        new_habs *= factor;
+        _habs *= factor;
         res = true;
     }
     return res;

@@ -681,7 +681,8 @@ bool DerivedSolver<T, N, StateDerived>::_adapt_to_event(Event<T, N>& event){
         else if ( _checkpoint.is_set() && event.has_mask()){
             _checkpoint.remove();
         }
-        this->_state->assign(event.data().t(), event.data().q_true());
+        this->_rhs(this->_mut.qdiff, event.data().t(), event.data().q_true()); //TODO: remove in case the specific derived state does not require it.
+        this->_state->assign(event.data().t(), event.data().q_true(), this->_state->habs(), this->_state->direction(), this->_mut.qdiff);
         if (event.hide_mask()){
             this->_q_exposed = &event.data().q();
         }
@@ -764,7 +765,8 @@ bool DerivedSolver<T, N, StateDerived>::_validate_state(){
     this->_N++;
 
     if (this->_mask != nullptr){
-        this->_state->apply_mask(this->_mask, this->_args);
+        this->_rhs(this->_mut.qdiff, this->t(), this->q_true());
+        this->_state->assign(this->t(), this->_mask(this->t(), this->q_true(), this->_args), this->_state->habs(), this->_state->direction(), this->_mut.qdiff);
     }
 
     if (this->_autosave && success){

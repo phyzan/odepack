@@ -268,7 +268,7 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
             }
         }
     }
-    std::cout << "Parallel integration completed in: " << clock.message() << std::endl;
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
 

@@ -199,7 +199,7 @@ void var_integrate_all(const std::vector<VariationalODE<T, N>*>& list, const T& 
             }
         }
     }
-    std::cout << "Parallel integration completed in: " << clock.message() << std::endl;
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
 
