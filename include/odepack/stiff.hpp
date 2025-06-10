@@ -11,7 +11,7 @@ using LUResult = Eigen::PartialPivLU<JacMat<T, N>>;
 
 template<typename T, int N>
 LUResult<T, N> lu(const JacMat<T, N>& A) {
-    return LUResult(A);
+    return LUResult<T, N>(A);
 }
 
 // Solving Ax = b using LU decomposition
@@ -35,9 +35,8 @@ vec<T, N> cumsum(const vec<T, N>& x){
 }
 
 template<typename T>
-Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
-compute_R(const int& order, const T& factor) {
-    using MatrixXT = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+Eigen::Matrix<T, -1, -1> compute_R(const int& order, const T& factor) {
+    using MatrixXT = Eigen::Matrix<T, -1, -1>;
 
     MatrixXT M = MatrixXT::Zero(order + 1, order + 1);
 
@@ -144,7 +143,7 @@ public:
         Base::adjust(h_abs, dir, diff);
         D.setZero();
         D.col(0) = this->_q;
-        D.col(1) = h_abs*this->_direction*diff; //dq
+        D.col(1) = this->h()*diff; //dq
         n_eq_steps = 0;
         order = 1;
         lu = false;

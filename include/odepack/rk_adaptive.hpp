@@ -73,7 +73,7 @@ class RungeKutta : public DerivedSolver<T, N, RKDerived, RKState<T, N, Nstages, 
 
 public:
 
-    static const int ERR_EST_ORDER = RKDerived::ERR_EST_ORDER;
+    static constexpr int ERR_EST_ORDER = RKDerived::ERR_EST_ORDER;
     static const T ERR_EXP;
 
     using OdsBase = DerivedSolver<T, N, RKDerived, STATE>;
@@ -190,7 +190,7 @@ class RK45 : public RungeKutta<RK45<T, N>, T, N, 6, 5>{
 
 public:
 
-    static const int ERR_EST_ORDER = 4;
+    static constexpr int ERR_EST_ORDER = 4;
 
     RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK45", ARGS){}
     
@@ -254,7 +254,7 @@ class RK23 : public RungeKutta<RK23<T, N>, T, N, 3, 3> {
     
 public:
 
-    static const int ERR_EST_ORDER = 2;
+    static constexpr int ERR_EST_ORDER = 2;
 
     RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK23", ARGS){}
 

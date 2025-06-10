@@ -53,7 +53,7 @@ inline TimePoint now(){
     return std::chrono::high_resolution_clock::now();
 }
 
-inline double timeit(const TimePoint& t1, const TimePoint& t2){
+inline double as_duration(const TimePoint& t1, const TimePoint& t2){
     std::chrono::duration<double> duration = t2-t1;
     return duration.count();
 }
@@ -216,7 +216,7 @@ public:
     }
 
     inline double seconds() const{
-        return timeit(_start, now());
+        return as_duration(_start, now());
     }
 
     inline std::string message() const{
@@ -241,17 +241,17 @@ struct Functor{
 
     Functor(const Fvoid<T, N, VecLike>& f):func(f){}
 
-    Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+    Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
     Functor(const Fvoidptr<T, N, VecLike>& f):func(f){}
 
-    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
-    inline void operator()(VecLike<T, N>& result, const T& t, const VecLike<T, N>& q, const std::vector<T>& args)const{
+    inline void operator()(VecLike<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
         func(result, t, q, args);
     }
 
-    inline VecLike<T, N> operator()(const T& t, const VecLike<T, N>& q, const std::vector<T>& args)const{
+    inline VecLike<T, N> operator()(const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
         VecLike<T, N> res(q.size());
         func(res, t, q, args);
         return res;
@@ -263,7 +263,7 @@ struct Functor{
     }
 
     Functor<T, N, VecLike>& operator=(const Func<T, N, VecLike>& f){
-        func = [f](VecLike<T, N>& res, const T& t, const VecLike<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
+        func = [f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
         return *this;
     }
 

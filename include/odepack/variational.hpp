@@ -127,7 +127,7 @@ public:
         }
         t2 = now();
 
-        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), timeit(t1, t2), this->_solver->message()};
+        OdeResult<T, N> res = {subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), as_duration(t1, t2), this->_solver->message()};
         return res;
     }
 

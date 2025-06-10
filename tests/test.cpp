@@ -1,6 +1,6 @@
 #include "../include/odepack/variational.hpp"
 
-const int N = -1;
+const int N = 4;
 using T = double;
 using Ty = vec<T, N>;
 
@@ -11,14 +11,14 @@ void f(Ty& df, const T& t, const Ty& q, const std::vector<T>& args){
     df[3] = -q[1];
 }
 
-void jacm (JacMat<T, N>& j, const T& t, const Ty& q, const std::vector<T>& args){
-    JacMat<T, N> J(4, 4);
-    J <<  0.0,  0.0,  1.0,  0.0,
-          0.0,  0.0,  0.0,  1.0,
-         -1.0,  0.0,  0.0,  0.0,
-          0.0, -1.0,  0.0,  0.0;
-    j=J;
-}
+// void jacm (JacMat<T, N>& j, const T& t, const Ty& q, const std::vector<T>& args){
+//     JacMat<T, N> J(4, 4);
+//     J <<  0.0,  0.0,  1.0,  0.0,
+//           0.0,  0.0,  0.0,  1.0,
+//          -1.0,  0.0,  0.0,  0.0,
+//           0.0, -1.0,  0.0,  0.0;
+//     j=J;
+// }
 
 T ps_func(const T& t, const Ty& q, const std::vector<T>& args){
     return q[1];
@@ -45,13 +45,14 @@ int main(){
     T max_step = 100;
 
     // T tmax = 10001*pi/2;
-    T tmax = 1;
+    T tmax = 10000.1;
 
-    PreciseEvent<T, N> ps("Poincare Section", ps_func);
-    PeriodicEvent<T, N> ev2("periodic", 1, 0.998);
+    PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
+    PeriodicEvent<T, N> ev2("periodic", 1, 0.5);
 
-    VariationalODE<T, N> ode({f, jacm}, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {&ps}, "RK45");
-    ode.var_integrate(10000, 100).examine();
+    VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {&ps, &ev2}, "RK45");
+
+    ode.integrate(tmax, 100).examine();
     ode.state().show();
 
     //g++ -g -O3 -fopenmp -Wall -std=c++20 tests/test.cpp -o tests/test -lmpfr -lgmp

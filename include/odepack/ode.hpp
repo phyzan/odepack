@@ -321,13 +321,13 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
-                ++i;
+                i++;
                 _register_state();
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
                 ++frame_counter;
-                ++i;
+                i++;
             }
         }
         if (max_prints > 0){
@@ -348,7 +348,7 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     }
     TimePoint t2 = now();
 
-    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), timeit(t1, t2), _solver->message()};
+    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message()};
 
     _runtime += res.runtime;
     return res;
