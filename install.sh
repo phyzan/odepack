@@ -6,10 +6,8 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 mkdir -p "$DEST_DIR"
-cp src/*.hpp "$DEST_DIR"
+cp include/odepack/*.hpp "$DEST_DIR"
 echo "Installation complete. The header files are now located in $DEST_DIR"
 
 cd ..
 rm -rf "odepack"
-
-echo "The git cloned directory 'odepack' has been removed."

@@ -9,7 +9,7 @@
                 "-std=c++20",
                 "-O3",
                 "-fopenmp",
-                "-I/usr/local/lib",
+                "-I/usr/include",
                 "-Wall",
                 "-fPIC",
                 "-g",
