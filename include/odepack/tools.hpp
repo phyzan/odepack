@@ -47,7 +47,7 @@ using complex = std::complex<T>;
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag;
 
-using TimePoint = std::chrono::_V2::system_clock::time_point;
+using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
 inline TimePoint now(){
     return std::chrono::high_resolution_clock::now();
