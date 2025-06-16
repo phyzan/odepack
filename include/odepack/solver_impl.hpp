@@ -35,6 +35,8 @@ public:
 
     DerivedSolver() = delete;
 
+    ~DerivedSolver();
+
     OdeRhs<T, N>                 ode_rhs() const override;
     const T&                     t() const final;
     const vec<T, N>&             q() const final;
@@ -258,7 +260,10 @@ DerivedSolver<T, N, Derived, STATE>& DerivedSolver<T, N, Derived, STATE>::operat
 
 
 
-
+template<typename T, int N, class Derived, class STATE>
+DerivedSolver<T, N, Derived, STATE>::~DerivedSolver() {
+    _clear_states();
+}
 
 
 
