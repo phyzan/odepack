@@ -24,76 +24,64 @@ class Event{
 
 public:
 
-    virtual bool determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) = 0;
+    virtual bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) = 0;
 
-    virtual bool is_stop_event() const {return false;}
+    virtual bool                    is_stop_event() const;
 
-    virtual bool is_leathal() const { return false;}
+    virtual bool                    is_leathal() const;
 
-    virtual bool check(const T& t, const vec<T, N>& q) const {return (_check_if == nullptr) ? true : _check_if(t, q, _args);}
+    virtual bool                    check(const T& t, const vec<T, N>& q) const;
 
-    virtual void go_back();
+    virtual void                    go_back();
 
-    inline void set_args(const std::vector<T>& args){ _args = args;}
+    inline void                     set_args(const std::vector<T>& args);
 
-    virtual Event<T, N>* clone() const = 0;
+    virtual Event<T, N>*            clone() const = 0;
 
-    const ViewState<T, N>& state() const;
+    const ViewState<T, N>&          state() const;
 
-    inline const std::string& name()const{ return _name;}
+    inline const std::string&       name() const;
 
-    inline const bool& hide_mask()const{ return _hide_mask;}
+    virtual bool                    allows_checkpoint() const;
 
-    inline bool has_mask()const{ return _mask != nullptr;}
+    inline const size_t&            counter() const;
 
-    virtual bool allows_checkpoint() const{ return !has_mask(); }
+    virtual bool                    is_precise() const = 0;
 
-    inline const size_t& counter() const{ return _counter; }
+    inline const std::vector<T>&    args() const;
 
-    virtual bool is_precise() const = 0;
+    inline void                     remove();
 
-    const std::vector<T> args() const{
-        return _args;
-    }
-
-    void remove(){
-        _is_determined = false;
-    }
-
-    virtual ~Event() = default;
+    virtual                         ~Event() = default;
 
 
 private:
 
-    std::string _name;
-    event_f<T, N> _when = nullptr;
-    is_event_f<T, N> _check_if = nullptr;
-    Functor<T, N> _mask = nullptr;
-    bool _hide_mask; // variable that is only used externally for odesolvers to determine when and whether to call q_event or q_masked.
-    size_t _counter = 0;
-    std::vector<T> _args = {};
-    ViewState<T, N> _state;
-    bool _is_determined = false;
+    std::string         _name;
+    event_f<T, N>       _when = nullptr;
+    is_event_f<T, N>    _check_if = nullptr;
+    Functor<T, N>       _mask = nullptr;
+    bool                _hide_mask;
+    size_t              _counter = 0;
+    std::vector<T>      _args = {};
+    ViewState<T, N>     _state;
+    bool                _is_determined = false;
 
 protected:
 
-    Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
-        if (name == ""){
-            throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
-        }
-    }
+    Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
 
     Event(const Event<T, N>& other) = default;
 
     Event(Event&& other) = default;
 
-    Event<T, N>& operator=(const Event<T, N>& other) = default;
+    Event<T, N>&    operator=(const Event<T, N>& other) = default;
 
-    Event<T, N>& operator=(Event<T, N>&& other) = default;
+    Event<T, N>&    operator=(Event<T, N>&& other) = default;
 
-    inline T obj_fun(const T& t, const vec<T, N>& q) const { return _when(t, q, _args); }
+    inline T        obj_fun(const T& t, const vec<T, N>& q) const;
 
-    void _set(const T& t, const vec<T, N>& q);
+    void            _set(const T& t, const vec<T, N>& q);
 
 };
 
@@ -101,6 +89,8 @@ template<typename T, int N>
 class PreciseEvent : public Event<T, N>{
 
 public:
+
+    PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
 
     PreciseEvent(const PreciseEvent<T, N>& other) = default;
 
@@ -110,15 +100,11 @@ public:
 
     PreciseEvent<T, N>& operator=(PreciseEvent<T, N>&& other) = default;
 
-    PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+    PreciseEvent<T, N>* clone() const override;
 
-    PreciseEvent<T, N>* clone() const override{
-        return new PreciseEvent<T, N>(*this);
-    }
+    bool                determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
 
-    bool determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
-
-    inline bool is_precise() const final { return true;}
+    inline bool         is_precise() const final;
 
 private:
 
@@ -132,11 +118,7 @@ class PeriodicEvent : public PreciseEvent<T, N>{
 
 public:
 
-    PeriodicEvent(const std::string& name, const T& period, const T& start=0, Functor<T, N> mask=nullptr, const bool& hide_mask=false): PreciseEvent<T, N>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
-        if (period <= 0){
-            throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
-        }
-    }
+    PeriodicEvent(const std::string& name, const T& period, const T& start=0, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
     PeriodicEvent(const PeriodicEvent<T, N>& other) = default;
 
@@ -146,13 +128,11 @@ public:
 
     PeriodicEvent<T, N>& operator=(PeriodicEvent<T, N>&& other) = default;
 
-    PeriodicEvent<T, N>* clone() const override{
-        return new PeriodicEvent<T, N>(*this);
-    }
+    PeriodicEvent<T, N>* clone() const override;
 
-    bool determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
+    bool                 determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
 
-    void go_back() override;
+    void                 go_back() override;
 
 protected:
     T _period;
@@ -171,7 +151,7 @@ class RoughEvent : public Event<T, N>{
 
 public:
 
-    RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false): Event<T, N>(name, when, check_if, mask, hide_mask){}
+    RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
     RoughEvent(const RoughEvent<T, N>& other) = default;
 
@@ -181,15 +161,13 @@ public:
 
     RoughEvent<T, N>& operator=(RoughEvent<T, N>&& other) = default;
 
-    RoughEvent<T, N>* clone() const override{
-        return new RoughEvent<T, N>(*this);
-    }
+    RoughEvent<T, N>* clone() const override;
 
-    bool determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) final ;
+    bool              determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) final ;
 
-    inline bool allows_checkpoint() const override {return false; }
+    inline bool       allows_checkpoint() const final;
 
-    inline bool is_precise() const final { return false;}
+    inline bool       is_precise() const final;
 
 };
 
@@ -219,6 +197,63 @@ public:
 
 
 //Event CLASS
+
+template<typename T, int N>
+Event<T, N>::Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
+    if (name == ""){
+        throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
+    }
+}
+
+template<typename T, int N>
+inline T Event<T, N>::obj_fun(const T& t, const vec<T, N>& q) const{ 
+    return _when(t, q, _args);
+}
+
+template<typename T, int N>
+bool Event<T, N>::is_stop_event() const{
+    return false;
+}
+
+template<typename T, int N>
+bool Event<T, N>::is_leathal() const{
+    return false;
+}
+
+template<typename T, int N>
+bool Event<T, N>::check(const T& t, const vec<T, N>& q) const {
+    return (_check_if == nullptr) ? true : _check_if(t, q, _args);
+}
+
+template<typename T, int N>
+void Event<T, N>::set_args(const std::vector<T>& args){
+    _args = args;
+}
+
+template<typename T, int N>
+inline const std::string& Event<T, N>::name()const{
+    return _name;
+}
+
+template<typename T, int N>
+bool Event<T, N>::allows_checkpoint() const{
+    return _mask == nullptr; 
+}
+
+template<typename T, int N>
+inline const size_t& Event<T, N>::counter()const{
+    return _counter;
+}
+
+template<typename T, int N>
+inline const std::vector<T>& Event<T, N>::args()const{
+    return _args;
+}
+
+template<typename T, int N>
+inline void Event<T, N>::remove(){
+    _is_determined = false;
+}
 
 template<typename T, int N>
 void Event<T, N>::go_back(){
@@ -278,10 +313,29 @@ bool PreciseEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2
 
 }
 
+template<typename T, int N>
+PreciseEvent<T, N>* PreciseEvent<T, N>::clone() const{
+    return new PreciseEvent<T, N>(*this);
+}
 
+template<typename T, int N>
+inline bool PreciseEvent<T, N>::is_precise() const {
+    return true;
+}
 
 //PeriodicEvent CLASS
 
+template<typename T, int N>
+PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, const T& period, const T& start, Functor<T, N> mask, const bool& hide_mask): PreciseEvent<T, N>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
+    if (period <= 0){
+        throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
+    }
+}
+
+template<typename T, int N>
+PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
+    return new PeriodicEvent<T, N>(*this);
+}
 
 template<typename T, int N>
 bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {
@@ -315,6 +369,25 @@ void PeriodicEvent<T, N>::go_back() {
 
 
 //RoughEvent CLASS
+
+template<typename T, int N>
+RoughEvent<T, N>::RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): Event<T, N>(name, when, check_if, mask, hide_mask){}
+
+template<typename T, int N>
+RoughEvent<T, N>* RoughEvent<T, N>::clone() const{
+    return new RoughEvent<T, N>(*this);
+}
+
+
+template<typename T, int N>
+inline bool RoughEvent<T, N>::allows_checkpoint() const {
+    return false;
+}
+
+template<typename T, int N>
+inline bool RoughEvent<T, N>::is_precise() const {
+    return false;
+}
 
 template<typename T, int N>
 bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {

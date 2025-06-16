@@ -779,11 +779,11 @@ void DerivedSolver<T, N, Derived, STATE>::_finalize_state(const State<T, N>& sta
     }
     else if (this->at_event()){
 
-        if (this->current_event().has_mask()){
+        if (!this->current_event().allows_checkpoint()){
             //make new start. Interpolating coefficients might not be valid until the next step.
             *_state = std::move(this->new_state(_true_state->t(), _true_state->vector(), _state->h()));
             _equiv_states = true;
-            //do not set _true_state = _state yet, because if the event has hide_mask(),
+            //do not set _true_state = _state yet, because if the event has a hidden mask,
             //the event state exposed vector will not be viewed.
         }
 
