@@ -145,6 +145,8 @@ protected:
 
     RungeKutta(SOLVER_CONSTRUCTOR(T, N)) : OdsBase(name, ARGS), A(RKDerived::Amatrix()), B(RKDerived::Bmatrix()), C(RKDerived::Cmatrix()), E(RKDerived::Ematrix()), _rk_mut(q0) {}
 
+    DEFAULT_RULE_OF_FOUR(RungeKutta);
+
 private:
 
     void _step_impl(STATE& result, const STATE& state, const T& h) const{
@@ -192,7 +194,11 @@ public:
 
     static constexpr int ERR_EST_ORDER = 4;
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK45", ARGS){}
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK45", ARGS){
+        this->_finalize(t0, q0, first_step);
+    }
+
+    DEFAULT_RULE_OF_FOUR(RK45);
     
     static typename RKbase::Atype Amatrix() {
         typename RKbase::Atype A;
@@ -256,7 +262,11 @@ public:
 
     static constexpr int ERR_EST_ORDER = 2;
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK23", ARGS){}
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : RKbase("RK23", ARGS){
+        this->_finalize(t0, q0, first_step);
+    }
+
+    DEFAULT_RULE_OF_FOUR(RK23);
 
     static typename RKbase::Atype Amatrix() {
         typename RKbase::Atype A;

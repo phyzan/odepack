@@ -13,6 +13,12 @@
 
 // USEFUL ALIASES
 
+#define DEFAULT_RULE_OF_FOUR(CLASSNAME)                  \
+    CLASSNAME(const CLASSNAME& other) = default;      \
+    CLASSNAME(CLASSNAME&& other) = default;           \
+    CLASSNAME& operator=(const CLASSNAME& other) = default; \
+    CLASSNAME& operator=(CLASSNAME&& other) = default;
+
 template<typename T, int N=-1>
 using vec = Eigen::Array<T, N, 1>;
 
@@ -286,13 +292,7 @@ struct OdeRhs{
     Functor<T, N> ode_rhs=nullptr;
     Jac<T, N> jacobian=nullptr;
 
-    OdeRhs(const OdeRhs& other) = default;
-
-    OdeRhs(OdeRhs&& other) = default;
-
-    OdeRhs& operator=(const OdeRhs& other) = default;
-
-    OdeRhs& operator=(OdeRhs&& other) = default;
+    DEFAULT_RULE_OF_FOUR(OdeRhs);
 
     template<class A>
     OdeRhs(const A& rhs) : ode_rhs(rhs), jacobian(nullptr){}

@@ -71,13 +71,7 @@ protected:
 
     Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
 
-    Event(const Event<T, N>& other) = default;
-
-    Event(Event&& other) = default;
-
-    Event<T, N>&    operator=(const Event<T, N>& other) = default;
-
-    Event<T, N>&    operator=(Event<T, N>&& other) = default;
+    DEFAULT_RULE_OF_FOUR(Event);
 
     inline T        obj_fun(const T& t, const vec<T, N>& q) const;
 
@@ -92,13 +86,7 @@ public:
 
     PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
 
-    PreciseEvent(const PreciseEvent<T, N>& other) = default;
-
-    PreciseEvent(PreciseEvent&& other) = default;
-
-    PreciseEvent<T, N>& operator=(const PreciseEvent<T, N>& other) = default;
-
-    PreciseEvent<T, N>& operator=(PreciseEvent<T, N>&& other) = default;
+    DEFAULT_RULE_OF_FOUR(PreciseEvent);
 
     PreciseEvent<T, N>* clone() const override;
 
@@ -120,13 +108,7 @@ public:
 
     PeriodicEvent(const std::string& name, const T& period, const T& start=0, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
-    PeriodicEvent(const PeriodicEvent<T, N>& other) = default;
-
-    PeriodicEvent(PeriodicEvent&& other) = default;
-
-    PeriodicEvent<T, N>& operator=(const PeriodicEvent<T, N>& other) = default;
-
-    PeriodicEvent<T, N>& operator=(PeriodicEvent<T, N>&& other) = default;
+    DEFAULT_RULE_OF_FOUR(PeriodicEvent);
 
     PeriodicEvent<T, N>* clone() const override;
 
@@ -153,13 +135,7 @@ public:
 
     RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
-    RoughEvent(const RoughEvent<T, N>& other) = default;
-
-    RoughEvent(RoughEvent&& other) = default;
-
-    RoughEvent<T, N>& operator=(const RoughEvent<T, N>& other) = default;
-
-    RoughEvent<T, N>& operator=(RoughEvent<T, N>&& other) = default;
+    DEFAULT_RULE_OF_FOUR(RoughEvent);
 
     RoughEvent<T, N>* clone() const override;
 

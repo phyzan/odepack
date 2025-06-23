@@ -162,23 +162,17 @@ public:
     }
 
     bool save_data(const std::string& filename) const{
-        if (typeid(T) != typeid(_q_arr[0][0])){
-            std::cerr << ".save_data() only works for system of odes that are expressed in a 1D array\n";
+        std::ofstream file(filename, std::ios::out);
+        if (!file){
+            std::cerr << "Could not open file:" << filename << "\n";
             return false;
         }
-        else{
-            std::ofstream file(filename, std::ios::out);
-            if (!file){
-                std::cerr << "Could not open file:" << filename << "\n";
-                return false;
-            }
 
-            for (size_t i = 0; i < _t_arr.size(); ++i) {
-                write_checkpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
-            }
-            file.close(); // Close the file
-            return true;
+        for (size_t i = 0; i < _t_arr.size(); ++i) {
+            write_checkpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
         }
+        file.close(); // Close the file
+        return true;
     }
 
     void clear(){

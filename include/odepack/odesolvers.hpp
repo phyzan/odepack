@@ -2,8 +2,8 @@
 #define ODESOLVERS_HPP
 
 #include <string>
-#include "events.hpp"
 #include <memory>
+#include "events.hpp"
 
 
 template<typename T, int N>
@@ -57,13 +57,7 @@ protected:
 
     OdeSolver() = default;
 
-    OdeSolver(const OdeSolver& other) = default;
-
-    OdeSolver(OdeSolver&& other) = default;
-
-    OdeSolver& operator=(const OdeSolver& other) = default;
-
-    OdeSolver& operator=(OdeSolver&& other) = default;
+    DEFAULT_RULE_OF_FOUR(OdeSolver);
 };
 
 

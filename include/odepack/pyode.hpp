@@ -358,13 +358,7 @@ public:
         this->q0_shape = {static_cast<size_t>(this->ode->q()[0].size())};
     }
 
-    PyVarODE(const PyVarODE& other) = default;
-
-    PyVarODE(PyVarODE&& other) = default;
-    
-    PyVarODE& operator=(const PyVarODE& other) = default;
-
-    PyVarODE& operator=(PyVarODE&& other) = default;
+    DEFAULT_RULE_OF_FOUR(PyVarODE);
 
 
     VariationalODE<T, N>& varode(){

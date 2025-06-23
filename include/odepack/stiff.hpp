@@ -224,6 +224,7 @@ public:
     static const int ERR_EST_ORDER = 1; //the actual order flactuates
 
     BDF(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.jacobian), _mut(q0){
+        this->_finalize(t0, q0, first_step);
         if (_jacobian == nullptr){
             throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
         }

@@ -49,13 +49,7 @@ protected:
 
     State() = default;
 
-    State(const State& other) = default;
-
-    State(State&& other) = default;
-
-    State& operator=(const State& other) = default;
-
-    State& operator=(State&& other) = default;
+    DEFAULT_RULE_OF_FOUR(State);
 
     T _t; //current time
     vec<T, N> _q; //current vector
@@ -95,13 +89,7 @@ protected:
 
     DerivedState(const T& t, const vec<T, N>& q, const T& h) : State<T, N>(t, q, h){}
     
-    DerivedState(const DerivedState& other) = default;
-
-    DerivedState(DerivedState&& other) = default;
-
-    DerivedState& operator=(const DerivedState& other) = default;
-
-    DerivedState& operator=(DerivedState&& other) = default;
+    DEFAULT_RULE_OF_FOUR(DerivedState);
     
     bool _validate_step_resize(T& factor, const T& min_step, const T& max_step);
 };

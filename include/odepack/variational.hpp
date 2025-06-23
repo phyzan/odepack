@@ -94,13 +94,7 @@ public:
         _ind = _position_of_main_event();
     }
 
-    VariationalODE(const VariationalODE& other) = default;
-
-    VariationalODE(VariationalODE&& other) = default;
-
-    VariationalODE<T, N>& operator=(const VariationalODE<T, N>& other) = default;
-
-    VariationalODE<T, N>& operator=(VariationalODE<T, N>&& other) = default;
+    DEFAULT_RULE_OF_FOUR(VariationalODE);
 
     ODE<T, N>* clone() const override{
         return new VariationalODE<T, N>(*this);

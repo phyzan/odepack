@@ -7,7 +7,6 @@
 #include <memory>
 #include "events.hpp"
 #include "odesolvers.hpp"
-#include "tools.hpp"
 #include "states.hpp"
 
 #define MAIN_DEFAULT_CONSTRUCTOR(T, N) const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const std::vector<Event<T, N>*> events={}
@@ -101,6 +100,8 @@ protected:
 
     const vec<T, N>&     _interp(const T& t, const State<T, N>& state1, const State<T, N>& state2) const;
 
+    void                 _finalize(const T& t0, const vec<T, N>& q0, T first_step);
+
 private:
 
     Event<T, N>& current_event();
@@ -188,26 +189,6 @@ DerivedSolver<T, N, Derived, STATE>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): Od
     }
 
     _events.set_args(args);
-
-    int dir = sgn(first_step);
-
-    if (first_step != 0){
-        first_step = choose_step(abs(first_step), _min_step, _max_step);
-    }
-    else{
-        const ICS<T, N> ics = {t0, q0};
-        first_step = this->auto_step(1, &ics);
-        dir = 1;
-    }
-    _direction = dir;
-    //now first_step and initial direction are both != 0.
-
-    _initial_state = new STATE(new_state(t0, q0, first_step*dir));
-    _state = new STATE(*_initial_state);
-    _old_state = new STATE(*_initial_state);
-    _aux_state = new STATE(*_initial_state);
-    _temp_state = new ViewState<T, N>(t0, q0);
-    _true_state = _state;
 
     _error.setZero();
 }
@@ -649,6 +630,29 @@ template<typename T, int N, class Derived, class STATE>
 const vec<T, N>& DerivedSolver<T, N, Derived, STATE>::_interp(const T& t, const State<T, N>& state1, const State<T, N>& state2) const{
     this->call_impl(_mut.q, t, state1, state2);
     return _mut.q;
+}
+
+
+template<typename T, int N, class Derived, class STATE>
+void DerivedSolver<T, N, Derived, STATE>::_finalize(const T& t0, const vec<T, N>& q0, T first_step){
+    int dir = sgn(first_step);
+
+    if (first_step != 0){
+        first_step = choose_step(abs(first_step), _min_step, _max_step);
+    }
+    else{
+        const ICS<T, N> ics = {t0, q0};
+        first_step = this->auto_step(1, &ics);
+        dir = 1;
+    }
+    _direction = dir;
+    //now first_step and initial direction are both != 0.
+    _initial_state = new STATE(new_state(t0, q0, first_step*dir));
+    _state = new STATE(*_initial_state);
+    _old_state = new STATE(*_initial_state);
+    _aux_state = new STATE(*_initial_state);
+    _temp_state = new ViewState<T, N>(t0, q0);
+    _true_state = _state;
 }
 
 
