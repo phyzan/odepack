@@ -19,36 +19,17 @@ class EventCounter{
 
 public:
 
-    EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0) {}
+    EventCounter(const std::vector<EventOptions>& options);
 
-    inline const int& operator[](const size_t& i) const{
-        return _counter[i];
-    }
+    inline const int& operator[](const size_t& i) const;
 
-    void count_it(const size_t& i){
-        if ((_counter[i] != _options[i].max_events) && _is_running){
-            _counter[i]++;
-            _total++;
-            if ((_counter[i] == _options[i].max_events) && _options[i].terminate){
-                _is_running = false;
-            }
-        }
-        else{
-            throw std::runtime_error("Cannot register more events");
-        }
-    }
+    void count_it(const size_t& i);
 
-    const bool& is_running()const{
-        return _is_running;
-    }
+    inline const bool& is_running()const;
 
-    inline bool can_fit(const size_t& event)const{
-        return (_counter[event] != _options[event].max_events) && _is_running;
-    }
+    inline bool can_fit(const size_t& event)const;
 
-    inline const size_t& total()const{
-        return _total;
-    }
+    inline const size_t& total()const;
 
 private:
 
@@ -65,132 +46,55 @@ class ODE{
 
 public:
 
-    ODE(const OdeSolver<T, N>& solver) : _Nevents(solver.events().size()){
-        _solver = solver.clone();
-        _register_state();
-    }
+    ODE(const OdeSolver<T, N>& solver);
 
-    ODE(ODE_CONSTRUCTOR(T, N)) : ODE(*get_solver(method, ARGS)){}
+    ODE(ODE_CONSTRUCTOR(T, N));
 
-    ODE(const ODE<T, N>& other){
-        _copy_data(other);
-    }
+    ODE(const ODE<T, N>& other);
 
-    ODE(ODE<T, N>&& other): _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_arr(std::move(other._q_arr)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
-        other._solver = nullptr;
-    }
+    ODE(ODE<T, N>&& other);
 
-    ODE<T, N>& operator=(const ODE<T, N>& other){
-        if (&other == this) return *this;
-        _copy_data(other);
-        return *this;
-    }
+    ODE<T, N>& operator=(const ODE<T, N>& other);
 
-    ODE<T, N>& operator=(ODE<T, N>&& other){
-        if (&other != this){
-            _solver = other._solver;
-            _t_arr = std::move(other._t_arr);
-            _q_arr = std::move(other._q_arr);
-            _Nevents = std::move(other._Nevents);
-            _runtime = std::move(other._runtime);
-            other._solver = nullptr;
-        }
-        return *this;
-    }
+    ODE<T, N>& operator=(ODE<T, N>&& other);
 
-    virtual ~ODE(){delete _solver;}
+    virtual ~ODE();
 
-    virtual ODE<T, N>* clone() const{
-        return new ODE<T, N>(*this);
-    }
+    virtual ODE<T, N>*                          clone() const;
 
-    const OdeResult<T, N> integrate(const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
+    const OdeResult<T, N>                       integrate(const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
 
-    const OdeResult<T, N> go_to(const T& t, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
+    const OdeResult<T, N>                       go_to(const T& t, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
 
-    const SolverState<T, N> state() const {return _solver->state();}
+    const SolverState<T, N>                     state() const;
 
-    bool free(){
-        return _solver->free();
-    }
+    bool                                        free();
 
-    bool resume(){
-        return _solver->resume();
-    }
+    bool                                        resume();
 
-    bool advance();
+    bool                                        advance();
 
-    std::map<std::string, std::vector<size_t>> event_map(const size_t& start_point=0) const{
-        std::map<std::string, std::vector<size_t>> res;
-        size_t index;
-        for (size_t i=0; i<_solver->events().size(); i++){
-            const Event<T, N>& ev = _solver->events()[i];
-            res[ev.name()] = {};
-            std::vector<size_t>& list = res[ev.name()];
-            for (size_t j=0; j<_Nevents[i].size(); j++){
-                index = _Nevents[i][j];
-                if (index >= start_point){
-                    list.push_back(index-start_point);
-                }
-            }
-        }
-        return res;
-    }
+    std::map<std::string, std::vector<size_t>>  event_map(const size_t& start_point=0) const;
 
-    std::vector<T> t_filtered(const std::string& event) const {
-        return _event_data(this->t(), this->event_map(), event);
-    }
+    std::vector<T>                              t_filtered(const std::string& event) const;
 
-    std::vector<vec<T, N>> q_filtered(const std::string& event) const {
-        return _event_data(this->q(), this->event_map(), event);
-    }
+    std::vector<vec<T, N>>                      q_filtered(const std::string& event) const;
 
-    bool diverges()const{
-        return _solver->diverges();
-    }
+    bool                                        diverges()const;
 
-    bool is_dead() const{
-        return _solver->is_dead();
-    }
+    bool                                        is_dead() const;
 
-    const std::vector<T>& t()const {return _t_arr;}
-    const std::vector<vec<T, N>>& q()const{return _q_arr;}
-    const double& runtime() const{return _runtime;}
+    const std::vector<T>&                       t()const;
 
-    const OdeSolver<T, N>& solver() const{
-        return *_solver;
-    }
+    const std::vector<vec<T, N>>&               q() const;
 
-    bool save_data(const std::string& filename) const{
-        std::ofstream file(filename, std::ios::out);
-        if (!file){
-            std::cerr << "Could not open file:" << filename << "\n";
-            return false;
-        }
+    const double&                               runtime() const;
 
-        for (size_t i = 0; i < _t_arr.size(); ++i) {
-            write_checkpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
-        }
-        file.close(); // Close the file
-        return true;
-    }
+    const OdeSolver<T, N>&                      solver() const;
 
-    void clear(){
-        T t = _t_arr[_t_arr.size()-1];
-        vec<T, N> q = _q_arr[_q_arr.size()-1];
-        _t_arr.clear();
-        _t_arr.shrink_to_fit();
-        _t_arr.push_back(t);
+    bool                                        save_data(const std::string& filename) const;
 
-        _q_arr.clear();
-        _q_arr.shrink_to_fit();
-        _q_arr.push_back(q);
-        
-        for (size_t i=0; i<_Nevents.size(); i++){
-            _Nevents[i].clear();
-            _Nevents[i].shrink_to_fit();
-        }
-    }
+    void                                        clear();
 
 protected:
 
@@ -201,75 +105,18 @@ protected:
     double _runtime = 0;
 
 
-    void _register_state(){
-        _t_arr.push_back(_solver->t());
-        _q_arr.push_back(_solver->q());
-    }
+    void _register_state();
 
 private:
-    void _copy_data(const ODE<T, N>& other){
-        delete _solver;
-        _solver = other._solver->clone();
-        _t_arr = other._t_arr;
-        _q_arr = other._q_arr;
-        _Nevents = other._Nevents;
-        _runtime = other._runtime;
-    }
 
-    std::vector<EventOptions> _validate_events(const std::vector<EventOptions>& options)const{
-        std::vector<EventOptions> res(_solver->events().size());
-        bool found;
-        for (size_t i=0; i< options.size(); i++) {
-            found = false;
-            for (size_t j=0; j<_solver->events().size(); j++){
-                if (_solver->events()[j].name() == options[i].name){
-                    found = true;
-                    break;
-                }
-            }
-            if (!found){
-                throw std::logic_error("Event name \""+options[i].name+"\" is invalid");
-            }
-        }
+    void                        _copy_data(const ODE<T, N>& other);
 
-        for (size_t i=0; i<_solver->events().size(); i++){
-            found = false;
-            for (size_t j=0; j<options.size(); j++){
-                if (options[j].name == _solver->events()[i].name()){
-                    found = true;
-                    res[i] = options[j];
-                    res[i].max_events = std::max(options[j].max_events, -1);
-                    break;
-                }
-            }
-            if (!found){
-                res[i] = {_solver->events()[i].name()};
-            }
-        }
-        return res;
-    }
+    std::vector<EventOptions>   _validate_events(const std::vector<EventOptions>& options)const;
 
 };
 
 template<typename T, int N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const bool& display_progress=false){
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    const int target = list.size();
-    Clock clock;
-    clock.start();
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (ODE<T, N>* ode : list){
-        ode->integrate(interval, max_frames, event_options);
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
-    }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
-}
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options ={}, const int& threads=-1, const bool& display_progress=false);
 
 
 
@@ -279,6 +126,101 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
 -----------------------------IMPLEMENTATIONS-------------------------------
 -----------------------------------------------------------------------
 */
+
+
+
+template<typename T, int N>
+EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0) {}
+
+
+template<typename T, int N>
+inline const int& EventCounter<T, N>::operator[](const size_t& i) const{
+    return _counter[i];
+}
+
+template<typename T, int N>
+void EventCounter<T, N>::count_it(const size_t& i){
+    if ((_counter[i] != _options[i].max_events) && _is_running){
+        _counter[i]++;
+        _total++;
+        if ((_counter[i] == _options[i].max_events) && _options[i].terminate){
+            _is_running = false;
+        }
+    }
+    else{
+        throw std::runtime_error("Cannot register more events");
+    }
+}
+
+template<typename T, int N>
+inline const bool& EventCounter<T, N>::is_running()const{
+    return _is_running;
+}
+
+template<typename T, int N>
+inline bool EventCounter<T, N>::can_fit(const size_t& event)const{
+    return (_counter[event] != _options[event].max_events) && _is_running;
+}
+
+
+template<typename T, int N>
+inline const size_t& EventCounter<T, N>::total()const{
+    return _total;
+}
+
+
+
+
+template<typename T, int N>
+ODE<T, N>::ODE(const OdeSolver<T, N>& solver) : _Nevents(solver.events().size()){
+    _solver = solver.clone();
+    _register_state();
+}
+
+template<typename T, int N>
+ODE<T, N>::ODE(const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events, std::string method) : ODE(*get_solver(method, ARGS)){}
+
+
+template<typename T, int N>
+ODE<T, N>::ODE(const ODE& other){
+    _copy_data(other);
+}
+
+template<typename T, int N>
+ODE<T, N>::ODE(ODE&& other): _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_arr(std::move(other._q_arr)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
+    other._solver = nullptr;
+}
+
+template<typename T, int N>
+ODE<T, N>& ODE<T, N>::operator=(const ODE<T, N>& other){
+    if (&other == this) return *this;
+    _copy_data(other);
+    return *this;
+}
+
+template<typename T, int N>
+ODE<T, N>& ODE<T, N>::operator=(ODE<T, N>&& other){
+    if (&other != this){
+        _solver = other._solver;
+        _t_arr = std::move(other._t_arr);
+        _q_arr = std::move(other._q_arr);
+        _Nevents = std::move(other._Nevents);
+        _runtime = std::move(other._runtime);
+        other._solver = nullptr;
+    }
+    return *this;
+}
+
+template<typename T, int N>
+ODE<T, N>::~ODE(){
+    delete _solver;
+}
+
+
+template<typename T, int N>
+ODE<T, N>* ODE<T, N>::clone() const{
+    return new ODE<T, N>(*this);
+}
 
 template<typename T, int N>
 const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
@@ -349,6 +291,21 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
 }
 
 template<typename T, int N>
+const SolverState<T, N> ODE<T, N>::state() const{
+    return _solver->state();
+}
+
+template<typename T, int N>
+bool ODE<T, N>::free(){
+    return _solver->free();
+}
+
+template<typename T, int N>
+bool ODE<T, N>::resume(){
+    return _solver->resume();
+}
+
+template<typename T, int N>
 bool ODE<T, N>::advance(){
     bool success = false;
     if (_solver->advance()){
@@ -361,6 +318,167 @@ bool ODE<T, N>::advance(){
     return success;
 }
 
+template<typename T, int N>
+std::map<std::string, std::vector<size_t>> ODE<T, N>::event_map(const size_t& start_point) const{
+    std::map<std::string, std::vector<size_t>> res;
+    size_t index;
+    for (size_t i=0; i<_solver->events().size(); i++){
+        const Event<T, N>& ev = _solver->events()[i];
+        res[ev.name()] = {};
+        std::vector<size_t>& list = res[ev.name()];
+        for (size_t j=0; j<_Nevents[i].size(); j++){
+            index = _Nevents[i][j];
+            if (index >= start_point){
+                list.push_back(index-start_point);
+            }
+        }
+    }
+    return res;
+}
+
+template<typename T, int N>
+std::vector<T> ODE<T, N>::t_filtered(const std::string& event) const {
+    return _event_data(this->t(), this->event_map(), event);
+}
+
+template<typename T, int N>
+std::vector<vec<T, N>> ODE<T, N>::q_filtered(const std::string& event) const {
+    return _event_data(this->q(), this->event_map(), event);
+}
+
+template<typename T, int N>
+bool ODE<T, N>::diverges() const{
+    return _solver->diverges();
+}
+
+template<typename T, int N>
+bool ODE<T, N>::is_dead() const{
+    return _solver->is_dead();
+}
+
+template<typename T, int N>
+const std::vector<T>& ODE<T, N>::t()const{
+    return _t_arr;
+}
+
+template<typename T, int N>
+const std::vector<vec<T, N>>& ODE<T, N>::q()const{
+    return _q_arr;
+}
+
+template<typename T, int N>
+const double& ODE<T, N>::runtime()const{
+    return _runtime;
+}
+
+template<typename T, int N>
+const OdeSolver<T, N>& ODE<T, N>::solver()const{
+    return *_solver;
+}
+
+template<typename T, int N>
+bool ODE<T, N>::save_data(const std::string& filename) const{
+    std::ofstream file(filename, std::ios::out);
+    if (!file){
+        std::cerr << "Could not open file:" << filename << "\n";
+        return false;
+    }
+
+    for (size_t i = 0; i < _t_arr.size(); ++i) {
+        write_checkpoint(file, _t_arr[i], _q_arr[i], _solver->current_event_index());
+    }
+    file.close(); // Close the file
+    return true;
+}
+
+template<typename T, int N>
+void ODE<T, N>::clear(){
+    T t = _t_arr[_t_arr.size()-1];
+    vec<T, N> q = _q_arr[_q_arr.size()-1];
+    _t_arr.clear();
+    _t_arr.shrink_to_fit();
+    _t_arr.push_back(t);
+
+    _q_arr.clear();
+    _q_arr.shrink_to_fit();
+    _q_arr.push_back(q);
+
+    for (size_t i=0; i<_Nevents.size(); i++){
+        _Nevents[i].clear();
+        _Nevents[i].shrink_to_fit();
+    }
+}
+
+template<typename T, int N>
+void ODE<T, N>::_register_state(){
+    _t_arr.push_back(_solver->t());
+    _q_arr.push_back(_solver->q());
+}
+
+template<typename T, int N>
+void ODE<T, N>::_copy_data(const ODE<T, N>& other){
+    delete _solver;
+    _solver = other._solver->clone();
+    _t_arr = other._t_arr;
+    _q_arr = other._q_arr;
+    _Nevents = other._Nevents;
+    _runtime = other._runtime;
+}
+
+template<typename T, int N>
+std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOptions>& options)const{
+    std::vector<EventOptions> res(_solver->events().size());
+    bool found;
+    for (size_t i=0; i< options.size(); i++) {
+        found = false;
+        for (size_t j=0; j<_solver->events().size(); j++){
+            if (_solver->events()[j].name() == options[i].name){
+                found = true;
+                break;
+            }
+        }
+        if (!found){
+            throw std::logic_error("Event name \""+options[i].name+"\" is invalid");
+        }
+    }
+
+    for (size_t i=0; i<_solver->events().size(); i++){
+        found = false;
+        for (size_t j=0; j<options.size(); j++){
+            if (options[j].name == _solver->events()[i].name()){
+                found = true;
+                res[i] = options[j];
+                res[i].max_events = std::max(options[j].max_events, -1);
+                break;
+            }
+        }
+        if (!found){
+            res[i] = {_solver->events()[i].name()};
+        }
+    }
+    return res;
+}
+
+
+template<typename T, int N>
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const int& max_frames, const std::vector<EventOptions>& event_options, const int& threads, const bool& display_progress){
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = list.size();
+    Clock clock;
+    clock.start();
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (ODE<T, N>* ode : list){
+        ode->integrate(interval, max_frames, event_options);
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
+    }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+}
 
 
 #endif

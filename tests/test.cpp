@@ -33,8 +33,6 @@ bool check(const T& t, const Ty& q, const std::vector<T>& args){
 }
 
 int main(){
-    T pi = 3.141592653589793238462;
-
     T t0 = 0;
     Ty q0(4);
     q0 << 1., 1., 2.3, 4.5;
@@ -44,16 +42,21 @@ int main(){
     T min_step = 0.;
     T max_step = 100;
 
-    // T tmax = 10001*pi/2;
-    T tmax = 10000.1;
+    T tmax = 10000;
 
     PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
     PeriodicEvent<T, N> ev2("periodic", 1, 0.5);
 
     VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
 
-    // ode.integrate(tmax, 100).examine();
-    // ode.state().show();
+    while (true){
+        std::cin.get();
+        ode.integrate(100, 100).examine();
+        ode.state().show();
+    }
+
+    ode.integrate(tmax, 100).examine();
+    ode.state().show();
 
     //g++ -g -O3 -fopenmp -Wall -std=c++20 tests/test.cpp -o tests/test -lmpfr -lgmp
 

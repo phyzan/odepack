@@ -397,11 +397,11 @@ T DerivedSolver<T, N, Derived, STATE>::auto_step(T direction, const ICS<T, N>* i
 
     T d0 = rms_norm((q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
-    if (d0 < 1e-5 || d1 < 1e-5){
-        h0 = 1e-6;
+    if (d0 * 100000 < 1 || d1 * 100000 < 1){
+        h0 = T(1)/1000000;
     }
     else{
-        h0 = 0.01*d0/d1;
+        h0 = d0/d1/100;
     }
 
     y1 = q+h0*dir*_dq;
@@ -410,7 +410,7 @@ T DerivedSolver<T, N, Derived, STATE>::auto_step(T direction, const ICS<T, N>* i
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
     if (d1 <= 1e-15 && d2 <= 1e-15){
-        h1 = std::max(T(1e-6), 1e-3*h0);
+        h1 = std::max(T(1)/1000000, h0/1000);
     }
     else{
         h1 = pow(100*std::max(d1, d2), -T(1)/T(Derived::ERR_EST_ORDER+1));
