@@ -40,6 +40,8 @@ private:
 };
 
 
+//TODO:  Add constructor for fixed step size case
+//Do that in VariationalODE too.
 
 template<typename T, int N>
 class ODE{

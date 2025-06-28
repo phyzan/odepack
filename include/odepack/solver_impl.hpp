@@ -9,15 +9,12 @@
 #include "odesolvers.hpp"
 #include "states.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const std::vector<Event<T, N>*> events={}
 
-#define SOLVER_CONSTRUCTOR(T, N) const std::string& name, const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<Event<T, N>*> events
+template<typename T, int N, class Derived, class STATE>
+class DerivedAdaptiveStepSolver;
 
-#define ODE_CONSTRUCTOR(T, N) MAIN_DEFAULT_CONSTRUCTOR(T, N), std::string method="RK45"
-
-#define ARGS rhs, t0, q0, rtol, atol, min_step, max_step, first_step, args, events
-
-#define PARTIAL_ARGS rhs, rtol, atol, min_step, max_step, args, events
+template<typename T, int N, class Derived, class STATE>
+class DerivedFixedStepSolver;
 
 
 template<typename T, int N, class Derived, class STATE>
@@ -26,11 +23,13 @@ class DerivedSolver : public OdeSolver<T, N>{
     using Solver = DerivedSolver<T, N, Derived, STATE>;
     using UniqueClone = std::unique_ptr<OdeSolver<T, N>>;
 
-public:
+    template<typename A, int B, class C, class D>
+    friend class DerivedAdaptiveStepSolver;
 
-    static const T MAX_FACTOR;
-    static const T SAFETY;
-    static const T MIN_FACTOR;
+    template<typename A, int B, class C, class D>
+    friend class DerivedFixedStepSolver;
+
+public:
 
     DerivedSolver() = delete;
 
@@ -43,16 +42,11 @@ public:
     const T&                     stepsize() const final;
     const T&                     tmax() const final;
     const int&                   direction() const final;
-    const T&                     rtol() const final;
-    const T&                     atol() const final;
-    const T&                     min_step() const final;
-    const T&                     max_step() const final;
     const std::vector<T>&        args() const final;
     const size_t&                Nsys() const final;
     const bool&                  diverges() const final;
     const bool&                  is_running() const final;
     const bool&                  is_dead() const final;
-    const vec<T, N>&             error() const final;
     const std::string&           message() const final;
     const SolverState<T, N>      state() const final;
     const EventCollection<T, N>& events() const final;
@@ -61,7 +55,6 @@ public:
     const Event<T, N>&           current_event() const final;
     const int&                   current_event_index() const final;
     const std::string&           name() const final;
-    T                            auto_step(T direction=0, const ICS<T, N>* = nullptr) const final;
     OdeSolver<T, N>*             clone() const final;
     UniqueClone                  safe_clone() const final;
     UniqueClone                  with_new_events(const EventCollection<T, N>& events) const final;
@@ -74,15 +67,17 @@ public:
     bool                         resume() final;
     bool                         free() final;
 
+    void                         set_goal_impl(const T& tmax_new);//virtual
+
     STATE                        new_state(const T& t, const vec<T, N>& q, const T& h) const;//virtual
 
-    void                         adapt_impl(STATE& res, const STATE& state);//virtual
+    bool                         advance_impl();//virtual
 
     void                         call_impl(vec<T, N>& res, const T& t, const State<T, N>& state1, const State<T, N>& state2) const;//virtual
 
 protected:
 
-    DerivedSolver(SOLVER_CONSTRUCTOR(T, N));
+    DerivedSolver(const std::string& name, const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, const std::vector<T>& args, const std::vector<Event<T, N>*> events);
 
     DerivedSolver(const DerivedSolver& other);
 
@@ -130,10 +125,6 @@ private:
 
 
     Functor<T, N>              _ode_rhs;
-    T                          _rtol;
-    T                          _atol;
-    T                          _min_step;
-    T                          _max_step;
     std::vector<T>             _args;
     size_t                     _n; //size of ode system
     std::string                _name;
@@ -142,7 +133,6 @@ private:
     bool                       _is_running = true;
     bool                       _is_dead = false;
     size_t                     _N=0;//total number of solution updates
-    vec<T, N>                  _error;
     std::string                _message;
     EventCollection<T, N>      _events;
     int                        _current_event_index = -1;
@@ -173,30 +163,21 @@ private:
 
 
 template<typename T, int N, class Derived, class STATE>
-DerivedSolver<T, N, Derived, STATE>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events), _mut({q0, q0}){
+DerivedSolver<T, N, Derived, STATE>::DerivedSolver(const std::string& name, const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, const std::vector<T>& args, const std::vector<Event<T, N>*> events): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _args(args), _n(q0.size()), _name(name), _events(events), _mut({q0, q0}){
     std::unordered_set<std::string> seen;
     for (const Event<T, N>* ev : events) {
         if (!seen.insert(ev->name()).second) {
             throw std::runtime_error("Duplicate Event name not allowed: " + ev->name());
         }
     }
-    
-    if (_min_step < 0){
-        throw std::runtime_error("Minimum stepsize must be a non negative number");
-    }
-    if (_max_step < _min_step){
-        throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
-    }
 
     _events.set_args(args);
-
-    _error.setZero();
 }
 
 
 
 template<typename T, int N, class Derived, class STATE>
-DerivedSolver<T, N, Derived, STATE>::DerivedSolver(const DerivedSolver& other) : OdeSolver<T, N>(other), _ode_rhs(other._ode_rhs), _rtol(other._rtol), _atol(other._atol), _min_step(other._min_step), _max_step(other._max_step), _args(other._args), _n(other._n), _name(other._name), _tmax(other._tmax), _diverges(other._diverges), _is_running(other._is_running), _is_dead(other._is_dead), _N(other._N), _error(other._error), _message(other._message), _events(other._events), _current_event_index(other._current_event_index), _direction(other._direction), _mut(other._mut), _equiv_states(other._equiv_states){
+DerivedSolver<T, N, Derived, STATE>::DerivedSolver(const DerivedSolver& other) : OdeSolver<T, N>(other), _ode_rhs(other._ode_rhs), _args(other._args), _n(other._n), _name(other._name), _tmax(other._tmax), _diverges(other._diverges), _is_running(other._is_running), _is_dead(other._is_dead), _N(other._N), _message(other._message), _events(other._events), _current_event_index(other._current_event_index), _direction(other._direction), _mut(other._mut), _equiv_states(other._equiv_states){
     _initial_state = new STATE(*other._initial_state);
     _state = new STATE(*other._state);
     _old_state = new STATE(*other._old_state);
@@ -207,7 +188,7 @@ DerivedSolver<T, N, Derived, STATE>::DerivedSolver(const DerivedSolver& other) :
 
 
 template<typename T, int N, class Derived, class STATE>
-DerivedSolver<T, N, Derived, STATE>::DerivedSolver(DerivedSolver&& other) : OdeSolver<T, N>(std::move(other)), _ode_rhs(std::move(other._ode_rhs)), _rtol(std::move(other._rtol)), _atol(std::move(other._atol)), _min_step(std::move(other._min_step)), _max_step(std::move(other._max_step)), _args(std::move(other._args)), _n(std::move(other._n)), _name(std::move(other._name)), _tmax(std::move(other._tmax)), _diverges(std::move(other._diverges)), _is_running(std::move(other._is_running)), _is_dead(std::move(other._is_dead)), _N(std::move(other._N)), _error(std::move(other._error)), _message(std::move(other._message)), _events(std::move(other._events)), _current_event_index(std::move(other._current_event_index)), _direction(std::move(other._direction)), _mut(std::move(other._mut)), _initial_state(other._initial_state), _state(other._state), _old_state(other._old_state), _aux_state(other._aux_state), _temp_state(other._temp_state), _equiv_states(std::move(other._equiv_states)){
+DerivedSolver<T, N, Derived, STATE>::DerivedSolver(DerivedSolver&& other) : OdeSolver<T, N>(std::move(other)), _ode_rhs(std::move(other._ode_rhs)), _args(std::move(other._args)), _n(std::move(other._n)), _name(std::move(other._name)), _tmax(std::move(other._tmax)), _diverges(std::move(other._diverges)), _is_running(std::move(other._is_running)), _is_dead(std::move(other._is_dead)), _N(std::move(other._N)), _message(std::move(other._message)), _events(std::move(other._events)), _current_event_index(std::move(other._current_event_index)), _direction(std::move(other._direction)), _mut(std::move(other._mut)), _initial_state(other._initial_state), _state(other._state), _old_state(other._old_state), _aux_state(other._aux_state), _temp_state(other._temp_state), _equiv_states(std::move(other._equiv_states)){
     _find_true_state(other);
     other._initial_state = nullptr;
     other._state = nullptr;
@@ -284,26 +265,6 @@ inline const int& DerivedSolver<T, N, Derived, STATE>::direction() const {
 }
 
 template<typename T, int N, class Derived, class STATE>
-inline const T& DerivedSolver<T, N, Derived, STATE>::rtol() const {
-    return _rtol;
-}
-
-template<typename T, int N, class Derived, class STATE>
-inline const T& DerivedSolver<T, N, Derived, STATE>::atol() const {
-    return _atol;
-}
-
-template<typename T, int N, class Derived, class STATE>
-inline const T& DerivedSolver<T, N, Derived, STATE>::min_step() const {
-    return _min_step;
-}
-
-template<typename T, int N, class Derived, class STATE>
-inline const T& DerivedSolver<T, N, Derived, STATE>::max_step() const {
-    return _max_step;
-}
-
-template<typename T, int N, class Derived, class STATE>
 inline const std::vector<T>& DerivedSolver<T, N, Derived, STATE>::args() const {
     return _args;
 }
@@ -326,11 +287,6 @@ inline const bool& DerivedSolver<T, N, Derived, STATE>::is_running() const {
 template<typename T, int N, class Derived, class STATE>
 inline const bool& DerivedSolver<T, N, Derived, STATE>::is_dead() const {
     return _is_dead;
-}
-
-template<typename T, int N, class Derived, class STATE>
-inline const vec<T, N>& DerivedSolver<T, N, Derived, STATE>::error() const {
-    return _error;
 }
 
 template<typename T, int N, class Derived, class STATE>
@@ -380,48 +336,6 @@ inline const std::string& DerivedSolver<T, N, Derived, STATE>::name() const {
 
 
 template<typename T, int N, class Derived, class STATE>
-T DerivedSolver<T, N, Derived, STATE>::auto_step(T direction, const ICS<T, N>* ics)const{
-    //returns absolute value of emperically determined first step.
-    const int dir = (direction == 0) ? _state->direction() : ( (direction > 0) ? 1 : -1);
-    const T& t = (ics == nullptr) ? _state->t() : ics->t;
-    const vec<T, N>& q = (ics == nullptr) ? _state->vector() : ics->q;
-
-    if (dir == 0){
-        //needed even if the resulting stepsize will have a positive value.
-        throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
-    }
-    T h0, d2, h1;
-    vec<T, N> y1, f1;
-    vec<T, N> scale = _atol + q.cwiseAbs()*_rtol;
-    vec<T, N> _dq = this->_rhs(t, q);
-
-    T d0 = rms_norm((q/scale).eval());
-    T d1 = rms_norm((_dq/scale).eval());
-    if (d0 * 100000 < 1 || d1 * 100000 < 1){
-        h0 = T(1)/1000000;
-    }
-    else{
-        h0 = d0/d1/100;
-    }
-
-    y1 = q+h0*dir*_dq;
-    f1 = _rhs(t+h0*dir, y1);
-
-    d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
-    
-    if (d1 <= 1e-15 && d2 <= 1e-15){
-        h1 = std::max(T(1)/1000000, h0/1000);
-    }
-    else{
-        h1 = pow(100*std::max(d1, d2), -T(1)/T(Derived::ERR_EST_ORDER+1));
-    }
-
-    return std::max(std::min({100*h0, h1, this->_max_step}), this->_min_step);
-}
-
-
-
-template<typename T, int N, class Derived, class STATE>
 inline OdeSolver<T, N>* DerivedSolver<T, N, Derived, STATE>::clone()const{
     return new Derived(*static_cast<const Derived*>(this));
 }
@@ -449,35 +363,7 @@ inline Derived* DerivedSolver<T, N, Derived, STATE>::derived_clone()const{
 
 template<typename T, int N, class Derived, class STATE>
 bool DerivedSolver<T, N, Derived, STATE>::advance(){
-
-    if (this->_is_dead){
-        this->_warn_dead();
-        return false;
-    }
-    else if (!this->_is_running){
-        this->_warn_paused();
-        return false;
-    }
-
-
-    if (_equiv_states){
-        this->adapt_impl(*_aux_state, *_state); //only *_aux_state changed
-        if (_validate_it(*_aux_state)){
-            _register_states(); //now _old_state became _state, _state is updated, and _true_state points to _state
-            _finalize_state(*_old_state); //ONLY affects the _true_state pointer
-            this->_error += _true_state->local_error();
-        }
-        else{
-            return false;
-        }
-    }
-    else{
-        const State<T, N>* tmp = _true_state;
-        _true_state = _state; //temporarily set to the next naturally adapted state.
-        _equiv_states = true;
-        _finalize_state(*tmp);
-    }
-    return true;
+    return this->advance_impl();
 }
 
 
@@ -496,25 +382,7 @@ bool DerivedSolver<T, N, Derived, STATE>::set_goal(const T& t_max_new){
         return true;
     }
     else{
-        this->_tmax = t_max_new;
-        const T dir = t_max_new-_true_state->t();
-        if (dir*_state->direction() < 0){
-            _direction = sgn(dir);
-            _state->adjust(auto_step(dir), dir, _rhs(_state->t(), _state->vector()));
-            
-            //_true_state might lie somewhere between _old_state and _state.
-            //So _state and _old_state must accordinly adapt so that _true_state still lies between them,
-            //but only one step difference (the step difference might have changed when we changed direction)
-            if (!_equiv_states){
-                //the interior *_true_state will not be affected below, even if the _true_state pointer itself will.
-                const State<T, N>* const tmp = _true_state; //_true_state pointer will be affected below, so we need to store it first.
-                while (_state->t()*dir < tmp->t()*dir){
-                    adapt_impl(*_aux_state, *_state);
-                    _register_states();
-                }
-                _true_state = tmp;
-            }
-        }
+        this->set_goal_impl(t_max_new);
         return resume();
     }
 }
@@ -566,17 +434,19 @@ bool DerivedSolver<T, N, Derived, STATE>::free() {
 
 
 
-
+template<typename T, int N, class Derived, class STATE>
+void DerivedSolver<T, N, Derived, STATE>::set_goal_impl(const T& tmax_new) {
+    return static_cast<Derived*>(this)->set_goal_impl(tmax_new);
+}
 
 template<typename T, int N, class Derived, class STATE>
 STATE DerivedSolver<T, N, Derived, STATE>::new_state(const T& t, const vec<T, N>& q, const T& h) const {
     return static_cast<const Derived*>(this)->new_state(t, q, h);
 }
 
-
 template<typename T, int N, class Derived, class STATE>
-void DerivedSolver<T, N, Derived, STATE>::adapt_impl(STATE& res, const STATE& state){
-    return static_cast<Derived*>(this)->adapt_impl(res, state);
+bool DerivedSolver<T, N, Derived, STATE>::advance_impl() {
+    return static_cast<Derived*>(this)->advance_impl();
 }
 
 
@@ -635,19 +505,7 @@ const vec<T, N>& DerivedSolver<T, N, Derived, STATE>::_interp(const T& t, const 
 
 template<typename T, int N, class Derived, class STATE>
 void DerivedSolver<T, N, Derived, STATE>::_finalize(const T& t0, const vec<T, N>& q0, T first_step){
-    int dir = sgn(first_step);
-
-    if (first_step != 0){
-        first_step = choose_step(abs(first_step), _min_step, _max_step);
-    }
-    else{
-        const ICS<T, N> ics = {t0, q0};
-        first_step = this->auto_step(1, &ics);
-        dir = 1;
-    }
-    _direction = dir;
-    //now first_step and initial direction are both != 0.
-    _initial_state = new STATE(new_state(t0, q0, first_step*dir));
+    _initial_state = new STATE(new_state(t0, q0, first_step));
     _state = new STATE(*_initial_state);
     _old_state = new STATE(*_initial_state);
     _aux_state = new STATE(*_initial_state);
@@ -823,10 +681,6 @@ inline void DerivedSolver<T, N, Derived, STATE>::_clear_states(){
 template<typename T, int N, class Derived, class STATE>
 inline void DerivedSolver<T, N, Derived, STATE>::_copy_data(const Solver& other){
     _ode_rhs = other._ode_rhs;
-    _rtol = other._rtol;
-    _atol = other._atol;
-    _min_step = other._min_step;
-    _max_step = other._max_step;
     _args = other._args;
     _n = other._n;
     _name = other._name;
@@ -835,7 +689,6 @@ inline void DerivedSolver<T, N, Derived, STATE>::_copy_data(const Solver& other)
     _is_running = other._is_running;
     _is_dead = other._is_dead;
     _N = other._N;
-    _error = other._error;
     _message = other._message;
     _events = other._events;
     _current_event_index = other._current_event_index;
@@ -855,10 +708,6 @@ inline void DerivedSolver<T, N, Derived, STATE>::_copy_data(const Solver& other)
 template<typename T, int N, class Derived, class STATE>
 inline void DerivedSolver<T, N, Derived, STATE>::_move_data(Solver&& other) {
     _ode_rhs = std::move(other._ode_rhs);
-    _rtol = std::move(other._rtol);
-    _atol = std::move(other._atol);
-    _min_step = std::move(other._min_step);
-    _max_step = std::move(other._max_step);
     _args = std::move(other._args);
     _n = std::move(other._n);
     _name = std::move(other._name);
@@ -867,7 +716,6 @@ inline void DerivedSolver<T, N, Derived, STATE>::_move_data(Solver&& other) {
     _is_running = std::move(other._is_running);
     _is_dead = std::move(other._is_dead);
     _N = std::move(other._N);
-    _error = std::move(other._error);
     _message = std::move(other._message);
     _events = std::move(other._events);
     _current_event_index = std::move(other._current_event_index);
@@ -888,16 +736,5 @@ inline void DerivedSolver<T, N, Derived, STATE>::_move_data(Solver&& other) {
     other._temp_state = nullptr;
     other._true_state = nullptr;
 }
-
-
-template<typename T, int N, class Derived, class STATE>
-const T DerivedSolver<T, N, Derived, STATE>::MAX_FACTOR = T(10);
-
-template<typename T, int N, class Derived, class STATE>
-const T DerivedSolver<T, N, Derived, STATE>::SAFETY = T(9)/10;
-
-template<typename T, int N, class Derived, class STATE>
-const T DerivedSolver<T, N, Derived, STATE>::MIN_FACTOR = T(2)/10;
-
 
 #endif

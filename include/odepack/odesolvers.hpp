@@ -23,16 +23,11 @@ public:
     virtual const T&                     stepsize() const = 0;
     virtual const T&                     tmax() const = 0;
     virtual const int&                   direction() const = 0;
-    virtual const T&                     rtol() const = 0;
-    virtual const T&                     atol() const = 0;
-    virtual const T&                     min_step() const = 0;
-    virtual const T&                     max_step() const = 0;
     virtual const std::vector<T>&        args() const = 0;
     virtual const size_t&                Nsys() const = 0;
     virtual const bool&                  diverges() const = 0;
     virtual const bool&                  is_running() const = 0;
     virtual const bool&                  is_dead() const = 0;
-    virtual const vec<T, N>&             error()const = 0;
     virtual const std::string&           message() const = 0;
     virtual const SolverState<T, N>      state() const = 0;
     virtual const EventCollection<T, N>& events()const = 0;
@@ -41,7 +36,6 @@ public:
     virtual const Event<T, N>&           current_event() const = 0;
     virtual const int&                   current_event_index() const = 0;
     virtual const std::string&           name()const = 0;
-    virtual T                            auto_step(T direction=0, const ICS<T, N>* ics = nullptr)const = 0;
     virtual OdeSolver<T, N>*             clone() const = 0;
     virtual UniqueClone                  safe_clone() const = 0;
     virtual UniqueClone                  with_new_events(const EventCollection<T, N>& events) const = 0;
@@ -58,6 +52,30 @@ protected:
     OdeSolver() = default;
 
     DEFAULT_RULE_OF_FOUR(OdeSolver);
+};
+
+
+template<typename T, int N>
+class AdaptiveStepSolver : public OdeSolver<T, N>{
+
+    virtual const T&                     rtol() const = 0;
+    virtual const T&                     atol() const = 0;
+    virtual const T&                     min_step() const = 0;
+    virtual const T&                     max_step() const = 0;
+    virtual const vec<T, N>&             error()const = 0;
+    virtual T                            auto_step(T direction=0, const ICS<T, N>* ics = nullptr)const = 0;
+};
+
+
+template<typename T, int N>
+class FixedStepSolver: public OdeSolver<T, N>{
+
+protected:
+
+    FixedStepSolver() = default;
+
+    DEFAULT_RULE_OF_FOUR(FixedStepSolver);
+
 };
 
 

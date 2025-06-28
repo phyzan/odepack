@@ -1,7 +1,7 @@
 #ifndef STIFF_HPP
 #define STIFF_HPP
 
-#include "solver_impl.hpp"
+#include "adaptive_solver_impl.hpp"
 #include <stdexcept>
 
 const int MAX_ORDER = 5;
@@ -119,7 +119,7 @@ class StateBDF final: public DerivedState<T, N, StateBDF<T, N>>{
 
 public:
 
-    StateBDF(const T& t, const vec<T, N>& q, const T& h) : DerivedState<T, N, StateBDF<T, N>>(t, q, h){
+    StateBDF(const T& t, const vec<T, N>& q, const T& h) : Base(t, q, h){
         //state not fully initialized yet. It needs to be "adjusted".
         I = Eigen::Matrix<T, N, N>::Identity(q.size(), q.size());
         _q_predict.resize(q.size());
@@ -213,10 +213,10 @@ struct NewtConv{
 
 
 template<typename T, int N>
-class BDF : public DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>>{
+class BDF : public DerivedAdaptiveStepSolver<T, N, BDF<T, N>, StateBDF<T, N>>{
 
     using STATE = StateBDF<T, N>;
-    using SolverBase = DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>>;
+    using SolverBase = DerivedAdaptiveStepSolver<T, N, BDF<T, N>, StateBDF<T, N>>;
 
 public:
 

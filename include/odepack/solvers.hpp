@@ -5,6 +5,8 @@
 #include "stiff.hpp"
 #include <memory>
 
+//TODO: overload get_solver with arguments for adaptive and fixed step size solvers.
+
 template<typename T, int N>
 std::unique_ptr<OdeSolver<T, N>> get_solver(std::string name, MAIN_DEFAULT_CONSTRUCTOR(T, N)) {
     if (name == "RK23") {

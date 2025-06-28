@@ -4,7 +4,7 @@
 //https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method
 
 
-#include "solver_impl.hpp"
+#include "adaptive_solver_impl.hpp"
 
 template<typename T, int Norder, int Nstages> 
 using A_matrix = Eigen::Array<T, Nstages, Norder>;
@@ -68,7 +68,7 @@ struct _RK_mutable{
 
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-class RungeKutta : public DerivedSolver<T, N, RKDerived, RKState<T, N, Nstages, Norder>>{
+class RungeKutta : public DerivedAdaptiveStepSolver<T, N, RKDerived, RKState<T, N, Nstages, Norder>>{
     using STATE = RKState<T, N, Nstages, Norder>;
 
 public:
@@ -76,7 +76,7 @@ public:
     static constexpr int ERR_EST_ORDER = RKDerived::ERR_EST_ORDER;
     static const T ERR_EXP;
 
-    using OdsBase = DerivedSolver<T, N, RKDerived, STATE>;
+    using OdsBase = DerivedAdaptiveStepSolver<T, N, RKDerived, STATE>;
     using StageContainer = std::array<vec<T, N>, Nstages+1>;
     using Atype = A_matrix<T, Norder, Nstages>;
     using Btype = B_matrix<T, Norder, Nstages>;
