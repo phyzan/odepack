@@ -242,11 +242,12 @@ public:
         return res;
     }
 
-    void call_impl(vec<T, N>& res, const T& t, const State<T, N>& state1, const State<T, N>& state2) const{
-        //TODO: use more accurate interpolating algorithm
-        _mut.f = (state2.vector()-state1.vector())/(state2.t()-state1.t());
-        const vec<T, N>& slope = _mut.f;
-        res = state1.vector() + slope * (t-state1.t());
+    void coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const{
+
+    }
+
+    int interp_order() const{
+        return this->_state->order;
     }
 
     void adapt_impl(STATE& res, const STATE& state){

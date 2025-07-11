@@ -42,7 +42,9 @@ public:
 
     inline const std::string&       name() const;
 
-    virtual bool                    allows_checkpoint() const;
+    inline bool                     is_masked() const;
+
+    inline const bool&              hides_mask() const;
 
     inline const size_t&            counter() const;
 
@@ -141,8 +143,6 @@ public:
 
     bool              determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) final ;
 
-    inline bool       allows_checkpoint() const final;
-
     inline bool       is_precise() const final;
 
 };
@@ -175,7 +175,7 @@ public:
 //Event CLASS
 
 template<typename T, int N>
-Event<T, N>::Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask){
+Event<T, N>::Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask && mask != nullptr){
     if (name == ""){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
@@ -212,8 +212,13 @@ inline const std::string& Event<T, N>::name()const{
 }
 
 template<typename T, int N>
-bool Event<T, N>::allows_checkpoint() const{
-    return _mask == nullptr; 
+inline bool Event<T, N>::is_masked() const{
+    return _mask != nullptr;
+}
+
+template<typename T, int N>
+inline const bool& Event<T, N>::hides_mask() const{
+    return _hide_mask;
 }
 
 template<typename T, int N>
@@ -352,12 +357,6 @@ RoughEvent<T, N>::RoughEvent(const std::string& name, event_f<T, N> when, is_eve
 template<typename T, int N>
 RoughEvent<T, N>* RoughEvent<T, N>::clone() const{
     return new RoughEvent<T, N>(*this);
-}
-
-
-template<typename T, int N>
-inline bool RoughEvent<T, N>::allows_checkpoint() const {
-    return false;
 }
 
 template<typename T, int N>

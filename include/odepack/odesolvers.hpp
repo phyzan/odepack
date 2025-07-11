@@ -41,6 +41,7 @@ public:
     virtual const Event<T, N>&           current_event() const = 0;
     virtual const int&                   current_event_index() const = 0;
     virtual const std::string&           name()const = 0;
+    virtual const std::vector<LinkedInterpolator<T, N>>& interpolators() const = 0;
     virtual T                            auto_step(T direction=0, const ICS<T, N>* ics = nullptr)const = 0;
     virtual OdeSolver<T, N>*             clone() const = 0;
     virtual UniqueClone                  safe_clone() const = 0;
@@ -52,6 +53,8 @@ public:
     virtual void                         kill(const std::string& text = "") = 0;
     virtual bool                         resume() = 0;
     virtual bool                         free() = 0;
+    virtual void                         start_interpolation() = 0;
+    virtual void                         stop_interpolation() = 0;
 
 protected:
 

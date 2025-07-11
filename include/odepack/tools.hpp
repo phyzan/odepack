@@ -408,14 +408,6 @@ bool operator==(const Any& a, const Functor<T, N>& b){
 }
 
 
-template<typename T, int N>
-struct _MutableData{
-
-    vec<T, N> q;
-    vec<T, N> qdiff;
-};
-
-
 template<typename T>
 inline T choose_step(const T& habs, const T& hmin, const T& hmax){
     return std::max(std::min(habs, hmax), hmin);
@@ -428,5 +420,14 @@ struct ICS{
     T t;
     vec<T, N> q;
 };
+
+template<typename T>
+std::string to_string(const T& value, int digits = 3) {
+    static_assert(std::is_arithmetic<T>::value || std::is_class<T>::value, "T must be a numeric or class type with ostream << defined");
+
+    std::ostringstream out;
+    out << std::setprecision(digits) << std::scientific << value;
+    return out.str();
+}
 
 #endif

@@ -78,6 +78,13 @@
         "mutex": "cpp",
         "__locale": "cpp",
         "__threading_support": "cpp",
-        "__verbose_abort": "cpp"
+        "__verbose_abort": "cpp",
+        "random": "cpp",
+        "__config": "cpp",
+        "print": "cpp",
+        "version": "cpp",
+        "mprealsupport": "cpp",
+        "condition_variable": "cpp",
+        "filesystem": "cpp"
     }
 }

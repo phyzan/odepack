@@ -18,6 +18,8 @@ using C_matrix = B_matrix<T, Norder, Nstages>;
 template<typename T, int Norder, int Nstages> 
 using E_matrix = Eigen::Array<T, Nstages+1, 1>;
 
+template<typename T, int Nstages> 
+using P_matrix = Eigen::Array<T, Nstages+1, -1>;
 
 
 
@@ -82,11 +84,13 @@ public:
     using Btype = B_matrix<T, Norder, Nstages>;
     using Ctype = C_matrix<T, Norder, Nstages>;
     using Etype = E_matrix<T, Norder, Nstages>;
+    using Ptype = P_matrix<T, Nstages>;
 
-    const Atype A;
-    const Btype B;
-    const Ctype C;
-    const Etype E;
+    static const Atype A;
+    static const Btype B;
+    static const Ctype C;
+    static const Etype E;
+    static const Ptype P;
 
     void adapt_impl(STATE& res, const STATE& state) {
         const T& h_min = this->min_step();
@@ -127,7 +131,6 @@ public:
             if (!res.resize_step(factor, h_min, max_step)){
                 break;
             }
-            
         }
     }
 
@@ -135,15 +138,20 @@ public:
         return STATE(t, q, h);
     }
 
-    void call_impl(vec<T, N>& res, const T& t, const State<T, N>& state1, const State<T, N>& state2) const{
-        //TODO: apply interpolation coefficients, remove static_cast
-        _step_impl(_rk_mut.state, static_cast<const STATE&>(state1), t-state1.t());
-        res = _rk_mut.state.vector();
+    void coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const {
+        for (int i=0; i<N; i++){
+            for (int j=0; j<mat.cols(); j++){
+                mat(i, j) = 0;
+                for (size_t k=0; k<Nstages+1; k++){
+                    mat(i, j) += state2._K[k][i] * this->P(k, j);
+                }
+            }
+        }
     }
 
 protected:
 
-    RungeKutta(SOLVER_CONSTRUCTOR(T, N)) : OdsBase(name, ARGS), A(RKDerived::Amatrix()), B(RKDerived::Bmatrix()), C(RKDerived::Cmatrix()), E(RKDerived::Ematrix()), _rk_mut(q0) {}
+    RungeKutta(SOLVER_CONSTRUCTOR(T, N)) : OdsBase(name, ARGS), _rk_mut(q0) {}
 
     DEFAULT_RULE_OF_FOUR(RungeKutta);
 
@@ -198,6 +206,10 @@ public:
         this->_finalize(t0, q0, first_step);
     }
 
+    int interp_order() const{
+        return 4;
+    }
+
     DEFAULT_RULE_OF_FOUR(RK45);
     
     static typename RKbase::Atype Amatrix() {
@@ -244,6 +256,19 @@ public:
              T(1)/T(40);
         return E;
     }
+
+    static typename RKbase::Ptype Pmatrix() {
+        typename RKbase::Ptype P(Nstages+1, 4);
+        P <<    T(1),   -T(8048581381)/T(2820520608),   T(8663915743)/T(2820520608),   -T(12715105075)/T(11282082432),
+                T(0),    T(0),                          T(0),                          T(0),
+                T(0),    T(131558114200)/T(32700410799), -T(68118460800)/T(10900136933), T(87487479700)/T(32700410799),
+                T(0),   -T(1754552775)/T(470086768),     T(14199869525)/T(1410260304),  -T(10690763975)/T(1880347072),
+                T(0),    T(127303824393)/T(49829197408), -T(318862633887)/T(49829197408), T(701980252875)/T(199316789632),
+                T(0),   -T(282668133)/T(205662961),       T(2019193451)/T(616988883),   -T(1453857185)/T(822651844),
+                T(0),    T(40617522)/T(29380423),        -T(110615467)/T(29380423),     T(69997945)/T(29380423);
+        return P;
+    }
+
 };
 
 
@@ -267,6 +292,10 @@ public:
     }
 
     DEFAULT_RULE_OF_FOUR(RK23);
+
+    int interp_order() const{
+        return 3;
+    }
 
     static typename RKbase::Atype Amatrix() {
         typename RKbase::Atype A;
@@ -300,6 +329,15 @@ public:
                 T(1)/T(8);
         return E;
     }
+
+    static typename RKbase::Ptype Pmatrix() {
+        typename RKbase::Ptype P(Nstages+1, 3);
+        P << T(1),   -T(4)/T(3),  T(5)/T(9),
+            T(0),    T(1),      -T(2)/T(3),
+            T(0),    T(4)/T(3), -T(8)/T(9),
+            T(0),   -T(1),       T(1);
+        return P;
+    }
 };
 
 
@@ -307,5 +345,20 @@ public:
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
 const T RungeKutta<RKDerived, T, N, Nstages, Norder>::ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
+
+template<typename RKDerived, typename T, int N, int Nstages, int Norder>
+const RungeKutta<RKDerived, T, N, Nstages, Norder>::Atype RungeKutta<RKDerived, T, N, Nstages, Norder>::A = RKDerived::Amatrix();
+
+template<typename RKDerived, typename T, int N, int Nstages, int Norder>
+const RungeKutta<RKDerived, T, N, Nstages, Norder>::Btype RungeKutta<RKDerived, T, N, Nstages, Norder>::B = RKDerived::Bmatrix();
+
+template<typename RKDerived, typename T, int N, int Nstages, int Norder>
+const RungeKutta<RKDerived, T, N, Nstages, Norder>::Ctype RungeKutta<RKDerived, T, N, Nstages, Norder>::C = RKDerived::Cmatrix();
+
+template<typename RKDerived, typename T, int N, int Nstages, int Norder>
+const RungeKutta<RKDerived, T, N, Nstages, Norder>::Etype RungeKutta<RKDerived, T, N, Nstages, Norder>::E = RKDerived::Ematrix();
+
+template<typename RKDerived, typename T, int N, int Nstages, int Norder>
+const RungeKutta<RKDerived, T, N, Nstages, Norder>::Ptype RungeKutta<RKDerived, T, N, Nstages, Norder>::P = RKDerived::Pmatrix();
 
 #endif

@@ -41,22 +41,34 @@ int main(){
     T atol = 1e-12;
     T min_step = 0.;
     T max_step = 100;
+    T pi = 3.14159265359;
 
     T tmax = 10000;
+
 
     PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
     PeriodicEvent<T, N> ev2("periodic", 1, 0.5);
 
-    VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
-
-    while (true){
-        std::cin.get();
-        ode.integrate(100, 100).examine();
-        ode.state().show();
+    // VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
+    RK45<T, N> s(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps});
+    s.start_interpolation();
+    s.set_goal(10000);
+    while (s.is_running()){
+        s.advance();
     }
 
-    ode.integrate(tmax, 100).examine();
-    ode.state().show();
+
+    s.set_goal(-1);
+    while (s.is_running()){
+        s.advance();
+    }
+    s.state().show();
+
+    std::cout << s.interpolators().front().call(2*pi*105).transpose() << std::endl;
+    std::cout << s.interpolators().back().call(2*pi*105).transpose() << std::endl;
+
+    // ode.integrate(tmax, 100).examine();
+    // ode.state().show();
 
     //g++ -g -O3 -fopenmp -Wall -std=c++20 tests/test.cpp -o tests/test -lmpfr -lgmp
 
