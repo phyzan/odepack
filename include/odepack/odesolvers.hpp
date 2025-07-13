@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include "events.hpp"
+#include "interpolators.hpp"
 
 
 template<typename T, int N>
@@ -40,12 +41,12 @@ public:
     virtual std::string                  event_name() const = 0;
     virtual const Event<T, N>&           current_event() const = 0;
     virtual const int&                   current_event_index() const = 0;
-    virtual const std::string&           name()const = 0;
-    virtual const std::vector<LinkedInterpolator<T, N>>& interpolators() const = 0;
+    virtual const std::string&           name() const = 0;
     virtual T                            auto_step(T direction=0, const ICS<T, N>* ics = nullptr)const = 0;
     virtual OdeSolver<T, N>*             clone() const = 0;
     virtual UniqueClone                  safe_clone() const = 0;
     virtual UniqueClone                  with_new_events(const EventCollection<T, N>& events) const = 0;
+    virtual std::vector<const Interpolator<T, N>*> interpolators() const;
 
     virtual bool                         advance()=0;
     virtual bool                         set_goal(const T& t_max) = 0;

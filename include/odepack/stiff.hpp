@@ -213,10 +213,10 @@ struct NewtConv{
 
 
 template<typename T, int N>
-class BDF : public DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>>{
+class BDF : public DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>, StandardLocalInterpolator<T, N, StateBDF<T, N>>>{
 
     using STATE = StateBDF<T, N>;
-    using SolverBase = DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>>;
+    using SolverBase = DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>, StandardLocalInterpolator<T, N, StateBDF<T, N>>>;
 
 public:
 
@@ -244,10 +244,6 @@ public:
 
     void coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const{
 
-    }
-
-    int interp_order() const{
-        return this->_state->order;
     }
 
     void adapt_impl(STATE& res, const STATE& state){

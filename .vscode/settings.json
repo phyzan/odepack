@@ -85,6 +85,12 @@
         "version": "cpp",
         "mprealsupport": "cpp",
         "condition_variable": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "cassert": "cpp",
+        "cerrno": "cpp",
+        "cfloat": "cpp",
+        "climits": "cpp",
+        "core": "cpp",
+        "__availability": "cpp"
     }
 }

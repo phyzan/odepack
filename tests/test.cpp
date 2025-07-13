@@ -63,9 +63,9 @@ int main(){
         s.advance();
     }
     s.state().show();
-
-    std::cout << s.interpolators().front().call(2*pi*105).transpose() << std::endl;
-    std::cout << s.interpolators().back().call(2*pi*105).transpose() << std::endl;
+    
+    std::cout << s.interpolators().front()->call(2*pi*105).transpose() << std::endl;
+    std::cout << s.interpolators().back()->call(2*pi*105).transpose() << std::endl;
 
     // ode.integrate(tmax, 100).examine();
     // ode.state().show();
