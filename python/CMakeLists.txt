@@ -8,19 +8,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Set compile flags
 add_compile_options(-O3 -fno-math-errno -Wall -march=x86-64 -fopenmp -fPIC)
 
-# Find Python
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+# Find OpenMP
+find_package(OpenMP REQUIRED)
 
-# Find pybind11
+# Find Python and pybind11
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 REQUIRED)
 
 # Create the shared library as a Python module
 pybind11_add_module(odepack MODULE pyode.cpp)
 
-# Link extra libraries
-target_link_libraries(odepack PRIVATE mpfr gmp)
+# Link extra libraries to the module
+target_link_libraries(odepack PRIVATE
+    OpenMP::OpenMP_CXX
+    mpfr
+    gmp
+)
 
-# Include directories explicitly, if not found via pybind11
+# Include directories if not found automatically
 target_include_directories(odepack PRIVATE
     ${Python3_INCLUDE_DIRS}
     ${pybind11_INCLUDE_DIRS}

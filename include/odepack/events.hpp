@@ -10,6 +10,7 @@ During an ode integration, we might want to save specific events that are encout
 
 */
 
+#include <unordered_set>
 #include "states.hpp"
 
 template<typename T, int N>
@@ -108,15 +109,23 @@ class PeriodicEvent : public PreciseEvent<T, N>{
 
 public:
 
-    PeriodicEvent(const std::string& name, const T& period, const T& start=0, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+    PeriodicEvent(const std::string& name, const T& period, const T& start, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+
+    PeriodicEvent(const std::string& name, const T& period, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
     DEFAULT_RULE_OF_FOUR(PeriodicEvent);
 
-    PeriodicEvent<T, N>* clone() const override;
+    const T&                period() const;
 
-    bool                 determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
+    const T&                t_start() const;
 
-    void                 go_back() override;
+    PeriodicEvent<T, N>*    clone() const override;
+
+    bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
+
+    void                    go_back() override;
+
+    void                    set_start(const T& t);
 
 protected:
     T _period;
@@ -314,6 +323,19 @@ PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, const T& period, con
 }
 
 template<typename T, int N>
+PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, const T& period, Functor<T, N> mask, const bool& hide_mask): PeriodicEvent<T, N>(name, period, inf<T>(), mask, hide_mask){}
+
+template<typename T, int N>
+const T& PeriodicEvent<T, N>::t_start() const{
+    return _start;
+}
+
+template<typename T, int N>
+const T& PeriodicEvent<T, N>::period() const{
+    return _period;
+}
+
+template<typename T, int N>
 PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
     return new PeriodicEvent<T, N>(*this);
 }
@@ -346,7 +368,15 @@ void PeriodicEvent<T, N>::go_back() {
     }
 }
 
-
+template<typename T, int N>
+void PeriodicEvent<T, N>::set_start(const T& t) {
+    if (abs(_start) == inf<T>()){
+        _start = t;
+    }
+    else{
+        throw std::runtime_error("Cannot reset starting point of PeriodicEvent");
+    }
+}
 
 
 //RoughEvent CLASS
@@ -403,13 +433,15 @@ public:
         _copy(events.begin(), events.size());
     }
 
-    EventCollection(const EventCollection<T, N>& other){
-        _copy(other._events.begin(), other._events.size());
-    }
-
     EventCollection() = default;
 
-    EventCollection(EventCollection<T, N>&& other): _events(std::move(other._events)){}
+    EventCollection(const EventCollection& other) : _events(other._events.size()), _names(other._names){
+        for (size_t i=0; i<_events.size(); i++){
+            _events[i] = other._events[i]->clone();
+        }
+    }
+
+    EventCollection(EventCollection&& other) = default;
 
     ~EventCollection(){
         _clear();
@@ -421,6 +453,8 @@ public:
         }
         return *this;
     }
+
+    EventCollection& operator=(EventCollection<T, N>&& other) = default;
 
     inline const Event<T, N>& operator[](const size_t& i) const {
         return *_events.at(i);
@@ -441,6 +475,9 @@ public:
     }
 
     EventCollection<T, N> including(const Event<T, N>* event) const {
+        if (_names.contains(event->name())) {
+            throw std::runtime_error("Cannot include new Event because dublicate names are not allowed: " + event->name());
+        }
         EventCollection<T, N> res(*this);
         res._events.push_back(event->clone());
         res._events.shrink_to_fit();
@@ -463,9 +500,13 @@ private:
         // our current _events vector. We sort the vector to contain normal events first,
         // and stop_events after to improve runtime performance and not miss out on any stop_events
         // if a single step encounters multiple events.
+
         std::vector<Event<T, N>*> new_precise_events;
         std::vector<Event<T, N>*> new_rough_events;
         for (size_t i = 0; i < size; i++) {
+            if (!_names.insert(events[i]->name()).second) {
+                throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
+            }
             if (events[i]->is_precise()) {
                 new_precise_events.push_back(events[i]->clone());
             }
@@ -485,6 +526,7 @@ private:
     }
 
     std::vector<Event<T, N>*> _events;
+    std::unordered_set<std::string> _names;
 
 };
 

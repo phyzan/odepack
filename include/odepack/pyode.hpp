@@ -104,19 +104,14 @@ public:
     PyEvent(py::str name, py::object when, py::object check_if, py::object mask, py::bool_ hide_mask, T event_tol):_name(name.cast<std::string>()), py_when(when), py_check_if(check_if), py_mask(mask), hide_mask(hide_mask), _event_tol(event_tol){}
 
     virtual PreciseEvent<T, N>* toEvent(const _Shape& shape, py::tuple args=py::tuple()) {
-        delete this->_event_ptr;
-        this->_event_ptr = new PreciseEvent<T, N>(this->_name, to_event<T, N>(this->py_when, shape, args), to_event_check<T, N>(this->py_check_if, shape, args), to_Func<T, N>(this->py_mask, shape, args), this->hide_mask, this->_event_tol);
-        return this->_event_ptr;
+        return new PreciseEvent<T, N>(this->_name, to_event<T, N>(this->py_when, shape, args), to_event_check<T, N>(this->py_check_if, shape, args), to_Func<T, N>(this->py_mask, shape, args), this->hide_mask, this->_event_tol);
     }
 
     py::str name()const{
         return py::str(_name);
     }
 
-    virtual ~PyEvent(){
-        delete this->_event_ptr;
-        this->_event_ptr = nullptr;
-    }
+    virtual ~PyEvent(){}
 
     std::string _name;
 
@@ -124,8 +119,6 @@ public:
     py::object py_check_if;
     py::object py_mask;
     bool hide_mask;
-    
-    PreciseEvent<T, N>* _event_ptr = nullptr;
 
     T _event_tol;
 
@@ -138,10 +131,10 @@ class PyPerEvent : public PyEvent<T, N>{
 public:
     PyPerEvent(py::str name, const T& period, const T& start, py::object mask, py::bool_ hide_mask):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(start){}
 
+    PyPerEvent(py::str name, const T& period, py::object mask, py::bool_ hide_mask):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(inf<T>()){}
+
     PreciseEvent<T, N>* toEvent(const _Shape& shape, py::tuple args) override{
-        delete this->_event_ptr;
-        this->_event_ptr = new PeriodicEvent<T, N>(this->_name, this->_period, this->_start, to_Func<T, N>(this->py_mask, shape, args), this->hide_mask);
-        return this->_event_ptr;
+        return new PeriodicEvent<T, N>(this->_name, this->_period, this->_start, to_Func<T, N>(this->py_mask, shape, args), this->hide_mask);
     }
 
     const T& period()const{
@@ -254,7 +247,12 @@ struct PyOdeResult{
 template<typename T, int N>
 struct PyOdeSolution : public PyOdeResult<T, N>{
 
-    PyOdeSolution(const OdeSolution<T, N>& res, const _Shape& q0_shape) : PyOdeResult<T, N>(res, q0_shape) {}
+    PyOdeSolution(const OdeSolution<T, N>& res, const _Shape& q0_shape) : PyOdeResult<T, N>(res, q0_shape) {
+        nd = 1;
+        for (size_t i=0; i<q0_shape.size(); i++){
+            nd *= q0_shape[i];
+        }
+    }
 
     DEFAULT_RULE_OF_FOUR(PyOdeSolution);
 
@@ -268,25 +266,23 @@ struct PyOdeSolution : public PyOdeResult<T, N>{
 
     py::array_t<T> operator()(const py::array_t<T>& array) const{
         const size_t nt = array.size();
-        const size_t nd = this->q0_shape.size();
         _Shape final_shape(array.shape(), array.shape()+array.ndim());
         final_shape.insert(final_shape.end(), this->q0_shape.begin(), this->q0_shape.end());
 
-        vec<T, N> q;
+        vec<T, N> q(nd);
+        const T* data = array.data();
         std::vector<T> res(nt*nd);
         for (size_t i=0; i<nt; i++){
-            q = this->sol()(array.at(i));
+            q = this->sol()(data[i]);
             for (size_t j=0; j<nd; j++){
                 res[i*nd+j] = q[j];
             }
         }
-        return to_numpy<T>(res, final_shape);
+        py::array_t<T> r = to_numpy<T>(res, final_shape);
+        return r;
     }
 
-    inline py::array_t<T> operator()(const py::iterable& array) const{
-        py::array_t<T> arr = to_numpy<T>(toCPP_Array<T, std::vector<T>>(array));
-        return this->operator()(arr);
-    }
+    size_t nd;
 
 };
 
@@ -661,7 +657,12 @@ void define_ode_module(py::module& m) {
         .def(py::init<py::str, T, T, py::object, py::bool_>(),
             py::arg("name"),
             py::arg("period"),
-            py::arg("start")=0,
+            py::arg("start"),
+            py::arg("mask")=py::none(),
+            py::arg("hide_mask")=false)
+        .def(py::init<py::str, T, py::object, py::bool_>(),
+            py::arg("name"),
+            py::arg("period"),
             py::arg("mask")=py::none(),
             py::arg("hide_mask")=false)
         .def_property_readonly("period", [](const PyPerEvent<T, N>& self){
@@ -688,8 +689,7 @@ void define_ode_module(py::module& m) {
     
     py::class_<PyOdeSolution<T, N>, PyOdeResult<T, N>>(m, "OdeSolution", py::module_local())
         .def("__call__", [](const PyOdeSolution<T, N>& self, const T& t){return self(t);})
-        .def("__call__", [](const PyOdeSolution<T, N>& self, const py::array_t<T>& array){return self(array);})
-        .def("__call__", [](const PyOdeSolution<T, N>& self, const py::iterable& array){return self(array);});
+        .def("__call__", [](const PyOdeSolution<T, N>& self, const py::array_t<T>& array){return self(array);});
 
     py::class_<PySolverState<T, N>>(m, "SolverState", py::module_local())
         .def_property_readonly("t", [](const PySolverState<T, N>& self){return self.t;})

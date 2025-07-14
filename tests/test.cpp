@@ -1,6 +1,6 @@
 #include "../include/odepack/variational.hpp"
 
-const int N = 4;
+const int N = -1;
 using T = double;
 using Ty = vec<T, N>;
 
@@ -21,11 +21,7 @@ void f(Ty& df, const T& t, const Ty& q, const std::vector<T>& args){
 // }
 
 T ps_func(const T& t, const Ty& q, const std::vector<T>& args){
-    return q[1];
-}
-
-inline T stopfunc(const T& t, const Ty& q, const std::vector<T>& args){
-    return q[1]-15;
+    return q[1]-1;
 }
 
 bool check(const T& t, const Ty& q, const std::vector<T>& args){
@@ -35,25 +31,25 @@ bool check(const T& t, const Ty& q, const std::vector<T>& args){
 int main(){
     T t0 = 0;
     Ty q0(4);
-    q0 << 1., 1., 2.3, 4.5;
-    T first_step = 1e-3;
-    T rtol = 1e-12;
-    T atol = 1e-12;
+    q0 << 1, -2, 3, 5;
+    T first_step = 0;
+    T rtol = 0;
+    T atol = 1e-10;
     T min_step = 0.;
     T max_step = 100;
     T pi = 3.14159265359;
 
-    T tmax = 100000;
+    T tmax = 1000;
 
 
     PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
-    PeriodicEvent<T, N> ev2("periodic", 1, 0.5);
+    PeriodicEvent<T, N> ev2("periodic", 5);
 
-    VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
+    ODE<T, N> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps, &ev2}, "RK45");
 
     auto res = ode.rich_integrate(tmax);
 
-    std::cout << res(9999).transpose() << std::endl;
+    // std::cout << res(9999).transpose() << std::endl;
     std::cout << res(1).transpose() << std::endl;
     std::cout << res(1.0000001).transpose() << std::endl;
     // RK45<T, N> s(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps});

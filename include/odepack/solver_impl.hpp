@@ -31,7 +31,7 @@ struct _MutableData{
     Eigen::Matrix<T, N, -1> coef_mat;
     bool            interpolator_is_set = false;
 
-    _MutableData(const vec<T, N>& q, int interp_order) : q(q), qdiff(q), interpolator(0, q), coef_mat(N, interp_order) {}
+    _MutableData(const vec<T, N>& q, int interp_order) : q(q), qdiff(q), interpolator(0, q), coef_mat(q.size(), interp_order) {}
 };
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
@@ -105,13 +105,13 @@ public:
 
     void                            clear_interpolators() final;
 
-    inline STATE                 new_state(const T& t, const vec<T, N>& q, const T& h) const;//virtual
+    inline STATE                    new_state(const T& t, const vec<T, N>& q, const T& h) const;//virtual
 
-    inline void                  adapt_impl(STATE& res, const STATE& state);//virtual
+    inline void                     adapt_impl(STATE& res, const STATE& state);//virtual
 
-    inline INTERPOLATOR          state_interpolator(const STATE& state1, const STATE& state2, int bdr1, int bdr2) const;//virtual. required only if _req_coef_mat is false
+    inline INTERPOLATOR             state_interpolator(const STATE& state1, const STATE& state2, int bdr1, int bdr2) const;//virtual. required only if _req_coef_mat is false
 
-    inline void                  coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const requires _req_coef_mat; //virtual. required only if _req_coef_mat is true
+    inline void                     coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const requires _req_coef_mat; //virtual. required only if _req_coef_mat is true
 
 
 
@@ -216,18 +216,23 @@ private:
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events), _mut(q0, INTERP_ORDER){
-    std::unordered_set<std::string> seen;
-    for (const Event<T, N>* ev : events) {
-        if (!seen.insert(ev->name()).second) {
-            throw std::runtime_error("Duplicate Event name not allowed: " + ev->name());
-        }
-    }
     
     if (_min_step < 0){
         throw std::runtime_error("Minimum stepsize must be a non negative number");
     }
     if (_max_step < _min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
+    }
+
+    for (size_t i=0; i<_events.size(); i++){
+        if (PeriodicEvent<T, N>* p = dynamic_cast<PeriodicEvent<T, N>*>(&_events[i])){
+            if (abs(p->t_start()) == inf<T>()){
+                p->set_start(t0+p->period());
+            }
+            else if (p->t_start() == t0){
+                throw std::runtime_error("The starting time of a periodic event cannot be set at the initial time of the ode solver.");
+            }
+        }
     }
 
     _events.set_args(args);

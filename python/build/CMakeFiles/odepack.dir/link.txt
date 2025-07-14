@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -flto -shared  -o odepack.cpython-312-x86_64-linux-gnu.so CMakeFiles/odepack.dir/pyode.cpp.o  -lmpfr -lgmp 

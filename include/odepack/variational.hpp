@@ -28,7 +28,9 @@ template<typename T, int N>
 class NormalizationEvent: public PeriodicEvent<T, N>{
 
 public:
-    NormalizationEvent(const std::string& name, const T& period, const T& start): PeriodicEvent<T, N>(name, period, start, normalize<T, N>, true), _t_renorm(start), _t_last(start){}
+    NormalizationEvent(const std::string& name, const T& period, const T& start = inf<T>()): PeriodicEvent<T, N>(name, period, start, normalize<T, N>, true), _t_renorm(start), _t_last(start){}
+
+    DEFAULT_RULE_OF_FOUR(NormalizationEvent);
 
     bool determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override{
         if (PeriodicEvent<T, N>::determine(t1, q1, t2, q2, q)){
@@ -79,7 +81,7 @@ private:
 
 template<typename T, int N>
 std::unique_ptr<OdeSolver<T, N>> as_variational(const OdeSolver<T, N>& solver, const T& period){
-    NormalizationEvent<T, N> extra_event("Normalization", period, solver.t()+period);
+    NormalizationEvent<T, N> extra_event("Normalization", period);
     EventCollection<T, N> events = solver.events().including(&extra_event);
     return solver.with_new_events(events);
 }

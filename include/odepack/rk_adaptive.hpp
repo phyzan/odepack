@@ -266,7 +266,7 @@ RungeKutta<RKDerived, T, N, Nstages, Norder>::STATE RungeKutta<RKDerived, T, N, 
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
 void RungeKutta<RKDerived, T, N, Nstages, Norder>::coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const{
-    for (int i=0; i<N; i++){
+    for (size_t i=0; i<this->Nsys(); i++){
         for (int j=0; j<mat.cols(); j++){
             mat(i, j) = 0;
             for (size_t k=0; k<Nstages+1; k++){

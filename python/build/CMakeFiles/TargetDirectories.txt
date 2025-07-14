@@ -1,3 +1,0 @@
-/home/senpy/Documents/repos/odepack/python/build/CMakeFiles/odepack.dir
-/home/senpy/Documents/repos/odepack/python/build/CMakeFiles/edit_cache.dir
-/home/senpy/Documents/repos/odepack/python/build/CMakeFiles/rebuild_cache.dir
