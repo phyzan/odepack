@@ -39,6 +39,7 @@ class DerivedSolver : public OdeSolver<T, N>{
 
     using Solver = DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>;
     using UniqueClone = std::unique_ptr<OdeSolver<T, N>>;
+    using InterpolatorList = std::vector<const Interpolator<T, N>*>;
 
     static constexpr bool _req_coef_mat = std::is_same_v<INTERPOLATOR, StandardLocalInterpolator<T, N, STATE>>;
 
@@ -61,46 +62,48 @@ public:
 
     ~DerivedSolver();
 
-    OdeRhs<T, N>                 ode_rhs() const override;
-    const T&                     t() const final;
-    const vec<T, N>&             q() const final;
-    const vec<T, N>&             q_true() const final;
-    const T&                     stepsize() const final;
-    const T&                     tmax() const final;
-    const int&                   direction() const final;
-    const T&                     rtol() const final;
-    const T&                     atol() const final;
-    const T&                     min_step() const final;
-    const T&                     max_step() const final;
-    const std::vector<T>&        args() const final;
-    const size_t&                Nsys() const final;
-    const bool&                  diverges() const final;
-    const bool&                  is_running() const final;
-    const bool&                  is_dead() const final;
-    const vec<T, N>&             error() const final;
-    const std::string&           message() const final;
-    const SolverState<T, N>      state() const final;
-    const EventCollection<T, N>& events() const final;
-    bool                         at_event() const final;
-    std::string                  event_name() const final;
-    const Event<T, N>&           current_event() const final;
-    const int&                   current_event_index() const final;
-    const std::string&           name() const final;
-    T                            auto_step(T direction=0, const ICS<T, N>* = nullptr) const final;
-    OdeSolver<T, N>*             clone() const final;
-    UniqueClone                  safe_clone() const final;
-    UniqueClone                  with_new_events(const EventCollection<T, N>& events) const final;
-    std::vector<const Interpolator<T, N>*> interpolators() const final;
-    Derived*                     derived_clone() const;
+    OdeRhs<T, N>                    ode_rhs() const override;
+    const T&                        t() const final;
+    const vec<T, N>&                q() const final;
+    const vec<T, N>&                q_true() const final;
+    const T&                        stepsize() const final;
+    const T&                        tmax() const final;
+    const int&                      direction() const final;
+    const T&                        rtol() const final;
+    const T&                        atol() const final;
+    const T&                        min_step() const final;
+    const T&                        max_step() const final;
+    const std::vector<T>&           args() const final;
+    const size_t&                   Nsys() const final;
+    const bool&                     diverges() const final;
+    const bool&                     is_running() const final;
+    const bool&                     is_dead() const final;
+    const vec<T, N>&                error() const final;
+    const std::string&              message() const final;
+    const SolverState<T, N>         state() const final;
+    const EventCollection<T, N>&    events() const final;
+    bool                            at_event() const final;
+    std::string                     event_name() const final;
+    const Event<T, N>&              current_event() const final;
+    const int&                      current_event_index() const final;
+    const std::string&              name() const final;
+    T                               auto_step(T direction=0, const ICS<T, N>* = nullptr) const final;
+    OdeSolver<T, N>*                clone() const final;
+    UniqueClone                     safe_clone() const final;
+    UniqueClone                     with_new_events(const EventCollection<T, N>& events) const final;
+    InterpolatorList                interpolators() const final;
+    Derived*                        derived_clone() const;
 
-    bool                         advance() final;
-    bool                         set_goal(const T& t_max) final;
-    void                         stop(const std::string& text) final;
-    void                         kill(const std::string& text) final;
-    bool                         resume() final;
-    bool                         free() final;
-    void                         start_interpolation() final;
-    void                         stop_interpolation() final;
+    bool                            advance() final;
+    bool                            set_goal(const T& t_max) final;
+    void                            stop(const std::string& text) final;
+    void                            kill(const std::string& text) final;
+    bool                            resume() final;
+    bool                            free() final;
+    void                            start_interpolation() final;
+    void                            stop_interpolation() final;
+
+    void                            clear_interpolators() final;
 
     inline STATE                 new_state(const T& t, const vec<T, N>& q, const T& h) const;//virtual
 
@@ -108,7 +111,7 @@ public:
 
     inline INTERPOLATOR          state_interpolator(const STATE& state1, const STATE& state2, int bdr1, int bdr2) const;//virtual. required only if _req_coef_mat is false
 
-    inline void                  coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const requires _req_coef_mat; //virtual
+    inline void                  coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const requires _req_coef_mat; //virtual. required only if _req_coef_mat is true
 
 
 
@@ -624,6 +627,11 @@ void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::start_interpolation() {
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::stop_interpolation() {
     _interp_data = false;
+}
+
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::clear_interpolators() {
+    _interpolators.clear();
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>

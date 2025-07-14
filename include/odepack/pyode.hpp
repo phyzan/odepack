@@ -209,18 +209,84 @@ public:
 template<typename T, int N>
 struct PyOdeResult{
 
-    PyOdeResult(const OdeResult<T, N>& r, const _Shape& q0_shape): res(r), q0_shape(q0_shape){}
+    PyOdeResult(const OdeResult<T, N>& r, const _Shape& q0_shape): res(r.clone()), q0_shape(q0_shape){}
+
+    PyOdeResult(const PyOdeResult& other) : res(other.res->clone()), q0_shape(other.q0_shape) {}
+
+    PyOdeResult(PyOdeResult&& other) : res(other.res), q0_shape(std::move(other.q0_shape)) {
+        other.res = nullptr;
+    }
+
+    virtual ~PyOdeResult(){delete res; res = nullptr;}
+
+    PyOdeResult& operator=(const PyOdeResult& other){
+        if (&other != this){
+            delete res;
+            res = other.res->clone();
+            q0_shape = other.q0_shape;
+        }
+        return *this;
+    }
+
+    PyOdeResult& operator=(PyOdeResult&& other){
+        if (&other != this){
+            delete res;
+            res = other.res;
+            q0_shape = other.q0_shape;
+            other.res = nullptr;
+        }
+        return *this;
+    }
 
     py::tuple event_data(const py::str& event)const{
-        std::vector<T> t_data = this->res.t_filtered(event.cast<std::string>());
+        std::vector<T> t_data = this->res->t_filtered(event.cast<std::string>());
         py::array_t<T> t_res = to_numpy<T>(t_data);
-        std::vector<vec<T, N>> q_data = this->res.q_filtered(event.cast<std::string>());
+        std::vector<vec<T, N>> q_data = this->res->q_filtered(event.cast<std::string>());
         py::array_t<T> q_res = to_numpy<T>(flatten<T, N>(q_data), getShape(q_data.size(), this->q0_shape));
         return py::make_tuple(t_res, q_res);
     }
 
-    const OdeResult<T, N> res;
-    const _Shape q0_shape;
+    OdeResult<T, N>* res;
+    _Shape q0_shape;
+
+};
+
+template<typename T, int N>
+struct PyOdeSolution : public PyOdeResult<T, N>{
+
+    PyOdeSolution(const OdeSolution<T, N>& res, const _Shape& q0_shape) : PyOdeResult<T, N>(res, q0_shape) {}
+
+    DEFAULT_RULE_OF_FOUR(PyOdeSolution);
+
+    inline const OdeSolution<T, N>& sol() const{
+        return static_cast<const OdeSolution<T, N>&>(*this->res);
+    }
+
+    inline py::array_t<T> operator()(const T& t) const{
+        return to_numpy<T>(this->sol()(t), this->q0_shape);
+    }
+
+    py::array_t<T> operator()(const py::array_t<T>& array) const{
+        const size_t nt = array.size();
+        const size_t nd = this->q0_shape.size();
+        _Shape final_shape(array.shape(), array.shape()+array.ndim());
+        final_shape.insert(final_shape.end(), this->q0_shape.begin(), this->q0_shape.end());
+
+        vec<T, N> q;
+        std::vector<T> res(nt*nd);
+        for (size_t i=0; i<nt; i++){
+            q = this->sol()(array.at(i));
+            for (size_t j=0; j<nd; j++){
+                res[i*nd+j] = q[j];
+            }
+        }
+        return to_numpy<T>(res, final_shape);
+    }
+
+    inline py::array_t<T> operator()(const py::iterable& array) const{
+        py::array_t<T> arr = to_numpy<T>(toCPP_Array<T, std::vector<T>>(array));
+        return this->operator()(arr);
+    }
 
 };
 
@@ -303,9 +369,16 @@ public:
 
     PyOdeResult<T, N> py_integrate(const T& interval, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
         OdeResult<T, N> res = ode->integrate(interval, max_frames, to_Options(event_options), max_prints, include_first);
-        PyOdeResult<T, N> py_res = PyOdeResult<T, N>(res, this->q0_shape);
+        PyOdeResult<T, N> py_res(res, this->q0_shape);
         return py_res;
     }
+
+    PyOdeSolution<T, N> py_rich_integrate(const T& interval, const py::dict& event_options, const int& max_prints){
+        OdeSolution<T, N> res = ode->rich_integrate(interval, to_Options(event_options), max_prints);
+        PyOdeSolution<T, N> py_res(res, this->q0_shape);
+        return py_res;
+    }
+
 
     PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
         return this->py_integrate(t, max_frames, event_options, max_prints, include_first);
@@ -598,21 +671,25 @@ void define_ode_module(py::module& m) {
 
     py::class_<PyOdeResult<T, N>>(m, "OdeResult", py::module_local())
         .def_property_readonly("t", [](const PyOdeResult<T, N>& self){
-            return to_numpy<T>(self.res.t);
+            return to_numpy<T>(self.res->t());
         })
         .def_property_readonly("q", [](const PyOdeResult<T, N>& self){
-            return to_numpy<T>(flatten<T, N>(self.res.q), getShape(self.res.t.size(), self.q0_shape));
+            return to_numpy<T>(flatten<T, N>(self.res->q()), getShape(self.res->t().size(), self.q0_shape));
         })
         .def_property_readonly("event_map", [](const PyOdeResult<T, N>& self){
-            return to_PyDict(self.res.event_map);
+            return to_PyDict(self.res->event_map());
         })
         .def("event_data", &PyOdeResult<T, N>::event_data, py::arg("event"))
-        .def_property_readonly("diverges", [](const PyOdeResult<T, N>& self){return self.res.diverges;})
-        .def_property_readonly("success", [](const PyOdeResult<T, N>& self){return self.res.success;})
-        .def_property_readonly("runtime", [](const PyOdeResult<T, N>& self){return self.res.runtime;})
-        .def_property_readonly("message", [](const PyOdeResult<T, N>& self){return self.res.message;})
-        .def("examine", [](const PyOdeResult<T, N>& self){return self.res.examine();});
-
+        .def_property_readonly("diverges", [](const PyOdeResult<T, N>& self){return self.res->diverges();})
+        .def_property_readonly("success", [](const PyOdeResult<T, N>& self){return self.res->success();})
+        .def_property_readonly("runtime", [](const PyOdeResult<T, N>& self){return self.res->runtime();})
+        .def_property_readonly("message", [](const PyOdeResult<T, N>& self){return self.res->message();})
+        .def("examine", [](const PyOdeResult<T, N>& self){return self.res->examine();});
+    
+    py::class_<PyOdeSolution<T, N>, PyOdeResult<T, N>>(m, "OdeSolution", py::module_local())
+        .def("__call__", [](const PyOdeSolution<T, N>& self, const T& t){return self(t);})
+        .def("__call__", [](const PyOdeSolution<T, N>& self, const py::array_t<T>& array){return self(array);})
+        .def("__call__", [](const PyOdeSolution<T, N>& self, const py::iterable& array){return self(array);});
 
     py::class_<PySolverState<T, N>>(m, "SolverState", py::module_local())
         .def_property_readonly("t", [](const PySolverState<T, N>& self){return self.t;})
@@ -660,6 +737,11 @@ void define_ode_module(py::module& m) {
             py::arg("event_options")=py::dict(),
             py::arg("max_prints")=0,
             py::arg("include_first")=false)
+        .def("rich_integrate", &PyODE<T, N>::py_rich_integrate,
+            py::arg("interval"),
+            py::kw_only(),
+            py::arg("event_options")=py::dict(),
+            py::arg("max_prints")=0)
         .def("go_to", &PyODE<T, N>::py_go_to,
         py::arg("t"),
         py::kw_only(),

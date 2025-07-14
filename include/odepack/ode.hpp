@@ -62,11 +62,13 @@ public:
 
     virtual ODE<T, N>*                          clone() const;
 
-    const OdeResult<T, N>                       integrate(const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
+    OdeSolution<T, N>                           rich_integrate(const T& interval, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0);
 
-    const OdeResult<T, N>                       go_to(const T& t, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
+    OdeResult<T, N>                             integrate(const T& interval, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
 
-    const SolverState<T, N>                     state() const;
+    OdeResult<T, N>                             go_to(const T& t, const int& max_frames=-1, const std::vector<EventOptions>& event_options={}, const int& max_prints = 0, const bool& include_first=false);
+
+    SolverState<T, N>                           state() const;
 
     bool                                        free();
 
@@ -223,13 +225,23 @@ ODE<T, N>* ODE<T, N>::clone() const{
 }
 
 template<typename T, int N>
-const OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
+OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector<EventOptions>& event_options, const int& max_prints){
+    _solver->start_interpolation();
+    OdeResult<T, N> res = this->integrate(interval, -1, event_options, max_prints, true);
+    OdeSolution<T, N> rich_res(std::move(res), *_solver->interpolators().back());
+    _solver->stop_interpolation();
+    return rich_res;
+
+}
+
+template<typename T, int N>
+OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
     return this->go_to(_solver->t()+interval, max_frames, event_options, max_prints, include_first);
 }
 
 
 template<typename T, int N>
-const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
+OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::vector<EventOptions>& event_options, const int& max_prints, const bool& include_first){
     TimePoint t1 = now();
     const T t0 = _solver->t();
     const T interval = t-t0;
@@ -284,14 +296,14 @@ const OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const 
     }
     TimePoint t2 = now();
 
-    OdeResult<T, N> res = {subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message()};
+    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first), subvec(_q_arr, Nt-include_first), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
 
-    _runtime += res.runtime;
+    _runtime += res.runtime();
     return res;
 }
 
 template<typename T, int N>
-const SolverState<T, N> ODE<T, N>::state() const{
+SolverState<T, N> ODE<T, N>::state() const{
     return _solver->state();
 }
 

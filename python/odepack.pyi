@@ -65,6 +65,15 @@ class OdeResult:
     def event_data(self, event: str)->tuple[np.ndarray, np.ndarray]:...
 
 
+class OdeSolution(OdeResult):
+
+    @overload
+    def __call__(self, t: float)->np.ndarray:...
+
+    @overload
+    def __call__(self, t: np.ndarray)->np.ndarray:...
+
+
 class SolverState:
 
     @property
@@ -115,6 +124,8 @@ class LowLevelODE:
     def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: list[Event]=None, method="RK45"):...
 
     def integrate(self, interval, *, max_frames=-1, event_options: dict[str, tuple[int, bool]|int]={}, max_prints=0, include_first=False)->OdeResult:...
+
+    def rich_integrate(self, interval, *, event_options: dict[str, tuple[int, bool]|int]={}, max_prints=0)->OdeSolution:...
 
     def go_to(self, t, *, max_frames=-1, event_options: dict[str, tuple[int, bool]|int]={}, max_prints=0, include_first=False)->OdeResult:...
 

@@ -14,6 +14,8 @@ public:
 
     Interval(const T& x) : _a(x), _b(x), _left(1), _right(1), _is_point(true) {}
 
+    Interval() = default;
+
     DEFAULT_RULE_OF_FOUR(Interval);
 
     inline bool contains(const T& t) const;
@@ -68,29 +70,31 @@ public:
 
     //ACCESSORS
 
-    virtual const vec<T, N>&    q_start() const = 0;
+    virtual const Interval<T>&   interval() const = 0;
 
-    virtual const vec<T, N>&    q_end() const = 0;
+    virtual const vec<T, N>&        q_start() const = 0;
 
-    virtual const int&          start_bdr() const = 0;
+    virtual const vec<T, N>&        q_end() const = 0;
 
-    virtual const int&          end_bdr() const = 0;
+    virtual const int&              start_bdr() const = 0;
 
-    virtual const int&          dir() const = 0;
+    virtual const int&              end_bdr() const = 0;
 
-    virtual const T&            t_start() const = 0;
+    virtual const int&              dir() const = 0;
 
-    virtual const T&            t_end() const = 0;
+    virtual const T&                t_start() const = 0;
 
-    virtual bool                is_out_of_bounds(const T& t) const = 0;
+    virtual const T&                t_end() const = 0;
 
-    virtual bool                can_link_with(const Interpolator<T, N>& other) const = 0;
+    virtual bool                    is_out_of_bounds(const T& t) const = 0;
 
-    virtual Interpolator<T, N>* clone() const = 0;
+    virtual bool                    can_link_with(const Interpolator<T, N>& other) const = 0;
 
-    void                        call(vec<T, N>& result, const T& t) const;
+    virtual Interpolator<T, N>*     clone() const = 0;
 
-    vec<T, N>                   call(const T& t) const;
+    void                            call(vec<T, N>& result, const T& t) const;
+
+    vec<T, N>                       call(const T& t) const;
 
 
     //MODIFIERS
@@ -141,7 +145,7 @@ public:
 
     //ACCESSORS
 
-    inline const Interval<T>&   interval() const;
+    inline const Interval<T>&   interval() const override;
 
     inline const vec<T, N>&     q_start() const override;
 
@@ -190,8 +194,6 @@ private:
     Interval<T> _interval;
     T _tmin;
     T _tmax;
-    T _t_old;
-    T _t;
     vec<T, N> _q_old;
     vec<T, N> _q;
 
@@ -202,7 +204,7 @@ private:
 
 
 template<typename T, int N, typename STATE>
-class StandardLocalInterpolator : public LocalInterpolator<T, N>{
+class StandardLocalInterpolator final: public LocalInterpolator<T, N>{
     //The purpose of this class is to provide a continuous output between the naturally adapted states
     //of an OdeSolver.
     
@@ -256,6 +258,8 @@ public:
 
 
     //ACCESSORS
+
+    const Interval<T>&                      interval() const override;
 
     size_t                                  size() const;
 
@@ -326,6 +330,62 @@ private:
     std::vector<Interpolator<T, N>*> _interp_ptrs = {};
     mutable vec<T, N> _q;
     int _dir = 0;
+    mutable bool _interval_cached = false;
+    mutable Interval<T> _interval;
+
+};
+
+
+
+template<typename T, int N>
+class OdeSolution : public OdeResult<T, N>{
+
+public:
+
+    using EventMap = OdeResult<T, N>::EventMap;
+
+    OdeSolution(const std::vector<T>& t, const std::vector<vec<T, N>>& q, const EventMap& event_map, bool diverges, bool success, double runtime, const std::string& message, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(t, q, event_map, diverges, success, runtime, message), _interpolator(interpolator.clone()) {}
+
+    OdeSolution(const OdeSolution& other) : OdeResult<T, N>(other), _interpolator(other._interpolator->clone()) {}
+
+    OdeSolution(OdeSolution&& other) : OdeResult<T, N>(std::move(other)), _interpolator(other._interpolator){
+        other._interpolator = nullptr;
+    }
+
+    OdeSolution(OdeResult<T, N>&& other, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(other)), _interpolator(interpolator.clone()) {}
+
+    OdeSolution& operator=(const OdeSolution& other){
+        if (&other != this){
+            delete _interpolator;
+            _interpolator = other._interpolator->clone();
+        }
+        return *this;
+    }
+
+    OdeSolution& operator=(OdeSolution&& other){
+        if (&other != this){
+            delete _interpolator;
+            _interpolator = other._interpolator;
+            other._interpolator = nullptr;
+        }
+        return *this;
+    }
+
+    ~OdeSolution(){
+        delete _interpolator;
+        _interpolator = nullptr;
+    }
+
+    inline vec<T, N> operator()(const T& t) const{
+        return _interpolator->call(t);
+    }
+
+    OdeSolution<T, N>* clone() const override{ return new OdeSolution<T, N>(*this);}
+
+private:
+
+    Interpolator<T, N>* _interpolator;
+
 };
 
 
@@ -464,7 +524,7 @@ Interpolator<T, N>::Interpolator(const int& n) : _q(n) {}
 template<typename T, int N>
 void Interpolator<T, N>::call(vec<T, N>& result, const T& t) const{
     if (this->is_out_of_bounds(t)){
-        throw std::runtime_error("Scalar " + to_string(t) + " is out of bounds in LinkedInterpolator with range ["+to_string(t_start())+", "+to_string(t_end())+"]");
+        throw std::runtime_error("Scalar " + to_string(t) + " is out of bounds in LinkedInterpolator with range " + interval().signature());
     }
     this->_call_impl(result, t);
 }
@@ -477,11 +537,11 @@ vec<T, N> Interpolator<T, N>::call(const T& t) const{
 
 
 template<typename T, int N>
-LocalInterpolator<T, N>::LocalInterpolator(const T& t, const vec<T, N>& q) : Interpolator<T, N>(q.size()), _interval(t), _tmin(t), _tmax(t), _t_old(t), _t(t), _q_old(q), _q(q){}
+LocalInterpolator<T, N>::LocalInterpolator(const T& t, const vec<T, N>& q) : Interpolator<T, N>(q.size()), _interval(t), _tmin(t), _tmax(t), _q_old(q), _q(q){}
 
 
 template<typename T, int N>
-LocalInterpolator<T, N>::LocalInterpolator(const State<T, N>& old_state, const State<T, N>& state, int left_bdr, int right_bdr) : Interpolator<T, N>(state.vector().size()), _interval(old_state.t(), state.t(), left_bdr, right_bdr), _tmin(old_state.t()), _tmax(state.t()), _t_old(old_state.t()), _t(state.t()), _q_old(old_state.exposed_vector()), _q(state.exposed_vector()){}
+LocalInterpolator<T, N>::LocalInterpolator(const State<T, N>& old_state, const State<T, N>& state, int left_bdr, int right_bdr) : Interpolator<T, N>(state.vector().size()), _interval(old_state.t(), state.t(), left_bdr, right_bdr), _tmin(old_state.t()), _tmax(state.t()), _q_old(old_state.exposed_vector()), _q(state.exposed_vector()){}
 
 template<typename T, int N>
 inline const Interval<T>& LocalInterpolator<T, N>::interval() const{
@@ -520,12 +580,12 @@ inline const int& LocalInterpolator<T, N>::dir() const{
 
 template<typename T, int N>
 inline const T& LocalInterpolator<T, N>::t_start() const{
-    return _t_old;
+    return _interval.start();
 }
 
 template<typename T, int N>
 inline const T& LocalInterpolator<T, N>::t_end() const{
-    return _t;
+    return _interval.end();
 }
 
 template<typename T, int N>
@@ -599,7 +659,7 @@ const T& LocalInterpolator<T, N>::_t_max() const{
 
 template<typename T, int N>
 void LocalInterpolator<T, N>::_call_impl(vec<T, N>& result, const T& t) const{
-    result = _q_old + (_q-_q_old)/(_t - _t_old) * (t-_t_old);
+    result = _q_old + (_q-_q_old)/(_interval.end() - _interval.start()) * (t-_interval.start());
 }
 
 
@@ -688,6 +748,17 @@ LinkedInterpolator<T, N, INTERPOLATOR>::~LinkedInterpolator(){
 
 
 template<typename T, int N, typename INTERPOLATOR>
+const Interval<T>& LinkedInterpolator<T, N, INTERPOLATOR>::interval() const{
+    if (_interval_cached){
+        return _interval;
+    }
+    else{
+        _interval = Interval<T>(t_start(), t_end(), start_bdr(), end_bdr());
+        return _interval;
+    }
+}
+
+template<typename T, int N, typename INTERPOLATOR>
 size_t LinkedInterpolator<T, N, INTERPOLATOR>::size() const{
     if constexpr (_is_void){
         return _interp_ptrs.size();
@@ -735,6 +806,16 @@ inline const T& LinkedInterpolator<T, N, INTERPOLATOR>::t_end() const{
     return _get_last().t_end();
 }
 
+template<typename T, int N, typename INTERPOLATOR>
+inline const INTERPOLATOR& LinkedInterpolator<T, N, INTERPOLATOR>::interpolant(const size_t& i) const{
+    return _get_safe(i);
+}
+
+template<typename T, int N, typename INTERPOLATOR>
+inline const INTERPOLATOR& LinkedInterpolator<T, N, INTERPOLATOR>::last_interpolant() const{
+    return _get_last();
+}
+
 
 template<typename T, int N, typename INTERPOLATOR>
 bool LinkedInterpolator<T, N, INTERPOLATOR>::is_out_of_bounds(const T& t) const {
@@ -762,22 +843,25 @@ LinkedInterpolator<T, N, INTERPOLATOR>* LinkedInterpolator<T, N, INTERPOLATOR>::
 
 template<typename T, int N, typename INTERPOLATOR>
 void LinkedInterpolator<T, N, INTERPOLATOR>::link_with(Interpolator<T, N>& interpolant){
+    _interval_cached = false;
     _get_last().link_with(interpolant);
 }
 
 template<typename T, int N, typename INTERPOLATOR>
 void LinkedInterpolator<T, N, INTERPOLATOR>::link_after(Interpolator<T, N>& interpolant){
+    _interval_cached = false;
     _get(0).link_after(interpolant);
 }
 
 template<typename T, int N, typename INTERPOLATOR>
 inline void LinkedInterpolator<T, N, INTERPOLATOR>::adjust(const T& t_new) {
+    _interval_cached = false;
     _get_last().adjust(t_new);
 }
 
 template<typename T, int N, typename INTERPOLATOR>
 void LinkedInterpolator<T, N, INTERPOLATOR>::expand(const INTERPOLATOR& interpolant) {
-
+    _interval_cached = false;
     if (_can_replace_last_with(interpolant)){
         if constexpr (_is_void){
             delete _interp_ptrs.back();
@@ -807,29 +891,22 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::expand(const INTERPOLATOR& interpol
 }
 
 template<typename T, int N, typename INTERPOLATOR>
-inline const INTERPOLATOR& LinkedInterpolator<T, N, INTERPOLATOR>::interpolant(const size_t& i) const{
-    return _get_safe(i);
-}
-
-template<typename T, int N, typename INTERPOLATOR>
-inline const INTERPOLATOR& LinkedInterpolator<T, N, INTERPOLATOR>::last_interpolant() const{
-    return _get_last();
-}
-
-template<typename T, int N, typename INTERPOLATOR>
 inline void LinkedInterpolator<T, N, INTERPOLATOR>::open_end(){
+    _interval_cached = false;
     _get_last().open_end();
 }
 
 
 template<typename T, int N, typename INTERPOLATOR>
 inline void LinkedInterpolator<T, N, INTERPOLATOR>::close_end(){
+    _interval_cached = false;
     _get_last().close_end();
 }
 
 
 template<typename T, int N, typename INTERPOLATOR>
 inline void LinkedInterpolator<T, N, INTERPOLATOR>::close_start(){
+    _interval_cached = false;
     _get(0).close_end();
 }
 
@@ -843,7 +920,6 @@ size_t LinkedInterpolator<T, N, INTERPOLATOR>::_search_index(const T& t) const{
     size_t right = size()-1;
     size_t mid;
     const int d = dir();
-
     while (right > left){
         mid = (right+left) / 2;
         if (!_get(left).is_out_of_bounds(t)){

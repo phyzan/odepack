@@ -305,31 +305,46 @@ struct OdeRhs{
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
 template<typename T, int N>
-struct OdeResult{
+class OdeResult{
 
+public:
 
-    const std::vector<T> t;
-    const std::vector<vec<T, N>> q;
-    const std::map<std::string, std::vector<size_t>> event_map;
-    const bool diverges;
-    const bool success;// if the OdeSolver didnt die during the integration
-    const double runtime;
-    const std::string message;
+    using EventMap = std::map<std::string, std::vector<size_t>>;
+
+    OdeResult(const std::vector<T>& t, const std::vector<vec<T, N>>& q, const EventMap& event_map, bool diverges, bool success, double runtime, const std::string& message) : _t(t), _q(q), _event_map(event_map), _diverges(diverges), _success(success), _runtime(runtime), _message(message) {}
+
+    DEFAULT_RULE_OF_FOUR(OdeResult);
+
+    virtual ~OdeResult() = default;
+
+    const std::vector<T>& t() const {return _t;}
+
+    const std::vector<vec<T, N>>& q() const {return _q;}
+
+    const EventMap& event_map() const { return _event_map;}
+
+    const bool& diverges() const {return _diverges;}
+
+    const bool success() const {return _success;}
+
+    const double& runtime() const {return _runtime;}
+
+    const std::string& message() const {return _message;}
 
     void examine() const{
         std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n" <<
-        "\tPoints           : " << t.size() << "\n" <<
-        "\tDiverges         : " << (diverges ? "true" : "false") << "\n" << 
-        "\tSuccess          : " << (success ? "true" : "false") << "\n" <<
-        "\tRuntime          : " << runtime << "\n" <<
-        "\tTermination cause: " << message << "\n" <<
+        "\tPoints           : " << _t.size() << "\n" <<
+        "\tDiverges         : " << (_diverges ? "true" : "false") << "\n" << 
+        "\tSuccess          : " << (_success ? "true" : "false") << "\n" <<
+        "\tRuntime          : " << _runtime << "\n" <<
+        "\tTermination cause: " << _message << "\n" <<
         event_log();
     }
 
     std::string event_log() const{
         std::string res = "";
         res += "\tEvents:\n\t----------\n";
-        for (const auto& [name, array] : event_map){
+        for (const auto& [name, array] : _event_map){
             res += "\t    " + name + " : " + std::to_string(array.size()) + "\n";
         }
         res += "\n\t----------\n";
@@ -337,13 +352,24 @@ struct OdeResult{
     }
 
     std::vector<T> t_filtered(const std::string& event) const {
-        return _event_data(this->t, this->event_map, event);
+        return _event_data(this->_t, this->_event_map, event);
     }
 
     std::vector<vec<T, N>> q_filtered(const std::string& event) const {
-        return _event_data(this->q, this->event_map, event);
+        return _event_data(this->_q, this->_event_map, event);
     }
+
+    virtual OdeResult<T, N>* clone() const{ return new OdeResult<T, N>(*this);}
     
+private:
+
+    std::vector<T> _t;
+    std::vector<vec<T, N>> _q;
+    EventMap _event_map;
+    bool _diverges;
+    bool _success;// if the OdeSolver didnt die during the integration
+    double _runtime;
+    std::string _message;
 };
 
 

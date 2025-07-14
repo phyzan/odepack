@@ -443,7 +443,7 @@ typename RK23<T, N>::RKbase::Etype RK23<T, N>::Ematrix() {
 
 template<typename T, int N>
 typename RK23<T, N>::RKbase::Ptype RK23<T, N>::Pmatrix() {
-    typename RKbase::Ptype P(Nstages+1, 4);
+    typename RKbase::Ptype P(Nstages+1, 3);
     P << T(1),   -T(4)/T(3),  T(5)/T(9),
         T(0),    T(1),      -T(2)/T(3),
         T(0),    T(4)/T(3), -T(8)/T(9),

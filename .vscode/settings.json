@@ -91,6 +91,7 @@
         "cfloat": "cpp",
         "climits": "cpp",
         "core": "cpp",
-        "__availability": "cpp"
+        "__availability": "cpp",
+        "__assert": "cpp"
     }
 }

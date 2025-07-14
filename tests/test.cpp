@@ -43,29 +43,35 @@ int main(){
     T max_step = 100;
     T pi = 3.14159265359;
 
-    T tmax = 10000;
+    T tmax = 100000;
 
 
     PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
     PeriodicEvent<T, N> ev2("periodic", 1, 0.5);
 
-    // VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
-    RK45<T, N> s(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps});
-    s.start_interpolation();
-    s.set_goal(10000);
-    while (s.is_running()){
-        s.advance();
-    }
+    VariationalODE<T, N> ode(f, t0, q0, 1, rtol, atol, min_step, max_step, first_step, {}, {}, "RK45");
+
+    auto res = ode.rich_integrate(tmax);
+
+    std::cout << res(9999).transpose() << std::endl;
+    std::cout << res(1).transpose() << std::endl;
+    std::cout << res(1.0000001).transpose() << std::endl;
+    // RK45<T, N> s(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps});
+    // s.start_interpolation();
+    // s.set_goal(10000);
+    // while (s.is_running()){
+    //     s.advance();
+    // }
 
 
-    s.set_goal(-1);
-    while (s.is_running()){
-        s.advance();
-    }
-    s.state().show();
+    // s.set_goal(-1);
+    // while (s.is_running()){
+    //     s.advance();
+    // }
+    // s.state().show();
     
-    std::cout << s.interpolators().front()->call(2*pi*105).transpose() << std::endl;
-    std::cout << s.interpolators().back()->call(2*pi*105).transpose() << std::endl;
+    // std::cout << s.interpolators().front()->call(2*pi*105).transpose() << std::endl;
+    // std::cout << s.interpolators().back()->call(2*pi*105).transpose() << std::endl;
 
     // ode.integrate(tmax, 100).examine();
     // ode.state().show();
