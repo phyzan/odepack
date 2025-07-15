@@ -720,6 +720,11 @@ const vec<T, N>& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_interp(cons
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_finalize(const T& t0, const vec<T, N>& q0, T first_step){
+
+    if (!q0.isFinite().all()){
+        throw std::runtime_error("The given initial conditions contain non finite values (inf or nan).");
+    }
+
     int dir = sgn(first_step);
 
     if (first_step != 0){

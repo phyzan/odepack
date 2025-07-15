@@ -449,6 +449,8 @@ public:
 
     EventCollection<T, N>& operator=(const EventCollection<T, N>& other){
         if (&other != this){
+            _clear();
+            _names.clear();
             _copy(other._events.begin(), other._events.size());
         }
         return *this;
@@ -500,7 +502,6 @@ private:
         // our current _events vector. We sort the vector to contain normal events first,
         // and stop_events after to improve runtime performance and not miss out on any stop_events
         // if a single step encounters multiple events.
-
         std::vector<Event<T, N>*> new_precise_events;
         std::vector<Event<T, N>*> new_rough_events;
         for (size_t i = 0; i < size; i++) {
@@ -531,20 +532,4 @@ private:
 };
 
 
-
-
-/*
-
-(rule of 5)
-In classes, explicitly declare:
-
-protected copy/move constructors in pure virtual base classes
-
-public copy/move constructors in concrete classes
-
-similar for assignment and move assignment operator
-
-public virtual destructor in base class
-
-*/
 #endif
