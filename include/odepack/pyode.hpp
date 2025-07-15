@@ -581,7 +581,7 @@ py::dict to_PyDict(const std::map<std::string, std::vector<size_t>>& _map){
 template<class Scalar, class ArrayType>
 py::array_t<Scalar> to_numpy(const ArrayType& array, const _Shape& q0_shape){
     if (q0_shape.size() == 0){
-        py::array_t<Scalar> res(array.size(), array.data());
+        py::array_t<Scalar> res(std::vector<size_t>{static_cast<size_t>(array.size())}, array.data());
         return res;
     }
     else{

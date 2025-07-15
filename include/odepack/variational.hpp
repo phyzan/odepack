@@ -37,7 +37,7 @@ public:
             _t_last = _t_renorm;
             _logksi_last = _logksi;
             _t_renorm = this->state().t();
-            _logksi += std::log(delq_norm(this->state().vector()));
+            _logksi += std::log(delq_norm(this->state().exposed_vector()));
             return true;
         }
         else{
@@ -65,6 +65,11 @@ public:
 
     NormalizationEvent<T, N>* clone() const override{
         return new NormalizationEvent<T, N>(*this);
+    }
+
+    void set_start(const T& t) override{
+        PeriodicEvent<T, N>::set_start(t);
+        _t_renorm = this->_start;
     }
 
 

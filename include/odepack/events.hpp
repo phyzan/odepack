@@ -125,7 +125,7 @@ public:
 
     void                    go_back() override;
 
-    void                    set_start(const T& t);
+    virtual void            set_start(const T& t);
 
 protected:
     T _period;

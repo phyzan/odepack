@@ -145,29 +145,31 @@ private:
 
     const INTERPOLATOR& _interpolator() const;
 
-    void         _register_states();
+    void            _register_states();
 
-    bool         _adapt_to_event(Event<T, N>& event, const State<T, N>& before, const State<T, N>& after);
+    void            _initialize_events(const T& t0);
 
-    void         _add_interpolant(const INTERPOLATOR& interpolant);
+    bool            _adapt_to_event(Event<T, N>& event, const State<T, N>& before, const State<T, N>& after);
 
-    bool         _validate_it(const STATE& state);
+    void            _add_interpolant(const INTERPOLATOR& interpolant);
 
-    void         _warn_dead();
+    bool            _validate_it(const STATE& state);
 
-    void         _warn_paused();
+    void            _warn_dead();
 
-    void         _warn_travolta();
+    void            _warn_paused();
 
-    void         _find_true_state(const Solver& other);
+    void            _warn_travolta();
 
-    void         _finalize_state(const State<T, N>& start);
+    void            _find_true_state(const Solver& other);
 
-    void         _clear_states();
+    void            _finalize_state(const State<T, N>& start);
 
-    void         _copy_data(const Solver& other);
+    void            _clear_states();
 
-    void         _move_data(Solver&& other);
+    void            _copy_data(const Solver& other);
+
+    void            _move_data(Solver&& other);
 
     Functor<T, N>                               _ode_rhs;
     T                                           _rtol;
@@ -184,7 +186,7 @@ private:
     size_t                                      _N=0;//total number of solution updates
     vec<T, N>                                   _error;
     std::string                                 _message;
-    EventCollection<T, N>                       _events;
+    EventCollection<T, N>                       _events = {};
     int                                         _current_event_index = -1;
     int                                         _direction;
     STATE*                                      _initial_state;
@@ -223,19 +225,6 @@ DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUC
     if (_max_step < _min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
-
-    for (size_t i=0; i<_events.size(); i++){
-        if (PeriodicEvent<T, N>* p = dynamic_cast<PeriodicEvent<T, N>*>(&_events[i])){
-            if (abs(p->t_start()) == inf<T>()){
-                p->set_start(t0+p->period());
-            }
-            else if (p->t_start() == t0){
-                throw std::runtime_error("The starting time of a periodic event cannot be set at the initial time of the ode solver.");
-            }
-        }
-    }
-
-    _events.set_args(args);
 
     _error.setZero();
 }
@@ -483,7 +472,7 @@ template<typename T, int N, typename Derived, typename STATE, typename INTERPOLA
 inline std::unique_ptr<OdeSolver<T, N>> DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::with_new_events(const EventCollection<T, N>& events)const{
     Derived* cl = derived_clone();
     cl->_events = events;
-    cl->_events.set_args(this->_args);
+    cl->_initialize_events(this->t());
     return std::unique_ptr<OdeSolver<T, N>>(cl);
 }
 
@@ -735,6 +724,9 @@ void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_finalize(const T& t0, c
         first_step = this->auto_step(1, &ics);
         dir = 1;
     }
+
+    _initialize_events(t0);
+    
     _direction = dir;
     //now first_step and initial direction are both != 0.
     _initial_state = new STATE(new_state(t0, q0, first_step*dir));
@@ -768,6 +760,21 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_register_states(
     }
 }
 
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_initialize_events(const T& t0){
+
+    _events.set_args(this->_args);
+    for (size_t i=0; i<_events.size(); i++){
+        if (PeriodicEvent<T, N>* p = dynamic_cast<PeriodicEvent<T, N>*>(&_events[i])){
+            if (abs(p->t_start()) == inf<T>()){
+                p->set_start(t0+p->period());
+            }
+            else if (p->t_start() == t0){
+                throw std::runtime_error("The starting time of a periodic event cannot be set at the initial time of the ode solver.");
+            }
+        }
+    }
+}
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 bool DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_adapt_to_event(Event<T, N>& event, const State<T, N>& before, const State<T, N>& after){
