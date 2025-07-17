@@ -1,1 +1,1 @@
-/usr/bin/c++ -fPIC -flto -shared  -o odepack.cpython-312-x86_64-linux-gnu.so CMakeFiles/odepack.dir/pyode.cpp.o  -lmpfr -lgmp /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a 
+/usr/bin/c++ -fPIC -flto -Wl,--dependency-file=CMakeFiles/odepack.dir/link.d -shared  -o odepack.cpython-312-x86_64-linux-gnu.so CMakeFiles/odepack.dir/pyode.cpp.o  -lmpfr -lgmp /usr/lib/gcc/x86_64-linux-gnu/13/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.a

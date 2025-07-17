@@ -15,10 +15,8 @@ CMakeFiles/odepack.dir/pyode.cpp.o: \
  /usr/include/x86_64-linux-gnu/c++/13/bits/cpu_defines.h \
  /usr/include/c++/13/pstl/pstl_config.h \
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h \
- /usr/include/pybind11/pybind11.h /usr/include/pybind11/detail/class.h \
- /usr/include/pybind11/attr.h /usr/include/pybind11/detail/common.h \
- /usr/include/python3.12/Python.h /usr/include/python3.12/patchlevel.h \
- /usr/include/python3.12/pyconfig.h \
+ /usr/include/pybind11/detail/common.h /usr/include/python3.12/Python.h \
+ /usr/include/python3.12/patchlevel.h /usr/include/python3.12/pyconfig.h \
  /usr/include/x86_64-linux-gnu/python3.12/pyconfig.h \
  /usr/include/python3.12/pymacconfig.h /usr/include/c++/13/stdlib.h \
  /usr/include/c++/13/cstdlib /usr/include/stdlib.h \
@@ -364,7 +362,9 @@ CMakeFiles/odepack.dir/pyode.cpp.o: \
  /usr/include/c++/13/bits/stl_vector.h \
  /usr/include/c++/13/bits/stl_bvector.h \
  /usr/include/c++/13/bits/vector.tcc /usr/include/c++/13/version \
- /usr/include/pybind11/cast.h /usr/include/pybind11/detail/descr.h \
+ /usr/include/pybind11/pybind11.h /usr/include/pybind11/detail/class.h \
+ /usr/include/pybind11/attr.h /usr/include/pybind11/cast.h \
+ /usr/include/pybind11/detail/descr.h \
  /usr/include/pybind11/detail/type_caster_base.h \
  /usr/include/pybind11/pytypes.h /usr/include/pybind11/buffer_info.h \
  /usr/include/c++/13/iterator /usr/include/c++/13/bits/stream_iterator.h \

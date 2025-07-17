@@ -69,7 +69,7 @@ public:
 
     void set_start(const T& t) override{
         PeriodicEvent<T, N>::set_start(t);
-        _t_renorm = this->_start;
+        _t_renorm = t;
     }
 
 
@@ -107,31 +107,6 @@ public:
         return new VariationalODE<T, N>(*this);
     }
 
-    OdeResult<T, N> var_integrate(const T& interval, const T& lyap_period, const int& max_prints=0){
-        TimePoint t1 = now();
-        TimePoint t2;
-        const size_t Nt = this->_t_arr.size();
-        T t_total = 0;
-        T t0 = this->_solver->t();
-        while (t_total < interval){
-            t_total = std::min(t_total+lyap_period, interval); //we could just add lyap_period, but a roundoff error is slowly added up
-            this->go_to(t0+t_total, 0, {{"Normalization", 0}}, max_prints, false);
-            if (this->is_dead()){
-                break;
-            }
-            else if (this->_solver->t()==t0+t_total){
-                this->_register_lyap();
-                if (this->_t_arr.back() != this->_solver->t()){
-                    this->_register_state();
-                }
-            }
-        }
-        t2 = now();
-
-        OdeResult<T, N> res(subvec(this->_t_arr, Nt), subvec(this->_q_arr, Nt), this->event_map(Nt), this->_solver->diverges(), !this->_solver->is_dead(), as_duration(t1, t2), this->_solver->message());
-        return res;
-    }
-
     inline const std::vector<T>& t_lyap() const{
         return _t_lyap;
     }
@@ -149,7 +124,7 @@ private:
         }
     }
 
-    const NormalizationEvent<T, N>& _main_event()const{
+    inline const NormalizationEvent<T, N>& _main_event()const{
         return static_cast<const NormalizationEvent<T, N>&>(this->solver().events()[_ind]);
     }
 
@@ -162,15 +137,12 @@ private:
         throw std::runtime_error("Normalization event not found");
     }
 
-    void _register_lyap(){
-        const NormalizationEvent<T, N>& ev = _main_event();
-        if ( (_t_lyap.size() == 0) || (ev.t_lyap() != _t_lyap.back())){
+    void _register_state(const int& event) override{
+        ODE<T, N>::_register_state();
+        if (event == static_cast<int>(_ind)){
+            const NormalizationEvent<T, N>& ev = _main_event();
             _t_lyap.push_back(ev.t_lyap());
             _lyap_array.push_back(ev.lyap());
-            // if ( (this->_Nevents[_ind].size() == 0) || (this->_Nevents[_ind].back() != this->_t_arr.size()) ){
-            //     this->_Nevents[_ind].pushback(_t_arr.size()) //not _t_arr.size() in general
-            // }
-            
         }
     }
 
@@ -179,29 +151,5 @@ private:
     std::vector<T> _lyap_array = {};
 
 };
-
-
-
-template<typename T, int N>
-void var_integrate_all(const std::vector<VariationalODE<T, N>*>& list, const T& interval, const T& lyap_period, const int& threads=-1, const bool& display_progress = false){
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    int target = list.size();
-    Clock clock;
-    clock.start();
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (VariationalODE<T, N>* ode : list){
-        ode->var_integrate(interval, lyap_period);
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
-    }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
-}
-
-
 
 #endif

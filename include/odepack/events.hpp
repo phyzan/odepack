@@ -10,6 +10,7 @@ During an ode integration, we might want to save specific events that are encout
 
 */
 
+#include <stdexcept>
 #include <unordered_set>
 #include "states.hpp"
 

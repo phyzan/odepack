@@ -3,9 +3,11 @@
 
 
 #include <cstddef>
+#include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
+#include <stdexcept>
 #include "variational.hpp"
 #include "solvers.hpp"
 
@@ -63,16 +65,24 @@ std::vector<EventOptions> to_Options(const py::dict& d) {
 
         if (py::isinstance<py::int_>(value)) {
             opt.max_events = value.cast<int>();
-            opt.terminate = false;
         } else if (py::isinstance<py::tuple>(value)) {
             auto tup = value.cast<py::tuple>();
             if (tup.size() != 2)
                 throw std::runtime_error("Expected tuple of (int, bool)");
 
             opt.max_events = tup[0].cast<int>();
-            opt.terminate = tup[1].cast<bool>();
+            if (tup.size() > 1){
+                opt.terminate = tup[1].cast<bool>();
+            }
+            if (tup.size() > 2){
+                opt.period = tup[2].cast<int>();
+            }
+            if (tup.size() > 3){
+                throw py::value_error("Tuple size in event options dict value must be at most 3");
+            }
+            
         } else {
-            throw std::runtime_error("Expected int or (int, bool) tuple");
+            throw py::value_error("Expected int or (int, bool, int) tuple in event options dict value");
         }
 
         result.push_back(opt);
@@ -131,7 +141,7 @@ class PyPerEvent : public PyEvent<T, N>{
 public:
     PyPerEvent(py::str name, const T& period, const T& start, py::object mask, py::bool_ hide_mask):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(start){}
 
-    PyPerEvent(py::str name, const T& period, py::object mask, py::bool_ hide_mask):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(inf<T>()){}
+    PyPerEvent(py::str name, const T& period, py::object mask, py::bool_ hide_mask):PyPerEvent<T, N>(name, period, inf<T>(), mask, hide_mask){}
 
     PreciseEvent<T, N>* toEvent(const _Shape& shape, py::tuple args) override{
         return new PeriodicEvent<T, N>(this->_name, this->_period, this->_start, to_Func<T, N>(this->py_mask, shape, args), this->hide_mask);
@@ -377,7 +387,9 @@ public:
 
 
     PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
-        return this->py_integrate(t, max_frames, event_options, max_prints, include_first);
+        OdeResult<T, N> res = ode->go_to(t, max_frames, to_Options(event_options), max_prints, include_first);
+        PyOdeResult<T, N> py_res(res, this->q0_shape);
+        return py_res;
     }
 
     py::array_t<T> t_array()const{
@@ -436,11 +448,6 @@ public:
 
     const VariationalODE<T, N>& varode() const {
         return *static_cast<VariationalODE<T, N>*>(this->ode);
-    }
-
-    PyOdeResult<T, N> py_var_integrate(const T& interval, const T& lyap_period, const int& max_prints=0){
-        OdeResult<T, N> res = varode().var_integrate(interval, lyap_period, max_prints);
-        return PyOdeResult<T, N>(res, this->q0_shape);
     }
 
     py::array_t<T> py_t_lyap() const{
@@ -654,6 +661,11 @@ void define_ode_module(py::module& m) {
             return self.py_check_if;});
         
     py::class_<PyPerEvent<T, N>, PyEvent<T, N>>(m, "PeriodicEvent", py::module_local())
+        .def(py::init<py::str, T, py::object, py::bool_>(),
+            py::arg("name"),
+            py::arg("period"),
+            py::arg("mask")=py::none(),
+            py::arg("hide_mask")=false)
         .def(py::init<py::str, T, T, py::object, py::bool_>(),
             py::arg("name"),
             py::arg("period"),
@@ -792,7 +804,6 @@ void define_ode_module(py::module& m) {
             py::arg("args")=py::tuple(),
             py::arg("events")=nullptr,
             py::arg("method")="RK45")
-        .def("var_integrate", &PyVarODE<T, N>::py_var_integrate, py::arg("interval"), py::arg("lyap_period"), py::arg("max_prints")=0)
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE<T, N>::py_lyap)
         .def("copy", [](const PyVarODE<T, N>& self){return PyVarODE<T, N>(self);});
@@ -813,14 +824,6 @@ void define_ode_module(py::module& m) {
             }
             integrate_all(array, interval, max_frames, to_Options(event_options), threads, display_progress);
         }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::dict(), py::arg("threads")=-1, py::arg("display_progress")=false);
-    
-    m.def("var_integrate_all", [](py::object list, const T& interval, const T& lyap_period, const int& threads, const bool& display_progress){
-        std::vector<VariationalODE<T, N>*> array;
-        for (const py::handle& item : list) {
-            array.push_back(&item.cast<PyVarODE<T, N>&>().varode());
-        }
-        var_integrate_all(array, interval, lyap_period, threads, display_progress);
-    }, py::arg("varode_array"), py::arg("interval"), py::arg("lyap_period"), py::arg("threads")=-1, py::arg("display_progress")=false);
 }
 
 #endif

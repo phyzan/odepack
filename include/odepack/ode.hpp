@@ -3,6 +3,8 @@
 
 #include <cstddef>
 #include <omp.h>
+#include <stdexcept>
+#include "tools.hpp"
 #include "solvers.hpp"
 
 
@@ -10,6 +12,7 @@ struct EventOptions{
     std::string name;
     int max_events=-1;
     bool terminate=false;
+    int period=1;
 };
 
 
@@ -21,9 +24,11 @@ public:
 
     EventCounter(const std::vector<EventOptions>& options);
 
+    DEFAULT_RULE_OF_FOUR(EventCounter);
+
     inline const int& operator[](const size_t& i) const;
 
-    void count_it(const size_t& i);
+    bool count_it(const size_t& i);
 
     inline const bool& is_running()const;
 
@@ -35,6 +40,7 @@ private:
 
     std::vector<EventOptions> _options;
     std::vector<int> _counter;
+    std::vector<int> _period_counter;
     size_t _total=0;
     bool _is_running = true;
 };
@@ -107,7 +113,7 @@ protected:
     double _runtime = 0;
 
 
-    void _register_state();
+    virtual void _register_state(const int& event=-1);
 
 private:
 
@@ -132,7 +138,14 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
 
 
 template<typename T, int N>
-EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0) {}
+EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size()) {
+    for (size_t i=0; i<options.size(); i++){
+        if (options[i].period < 1){
+            throw std::runtime_error("The period argument in event options must be at least 1.");
+        }
+        _period_counter[i] = options[i].period-1;
+    }
+}
 
 
 template<typename T, int N>
@@ -141,17 +154,20 @@ inline const int& EventCounter<T, N>::operator[](const size_t& i) const{
 }
 
 template<typename T, int N>
-void EventCounter<T, N>::count_it(const size_t& i){
-    if ((_counter[i] != _options[i].max_events) && _is_running){
-        _counter[i]++;
-        _total++;
-        if ((_counter[i] == _options[i].max_events) && _options[i].terminate){
-            _is_running = false;
+bool EventCounter<T, N>::count_it(const size_t& i){
+    if (this->can_fit(i)){
+        _period_counter[i]++;
+        if (_period_counter[i] == _options[i].period){
+            _period_counter[i] = 0;
+            _counter[i]++;
+            _total++;
+            if ((_counter[i] == _options[i].max_events) && _options[i].terminate){
+                _is_running = false;
+            }
+            return true;
         }
     }
-    else{
-        throw std::runtime_error("Cannot register more events");
-    }
+    return false;
 }
 
 template<typename T, int N>
@@ -260,17 +276,15 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::v
     while (_solver->is_running()){
         if (_solver->advance()){
             const int& ev = _solver->current_event_index();
-            if (_solver->at_event() && event_counter.can_fit(ev)){
-                _Nevents[ev].push_back(_t_arr.size());
-                event_counter.count_it(ev);
-
+            if (_solver->at_event() && event_counter.count_it(ev)){
+                //the .count_it(ev) in the line above might have stopped the solver.
                 //if the solver stopped for any other reason, that takes priority.
                 //only if it is still running but max events have been reached, the solver will display "max events reached".
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
                 i++;
-                _register_state();
+                _register_state(ev);
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
@@ -324,7 +338,7 @@ bool ODE<T, N>::advance(){
         if (_solver->at_event()){
             _Nevents[_solver->current_event_index()].push_back(_t_arr.size());
         }
-        _register_state();
+        _register_state(_solver->current_event_index());
         success = true;
     }
     return success;
@@ -422,7 +436,10 @@ void ODE<T, N>::clear(){
 }
 
 template<typename T, int N>
-void ODE<T, N>::_register_state(){
+void ODE<T, N>::_register_state(const int& event){
+    if (event != -1){
+        _Nevents[event].push_back(_t_arr.size());
+    }
     _t_arr.push_back(_solver->t());
     _q_arr.push_back(_solver->q());
 }
@@ -441,7 +458,7 @@ template<typename T, int N>
 std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOptions>& options)const{
     std::vector<EventOptions> res(_solver->events().size());
     bool found;
-    for (size_t i=0; i< options.size(); i++) {
+    for (size_t i=0; i<options.size(); i++) {
         found = false;
         for (size_t j=0; j<_solver->events().size(); j++){
             if (_solver->events()[j].name() == options[i].name){
