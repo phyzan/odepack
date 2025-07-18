@@ -67,9 +67,6 @@ std::vector<EventOptions> to_Options(const py::dict& d) {
             opt.max_events = value.cast<int>();
         } else if (py::isinstance<py::tuple>(value)) {
             auto tup = value.cast<py::tuple>();
-            if (tup.size() != 2)
-                throw std::runtime_error("Expected tuple of (int, bool)");
-
             opt.max_events = tup[0].cast<int>();
             if (tup.size() > 1){
                 opt.terminate = tup[1].cast<bool>();

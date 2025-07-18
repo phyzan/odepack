@@ -138,12 +138,11 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
 
 
 template<typename T, int N>
-EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size()) {
+EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size(), 0) {
     for (size_t i=0; i<options.size(); i++){
         if (options[i].period < 1){
             throw std::runtime_error("The period argument in event options must be at least 1.");
         }
-        _period_counter[i] = options[i].period-1;
     }
 }
 
