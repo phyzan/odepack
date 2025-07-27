@@ -6,6 +6,7 @@
 #include "ode.hpp"
 #include "odesolvers.hpp"
 #include <memory>
+#include <stdexcept>
 
 template<typename T, int N>
 vec<T, N> normalize(const T& t, const vec<T, N>& q, const std::vector<T>& args){
@@ -96,9 +97,15 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const std::vector<Event<T, N>*>& events = {}, const std::string& method = "RK45") : ODE<T, N>(*as_variational(*get_solver(method, rhs, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events), period)) {
+    VariationalODE(const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, std::vector<Event<T, N>*>& events = {}, const std::string& method = "RK45") : ODE<T, N>(*as_variational(*get_solver(method, rhs, t0, normalize(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events), period)) {
         _assert_event(this->solver().q());
         _ind = _position_of_main_event();
+
+        for (size_t i=0; i<events.size(); i++){
+            if (dynamic_cast<const NormalizationEvent<T, N>*>(&events[i])){
+                throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
+            }
+        }
     }
 
     DEFAULT_RULE_OF_FOUR(VariationalODE);
@@ -119,7 +126,7 @@ public:
 private:
 
     void _assert_event(const vec<T, N>& q0)const{
-        if (q0.size()%2 != 0){
+        if ((q0.size() & 1) != 0){
             throw std::runtime_error("Variational ODEs require an even number of system size");
         }
     }
