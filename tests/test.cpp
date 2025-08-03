@@ -11,14 +11,14 @@ void f(Ty& df, const T& t, const Ty& q, const std::vector<T>& args){
     df[3] = -q[1];
 }
 
-// void jacm (JacMat<T, N>& j, const T& t, const Ty& q, const std::vector<T>& args){
-//     JacMat<T, N> J(4, 4);
-//     J <<  0.0,  0.0,  1.0,  0.0,
-//           0.0,  0.0,  0.0,  1.0,
-//          -1.0,  0.0,  0.0,  0.0,
-//           0.0, -1.0,  0.0,  0.0;
-//     j=J;
-// }
+void jacm (JacMat<T, N>& j, const T& t, const Ty& q, const std::vector<T>& args){
+    JacMat<T, N> J(4, 4);
+    J <<  0.0,  0.0,  1.0,  0.0,
+          0.0,  0.0,  0.0,  1.0,
+         -1.0,  0.0,  0.0,  0.0,
+          0.0, -1.0,  0.0,  0.0;
+    j=J;
+}
 
 T ps_func(const T& t, const Ty& q, const std::vector<T>& args){
     return q[1]-1;
@@ -45,13 +45,13 @@ int main(){
     PreciseEvent<T, N> ps("Poincare Section", ps_func, check);
     PeriodicEvent<T, N> ev2("periodic", 5);
 
-    ODE<T, N> ode(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps, &ev2}, "RK45");
+    ODE<T, N> ode({f, jacm}, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps, &ev2}, "BDF");
 
     auto res = ode.rich_integrate(tmax);
 
     // std::cout << res(9999).transpose() << std::endl;
     std::cout << res(1).transpose() << std::endl;
-    std::cout << res(1.0000001).transpose() << std::endl;
+    std::cout << res(1.01).transpose() << std::endl;
     // RK45<T, N> s(f, t0, q0, rtol, atol, min_step, max_step, first_step, {}, {&ps});
     // s.start_interpolation();
     // s.set_goal(10000);
