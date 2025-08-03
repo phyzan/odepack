@@ -9,7 +9,6 @@ set(CMAKE_DEPENDS_LANGUAGES
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/home/senpy/Documents/repos/odepack/python/pyode.cpp" "CMakeFiles/odepack.dir/pyode.cpp.o" "gcc" "CMakeFiles/odepack.dir/pyode.cpp.o.d"
-  "" "odepack.cpython-312-x86_64-linux-gnu.so" "gcc" "CMakeFiles/odepack.dir/link.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

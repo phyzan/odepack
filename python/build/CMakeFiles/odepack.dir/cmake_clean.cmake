@@ -1,5 +1,4 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/odepack.dir/link.d"
   "CMakeFiles/odepack.dir/pyode.cpp.o"
   "CMakeFiles/odepack.dir/pyode.cpp.o.d"
   "odepack.cpython-312-x86_64-linux-gnu.so"
