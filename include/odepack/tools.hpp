@@ -294,6 +294,8 @@ struct OdeRhs{
 
     DEFAULT_RULE_OF_FOUR(OdeRhs);
 
+    OdeRhs() = default;
+
     template<class A>
     OdeRhs(const A& rhs) : ode_rhs(rhs), jacobian(nullptr){}
 

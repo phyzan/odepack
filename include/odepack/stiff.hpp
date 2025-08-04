@@ -386,13 +386,11 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     const T& rtol = this->rtol();
 
     res = state; //ideally we would avoid this copy
-    res.lu = false;
     JacMat<T, N>& J = _mut.J;
     T& t_new = res._t;
     T safety, error_norm, error_m_norm, error_p_norm, max_factor, factor;
     int& order = res.order;
     bool converged;
-    int n_iter;
     bool current_jac = false;
     NewtConv conv_result;
     bool step_accepted = false;
@@ -407,7 +405,6 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
             }
             conv_result = _solve_bdf_system(res, t_new, _mut.scale);
             converged = conv_result.converged;
-            n_iter = conv_result.n_iter;
             if (!converged){
                 if (current_jac) break;
                 this->_jac(J, t_new, res.q_predict());
@@ -415,6 +412,7 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
                 current_jac = true;
             }
         }
+
         if (!converged){
             T factor = T(1)/T(2);
             if (res.resize_step(factor, h_min, max_step)){
@@ -427,13 +425,12 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
                 for (int i = order; i >= 0; --i) {
                     res.D.col(i) += res.D.col(i+1);
                 }
-                res.lu = false;
-                // state.set_LU(this->_jac(t_new, q));
+                res.lu = false; //not sure if this is important
                 return;
             }
         }
 
-        safety = T(9)/T(10) * T(2*NEWTON_MAXITER+1)/T(2*NEWTON_MAXITER+n_iter);
+        safety = T(9)/T(10) * T(2*NEWTON_MAXITER+1)/T(2*NEWTON_MAXITER+conv_result.n_iter);
         _mut.scale = atol + rtol * res.vector().cwiseAbs();
         error_norm = rms_norm((res._error/_mut.scale).eval());
 
@@ -448,7 +445,6 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
                 for (int i = order; i >= 0; --i) {
                     res.D.col(i) += res.D.col(i+1);
                 }
-                // state.set_LU(this->_jac(t_new, q));
                 res.lu = false;
                 return;
             }
@@ -461,7 +457,7 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
 
     
     res.n_eq_steps++;
-    res.set_LU(_mut.J);
+    // res.set_LU(_mut.J);
 
     res.D.col(order+2) = res.d.matrix() - res.D.col(order+1);
     res.D.col(order+1) = res.d;
@@ -496,8 +492,6 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     order += maxIndex-1;
     factor = std::min(this->MAX_FACTOR, safety*max_factor);
     res.resize_step(factor, h_min, max_step);
-    
-    // state.set_LU(this->_jac(t_new, q));
     res.lu = false;
 }
 
