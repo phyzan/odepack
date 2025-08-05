@@ -75,6 +75,7 @@ public:
     const T&                        max_step() const final;
     const std::vector<T>&           args() const final;
     const size_t&                   Nsys() const final;
+    const size_t&                   Nupdates() const final;
     const bool&                     diverges() const final;
     const bool&                     is_running() const final;
     const bool&                     is_dead() const final;
@@ -350,6 +351,11 @@ inline const size_t& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::Nsys() c
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+inline const size_t& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::Nupdates() const {
+    return _N;
+}
+
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 inline const bool& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::diverges() const {
     return _diverges;
 }
@@ -451,7 +457,6 @@ T DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::auto_step(T direction, cons
     else{
         h1 = pow(100*std::max(d1, d2), -T(1)/T(Derived::ERR_EST_ORDER+1));
     }
-
     return std::max(std::min({100*h0, h1, this->_max_step}), this->_min_step);
 }
 

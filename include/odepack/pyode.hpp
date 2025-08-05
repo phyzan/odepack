@@ -59,37 +59,20 @@ py::tuple to_tuple(const std::vector<T>& vec);
 template<typename T, int N>
 std::vector<Event<T, N>*> to_Events(py::object events, const _Shape& shape, py::tuple args);
 
-std::vector<EventOptions> to_Options(const py::dict& d) {
+struct PyOptions : public EventOptions{
+
+    PyOptions(std::string name, int max_events, bool terminate, int period) : EventOptions{name, max_events, terminate, period} {}
+
+};
+
+std::vector<EventOptions> to_Options(py::iterable d) {
     std::vector<EventOptions> result;
 
-    for (auto item : d) {
-        std::string key = py::cast<std::string>(item.first);
-        auto value = item.second;
-
-        EventOptions opt;
-        opt.name = key;
-
-        if (py::isinstance<py::int_>(value)) {
-            opt.max_events = value.cast<int>();
-        } else if (py::isinstance<py::tuple>(value)) {
-            auto tup = value.cast<py::tuple>();
-            opt.max_events = tup[0].cast<int>();
-            if (tup.size() > 1){
-                opt.terminate = tup[1].cast<bool>();
-            }
-            if (tup.size() > 2){
-                opt.period = tup[2].cast<int>();
-            }
-            if (tup.size() > 3){
-                throw py::value_error("Tuple size in event options dict value must be at most 3");
-            }
-            
-        } else {
-            throw py::value_error("Expected int or (int, bool, int) tuple in event options dict value");
-        }
-
-        result.push_back(opt);
+    for (const py::handle& item : d) {
+        PyOptions opt = py::cast<PyOptions>(item);
+        result.push_back(EventOptions(opt));
     }
+    result.shrink_to_fit();
     return result;
 }
 
@@ -218,6 +201,10 @@ struct PyJacWrapper{
             throw py::value_error("Invalid array sizes in jacobian function call");
         }
         this->rhs(res, t, q, args);
+        res = res.transpose().eval();
+        //we need to transpose the matrix, because to_numpy just copies the flat array,
+        //but eigen and fortran have different memory layout of the data in 2D:
+        //one is row major and the other column major (or the opposite, but you get it)
         return to_numpy<T>(res, {n, n});
     }
 };
@@ -404,20 +391,20 @@ public:
         return PySolverState<T, N>(s.t, s.q, s.habs, s.event, s.diverges, s.is_running, s.is_dead, s.Nt, s.message, q0_shape); 
     }
 
-    PyOdeResult<T, N> py_integrate(const T& interval, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
+    PyOdeResult<T, N> py_integrate(const T& interval, const int max_frames, py::iterable event_options, const int& max_prints, const bool& include_first){
         OdeResult<T, N> res = ode->integrate(interval, max_frames, to_Options(event_options), max_prints, include_first);
         PyOdeResult<T, N> py_res(res, this->q0_shape);
         return py_res;
     }
 
-    PyOdeSolution<T, N> py_rich_integrate(const T& interval, const py::dict& event_options, const int& max_prints){
+    PyOdeSolution<T, N> py_rich_integrate(const T& interval, py::iterable event_options, const int& max_prints){
         OdeSolution<T, N> res = ode->rich_integrate(interval, to_Options(event_options), max_prints);
         PyOdeSolution<T, N> py_res(res, this->q0_shape);
         return py_res;
     }
 
 
-    PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, const py::dict& event_options, const int& max_prints, const bool& include_first){
+    PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, py::iterable event_options, const int& max_prints, const bool& include_first){
         OdeResult<T, N> res = ode->go_to(t, max_frames, to_Options(event_options), max_prints, include_first);
         PyOdeResult<T, N> py_res(res, this->q0_shape);
         return py_res;
@@ -493,8 +480,6 @@ public:
     }
 
 };
-
-
 
 #pragma GCC visibility pop
 
@@ -707,6 +692,9 @@ std::vector<Event<T, N>*> to_Events(py::object events, const _Shape& shape, py::
 template<typename T, int N>
 void define_ode_module(py::module& m) {
 
+    py::class_<PyOptions>(m, "EventOpt", py::module_local())
+        .def(py::init<py::str, int, bool, int>(), py::arg("name"), py::arg("max_events")=-1, py::arg("terminate")=false, py::arg("period")=1);
+
     py::class_<PyEvent<T, N>>(m, "Event", py::module_local())
         .def(py::init<py::str, py::object, py::object, py::object, py::bool_, T>(),
         py::arg("name"),
@@ -813,23 +801,24 @@ void define_ode_module(py::module& m) {
             py::arg("args")=py::tuple(),
             py::arg("events")=nullptr,
             py::arg("method")="RK45")
+        .def(py::init<PyODE<T, N>>(), py::arg("ode"))
         .def("integrate", &PyODE<T, N>::py_integrate,
             py::arg("interval"),
             py::kw_only(),
             py::arg("max_frames")=-1,
-            py::arg("event_options")=py::dict(),
+            py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0,
             py::arg("include_first")=false)
         .def("rich_integrate", &PyODE<T, N>::py_rich_integrate,
             py::arg("interval"),
             py::kw_only(),
-            py::arg("event_options")=py::dict(),
+            py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0)
         .def("go_to", &PyODE<T, N>::py_go_to,
         py::arg("t"),
         py::kw_only(),
         py::arg("max_frames")=-1,
-        py::arg("event_options")=py::dict(),
+        py::arg("event_options")=py::tuple(),
         py::arg("max_prints")=0,
         py::arg("include_first")=false)
         .def("copy", [](const PyODE<T, N>& self){return PyODE<T, N>(self);})
@@ -877,6 +866,7 @@ void define_ode_module(py::module& m) {
             py::arg("args")=py::tuple(),
             py::arg("events")=nullptr,
             py::arg("method")="RK45")
+        .def(py::init<PyVarODE<T, N>>(), py::arg("ode"))
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE<T, N>::py_lyap)
         .def("copy", [](const PyVarODE<T, N>& self){return PyVarODE<T, N>(self);});
@@ -896,13 +886,13 @@ void define_ode_module(py::module& m) {
             return self.call(t, q, toCPP_Array<T, std::vector<T>>(py_args));
         }, py::arg("t"), py::arg("q"));
 
-    m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, const py::dict& event_options, const int& threads, const bool& display_progress){
+    m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, py::iterable event_options, const int& threads, const bool& display_progress){
             std::vector<ODE<T, N>*> array;
             for (const py::handle& item : list) {
                 array.push_back(item.cast<PyODE<T, N>&>().ode);
             }
             integrate_all(array, interval, max_frames, to_Options(event_options), threads, display_progress);
-        }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::dict(), py::arg("threads")=-1, py::arg("display_progress")=false);
+        }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 }
 
 #endif

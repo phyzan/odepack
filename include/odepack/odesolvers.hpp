@@ -31,6 +31,7 @@ public:
     virtual const T&                        max_step() const = 0;
     virtual const std::vector<T>&           args() const = 0;
     virtual const size_t&                   Nsys() const = 0;
+    virtual const size_t&                   Nupdates() const = 0;
     virtual const bool&                     diverges() const = 0;
     virtual const bool&                     is_running() const = 0;
     virtual const bool&                     is_dead() const = 0;

@@ -92,6 +92,7 @@
         "climits": "cpp",
         "core": "cpp",
         "__availability": "cpp",
-        "__assert": "cpp"
+        "__assert": "cpp",
+        "dense": "cpp"
     }
 }

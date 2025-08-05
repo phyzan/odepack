@@ -356,6 +356,10 @@ BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.
     if (_jacobian == nullptr){
         throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
     }
+    if (rtol == 0){
+        rtol = 100*std::numeric_limits<T>::epsilon();
+        std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol;
+    }
     _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
     _jac(_mut.J, t0, q0);
 }
@@ -523,6 +527,7 @@ NewtConv BDF<T, N>::_solve_bdf_system(StateBDF<T, N>& res, const T& t_new, const
             break;
         }
         _mut.dy = solve_lu(res.LU, (c*_mut.f-res.psi()-res.d).eval()).array();
+
         dy_norm = rms_norm((_mut.dy/scale).eval());
         if (dy_norm_old == 0){
             rate = 0;
@@ -537,8 +542,7 @@ NewtConv BDF<T, N>::_solve_bdf_system(StateBDF<T, N>& res, const T& t_new, const
 
         res._q += _mut.dy;
         res.d += _mut.dy;
-
-        if (dy_norm == 0 || (rate != 0 && rate/(1-rate)*dy_norm<_newton_tol)){
+        if (dy_norm == 0 || ((rate != 0) && (rate/(1-rate)*dy_norm<_newton_tol))){
             converged = true;
             break;
         }
