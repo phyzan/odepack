@@ -7,6 +7,7 @@
 
 template<typename T, int N>
 std::unique_ptr<OdeSolver<T, N>> get_solver(std::string name, MAIN_DEFAULT_CONSTRUCTOR(T, N)) {
+
     if (name == "RK23") {
         return std::make_unique<RK23<T, N>>(ARGS);
     }

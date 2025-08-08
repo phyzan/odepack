@@ -102,7 +102,9 @@ public:
 
     bool                                        save_data(const std::string& filename) const;
 
-    void                                        clear();
+    virtual void                                clear();
+
+    virtual void                                reset();
 
 protected:
 
@@ -113,7 +115,7 @@ protected:
     double _runtime = 0;
 
 
-    virtual void _register_state(const int& event=-1);
+    virtual void                _register_state(const int& event=-1);
 
 private:
 
@@ -243,7 +245,7 @@ template<typename T, int N>
 OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector<EventOptions>& event_options, const int& max_prints){
     _solver->start_interpolation();
     OdeResult<T, N> res = this->integrate(interval, -1, event_options, max_prints, true);
-    OdeSolution<T, N> rich_res(std::move(res), *_solver->interpolators().back());
+    OdeSolution<T, N> rich_res(std::move(res), *_solver->interpolator());
     _solver->stop_interpolation();
     return rich_res;
 
@@ -432,6 +434,21 @@ void ODE<T, N>::clear(){
         _Nevents[i].clear();
         _Nevents[i].shrink_to_fit();
     }
+}
+
+template<typename T, int N>
+void ODE<T, N>::reset(){
+    _solver->reset();
+    _t_arr.clear();
+    _t_arr.shrink_to_fit();
+    _q_arr.clear();
+    _q_arr.shrink_to_fit();
+    for (size_t i=0; i<_Nevents.size(); i++){
+        _Nevents[i].clear();
+        _Nevents[i].shrink_to_fit();
+    }
+    _runtime = 0;
+    _register_state();
 }
 
 template<typename T, int N>

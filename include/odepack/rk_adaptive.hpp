@@ -80,6 +80,8 @@ public:
     using Etype = E_matrix<T, Norder, Nstages>;
     using Ptype = P_matrix<T, Nstages>;
 
+    friend class DerivedSolver<T, N, RKDerived, STATE, INTERPOLATOR>;
+
     static const Atype A;
     static const Btype B;
     static const Ctype C;
@@ -91,6 +93,7 @@ public:
     STATE new_state(const T& t, const vec<T, N>& q, const T& h) const;
 
     void coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const;
+
 
 protected:
 
@@ -301,7 +304,6 @@ void RungeKutta<RKDerived, T, N, Nstages, Norder>::_step_impl(STATE& result, con
     result._error += K[Nstages] * this->E(Nstages)*h;
     result._t = state.t()+h;
 }
-
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
 const T RungeKutta<RKDerived, T, N, Nstages, Norder>::ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);

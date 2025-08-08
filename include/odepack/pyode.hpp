@@ -329,7 +329,9 @@ public:
     }
 
     PyODE(const PyFuncWrapper<T, N>& func_wrap, const PyJacWrapper<T, N>& jac_wrap, const T t0, const py::iterable& q0, const T rtol, const T atol, const T min_step, const T max_step, const T first_step, const py::tuple args, const PyEventWrapper<T, N>* ev_wrap, const py::str method){
+        
         std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), {func_wrap.rhs, jac_wrap.rhs}, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, toCPP_Array<T, std::vector<T>>(args), ((ev_wrap != nullptr) ? *ev_wrap->events : std::vector<Event<T, N>*>(0)));
+
         ode = new ODE<T, N>(*solver);
         q0_shape = {static_cast<size_t>(ode->q()[0].size())};
         _assert_sizes(func_wrap, ev_wrap);
@@ -822,6 +824,7 @@ void define_ode_module(py::module& m) {
         py::arg("max_prints")=0,
         py::arg("include_first")=false)
         .def("copy", [](const PyODE<T, N>& self){return PyODE<T, N>(self);})
+        .def("reset", [](PyODE<T, N>& self){self.ode->reset();})
         .def("advance", [](PyODE<T, N>& self){return self.ode->advance();})
         .def("state", &PyODE<T, N>::py_state)
         .def("save_data", [](PyODE<T, N>& self, py::str save_dir){return self.ode->save_data(save_dir.cast<std::string>());}, py::arg("save_dir"))

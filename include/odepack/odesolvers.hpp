@@ -14,7 +14,6 @@ class OdeSolver{
 public:
     
     using UniqueClone = std::unique_ptr<OdeSolver<T, N>>;
-    using InterpolatorList = std::vector<const Interpolator<T, N>*>;
 
     virtual ~OdeSolver() = default;
 
@@ -38,6 +37,7 @@ public:
     virtual const vec<T, N>&                error()const = 0;
     virtual const std::string&              message() const = 0;
     virtual const SolverState<T, N>         state() const = 0;
+    virtual const State<T, N>&              full_state() const = 0;
     virtual const EventCollection<T, N>&    events()const = 0;
     virtual bool                            at_event() const = 0;
     virtual std::string                     event_name() const = 0;
@@ -48,17 +48,19 @@ public:
     virtual OdeSolver<T, N>*                clone() const = 0;
     virtual UniqueClone                     safe_clone() const = 0;
     virtual UniqueClone                     with_new_events(const EventCollection<T, N>& events) const = 0;
-    virtual InterpolatorList                interpolators() const = 0;
+    virtual const Interpolator<T, N>*       interpolator() const = 0;
+    virtual const bool&                     is_interpolating() const = 0;
 
     virtual bool                            advance()=0;
     virtual bool                            set_goal(const T& t_max) = 0;
+    virtual void                            restart_from(const OdeSolver<T, N>& other) = 0;
     virtual void                            stop(const std::string& text = "") = 0;
     virtual void                            kill(const std::string& text = "") = 0;
     virtual bool                            resume() = 0;
     virtual bool                            free() = 0;
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
-    virtual void                            clear_interpolators() = 0;
+    virtual void                            reset() = 0;
 
 protected:
 

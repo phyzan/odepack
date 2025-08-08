@@ -36,6 +36,8 @@ public:
 
     virtual void                    go_back();
 
+    virtual void                    reset();
+
     inline void                     set_args(const std::vector<T>& args);
 
     virtual Event<T, N>*            clone() const = 0;
@@ -55,7 +57,7 @@ public:
     inline const std::vector<T>&    args() const;
 
     inline void                     remove();
-
+    
     virtual                         ~Event() = default;
 
 
@@ -127,6 +129,8 @@ public:
     void                    go_back() override;
 
     virtual void            set_start(const T& t);
+
+    void                    reset() override;
 
 protected:
     T _period;
@@ -255,6 +259,13 @@ void Event<T, N>::go_back(){
 }
 
 template<typename T, int N>
+void Event<T, N>::reset(){
+    _counter = 0;
+    _state = ViewState<T, N>();
+    _is_determined = false;
+}
+
+template<typename T, int N>
 const ViewState<T, N>& Event<T, N>::state() const {
     if (!_is_determined){
         throw std::runtime_error("Event has not been determined");
@@ -379,6 +390,14 @@ void PeriodicEvent<T, N>::set_start(const T& t) {
     }
 }
 
+template<typename T, int N>
+void PeriodicEvent<T, N>::reset(){
+    Event<T, N>::reset();
+    _np = 0;
+    _np_previous = 0;
+    _has_started = false;
+}
+
 
 //RoughEvent CLASS
 
@@ -477,6 +496,12 @@ public:
         }
     }
 
+    void reset(){
+        for (size_t i=0; i<this->size(); i++){
+            this->_events[i]->reset();
+        }
+    }
+
     EventCollection<T, N> including(const Event<T, N>* event) const {
         if (_names.contains(event->name())) {
             throw std::runtime_error("Cannot include new Event because dublicate names are not allowed: " + event->name());
@@ -505,6 +530,7 @@ private:
         // if a single step encounters multiple events.
         std::vector<Event<T, N>*> new_precise_events;
         std::vector<Event<T, N>*> new_rough_events;
+
         for (size_t i = 0; i < size; i++) {
             if (!_names.insert(events[i]->name()).second) {
                 throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
@@ -520,7 +546,6 @@ private:
         std::vector<Event<T, N>*> result(size);
         std::copy(new_precise_events.begin(), new_precise_events.end(), result.begin());
         std::copy(new_rough_events.begin(), new_rough_events.end(), result.begin() + new_precise_events.size());
-        
         // NOW we can delete our current events
         _clear();
 

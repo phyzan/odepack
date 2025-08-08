@@ -73,6 +73,14 @@ public:
         _t_renorm = t;
     }
 
+    void reset() override{
+        PeriodicEvent<T, N>::reset();
+        _t_renorm = this->_start;
+        _t_last = this->_start;
+        _logksi = 0;
+        _logksi_last = 0;
+    }
+
 
 private:
     T _t_renorm;
@@ -120,6 +128,22 @@ public:
 
     inline const std::vector<T>& lyap() const{
         return _lyap_array;
+    }
+
+    void clear() override{
+        ODE<T, N>::clear();
+        _t_lyap.clear();
+        _t_lyap.shrink_to_fit();
+        _lyap_array.clear();
+        _lyap_array.shrink_to_fit();
+    }
+
+    void reset() override {
+        ODE<T, N>::reset();
+        _t_lyap.clear();
+        _t_lyap.shrink_to_fit();
+        _lyap_array.clear();
+        _lyap_array.shrink_to_fit();
     }
 
 

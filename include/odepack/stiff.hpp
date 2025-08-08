@@ -16,7 +16,7 @@ template<typename T, int N>
 vec<T, N> cumsum(const vec<T, N>& x);
 
 template<typename T, int N>
-vec<T, N> cumprod(const vec<T, N>& x);
+void cumprod(Eigen::Matrix<T, -1, 1>& res, const vec<T, N>& x);
 
 template<typename T>
 Eigen::Matrix<T, -1, -1> compute_R(const int& order, const T& factor);
@@ -43,7 +43,6 @@ struct _MutableBDF{
 
     _MutableBDF(const vec<T, N>& q);
 
-    JacMat<T, N> J;
     vec<T, N> ypredict;
     vec<T, N> scale;
     vec<T, N> psi;
@@ -82,6 +81,8 @@ public:
 
     StateBDF(const T& t, const vec<T, N>& q, const T& h);
 
+    DEFAULT_RULE_OF_FOUR(StateBDF);
+
     StateBDF() = delete;
     
     bool resize_step(T& factor, const T& min_step=0, const T& max_step=inf<T>()) final;
@@ -92,13 +93,14 @@ public:
 
     const vec<T, N>& psi()const;
 
-    void set_LU(const JacMat<T, N>& J);
+    void set_LU();
     
 private:
 
     void _change_D(const T& factor);
 
     JacMat<T, N> I;
+    JacMat<T, N> J;
     Eigen::Matrix<T, N, MAX_ORDER+3> D;
     LUResult<T, N> LU;
     int n_eq_steps = 0;
@@ -152,12 +154,16 @@ class BDF : public DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>, BDFInterpolato
     using STATE = StateBDF<T, N>;
     using SolverBase = DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>, BDFInterpolator<T, N>>;
 
+    friend class DerivedSolver<T, N, BDF<T, N>, StateBDF<T, N>, BDFInterpolator<T, N>>;
+
 public:
 
-    const int NEWTON_MAXITER = 4;
+    static const int NEWTON_MAXITER = 4;
     static const int ERR_EST_ORDER = 1; //the actual order flactuates
 
     BDF(MAIN_DEFAULT_CONSTRUCTOR(T, N));
+
+    DEFAULT_RULE_OF_FOUR(BDF);
 
     OdeRhs<T, N> ode_rhs() const final;
 
@@ -169,12 +175,14 @@ public:
 
 private:
 
-    inline void _jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q);
-
-    const JacMat<T, N>& _jac(const T& t, const vec<T, N>& q)const;
+    inline void _jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const;
 
     NewtConv _solve_bdf_system(StateBDF<T, N>& res, const T& t_new, const vec<T, N>& scale);
-    
+
+    void _reset_impl(){
+        _mut = _MutableBDF<T, N>(this->q());
+        
+    }
 
     T _newton_tol;
     Jac<T, N> _jacobian;
@@ -269,9 +277,7 @@ BDFCONSTS<T>::BDFCONSTS(){
 }
 
 template<typename T, int N>
-_MutableBDF<T, N>::_MutableBDF(const vec<T, N>& q):ypredict(q), scale(q), psi(q), dy(q), f(q), error_m(q), error_p(q){
-    J.resize(q.size(), q.size());
-}
+_MutableBDF<T, N>::_MutableBDF(const vec<T, N>& q):ypredict(q), scale(q), psi(q), dy(q), f(q), error_m(q), error_p(q){}
 
 
 template<typename T, int N>
@@ -283,6 +289,8 @@ StateBDF<T, N>::StateBDF(const T& t, const vec<T, N>& q, const T& h) : DerivedSt
     d.resize(q.size());
     d = 0;
     D.resize(q.size(), MAX_ORDER+3);
+    J.resize(q.size(), q.size());
+    J.setZero();
 }
 
 
@@ -327,7 +335,7 @@ const vec<T, N>& StateBDF<T, N>::psi() const {
 }
 
 template<typename T, int N>
-void StateBDF<T, N>::set_LU(const JacMat<T, N>& J){
+void StateBDF<T, N>::set_LU(){
     JacMat<T, N> A = (I - this->h() / bdf.ALPHA[order] * J).eval();
     LU = Eigen::PartialPivLU<JacMat<T, N>>(A);
     lu = true;
@@ -351,8 +359,7 @@ void StateBDF<T, N>::_change_D(const T& factor){
 
 
 template<typename T, int N>
-BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.jacobian), _mut(q0){
-    this->_finalize(t0, q0, first_step);
+BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.jacobian), _mut(q0){    
     if (_jacobian == nullptr){
         throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
     }
@@ -361,7 +368,8 @@ BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.
         std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol;
     }
     _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
-    _jac(_mut.J, t0, q0);
+
+    this->_finalize(t0, q0, first_step);
 }
 
 template<typename T, int N>
@@ -373,6 +381,7 @@ template<typename T, int N>
 StateBDF<T, N> BDF<T, N>::new_state(const T& t, const vec<T, N>& q, const T& h) const{
     STATE res = {t, q, h};
     res.adjust(res._habs, sgn(h), this->_rhs(t, q));
+    this->_jac(res.J, t, q);
     return res;
 }
 
@@ -390,7 +399,7 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     const T& rtol = this->rtol();
 
     res = state; //ideally we would avoid this copy
-    JacMat<T, N>& J = _mut.J;
+    JacMat<T, N>& J = res.J;
     T& t_new = res._t;
     T safety, error_norm, error_m_norm, error_p_norm, max_factor, factor;
     int& order = res.order;
@@ -398,14 +407,15 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     bool current_jac = false;
     NewtConv conv_result;
     bool step_accepted = false;
-    while (!step_accepted){            
+    while (!step_accepted){
+        
         t_new = t + res.h();
 
         _mut.scale = atol + rtol * res.q_predict().cwiseAbs();
         converged = false;
         while (!converged){
             if (!res.lu){
-                res.set_LU(J);
+                res.set_LU();
             }
             conv_result = _solve_bdf_system(res, t_new, _mut.scale);
             converged = conv_result.converged;
@@ -461,7 +471,7 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
 
     
     res.n_eq_steps++;
-    // res.set_LU(_mut.J);
+    // res.set_LU();
 
     res.D.col(order+2) = res.d.matrix() - res.D.col(order+1);
     res.D.col(order+1) = res.d;
@@ -500,14 +510,8 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
 }
 
 template<typename T, int N>
-inline void BDF<T, N>::_jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q){
+inline void BDF<T, N>::_jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const{
     _jacobian(result, t, q, this->args());
-}
-
-template<typename T, int N>
-const JacMat<T, N>& BDF<T, N>::_jac(const T& t, const vec<T, N>& q)const{
-    _jacobian(_mut.J, t, q, this->args());
-    return _mut.J;
 }
 
 template<typename T, int N>
@@ -553,8 +557,6 @@ NewtConv BDF<T, N>::_solve_bdf_system(StateBDF<T, N>& res, const T& t_new, const
     res._error = res.bdf.ERR_CONST[res.order] * res.d;
     return {converged, j+1};
 }
-
-
 
 template<typename T, int N>
 BDFInterpolator<T, N>::BDFInterpolator(const T& t, const vec<T, N>& q) : LocalInterpolator<T, N>(t, q) {}
