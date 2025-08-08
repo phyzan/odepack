@@ -236,7 +236,7 @@ private:
 
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events, true), _current_linked_interpolator(t0, q0), _mut(q0, INTERP_ORDER){
+DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events), _current_linked_interpolator(t0, q0), _mut(q0, INTERP_ORDER){
     if (_min_step < 0){
         throw std::runtime_error("Minimum stepsize must be a non negative number");
     }
