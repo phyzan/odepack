@@ -93,6 +93,7 @@
         "core": "cpp",
         "__availability": "cpp",
         "__assert": "cpp",
-        "dense": "cpp"
+        "dense": "cpp",
+        "__node_handle": "cpp"
     }
 }

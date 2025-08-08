@@ -40,7 +40,9 @@ public:
 
     inline void close_start();
 
-    void resize(const T& new_end);
+    void adjust_start(const T& new_start);
+
+    void adjust_end(const T& new_end);
 
     inline bool can_link_with(const Interval<T>& other) const;
 
@@ -103,7 +105,9 @@ public:
 
     virtual void link_after(Interpolator<T, N>& other) = 0;
 
-    virtual void adjust(const T& t_end) = 0;
+    virtual void adjust_start(const T& t_start) = 0;
+
+    virtual void adjust_end(const T& t_end) = 0;
 
     virtual void close_end() = 0;
 
@@ -171,7 +175,9 @@ public:
 
     //MODIFIERS
 
-    void                        adjust(const T& t_end) override;
+    void                        adjust_start(const T& t_start) override;
+
+    void                        adjust_end(const T& t_end) override;
 
     void                        link_with(Interpolator<T, N>& other) override;
 
@@ -296,7 +302,9 @@ public:
 
     void                                    link_after(Interpolator<T, N>& interpolant) override;
 
-    inline void                             adjust(const T& t_new) override;
+    inline void                             adjust_start(const T& t_start) override;
+
+    inline void                             adjust_end(const T& t_new) override;
 
     void                                    expand(const INTERPOLATOR& interpolant);
 
@@ -461,7 +469,9 @@ public:
 
     void link_after(Interpolator<T, N>& other) override{}
 
-    void adjust(const T& end) override{}
+    void adjust_end(const T& end) override{}
+
+    void adjust_start(const T& t_start) override{}
 
     void close_end() override{}
 
@@ -586,9 +596,19 @@ inline void Interval<T>::close_start(){
     _left = 1;
 }
 
+template<typename T>
+inline void Interval<T>::adjust_start(const T& new_start){
+    if (sgn(_b-new_start) == _dir){
+        _a = new_start;
+        _h = _b - _a;
+    }
+    else{
+        throw std::runtime_error("Cannot resize interval");
+    }
+}
 
 template<typename T>
-inline void Interval<T>::resize(const T& new_end){
+inline void Interval<T>::adjust_end(const T& new_end){
     if (sgn(new_end-_a) == _dir){
         _b = new_end;
         _h = _b - _a;
@@ -724,18 +744,27 @@ LocalInterpolator<T, N>* LocalInterpolator<T, N>::clone() const{
     return new LocalInterpolator<T, N>(*this);
 }
 
-
 template<typename T, int N>
-void LocalInterpolator<T, N>::adjust(const T& t_end){
+void LocalInterpolator<T, N>::adjust_start(const T& t_start){
     const int& d = _interval.dir();
-    if (_interval.start()*d < t_end*d && t_end*d <= _tmax*d){
-        _interval.resize(t_end);
+    if ( t_start*d < _interval.end()*d && t_start*d >= _tmin*d){
+        _interval.adjust_start(t_start);
     }
     else{
         throw std::runtime_error("Cannot adjust interval");
     }
 }
 
+template<typename T, int N>
+void LocalInterpolator<T, N>::adjust_end(const T& t_end){
+    const int& d = _interval.dir();
+    if (_interval.start()*d < t_end*d && t_end*d <= _tmax*d){
+        _interval.adjust_end(t_end);
+    }
+    else{
+        throw std::runtime_error("Cannot adjust interval");
+    }
+}
 
 template<typename T, int N>
 void LocalInterpolator<T, N>::link_with(Interpolator<T, N>& other){
@@ -976,9 +1005,15 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::link_after(Interpolator<T, N>& inte
 }
 
 template<typename T, int N, typename INTERPOLATOR>
-inline void LinkedInterpolator<T, N, INTERPOLATOR>::adjust(const T& t_new) {
+inline void LinkedInterpolator<T, N, INTERPOLATOR>::adjust_start(const T& t_new) {
     _interval_cached = false;
-    _get_last().adjust(t_new);
+    _get(0).adjust_start(t_new);
+}
+
+template<typename T, int N, typename INTERPOLATOR>
+inline void LinkedInterpolator<T, N, INTERPOLATOR>::adjust_end(const T& t_new) {
+    _interval_cached = false;
+    _get_last().adjust_end(t_new);
 }
 
 template<typename T, int N, typename INTERPOLATOR>

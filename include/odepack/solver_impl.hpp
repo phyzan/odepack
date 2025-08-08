@@ -674,8 +674,30 @@ template<typename T, int N, typename Derived, typename STATE, typename INTERPOLA
 void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::start_interpolation() {
     if (!_interp_data){
         _interp_data = true;
-        _current_linked_interpolator = LinkedInterpolator<T, N, INTERPOLATOR>(_true_state->t(), _true_state->exposed_vector());
+
+        LinkedInterpolator<T, N, INTERPOLATOR>& cli = _current_linked_interpolator;
+        if (_equiv_states){
+            cli = LinkedInterpolator<T, N, INTERPOLATOR>(_true_state->t(), _true_state->exposed_vector());
         }
+        else{
+            int bdr1 = 1;
+            if (at_event() && current_event().hides_mask()){
+                cli = LinkedInterpolator<T, N, INTERPOLATOR>(_true_state->t(), _true_state->exposed_vector());
+                bdr1 = -1;
+            }
+            INTERPOLATOR r = state_interpolator(*_old_state, *_state, bdr1, -1);
+            r.adjust_start(_true_state->t());
+            
+            if (bdr1 == 1){
+                cli = LinkedInterpolator<T, N, INTERPOLATOR>(&r);
+            }
+            else{
+                cli.expand(r);
+            }
+
+        }
+        
+    }
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
@@ -717,7 +739,7 @@ const INTERPOLATOR& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_interpol
     }
     else{
         _mut.interpolator = std::move(state_interpolator(*_old_state, *_state, 0, 0));
-        _mut.interpolator.adjust(_true_state->t());
+        _mut.interpolator.adjust_end(_true_state->t());
         _mut.interpolator_is_set = true;
         return _mut.interpolator;
     }
@@ -1008,7 +1030,7 @@ void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_finalize_state(const St
     }
 
     if (_interp_data){
-        _current_linked_interpolator.adjust(_true_state->t());
+        _current_linked_interpolator.adjust_end(_true_state->t());
         _current_linked_interpolator.close_end();
     }
 
