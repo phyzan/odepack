@@ -264,7 +264,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::v
     const T interval = t-t0;
     const size_t Nt = _t_arr.size();
     long int frame_counter = 0;
-    size_t i = Nt;
     int prints = 0;
 
     _solver->set_goal(t);
@@ -284,13 +283,11 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const int& max_frames, const std::v
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
-                i++;
                 _register_state(ev);
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 _register_state();
                 ++frame_counter;
-                i++;
             }
         }
         if (max_prints > 0){
