@@ -119,7 +119,7 @@ class RK45 : public RungeKutta<RK45<T, N>, T, N, 6, 5>{
     
 
     using RKbase = RungeKutta<RK45<T, N>, T, N, Nstages, Norder>;
-    using INTERPOLATOR = RKbase::INTERPOLATOR;
+    using INTERPOLATOR = typename RKbase::INTERPOLATOR;
     using STATE = RKState<T, N, Nstages, Norder>;
     
 
@@ -155,7 +155,7 @@ class RK23 : public RungeKutta<RK23<T, N>, T, N, 3, 3> {
     
 
     using RKbase = RungeKutta<RK23<T, N>, T, N, Nstages, Norder>;
-    using INTERPOLATOR = RKbase::INTERPOLATOR;
+    using INTERPOLATOR = typename RKbase::INTERPOLATOR;
     using STATE = RKState<T, N, Nstages, Norder>;
     
 public:
@@ -263,7 +263,7 @@ void RungeKutta<RKDerived, T, N, Nstages, Norder>::adapt_impl(STATE& res, const 
 
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-RungeKutta<RKDerived, T, N, Nstages, Norder>::STATE RungeKutta<RKDerived, T, N, Nstages, Norder>::new_state(const T& t, const vec<T, N>& q, const T& h) const {
+typename RungeKutta<RKDerived, T, N, Nstages, Norder>::STATE RungeKutta<RKDerived, T, N, Nstages, Norder>::new_state(const T& t, const vec<T, N>& q, const T& h) const {
     return STATE(t, q, h);
 }
 
@@ -309,19 +309,19 @@ template<typename RKDerived, typename T, int N, int Nstages, int Norder>
 const T RungeKutta<RKDerived, T, N, Nstages, Norder>::ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-const RungeKutta<RKDerived, T, N, Nstages, Norder>::Atype RungeKutta<RKDerived, T, N, Nstages, Norder>::A = RKDerived::Amatrix();
+const typename RungeKutta<RKDerived, T, N, Nstages, Norder>::Atype RungeKutta<RKDerived, T, N, Nstages, Norder>::A = RKDerived::Amatrix();
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-const RungeKutta<RKDerived, T, N, Nstages, Norder>::Btype RungeKutta<RKDerived, T, N, Nstages, Norder>::B = RKDerived::Bmatrix();
+const typename RungeKutta<RKDerived, T, N, Nstages, Norder>::Btype RungeKutta<RKDerived, T, N, Nstages, Norder>::B = RKDerived::Bmatrix();
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-const RungeKutta<RKDerived, T, N, Nstages, Norder>::Ctype RungeKutta<RKDerived, T, N, Nstages, Norder>::C = RKDerived::Cmatrix();
+const typename RungeKutta<RKDerived, T, N, Nstages, Norder>::Ctype RungeKutta<RKDerived, T, N, Nstages, Norder>::C = RKDerived::Cmatrix();
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-const RungeKutta<RKDerived, T, N, Nstages, Norder>::Etype RungeKutta<RKDerived, T, N, Nstages, Norder>::E = RKDerived::Ematrix();
+const typename RungeKutta<RKDerived, T, N, Nstages, Norder>::Etype RungeKutta<RKDerived, T, N, Nstages, Norder>::E = RKDerived::Ematrix();
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-const RungeKutta<RKDerived, T, N, Nstages, Norder>::Ptype RungeKutta<RKDerived, T, N, Nstages, Norder>::P = RKDerived::Pmatrix();
+const typename RungeKutta<RKDerived, T, N, Nstages, Norder>::Ptype RungeKutta<RKDerived, T, N, Nstages, Norder>::P = RKDerived::Pmatrix();
 
 
 

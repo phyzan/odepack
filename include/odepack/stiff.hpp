@@ -408,7 +408,6 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     NewtConv conv_result;
     bool step_accepted = false;
     while (!step_accepted){
-        
         t_new = t + res.h();
 
         _mut.scale = atol + rtol * res.q_predict().cwiseAbs();

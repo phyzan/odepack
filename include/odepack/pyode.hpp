@@ -201,10 +201,6 @@ struct PyJacWrapper{
             throw py::value_error("Invalid array sizes in jacobian function call");
         }
         this->rhs(res, t, q, args);
-        res = res.transpose().eval();
-        //we need to transpose the matrix, because to_numpy just copies the flat array,
-        //but eigen and fortran have different memory layout of the data in 2D:
-        //one is row major and the other column major (or the opposite, but you get it)
         return to_numpy<T>(res, {n, n});
     }
 };

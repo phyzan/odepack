@@ -31,6 +31,9 @@ using Func = std::function<VecLike<T, N>(const T&, const vec<T, N>&, const std::
 template<typename T, int N, template<class, int> typename VecLike=vec>
 using Fvoid = std::function<void(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
 
+template<typename T>
+using FuncLowLevel = void(*)(T* rhs, const T* t, const T* f, const T* args); //both ode rhs and jacobian.
+
 template<typename T, int N, template<class, int> typename VecLike=vec>
 using Fptr = VecLike<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
 
@@ -38,7 +41,7 @@ template<typename T, int N, template<class, int> typename VecLike=vec>
 using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
 
 template<typename T, int N>
-using JacMat = Eigen::Matrix<T, N, N>;
+using JacMat = Eigen::Matrix<T, N, N, Eigen::RowMajor>;
 
 template<typename T, int N>
 using Jac = Functor<T, N, JacMat>;
@@ -240,7 +243,7 @@ inline void show_progress(const int& n, const int& target, const Clock& clock){
 }
 
 
-template<typename T, int N, template<class, int> typename VecLike>
+template<typename T, int N, template<typename, int> typename VecLike>
 struct Functor{
 
     Functor(const std::nullptr_t& ptr) : func(nullptr){}
@@ -250,6 +253,8 @@ struct Functor{
     Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
     Functor(const Fvoidptr<T, N, VecLike>& f):func(f){}
+
+    Functor(const FuncLowLevel<T> f):func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){f(res.data(), &t, q.data(), args.data());}){}
 
     Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
@@ -277,7 +282,7 @@ struct Functor{
         return (this == &other) ? true : other.func == func;
     }
 
-    template<class Any>
+    template<typename Any>
     bool operator==(const Any& other){
         return func == other;
     }
