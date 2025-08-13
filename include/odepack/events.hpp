@@ -20,6 +20,31 @@ using event_f = std::function<T(const T&, const vec<T, N>&, const std::vector<T>
 template<typename T, int N>
 using is_event_f = std::function<bool(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
+template<typename T, int N>
+struct ObjFun{
+
+    ObjFun(std::nullptr_t f) : objfun(f) {}
+
+    ObjFun(const event_f<T, N>& f) : objfun(f) {}
+
+    ObjFun(T (*f)(const T*, const T*, const T*)) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(&t, q.data(), args.data());}) {}
+    
+    event_f<T, N> objfun;
+
+};
+
+template<typename T, int N>
+struct ObjFunCondition{
+
+    ObjFunCondition(std::nullptr_t f) : objfun(f) {}
+
+    ObjFunCondition(const is_event_f<T, N>& f) : objfun(f) {}
+
+    ObjFunCondition(bool (*f)(const T*, const T*, const T*)) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(&t, q.data(), args.data());}) {}
+    
+    is_event_f<T, N> objfun;
+
+};
 
 template<typename T, int N>
 class Event{
@@ -75,7 +100,7 @@ private:
 
 protected:
 
-    Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
+    Event(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
 
     DEFAULT_RULE_OF_FOUR(Event);
 
@@ -90,7 +115,7 @@ class PreciseEvent : public Event<T, N>{
 
 public:
 
-    PreciseEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+    PreciseEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when.objfun, check_if.objfun, mask, hide_mask), _event_tol(event_tol){}
 
     DEFAULT_RULE_OF_FOUR(PreciseEvent);
 
@@ -149,7 +174,7 @@ class RoughEvent : public Event<T, N>{
 
 public:
 
-    RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+    RoughEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
     DEFAULT_RULE_OF_FOUR(RoughEvent);
 
@@ -189,7 +214,7 @@ public:
 //Event CLASS
 
 template<typename T, int N>
-Event<T, N>::Event(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when), _check_if(check_if), _mask(mask), _hide_mask(hide_mask && mask != nullptr){
+Event<T, N>::Event(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when.objfun), _check_if(check_if.objfun), _mask(mask), _hide_mask(hide_mask && mask != nullptr){
     if (name == ""){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
@@ -402,7 +427,7 @@ void PeriodicEvent<T, N>::reset(){
 //RoughEvent CLASS
 
 template<typename T, int N>
-RoughEvent<T, N>::RoughEvent(const std::string& name, event_f<T, N> when, is_event_f<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): Event<T, N>(name, when, check_if, mask, hide_mask){}
+RoughEvent<T, N>::RoughEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): Event<T, N>(name, when.objfun, check_if.objfun, mask, hide_mask){}
 
 template<typename T, int N>
 RoughEvent<T, N>* RoughEvent<T, N>::clone() const{
