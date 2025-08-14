@@ -3,6 +3,7 @@
 
 
 #include <cstddef>
+#include <odepack/tools.hpp>
 #include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -167,7 +168,7 @@ struct PyFuncWrapper{
     size_t q_size;
     size_t args_size;
 
-    PyFuncWrapper(const py::capsule& obj, size_t qsize, size_t args_size) : rhs(open_capsule<Fvoidptr<T, N>>(obj)), q_size(qsize), args_size(args_size) {}
+    PyFuncWrapper(const py::capsule& obj, size_t qsize, size_t args_size) : rhs(open_capsule<FuncLowLevel<T>>(obj)), q_size(qsize), args_size(args_size) {}
 
     py::array_t<T> call(const T& t, const py::object& py_q, const std::vector<T>& args) const {
         vec<T, N> q = toCPP_Array<T, vec<T, N>>(py_q);
@@ -189,7 +190,7 @@ struct PyJacWrapper{
 
 
 
-    PyJacWrapper(const py::capsule& obj, size_t qsize, size_t args_size) : rhs(open_capsule<Fvoidptr<T, N, JacMat>>(obj)), q_size(qsize), args_size(args_size) {}
+    PyJacWrapper(const py::capsule& obj, size_t qsize, size_t args_size) : rhs(open_capsule<FuncLowLevel<T>>(obj)), q_size(qsize), args_size(args_size) {}
 
     PyJacWrapper() : rhs(nullptr) {}
 
