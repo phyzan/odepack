@@ -39,6 +39,7 @@ class Event:
 
     '''
 
+    @overload
     def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False, event_tol=1e-12):
         '''
         Arguments
@@ -55,20 +56,15 @@ class Event:
         '''
         pass
 
+    @overload
+    def __init__(self, name: str, when, check_if, mask, hide_mask, event_tol, input_size, args_size):
+        pass
+
     @property
     def name(self)->str:...
     
     @property
-    def mask(self)->Func:...
-
-    @property
-    def hide_mask(self)->BoolFunc:...
-
-    @property
-    def when(self)->ObjFunc:...
-
-    @property
-    def check_if(self)->BoolFunc:...
+    def hide_mask(self)->bool:...
 
 
 class PeriodicEvent(Event):
@@ -79,10 +75,10 @@ class PeriodicEvent(Event):
     '''
 
     @overload
-    def __init__(self, name: str, period: float, start, mask: Func=None, hide_mask=False):...
+    def __init__(self, name: str, period: float, start: float=None, mask: Func=None, hide_mask=False):...
 
     @overload
-    def __init__(self, name: str, period: float, mask: Func=None, hide_mask=False):...
+    def __init__(self, name: str, period: float, start: float, mask, hide_mask, input_size, args_size):...
 
     @property
     def period(self)->float:...
@@ -254,21 +250,9 @@ class SolverState:
     def show(self):...
 
 
-class LowLevelEventArray:
-
-    def __init__(self, pointer, q_size: int, args_size: int):...
-
-
 class LowLevelFunction:
 
-    def __init__(self, pointer, q_size: int, args_size: int):...
-
-    def __call__(self, t: float, q: np.ndarray, *args: float)->np.ndarray: ...
-
-
-class LowLevelJacobian:
-
-    def __init__(self, pointer, q_size: int, args_size: int):...
+    def __init__(self, pointer, input_size: int, output_shape: Iterable[int], args_size: int):...
 
     def __call__(self, t: float, q: np.ndarray, *args: float)->np.ndarray: ...
 
@@ -278,9 +262,6 @@ class LowLevelODE:
     '''
     Main class representing an ODE. A LowLevelODE object can dynamically grow every time the user calls methods like .integrate, .advance, .go_to. Every time an integration method is called, the objects variables grow accordingly.
     '''
-
-    @overload
-    def __init__(self, f: LowLevelFunction, jac: LowLevelJacobian, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: LowLevelEventArray=None, method="RK45"):...
 
     @overload
     def __init__(self, f: Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: list[Event]=None, method="RK45"):
@@ -368,10 +349,7 @@ class LowLevelODE:
 
 
 class VariationalLowLevelODE(LowLevelODE):
-
-    @overload
-    def __init__(self, f: LowLevelFunction, jac: LowLevelJacobian, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: LowLevelEventArray=None, method="RK45"):...
-
+    
     @overload
     def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: list[Event]=None, method="RK45"):...
 

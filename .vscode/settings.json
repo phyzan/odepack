@@ -94,6 +94,7 @@
         "__availability": "cpp",
         "__assert": "cpp",
         "dense": "cpp",
-        "__node_handle": "cpp"
+        "__node_handle": "cpp",
+        "cinttypes": "cpp"
     }
 }

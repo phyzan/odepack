@@ -47,7 +47,7 @@ int main(){
 
     PreciseEvent<T, N> ev("Event", event);
 
-
+    std::vector<Event<T, N>*> evs = {&ev};
 
     ODE<T, N> ode({f, jac2}, t0, q0, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "BDF");
 

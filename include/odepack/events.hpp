@@ -20,31 +20,53 @@ using event_f = std::function<T(const T&, const vec<T, N>&, const std::vector<T>
 template<typename T, int N>
 using is_event_f = std::function<bool(const T&, const vec<T, N>&, const std::vector<T>&)>;
 
+template<typename T>
+using _LowlevelObjFun = T (*)(const T&, const T*, const T*);
+
+template<typename T>
+using _LowlevelObjFunCheck = bool (*)(const T&, const T*, const T*);
+
 template<typename T, int N>
 struct ObjFun{
 
-    ObjFun(std::nullptr_t f) : objfun(f) {}
+    ObjFun(std::nullptr_t f){}
 
-    ObjFun(const event_f<T, N>& f) : objfun(f) {}
+    ObjFun(const event_f<T, N>& f) : objfun(f) {
+        if (f == nullptr){
+            objfun = nullptr;
+        }
+    }
 
     template<typename LowLevelType>
-    ObjFun(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {}
+    ObjFun(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {
+        if (f == nullptr){
+            objfun = nullptr;
+        }
+    }
     
-    event_f<T, N> objfun;
+    event_f<T, N> objfun = nullptr;
 
 };
 
 template<typename T, int N>
 struct ObjFunCondition{
 
-    ObjFunCondition(std::nullptr_t f) : objfun(f) {}
+    ObjFunCondition(std::nullptr_t f) {}
 
-    ObjFunCondition(const is_event_f<T, N>& f) : objfun(f) {}
+    ObjFunCondition(const is_event_f<T, N>& f) : objfun(f) {
+        if (f == nullptr){
+            objfun = nullptr;
+        }
+    }
 
     template<typename LowLevelType>
-    ObjFunCondition(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {}
+    ObjFunCondition(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {
+        if (f == nullptr){
+            objfun = nullptr;
+        }
+    }
     
-    is_event_f<T, N> objfun;
+    is_event_f<T, N> objfun = nullptr;
 
 };
 
@@ -104,6 +126,8 @@ protected:
 
     Event(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
 
+    Event() = default;
+
     DEFAULT_RULE_OF_FOUR(Event);
 
     inline T        obj_fun(const T& t, const vec<T, N>& q) const;
@@ -118,6 +142,8 @@ class PreciseEvent : public Event<T, N>{
 public:
 
     PreciseEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+
+    PreciseEvent() = default;
 
     DEFAULT_RULE_OF_FOUR(PreciseEvent);
 
@@ -142,6 +168,8 @@ public:
     PeriodicEvent(const std::string& name, const T& period, const T& start, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
 
     PeriodicEvent(const std::string& name, const T& period, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+
+    PeriodicEvent() = default;
 
     DEFAULT_RULE_OF_FOUR(PeriodicEvent);
 
@@ -177,6 +205,8 @@ class RoughEvent : public Event<T, N>{
 public:
 
     RoughEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+
+    RoughEvent() = default;
 
     DEFAULT_RULE_OF_FOUR(RoughEvent);
 
@@ -464,19 +494,12 @@ class EventCollection{
 
 public:
 
-    EventCollection(std::initializer_list<Event<T, N>*> events){
-        _copy(events.begin(), events.size());
-    }
-
     EventCollection(std::initializer_list<const Event<T, N>*> events){
         _copy(events.begin(), events.size());
     }
 
-    EventCollection(const std::vector<Event<T, N>*>& events){
-        _copy(events.begin(), events.size());
-    }
-
-    EventCollection(const std::vector<const Event<T, N>*>& events){
+    template<typename EventIterator>
+    EventCollection(const EventIterator& events){
         _copy(events.begin(), events.size());
     }
 

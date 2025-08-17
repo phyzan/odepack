@@ -92,6 +92,15 @@ int sgn(const T& x){
     return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
 }
 
+template<typename Iterable>
+size_t prod(const Iterable& array){
+    size_t res = 1;
+    for (size_t i=0; i<array.size(); i++){
+        res *= array[i];
+    }
+    return res;
+}
+
 
 template<typename T, int N>
 void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
@@ -252,11 +261,23 @@ struct Functor{
 
     Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
 
-    Functor(const Fvoidptr<T, N, VecLike>& f):func(f){}
+    Functor(const Fvoidptr<T, N, VecLike>& f):func(f){
+        if (f == nullptr){
+            func = nullptr;
+        }
+    }
 
-    Functor(const FuncLowLevel<T> f):func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){f(res.data(), t, q.data(), args.data());}){}
+    Functor(const FuncLowLevel<T> f):func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){f(res.data(), t, q.data(), args.data());}){
+        if (f == nullptr){
+            func = nullptr;
+        }
+    }
 
-    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
+    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){
+        if (f == nullptr){
+            func = nullptr;
+        }
+    }
 
     inline void operator()(VecLike<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
         func(result, t, q, args);

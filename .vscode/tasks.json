@@ -10,6 +10,7 @@
                 "-O3",
                 "-fopenmp",
                 "-I/usr/include",
+                "-I/usr/include/python3.12",
                 "-Wall",
                 "-fPIC",
                 "-g",
