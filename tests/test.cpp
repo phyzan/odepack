@@ -4,7 +4,7 @@
 #include <odepack/events.hpp>
 #include <string>
 
-const int N = -1;
+const int N =-1;
 using T = double;
 using Ty = vec<T, N>;
 
@@ -42,7 +42,7 @@ int main(){
 
     std::vector<Event<T, N>*> evs = {&ev};
 
-    VariationalODE<T, N> ode({f, jac}, t0, q0, 0.4, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "BDF");
+    ODE<T, N> ode({f, jac}, t0, q0, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "RK45");
 
     ode.integrate(tmax, -1, {}).examine();
 

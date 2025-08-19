@@ -43,13 +43,27 @@ struct _MutableBDF{
 
     _MutableBDF(const vec<T, N>& q);
 
+    _MutableBDF(){
+        ypredict.setZero();
+        scale.setZero();
+        psi.setZero();
+        dy.setZero();
+        f.setZero();
+        error_m.setZero();
+        error_p.setZero();
+        error_norms.setZero();
+        factors.setZero();
+    }
+
     vec<T, N> ypredict;
     vec<T, N> scale;
     vec<T, N> psi;
     vec<T, N> dy;
     vec<T, N> f;
-    vec<T, N> error_m, error_p;
-    vec<T, 3> error_norms, factors;
+    vec<T, N> error_m;
+    vec<T, N> error_p ;
+    vec<T, 3> error_norms;
+    vec<T, 3> factors;
 
 };
 
@@ -272,7 +286,10 @@ BDFCONSTS<T>::BDFCONSTS(){
 }
 
 template<typename T, int N>
-_MutableBDF<T, N>::_MutableBDF(const vec<T, N>& q):ypredict(q), scale(q), psi(q), dy(q), f(q), error_m(q), error_p(q){}
+_MutableBDF<T, N>::_MutableBDF(const vec<T, N>& q):ypredict(q), scale(q), psi(q), dy(q), f(q), error_m(q), error_p(q){
+    error_norms.setZero();
+    factors.setZero();
+}
 
 
 template<typename T, int N>

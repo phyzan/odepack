@@ -47,13 +47,16 @@ protected:
         _error.setZero();
     }
 
-    State() = default;
+    State(){
+        _q.setZero();
+        _error.setZero();
+    }
 
     DEFAULT_RULE_OF_FOUR(State);
 
-    T _t; //current time
+    T _t = 0; //current time
     vec<T, N> _q; //current vector
-    T _habs; //absolute stepsize to be used for the next step
+    T _habs=0; //absolute stepsize to be used for the next step
     int _direction = 0;
     vec<T, N> _error;
 };
@@ -101,7 +104,9 @@ class ViewState final : public State<T, N>{
 
 public:
 
-    ViewState() = default;
+    ViewState():State<T, N>(){
+        _q_exposed.setZero();
+    }
 
     ViewState(const T& t, const vec<T, N>& q, const T& h=0) : State<T, N>(t, q, abs(h)), _q_exposed(q) {
         _q_exposed_ptr = &(this->_q);
