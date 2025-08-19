@@ -14,11 +14,6 @@
 namespace py = pybind11;
 
 //assumes empty args given as std::vector, use only for ODE instanciated from python directly
-template<typename T, int N>
-Func<T, N> to_Func(py::function f, const _Shape& shape, py::tuple args=py::tuple());
-
-template<typename T, int N>
-Func<T, N, JacMat> to_Jac(py::function f, const _Shape& shape, py::tuple args=py::tuple());
 
 _Shape shape(const py::object& arr);
 
@@ -33,28 +28,13 @@ _Shape getShape(const size_t& dim1, const _Shape& shape){
 template<class Scalar, class ArrayType>
 py::array_t<Scalar> to_numpy(const ArrayType& array, const _Shape& q0_shape={});
 
-template<typename T, int N>
-event_f<T, N> to_event(py::function py_event, const _Shape& shape, py::tuple args);
-
-template<typename T, int N>
-is_event_f<T, N> to_event_check(py::function py_event_check, const _Shape& shape, py::tuple py_args);
-
 py::dict to_PyDict(const std::map<std::string, std::vector<size_t>>& _map);
 
 template<typename T, class Ty>
 Ty toCPP_Array(const py::iterable& obj);
 
 template<typename T, int N>
-vec<T, N> fast_convert(const py::array_t<T>& A);
-
-template<typename T, int N>
-JacMat<T, N> fast_convert_jac(const py::array_t<T>& A);
-
-template<typename T, int N>
 std::vector<T> flatten(const std::vector<vec<T, N>>&);
-
-template<typename T>
-py::tuple to_tuple(const std::vector<T>& vec);
 
 template<typename T, int N>
 std::vector<std::unique_ptr<Event<T, N>>> to_Events(py::iterable events, const _Shape& shape, py::iterable args);
@@ -92,17 +72,93 @@ T open_capsule(py::capsule f){
 
 #pragma GCC visibility push(hidden)
 
+template<typename T>
+py::tuple as_tuple(const T* x, int size){
+    py::tuple tup(size);
+    for (int i=0; i<size; i++){
+        tup[i] = x[i];
+    }
+    return tup;
+}
+
+struct PyStruct{
+
+    py::function rhs;
+    py::function jac;
+    py::function mask;
+    py::function event;
+    _Shape shape = {};
+    py::tuple py_args = py::make_tuple();
+
+};
+
+template<typename T>
+void arrcpy(T* dst, const T* src, size_t size){
+    for (size_t i=0; i<size; i++){
+        dst[i] = src[i];
+    }
+}
+
+template<typename T>
+void arrcpy(T* dst, const void* src, size_t size){
+    const T* data = static_cast<const T*>(src);
+    arrcpy(dst, data, size);
+}
+
+template<typename T>
+void py_rhs(T* res, const T& t, const T* q, const T* args, const void* obj){
+    //args should always be the same as p.py_args
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::array_t<T> pyres = p.rhs(t, py::array_t<T>(p.shape, q), *p.py_args);
+    arrcpy(res, pyres.data(), pyres.size());
+}
+
+template<typename T>
+void py_jac(T* res, const T& t, const T* q, const T* args, const void* obj){
+    //args should always be the same as p.py_args
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::array_t<T> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
+    arrcpy(res, pyres.data(), pyres.size());
+}
+
+template<typename T>
+void py_mask(T* res, const T& t, const T* q, const T* args, const void* obj){
+    //args should always be the same as p.py_args
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::array_t<T> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
+    arrcpy(res, pyres.data(), pyres.size());
+}
+
+template<typename T>
+T py_event(const T& t, const T* q, const T* args, const void* obj){
+    //args should always be the same as p.py_args
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();
+}
+
 
 template<typename T, int N>
 class PyEvent {
 
 public:
-    PyEvent(std::string name, py::function when, py::function check_if, py::function mask, bool hide_mask, T event_tol) : _name(name), _hide_mask(hide_mask), _event_tol(event_tol), _is_lowlevel(false), _py_when(when), _py_check_if(check_if), _py_mask(mask){}
 
-    PyEvent(std::string name, py::object when, py::object check_if, py::object mask, bool hide_mask, T event_tol, size_t input_size, size_t args_size) : _name(name), _hide_mask(hide_mask), _event_tol(event_tol), _is_lowlevel(true), _input_size(input_size), _args_size(args_size){
-        this->_when = when.is_none() ? nullptr : open_capsule<_LowlevelObjFun<T>>(when);
-        this->_check_if = check_if.is_none() ? nullptr : open_capsule<_LowlevelObjFunCheck<T>>(check_if);
-        this->_mask = mask.is_none() ? nullptr : open_capsule<FuncLowLevel<T>>(mask);
+    PyEvent(std::string name, py::object when, int dir, py::object mask, bool hide_mask, T event_tol, size_t Nsys, size_t Nargs) : _name(name), _dir(sgn(dir)), _hide_mask(hide_mask), _event_tol(event_tol), _Nsys(Nsys), _Nargs(Nargs){
+        if (py::isinstance<py::capsule>(when)){
+            this->_when = open_capsule<ObjFun<T>>(when);
+        }
+        else if (py::isinstance<py::function>(when)){
+            data.event = when;
+            this->_when = py_event<T>;
+        }
+
+        if (py::isinstance<py::capsule>(mask)){
+            this->_mask = open_capsule<Func<T>>(mask);
+        }
+        else if (py::isinstance<py::function>(mask)){
+            data.mask = mask;
+            this->_mask = py_mask<T>;
+        }
+
     }
 
     DEFAULT_RULE_OF_FOUR(PyEvent);
@@ -113,24 +169,36 @@ public:
 
     T                   event_tol() const {return _event_tol;}
 
-    bool                is_lowlevel() const {return _is_lowlevel;}
+    bool                is_lowlevel() const{
+        return data.event.is_none() && data.mask.is_none();
+    }
 
-    size_t              input_size() const {return _input_size;}
-
-    size_t              args_size() const {return _args_size;}
+    void                check_sizes(size_t Nsys, size_t Nargs) const{
+        std::vector<py::function> funcs({data.event, data.mask});
+        for (const py::function& item : funcs){
+            if (item.is_none()){
+                //meaning that the function is lowlevel
+                if (_Nsys != Nsys){
+                    throw py::value_error("The event named \""+this->name()+"\" can only be applied on an ode of system size "+std::to_string(_Nsys)+", not "+std::to_string(Nsys));
+                }
+                else if (_Nargs != Nargs){
+                    throw py::value_error("The event named \""+this->name()+"\" can only accept "+std::to_string(_Nargs)+" extra args, not "+std::to_string(Nargs));
+                }
+            }
+        }
+    }
 
     virtual std::unique_ptr<Event<T, N>> toEvent(const _Shape& shape, py::tuple args) {
-        if (this->_is_lowlevel){
+        if (this->is_lowlevel()){
             for (const py::handle& arg : args){
                 if (!PyNumber_Check(arg.ptr())){
                     throw py::value_error("All args must be numbers");
                 }
             }
-            return std::make_unique<PreciseEvent<T, N>>(this->name(), _when, _check_if, this->_mask, this->hide_mask(), this->event_tol());
         }
-        else{
-            return std::make_unique<PreciseEvent<T, N>>(this->name(), to_event<T, N>(_py_when, shape, args), to_event_check<T, N>(_py_check_if, shape, args), to_Func<T, N>(_py_mask, shape, args), this->hide_mask(), this->event_tol());
-        }
+        data.py_args = args;
+        data.shape = shape;
+        return std::make_unique<ObjectOwningEvent<PreciseEvent<T, N>, PyStruct>>(data, this->name(), this->_when, _dir, this->_mask, this->hide_mask(), this->event_tol());
     }
 
     virtual ~PyEvent(){}
@@ -138,19 +206,17 @@ public:
 protected:
 
     std::string _name;
+    int _dir = 0;
     bool _hide_mask;
     T _event_tol;
-    bool _is_lowlevel;
 
-    py::function _py_when;
-    py::function _py_check_if;
-    py::function _py_mask;
+    ObjFun<T> _when = nullptr;
+    Func<T> _mask = nullptr;
 
-    _LowlevelObjFun<T> _when = nullptr;
-    _LowlevelObjFunCheck<T> _check_if = nullptr;
-    FuncLowLevel<T> _mask = nullptr;
-    size_t _input_size;
-    size_t _args_size;
+    size_t _Nsys;
+    size_t _Nargs;
+
+    PyStruct data;
 };
 
 
@@ -158,24 +224,23 @@ template<typename T, int N>
 class PyPerEvent : public PyEvent<T, N>{
 
 public:
-    PyPerEvent(std::string name, T period, py::object start, py::function mask, bool hide_mask):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0), _period(period), _start(start.is_none() ? inf<T>() : start.cast<T>()){}
 
-    PyPerEvent(std::string name, T period, py::object start, py::object mask, bool hide_mask, size_t input_size, size_t args_size):PyEvent<T, N>(name, py::none(), py::none(), mask, hide_mask, 0, input_size, args_size), _period(period), _start(start.is_none() ? inf<T>() : start.cast<T>()){}
+    PyPerEvent(std::string name, T period, py::object start, py::object mask, bool hide_mask, size_t Nsys, size_t Nargs):PyEvent<T, N>(name, py::function(), 0, mask, hide_mask, 0, Nsys, Nargs), _period(period), _start(start.is_none() ? inf<T>() : start.cast<T>()){}
 
     DEFAULT_RULE_OF_FOUR(PyPerEvent);
 
     std::unique_ptr<Event<T, N>> toEvent(const _Shape& shape, py::tuple args) override {
+
         if (this->is_lowlevel()){
             for (const py::handle& arg : args){
                 if (!PyNumber_Check(arg.ptr())){
                     throw py::value_error("All args must be numbers");
                 }
             }
-            return std::make_unique<PeriodicEvent<T, N>>(this->name(), _period, _start, this->_mask, this->hide_mask());
         }
-        else{
-            return std::make_unique<PeriodicEvent<T, N>>(this->name(), _period, _start, to_Func<T, N>(this->_py_mask, shape, args), this->hide_mask());
-        }
+        this->data.py_args = args;
+        this->data.shape = shape;
+        return std::make_unique<ObjectOwningEvent<PeriodicEvent<T, N>, PyStruct>>(this->data, this->name(), _period, _start, this->_mask, this->hide_mask());
     }
 
     const T& period()const{
@@ -196,14 +261,14 @@ private:
 template<typename T, int N>
 struct PyFuncWrapper{
 
-    FuncLowLevel<T> rhs;
-    size_t input_size;
+    Func<T> rhs;
+    size_t Nsys;
     std::vector<size_t> output_shape;
-    size_t args_size;
+    size_t Nargs;
     size_t output_size;
 
 
-    PyFuncWrapper(py::capsule obj, size_t input_size, py::iterable output_shape, size_t args_size) : rhs(open_capsule<FuncLowLevel<T>>(obj)), input_size(input_size), args_size(args_size) {
+    PyFuncWrapper(py::capsule obj, size_t Nsys, py::iterable output_shape, size_t Nargs) : rhs(open_capsule<Func<T>>(obj)), Nsys(Nsys), Nargs(Nargs) {
         this->output_shape = toCPP_Array<size_t, std::vector<size_t>>(output_shape);
         size_t s = 1;
         for (size_t i=0; i<this->output_shape.size(); i++){
@@ -216,10 +281,10 @@ struct PyFuncWrapper{
         std::vector<T> args =  toCPP_Array<T, std::vector<T>>(py_args);
         vec<T, N> q = toCPP_Array<T, vec<T, N>>(py_q);
         vec<T, N> res(output_size);
-        if (static_cast<size_t>(q.size()) != input_size || args.size() != args_size){
+        if (static_cast<size_t>(q.size()) != Nsys || args.size() != Nargs){
             throw py::value_error("Invalid array sizes in ode function call");
         }
-        this->rhs(res.data(), t, q.data(), args.data());
+        this->rhs(res.data(), t, q.data(), args.data(), nullptr);
         return to_numpy<T>(res, output_shape);
     }
 };
@@ -330,8 +395,8 @@ class PyODE{
 
 public:
 
-    PyODE(py::function f, T t0, py::iterable q0, py::function jacobian, T rtol, T atol, T min_step, T max_step, T first_step, py::iterable py_args, py::iterable events, py::str method){
-        OdeRhs<T, N> ode_rhs = this->_init(f, q0, jacobian, py_args, events);
+    PyODE(py::function f, T t0, py::iterable q0, py::object jacobian, T rtol, T atol, T min_step, T max_step, T first_step, py::iterable py_args, py::iterable events, py::str method){
+        OdeData<T> ode_rhs = this->_init(f, q0, jacobian, py_args, events);
         std::vector<T> args = toCPP_Array<T, std::vector<T>>(py_args);
         std::unique_ptr<OdeSolver<T, N>> solver = get_solver<T, N>(method.cast<std::string>(), ode_rhs, t0, toCPP_Array<T, vec<T, N>>(q0), rtol, atol, min_step, max_step, first_step, args, to_Events<T, N>(events, shape(q0), py_args));
         ode = new ODE<T, N>(*solver);
@@ -340,39 +405,41 @@ public:
 protected:
     PyODE(){}//derived classes manage ode and q0_shape creation
 
-    OdeRhs<T, N> _init(py::function f, py::iterable q0, py::function jacobian, py::iterable py_args, py::iterable events){
-        //initializes this->q0_shape; and makes checks.
+    OdeData<T> _init(py::function f, py::iterable q0, py::object jacobian, py::iterable py_args, py::iterable events){
 
-        q0_shape = shape(q0);
-        size_t _size = prod(q0_shape);
+        data.shape = shape(q0);
+        data.py_args = py::tuple(py_args);
+        size_t _size = prod(data.shape);
         std::vector<T> args = toCPP_Array<T, std::vector<T>>(py_args);
-        OdeRhs<T, N> ode_rhs;
+        OdeData<T> ode_rhs = {nullptr, nullptr, &data};
         if (py::isinstance<PyFuncWrapper<T, N>>(f)){
             PyFuncWrapper<T, N>& _f = f.cast<PyFuncWrapper<T, N>&>();
-            ode_rhs.ode_rhs = _f.rhs;
-            if (_f.input_size != _size){
+            ode_rhs.rhs = _f.rhs;
+            if (_f.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size");
             }
-            else if (_f.args_size != args.size()){
+            else if (_f.Nargs != args.size()){
                 throw py::value_error("The array size of the given extra args differs from the number of args specified for this ode system");
             }
         }
         else{
-            ode_rhs.ode_rhs = to_Func<T, N>(f, shape(q0), py_args);
+            data.rhs = f;
+            ode_rhs.rhs = py_rhs;
         }
         
         if (py::isinstance<PyFuncWrapper<T, N>>(jacobian)){
             PyFuncWrapper<T, N>& _j = jacobian.cast<PyFuncWrapper<T, N>&>();
             ode_rhs.jacobian = _j.rhs;
-            if (_j.input_size != _size){
+            if (_j.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
             }
-            else if (_j.args_size != args.size()){
+            else if (_j.Nargs != args.size()){
                 throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
             }
         }
         else if (!jacobian.is_none()){
-            ode_rhs.jacobian = to_Jac<T, N>(jacobian, shape(q0), py_args);
+            data.jac = jacobian;
+            ode_rhs.jacobian = py_jac;
         }
 
         for (py::handle ev : events){
@@ -380,14 +447,7 @@ protected:
                 throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class");
             }
             const PyEvent<T, N>& _ev = ev.cast<const PyEvent<T, N>&>();
-            if (_ev.is_lowlevel()){
-                if (_ev.input_size() != _size){
-                    throw py::value_error("An Event object provided cannot be applied on an ode of this system size");
-                }
-                else if (_ev.args_size() != args.size()){
-                    throw py::value_error("An Event object provided accepts a different number of extra args than of the ones provided");
-                }
-            }
+            _ev.check_sizes(_size, args.size());
 
         }
         return ode_rhs;
@@ -396,10 +456,13 @@ protected:
 
 public:
 
-    PyODE(const PyODE<T, N>& other) : ode(other.ode->clone()), q0_shape(other.q0_shape){}
+    PyODE(const PyODE<T, N>& other) : ode(other.ode->clone()), data(other.data){
+        ode->set_obj(&data);
+    }
 
-    PyODE(PyODE<T, N>&& other):ode(other.ode), q0_shape(other.q0_shape){
+    PyODE(PyODE<T, N>&& other):ode(other.ode), data(other.data){
         other.ode = nullptr;
+        ode->set_obj(&data);
     }
 
     PyODE<T, N>& operator=(const PyODE<T, N>& other){
@@ -408,7 +471,8 @@ public:
         }
         delete ode;
         ode = other.ode->clone();
-        q0_shape = other.q0_shape;
+        data = other.data;
+        ode->set_obj(&data);
         return *this;
     }
 
@@ -418,7 +482,8 @@ public:
         }
         ode = other.ode;
         other.ode = nullptr;
-        q0_shape = std::move(other.q0_shape);
+        data = other.data;
+        ode->set_obj(&data);
         return *this;
     }
 
@@ -428,25 +493,25 @@ public:
 
     PySolverState<T, N> py_state() const{
         SolverState<T, N> s = ode->state();
-        return PySolverState<T, N>(s.t, s.q, s.habs, s.event, s.diverges, s.is_running, s.is_dead, s.Nt, s.message, q0_shape); 
+        return PySolverState<T, N>(s.t, s.q, s.habs, s.event, s.diverges, s.is_running, s.is_dead, s.Nt, s.message, data.shape); 
     }
 
     PyOdeResult<T, N> py_integrate(const T& interval, const int max_frames, py::iterable event_options, const int& max_prints, const bool& include_first){
         OdeResult<T, N> res = ode->integrate(interval, max_frames, to_Options(event_options), max_prints, include_first);
-        PyOdeResult<T, N> py_res(res, this->q0_shape);
+        PyOdeResult<T, N> py_res(res, data.shape);
         return py_res;
     }
 
     PyOdeSolution<T, N> py_rich_integrate(const T& interval, py::iterable event_options, const int& max_prints){
         OdeSolution<T, N> res = ode->rich_integrate(interval, to_Options(event_options), max_prints);
-        PyOdeSolution<T, N> py_res(res, this->q0_shape);
+        PyOdeSolution<T, N> py_res(res, data.shape);
         return py_res;
     }
 
 
     PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, py::iterable event_options, const int& max_prints, const bool& include_first){
         OdeResult<T, N> res = ode->go_to(t, max_frames, to_Options(event_options), max_prints, include_first);
-        PyOdeResult<T, N> py_res(res, this->q0_shape);
+        PyOdeResult<T, N> py_res(res, data.shape);
         return py_res;
     }
 
@@ -456,7 +521,7 @@ public:
     }
 
     py::array_t<T> q_array()const{
-        py::array_t<T> res = to_numpy<T>(flatten<T, N>(ode->q()), getShape(ode->t().size(), this->q0_shape));
+        py::array_t<T> res = to_numpy<T>(flatten<T, N>(ode->q()), getShape(ode->t().size(), data.shape));
         return res;
     }
 
@@ -464,11 +529,11 @@ public:
         std::vector<T> t_data = ode->t_filtered(event.cast<std::string>());
         py::array_t<T> t_res = to_numpy<T>(t_data);
         std::vector<vec<T, N>> q_data = ode->q_filtered(event.cast<std::string>());
-        py::array_t<T> q_res = to_numpy<T>(flatten<T, N>(q_data), getShape(q_data.size(), this->q0_shape));
+        py::array_t<T> q_res = to_numpy<T>(flatten<T, N>(q_data), getShape(q_data.size(), data.shape));
         return py::make_tuple(t_res, q_res);
     }
     ODE<T, N>* ode;
-    _Shape q0_shape;
+    PyStruct data;
 };
 
 
@@ -477,8 +542,8 @@ class PyVarODE : public PyODE<T, N>{
 
 public:
 
-    PyVarODE(py::function f, T t0, py::iterable q0, T period, py::function jac, T rtol, T atol, T min_step, T max_step, T first_step, py::iterable args, py::iterable events, py::str method):PyODE<T, N>(){
-        OdeRhs<T, N> ode_rhs = this->_init(f, q0, jac, args, events);
+    PyVarODE(py::function f, T t0, py::iterable q0, T period, py::object jac, T rtol, T atol, T min_step, T max_step, T first_step, py::iterable args, py::iterable events, py::str method):PyODE<T, N>(){
+        OdeData<T> ode_rhs = this->_init(f, q0, jac, args, events);
         vec<T, N> q0_ = toCPP_Array<T, vec<T, N>>(q0);
         std::vector<T> args_ = toCPP_Array<T, std::vector<T>>(args);
         this->ode = new VariationalODE<T, N>(ode_rhs, t0, q0_, period, rtol, atol, min_step, max_step, first_step, args_, to_Events<T, N>(events, shape(q0), args), method.cast<std::string>());
@@ -513,90 +578,6 @@ public:
 -----------------------------------------------------------------------
 */
 
-template<typename T, int N>
-Func<T, N> to_Func(py::function f, const _Shape& shape, py::tuple py_args){
-    if (f.is_none()){
-        return nullptr;
-    }
-
-    Func<T, N> g;
-    if (py_args.empty()){
-        g = [f, shape](const T& t, const vec<T, N>& y, const std::vector<T>& args) -> vec<T, N> {
-            return fast_convert<T, N>(f(t, to_numpy<T>(y, shape), *to_tuple(args)));
-        };
-    }
-    else{
-        g = [f, shape, py_args](const T& t, const vec<T, N>& y, const std::vector<T>& _) -> vec<T, N> {
-            vec<T, N> res = fast_convert<T, N>(f(t, to_numpy<T>(y, shape), *py_args));
-            return res;
-        };
-    }
-
-    return g;
-}
-
-template<typename T, int N>
-Func<T, N, JacMat> to_Jac(py::function f, const _Shape& shape, py::tuple py_args){
-    if (f.is_none()){
-        return nullptr;
-    }
-
-    Func<T, N, JacMat> g;
-    if (py_args.empty()){
-        g = [f, shape](const T& t, const vec<T, N>& y, const std::vector<T>& args) -> JacMat<T, N> {
-            return fast_convert_jac<T, N>(f(t, to_numpy<T>(y, shape), *to_tuple(args)));
-        };
-    }
-    else{
-        g = [f, shape, py_args](const T& t, const vec<T, N>& y, const std::vector<T>& _) -> JacMat<T, N> {
-            return fast_convert_jac<T, N>(f(t, to_numpy<T>(y, shape), *py_args));
-        };
-    }
-
-    return g;
-}
-
-template<typename T, int N>
-event_f<T, N> to_event(py::function py_event, const _Shape& shape, py::tuple py_args){
-    if (py_event.is_none()){
-        return nullptr;
-    }
-    event_f<T, N> g;
-    if (py_args.empty()){
-        g = [py_event, shape](const T& t, const vec<T, N>& f, const std::vector<T>& args) -> T {
-            return py_event(t, to_numpy<T>(f, shape), *to_tuple(args)).template cast<T>();
-        };
-    }
-    else{
-        g = [py_event, shape, py_args](const T& t, const vec<T, N>& f, const std::vector<T>& _) -> T {
-            return py_event(t, to_numpy<T>(f, shape), *py_args).template cast<T>();
-        };
-    }
-
-    return g;
-}
-
-template<typename T, int N>
-is_event_f<T, N> to_event_check(py::function py_event_check, const _Shape& shape, py::tuple py_args){
-    if (py_event_check.is_none()){
-        return nullptr;
-    }
-
-    is_event_f<T, N> g;
-    if (py_args.empty()){
-        g = [py_event_check, shape](const T& t, const vec<T, N>& f, const std::vector<T>& args) -> bool {
-            return py_event_check(t, to_numpy<T>(f, shape), *to_tuple(args)).equal(py::bool_(true));
-        };
-    }
-    else{
-        g = [py_event_check, shape, py_args](const T& t, const vec<T, N>& f, const std::vector<T>& _) -> bool {
-            return py_event_check(t, to_numpy<T>(f, shape), *py_args).equal(py::bool_(true));
-        };
-    }
-
-    return g;
-}
-
 
 template<typename T, class Ty>
 Ty toCPP_Array(const py::iterable& obj) {
@@ -614,34 +595,6 @@ Ty toCPP_Array(const py::iterable& obj) {
         res[i] = data[i];
     }
 
-    return res;
-}
-
-
-
-template<typename T, int N>
-vec<T, N> fast_convert(const py::array_t<T>& A){
-    size_t n = A.size();
-    vec<T, N> res(n);
-    const T* data = static_cast<const T*>(A.data());
-    for (size_t i=0; i<n; i++){
-        res[i] = data[i];
-    }
-
-    return res;
-}
-
-template<typename T, int N>
-JacMat<T, N> fast_convert_jac(const py::array_t<T>& A){
-    size_t n = A.shape()[A.ndim()-1];
-    JacMat<T, N> res(n, n);
-    T* mat = res.data();
-    const T* data = static_cast<const T*>(A.data());
-    for (size_t i=0; i<n; i++){
-        for (size_t j=0; j<n; j++){
-            mat[i*n+j] = data[j*n+i];
-        }
-    }
     return res;
 }
 
@@ -691,15 +644,6 @@ std::vector<T> flatten(const std::vector<vec<T, N>>& f){
     return res;
 }
 
-template<typename T>
-py::tuple to_tuple(const std::vector<T>& arr) {
-    py::tuple py_tuple(arr.size());  // Create a tuple of the same size as the vector
-    for (size_t i = 0; i < arr.size(); ++i) {
-        py_tuple[i] = py::float_(arr[i]);  // Convert each double element to py::float_
-    }
-    return py_tuple;
-}
-
 template<typename T, int N>
 std::vector<std::unique_ptr<Event<T, N>>> to_Events(py::iterable events, const _Shape& shape, py::iterable args){   
     if (events.is_none()){
@@ -719,22 +663,15 @@ void define_ode_module(py::module& m) {
         .def(py::init<py::str, int, bool, int>(), py::arg("name"), py::arg("max_events")=-1, py::arg("terminate")=false, py::arg("period")=1);
 
     py::class_<PyEvent<T, N>>(m, "Event", py::module_local())
-        .def(py::init<std::string, py::function, py::function, py::function, bool, T>(),
+        .def(py::init<std::string, py::object, int, py::object, bool, T, size_t, size_t>(),
         py::arg("name"),
         py::arg("when"),
-        py::arg("check_if")=py::none(),
+        py::arg("dir")=0,
         py::arg("mask")=py::none(),
         py::arg("hide_mask")=false,
-        py::arg("event_tol")=1e-12)
-        .def(py::init<std::string, py::object, py::object, py::object, bool, T, size_t, size_t>(),
-        py::arg("name"),
-        py::arg("when"),
-        py::arg("check_if"),
-        py::arg("mask"),
-        py::arg("hide_mask"),
-        py::arg("event_tol"),
-        py::arg("input_size"),
-        py::arg("args_size"))
+        py::arg("event_tol")=1e-12,
+        py::arg("__Nsys")=0,
+        py::arg("__Nargs")=0)
         .def_property_readonly("name", [](const PyEvent<T, N>& self){
             return self.name();
         })
@@ -743,20 +680,14 @@ void define_ode_module(py::module& m) {
         });
         
     py::class_<PyPerEvent<T, N>, PyEvent<T, N>>(m, "PeriodicEvent", py::module_local())
-        .def(py::init<std::string, T, py::object, py::function, bool>(),
+        .def(py::init<std::string, T, py::object, py::object, bool, size_t, size_t>(),
             py::arg("name"),
             py::arg("period"),
             py::arg("start")=py::none(),
             py::arg("mask")=py::none(),
-            py::arg("hide_mask")=false)
-        .def(py::init<std::string, T, py::object, py::object, bool, size_t, size_t>(),
-            py::arg("name"),
-            py::arg("period"),
-            py::arg("start"),
-            py::arg("mask"),
-            py::arg("hide_mask"),
-            py::arg("input_size"),
-            py::arg("args_size"))
+            py::arg("hide_mask")=false,
+            py::arg("__Nsys")=0,
+            py::arg("__Nargs")=0)
         .def_property_readonly("period", [](const PyPerEvent<T, N>& self){
                 return self.period();})
         .def_property_readonly("start", [](const PyPerEvent<T, N>& self){
@@ -796,7 +727,7 @@ void define_ode_module(py::module& m) {
 
 
     py::class_<PyODE<T, N>>(m, "LowLevelODE", py::module_local())
-        .def(py::init<py::function, T, py::iterable, py::function, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
+        .def(py::init<py::function, T, py::iterable, py::object, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -808,7 +739,7 @@ void define_ode_module(py::module& m) {
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::none(),
+            py::arg("events")=py::tuple(),
             py::arg("method")="RK45")
         .def(py::init<PyODE<T, N>>(), py::arg("ode"))
         .def("integrate", &PyODE<T, N>::py_integrate,
@@ -846,7 +777,7 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("is_dead", [](const PyODE<T, N>& self){return self.ode->is_dead();});
     
     py::class_<PyVarODE<T, N>, PyODE<T, N>>(m, "VariationalLowLevelODE", py::module_local())
-        .def(py::init<py::function, T, py::iterable, T, py::function, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
+        .def(py::init<py::function, T, py::iterable, T, py::object, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -859,7 +790,7 @@ void define_ode_module(py::module& m) {
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::none(),
+            py::arg("events")=py::tuple(),
             py::arg("method")="RK45")
         .def(py::init<PyVarODE<T, N>>(), py::arg("ode"))
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)
@@ -867,7 +798,7 @@ void define_ode_module(py::module& m) {
         .def("copy", [](const PyVarODE<T, N>& self){return PyVarODE<T, N>(self);});
 
     py::class_<PyFuncWrapper<T, N>>(m, "LowLevelFunction", py::module_local())
-        .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("args_size"))
+        .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("Nargs"))
         .def("__call__", &PyFuncWrapper<T, N>::call, py::arg("t"), py::arg("q"));
 
     m.def("integrate_all", [](py::object list, const T& interval, const int& max_frames, py::iterable event_options, const int& threads, const bool& display_progress){

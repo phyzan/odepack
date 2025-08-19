@@ -9,17 +9,17 @@
 #include "odesolvers.hpp"
 #include "interpolators.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const EventCollection<T, N>& events={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const EventCollection<T, N>& events={}
 
-#define MAIN_CONSTRUCTOR(T, N) const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events
+#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events
 
-#define SOLVER_CONSTRUCTOR(T, N) const std::string& name, const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events
+#define SOLVER_CONSTRUCTOR(T, N) const std::string& name, OdeData<T> ode, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events
 
 #define ODE_CONSTRUCTOR(T, N) MAIN_DEFAULT_CONSTRUCTOR(T, N), std::string method="RK45"
 
-#define ARGS rhs, t0, q0, rtol, atol, min_step, max_step, first_step, args, events
+#define ARGS ode, t0, q0, rtol, atol, min_step, max_step, first_step, args, events
 
-#define PARTIAL_ARGS rhs, rtol, atol, min_step, max_step, args, events
+#define PARTIAL_ARGS ode, rtol, atol, min_step, max_step, args, events
 
 
 template<typename T, int N, typename INTERPOLATOR>
@@ -33,6 +33,9 @@ struct _MutableData{
 
     _MutableData(const vec<T, N>& q, int interp_order) : q(q), qdiff(q), interpolator(0, q), coef_mat(q.size(), interp_order) {}
 };
+
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+void interp_func(T* res, const T& t, const void* obj);
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 class DerivedSolver : public OdeSolver<T, N>{
@@ -53,6 +56,8 @@ class DerivedSolver : public OdeSolver<T, N>{
 
     static constexpr bool _req_coef_mat = std::is_same_v<INTERPOLATOR, StandardLocalInterpolator<T, N, STATE>>;
 
+    friend void interp_func<T, N, Derived, STATE, INTERPOLATOR>(T* res, const T& t, const void* obj);
+
 public:
 
     static const T MAX_FACTOR;
@@ -72,7 +77,6 @@ public:
 
     ~DerivedSolver();
 
-    OdeRhs<T, N>                            ode_rhs() const override;
     const T&                                t() const final;
     const vec<T, N>&                        q() const final;
     const vec<T, N>&                        q_true() const final;
@@ -117,6 +121,7 @@ public:
     void                                    start_interpolation() final;
     void                                    stop_interpolation() final;
     void                                    reset() final;
+    void                                    set_obj(const void* obj) final;
 
     inline STATE                            new_state(const T& t, const vec<T, N>& q, const T& h) const;//virtual
 
@@ -140,11 +145,9 @@ protected:
 
     DerivedSolver& operator=(DerivedSolver&& other);
 
-    const Functor<T, N>& _rhs() const;
-    
-    const vec<T, N>&     _rhs(const T& t, const vec<T, N>& q) const;
-
     void                 _rhs(vec<T, N>& result, const T& t, const vec<T, N>& q) const;
+
+    void                 _jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const;
 
     const vec<T, N>&     _interp(const T& t) const;
 
@@ -190,7 +193,7 @@ private:
 
     inline void         _fin_impl(const T& t0, const vec<T, N>& q0, T first_step); //virtual private
 
-    Functor<T, N>                               _ode_rhs;
+    OdeData<T>                                  _ode;
     T                                           _rtol;
     T                                           _atol;
     T                                           _min_step;
@@ -236,7 +239,7 @@ private:
 
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode_rhs(rhs.ode_rhs), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events), _current_linked_interpolator(t0, q0), _mut(q0, INTERP_ORDER){
+DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode(ode), _rtol(rtol), _atol(atol), _min_step(min_step), _max_step(max_step), _args(args), _n(q0.size()), _name(name), _error(q0.size()), _events(events), _current_linked_interpolator(t0, q0), _mut(q0, INTERP_ORDER){
     if (_min_step < 0){
         throw std::runtime_error("Minimum stepsize must be a non negative number");
     }
@@ -250,7 +253,7 @@ DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(SOLVER_CONSTRUC
 
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(const DerivedSolver& other) : OdeSolver<T, N>(other), _ode_rhs(other._ode_rhs), _rtol(other._rtol), _atol(other._atol), _min_step(other._min_step), _max_step(other._max_step), _args(other._args), _n(other._n), _name(other._name), _tmax(other._tmax), _diverges(other._diverges), _is_running(other._is_running), _is_dead(other._is_dead), _N(other._N), _error(other._error), _message(other._message), _events(other._events), _current_event_index(other._current_event_index), _direction(other._direction), _equiv_states(other._equiv_states), _requires_new_start(other._requires_new_start), _interp_data(other._interp_data), _current_linked_interpolator(other._current_linked_interpolator), _mut(other._mut){
+DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(const DerivedSolver& other) : OdeSolver<T, N>(other), _ode(other._ode), _rtol(other._rtol), _atol(other._atol), _min_step(other._min_step), _max_step(other._max_step), _args(other._args), _n(other._n), _name(other._name), _tmax(other._tmax), _diverges(other._diverges), _is_running(other._is_running), _is_dead(other._is_dead), _N(other._N), _error(other._error), _message(other._message), _events(other._events), _current_event_index(other._current_event_index), _direction(other._direction), _equiv_states(other._equiv_states), _requires_new_start(other._requires_new_start), _interp_data(other._interp_data), _current_linked_interpolator(other._current_linked_interpolator), _mut(other._mut){
     _initial_state = new STATE(*other._initial_state);
     _state = new STATE(*other._state);
     _old_state = new STATE(*other._old_state);
@@ -261,7 +264,7 @@ DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(const DerivedSo
 
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(DerivedSolver&& other) : OdeSolver<T, N>(std::move(other)), _ode_rhs(std::move(other._ode_rhs)), _rtol(std::move(other._rtol)), _atol(std::move(other._atol)), _min_step(std::move(other._min_step)), _max_step(std::move(other._max_step)), _args(std::move(other._args)), _n(std::move(other._n)), _name(std::move(other._name)), _tmax(std::move(other._tmax)), _diverges(std::move(other._diverges)), _is_running(std::move(other._is_running)), _is_dead(std::move(other._is_dead)), _N(std::move(other._N)), _error(std::move(other._error)), _message(std::move(other._message)), _events(std::move(other._events)), _current_event_index(std::move(other._current_event_index)), _direction(std::move(other._direction)), _initial_state(other._initial_state), _state(other._state), _old_state(other._old_state), _aux_state(other._aux_state), _temp_state(other._temp_state), _equiv_states(std::move(other._equiv_states)), _requires_new_start(other._requires_new_start), _interp_data(other._interp_data), _current_linked_interpolator(std::move(other._current_linked_interpolator)), _mut(std::move(other._mut)){
+DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::DerivedSolver(DerivedSolver&& other) : OdeSolver<T, N>(std::move(other)), _ode(std::move(other._ode)), _rtol(std::move(other._rtol)), _atol(std::move(other._atol)), _min_step(std::move(other._min_step)), _max_step(std::move(other._max_step)), _args(std::move(other._args)), _n(std::move(other._n)), _name(std::move(other._name)), _tmax(std::move(other._tmax)), _diverges(std::move(other._diverges)), _is_running(std::move(other._is_running)), _is_dead(std::move(other._is_dead)), _N(std::move(other._N)), _error(std::move(other._error)), _message(std::move(other._message)), _events(std::move(other._events)), _current_event_index(std::move(other._current_event_index)), _direction(std::move(other._direction)), _initial_state(other._initial_state), _state(other._state), _old_state(other._old_state), _aux_state(other._aux_state), _temp_state(other._temp_state), _equiv_states(std::move(other._equiv_states)), _requires_new_start(other._requires_new_start), _interp_data(other._interp_data), _current_linked_interpolator(std::move(other._current_linked_interpolator)), _mut(std::move(other._mut)){
     _find_true_state(other);
     other._initial_state = nullptr;
     other._state = nullptr;
@@ -298,13 +301,6 @@ DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>& DerivedSolver<T, N, Derived, 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::~DerivedSolver() {
     _clear_states();
-}
-
-
-
-template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-inline OdeRhs<T, N> DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::ode_rhs() const {
-    return {this->_ode_rhs, nullptr};
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
@@ -450,9 +446,10 @@ T DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::auto_step(T direction, cons
         throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
     }
     T h0, d2, h1;
-    vec<T, N> y1, f1;
+    vec<T, N> y1, f1(this->Nsys());
     vec<T, N> scale = _atol + q.cwiseAbs()*_rtol;
-    vec<T, N> _dq = this->_rhs(t, q);
+    vec<T, N> _dq(this->Nsys());
+    this->_rhs(_dq, t, q);
 
     T d0 = rms_norm((q/scale).eval());
     T d1 = rms_norm((_dq/scale).eval());
@@ -464,7 +461,7 @@ T DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::auto_step(T direction, cons
     }
 
     y1 = q+h0*dir*_dq;
-    f1 = _rhs(t+h0*dir, y1);
+    _rhs(f1, t+h0*dir, y1);
 
     d2 = rms_norm(((f1-_dq)/scale).eval()) / h0;
     
@@ -592,7 +589,7 @@ bool DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::set_goal(const T& t_max_
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::restart_from(const OdeSolver<T, N>& other){
-    //TODO. needs more checks. e.g. if _n and _args are the same. what about _ode_rhs, _rtol, _atol... ?
+    //TODO. needs more checks. e.g. if _n and _args are the same. what about _ode, _rtol, _atol... ?
     if (_is_dead){
         _warn_dead();
         return;
@@ -733,6 +730,11 @@ void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::reset() {
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::set_obj(const void* obj){
+    _ode.obj = obj;
+}
+
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 const INTERPOLATOR& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_interpolator() const{
     if (_mut.interpolator_is_set){
         return _mut.interpolator;
@@ -778,36 +780,14 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::coef_matrix(Eigen
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-inline const Functor<T, N>& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_rhs() const{
-    return _ode_rhs;
-}
-
-
-
-template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_rhs(vec<T, N>& result, const T& t, const vec<T, N>& q) const{
-    _ode_rhs(result, t, q, _args);
+    this->_ode.rhs(result.data(), t, q.data(), this->_args.data(), this->_ode.obj);
 }
-
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-inline const vec<T, N>& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_rhs(const T& t, const vec<T, N>& q) const {
-    /*
-    only assign a copy:
-        e.g. vec<T, N> r = this->_rhs(...); allowed
-
-        do NOT do this:
-            const vec<T, N>& r = this->_rhs(...);
-
-    This is because a reference to a mutable object is returned
-    to improve efficiency. If the function is called with different arguments,
-    the underlying mutable object will change value, which will lead to unexpected behavior
-    when using the first const& defined.
-    */
-    _ode_rhs(_mut.qdiff, t, q, _args);
-    return _mut.qdiff;
+inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const{
+    this->_ode.jacobian(result.data(), t, q.data(), this->_args.data(), this->_ode.obj);
 }
-
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 const vec<T, N>& DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_interp(const T& t) const{
@@ -886,12 +866,8 @@ template<typename T, int N, typename Derived, typename STATE, typename INTERPOLA
 bool DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_adapt_to_event(Event<T, N>& event, const State<T, N>& before, const State<T, N>& after){
 
     //MUST NOT change _state or _old_state in here, only _true_state
-
-    std::function<vec<T, N>(T)> qfunc = [this](const T& t){
-        return this->_interp(t);
-    };
     
-    if (event.determine(before.t(), before.vector(), after.t(), after.vector(), qfunc)){
+    if (event.determine(before.t(), before.vector(), after.t(), after.vector(), interp_func<T, N, Derived, STATE, INTERPOLATOR>, this)){
         _true_state = &event.state();
         _equiv_states = false;
         return true;
@@ -1057,7 +1033,7 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_clear_states(){
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_copy_data(const Solver& other){
-    _ode_rhs = other._ode_rhs;
+    _ode = other._ode;
     _rtol = other._rtol;
     _atol = other._atol;
     _min_step = other._min_step;
@@ -1092,7 +1068,7 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_copy_data(const 
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_move_data(Solver&& other) {
-    _ode_rhs = std::move(other._ode_rhs);
+    _ode = std::move(other._ode);
     _rtol = std::move(other._rtol);
     _atol = std::move(other._atol);
     _min_step = std::move(other._min_step);
@@ -1170,5 +1146,16 @@ const T DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::SAFETY = T(9)/10;
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
 const T DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::MIN_FACTOR = T(2)/10;
 
+
+template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
+void interp_func(T* res, const T& t, const void* obj){
+    const DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>* solver = reinterpret_cast<const DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>*>(obj);
+    solver->_interpolator().call(solver->_mut.q, t);
+    const T* data = solver->_mut.q.data();
+    for (size_t i = 0; i < solver->Nsys(); ++i){
+        res[i] = data[i];
+    }
+    
+}
 
 #endif

@@ -22,32 +22,20 @@
 template<typename T, int N=-1>
 using vec = Eigen::Array<T, N, 1>;
 
-template<typename T, int N, template<class, int> typename VecLike=vec>
-struct Functor;
-
-template<typename T, int N, template<class, int> typename VecLike=vec>
-using Func = std::function<VecLike<T, N>(const T&, const vec<T, N>&, const std::vector<T>&)>;
-
-template<typename T, int N, template<class, int> typename VecLike=vec>
-using Fvoid = std::function<void(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&)>;
-
-template<typename T>
-using FuncLowLevel = void(*)(T* rhs, const T& t, const T* f, const T* args); //both ode rhs and jacobian.
-
-template<typename T, int N, template<class, int> typename VecLike=vec>
-using Fptr = VecLike<T, N>(*)(const T&, const vec<T, N>&, const std::vector<T>&);
-
-template<typename T, int N, template<class, int> typename VecLike=vec>
-using Fvoidptr = void(*)(VecLike<T, N>&, const T&, const vec<T, N>&, const std::vector<T>&);
-
 template<typename T, int N>
 using JacMat = Eigen::Matrix<T, N, N, Eigen::RowMajor>;
 
-template<typename T, int N>
-using Jac = Functor<T, N, JacMat>;
+template<typename T>
+using Func = void(*)(T*, const T&, const T*, const T*, const void*);
 
 template<typename T>
-using _ObjFun = std::function<T(const T&)>;
+using FuncLike = void(*)(T*, const T&, const void*);
+
+template<typename T>
+using ObjFun = T(*)(const T&, const T*, const T*, const void*);
+
+template<typename T>
+using ObjFunLike = T(*)(const T&, const void*);
 
 using _Shape = std::vector<size_t>;
 
@@ -83,6 +71,15 @@ T rms_norm(const vec<T, N>& f){
 }
 
 template<typename T>
+T norm(const T* x, const size_t& size){
+    T res = 0;
+    for (size_t i=0; i<size; i++){
+        res += x[i]*x[i];
+    }
+    return sqrt(res);
+}
+
+template<typename T>
 T abs(const T& x){
     return (x > 0) ? x : -x;
 }
@@ -100,7 +97,6 @@ size_t prod(const Iterable& array){
     }
     return res;
 }
-
 
 template<typename T, int N>
 void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const int& event_index);
@@ -122,14 +118,14 @@ std::vector<T> _event_data(const std::vector<T>& q, const std::map<std::string, 
 //BISECTION USED FOR EVENTS IN ODES
 
 template<typename T>
-std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol){
+std::vector<T> bisect(ObjFunLike<T> f, const T& a, const T& b, const T& atol, const void* obj){
     T err = 2*atol+1;
     T _a = a;
     T _b = b;
     T c = a;
     T fm;
 
-    if (f(a)*f(b) > 0){
+    if (f(a, obj)*f(b, obj) > 0){
         throw std::runtime_error("Root not bracketed");
     }
 
@@ -138,8 +134,8 @@ std::vector<T> bisect(const _ObjFun<T>& f, const T& a, const T& b, const T& atol
         if (c == _a || c == _b){
             break;
         }
-        fm = f(c);
-        if (f(_a) * fm  > 0){
+        fm = f(c, obj);
+        if (f(_a, obj) * fm  > 0){
             _a = c;
         }
         else{
@@ -252,81 +248,12 @@ inline void show_progress(const int& n, const int& target, const Clock& clock){
 }
 
 
-template<typename T, int N, template<typename, int> typename VecLike>
-struct Functor{
+template<typename T>
+struct OdeData{
 
-    Functor(const std::nullptr_t& ptr) : func(nullptr){}
-
-    Functor(const Fvoid<T, N, VecLike>& f):func(f){}
-
-    Functor(const Func<T, N, VecLike>& f): func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){}
-
-    Functor(const Fvoidptr<T, N, VecLike>& f):func(f){
-        if (f == nullptr){
-            func = nullptr;
-        }
-    }
-
-    Functor(const FuncLowLevel<T> f):func([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){f(res.data(), t, q.data(), args.data());}){
-        if (f == nullptr){
-            func = nullptr;
-        }
-    }
-
-    Functor(const Fptr<T, N, VecLike>& f): Functor([f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); }){
-        if (f == nullptr){
-            func = nullptr;
-        }
-    }
-
-    inline void operator()(VecLike<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
-        func(result, t, q, args);
-    }
-
-    inline VecLike<T, N> operator()(const T& t, const vec<T, N>& q, const std::vector<T>& args)const{
-        VecLike<T, N> res(q.size());
-        func(res, t, q, args);
-        return res;
-    }
-
-    Functor<T, N, VecLike>& operator=(const Fvoid<T, N, VecLike>& new_func){
-        func = new_func;
-        return *this;
-    }
-
-    Functor<T, N, VecLike>& operator=(const Func<T, N, VecLike>& f){
-        func = [f](VecLike<T, N>& res, const T& t, const vec<T, N>& q, const std::vector<T>& args){res = f(t, q, args); };
-        return *this;
-    }
-
-    bool operator==(const Functor<T, N, VecLike>& other){
-        return (this == &other) ? true : other.func == func;
-    }
-
-    template<typename Any>
-    bool operator==(const Any& other){
-        return func == other;
-    }
-
-    Fvoid<T, N, VecLike> func=nullptr;
-};
-
-
-template<typename T, int N>
-struct OdeRhs{
-
-    Functor<T, N> ode_rhs=nullptr;
-    Jac<T, N> jacobian=nullptr;
-
-    DEFAULT_RULE_OF_FOUR(OdeRhs);
-
-    OdeRhs() = default;
-
-    template<class A>
-    OdeRhs(const A& rhs) : ode_rhs(rhs), jacobian(nullptr){}
-
-    template<class A, class B>
-    OdeRhs(const A& rhs, const B& jac) : ode_rhs(rhs), jacobian(jac){}
+    Func<T> rhs=nullptr;
+    Func<T> jacobian=nullptr;
+    const void* obj = nullptr;
 };
 
 
@@ -454,13 +381,6 @@ void write_checkpoint(std::ofstream& file, const T& t, const vec<T, N>& q, const
     }
     file << "\n";
 }
-
-
-template<class Any, typename T, int N>
-bool operator==(const Any& a, const Functor<T, N>& b){
-    return b.func == a;
-}
-
 
 template<typename T>
 inline T choose_step(const T& habs, const T& hmin, const T& hmax){

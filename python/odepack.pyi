@@ -39,8 +39,7 @@ class Event:
 
     '''
 
-    @overload
-    def __init__(self, name: str, when: ObjFunc, check_if: BoolFunc=None, mask: Func=None, hide_mask=False, event_tol=1e-12):
+    def __init__(self, name: str, when: ObjFunc, dir=0, mask: Func=None, hide_mask=False, event_tol=1e-12):
         '''
         Arguments
         ------------------
@@ -54,10 +53,6 @@ class Event:
 
         event_tol: The numerical tolerance used to determine the event accurately. It will be passed as a parameter in the root finder that solves the equation when(t, q(t)) = 0.
         '''
-        pass
-
-    @overload
-    def __init__(self, name: str, when, check_if, mask, hide_mask, event_tol, input_size, args_size):
         pass
 
     @property
@@ -74,11 +69,7 @@ class PeriodicEvent(Event):
     t = start + n*period, where n is an integer.
     '''
 
-    @overload
     def __init__(self, name: str, period: float, start: float=None, mask: Func=None, hide_mask=False):...
-
-    @overload
-    def __init__(self, name: str, period: float, start: float, mask, hide_mask, input_size, args_size):...
 
     @property
     def period(self)->float:...
@@ -252,7 +243,7 @@ class SolverState:
 
 class LowLevelFunction:
 
-    def __init__(self, pointer, input_size: int, output_shape: Iterable[int], args_size: int):...
+    def __init__(self, pointer, input_size: int, output_shape: Iterable[int], Nargs: int):...
 
     def __call__(self, t: float, q: np.ndarray, *args: float)->np.ndarray: ...
 
@@ -260,11 +251,11 @@ class LowLevelFunction:
 class LowLevelODE:
 
     '''
-    Main class representing an ODE. A LowLevelODE object can dynamically grow every time the user calls methods like .integrate, .advance, .go_to. Every time an integration method is called, the objects variables grow accordingly.
+    Main class representing an ODE. A LowLevelODE object can dynamically grow every time the user calls methods like .integrate, .advance, .go_to. Every time an integration method is called, the object's variables grow accordingly.
     '''
 
     @overload
-    def __init__(self, f: Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: list[Event]=None, method="RK45"):
+    def __init__(self, f: Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: Iterable[Event]=(), method="RK45"):
         '''
         f: f(t, q, ...)->array. Right hand side of the ODE. Must return an array of equal shape as the initial condition q0.
 

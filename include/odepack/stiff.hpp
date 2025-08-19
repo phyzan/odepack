@@ -165,8 +165,6 @@ public:
 
     DEFAULT_RULE_OF_FOUR(BDF);
 
-    OdeRhs<T, N> ode_rhs() const final;
-
     STATE new_state(const T& t, const vec<T, N>& q, const T& h) const;
 
     inline BDFInterpolator<T, N> state_interpolator(const STATE& state1, const STATE& state2, int bdr1, int bdr2) const;
@@ -174,8 +172,6 @@ public:
     void adapt_impl(STATE& res, const STATE& state);
 
 private:
-
-    inline void _jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const;
 
     NewtConv _solve_bdf_system(StateBDF<T, N>& res, const T& t_new, const vec<T, N>& scale);
 
@@ -185,7 +181,6 @@ private:
     }
 
     T _newton_tol;
-    Jac<T, N> _jacobian;
     mutable _MutableBDF<T, N> _mut;
 
 };
@@ -359,8 +354,8 @@ void StateBDF<T, N>::_change_D(const T& factor){
 
 
 template<typename T, int N>
-BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.jacobian), _mut(q0){    
-    if (_jacobian == nullptr){
+BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _mut(q0){    
+    if (ode.jacobian == nullptr){
         throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
     }
     if (rtol == 0){
@@ -373,14 +368,10 @@ BDF<T, N>::BDF(MAIN_CONSTRUCTOR(T, N)) : SolverBase("BDF", ARGS), _jacobian(rhs.
 }
 
 template<typename T, int N>
-OdeRhs<T, N> BDF<T, N>::ode_rhs() const {
-    return {this->_rhs(), this->_jacobian};
-}
-
-template<typename T, int N>
 StateBDF<T, N> BDF<T, N>::new_state(const T& t, const vec<T, N>& q, const T& h) const{
     STATE res = {t, q, h};
-    res.adjust(res._habs, sgn(h), this->_rhs(t, q));
+    this->_rhs(_mut.f, t, q);
+    res.adjust(res._habs, sgn(h), _mut.f);
     this->_jac(res.J, t, q);
     return res;
 }
@@ -506,11 +497,6 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
     factor = std::min(this->MAX_FACTOR, safety*max_factor);
     res.resize_step(factor, h_min, max_step);
     res.lu = false;
-}
-
-template<typename T, int N>
-inline void BDF<T, N>::_jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q) const{
-    _jacobian(result, t, q, this->args());
 }
 
 template<typename T, int N>

@@ -15,73 +15,25 @@ During an ode integration, we might want to save specific events that are encout
 #include "states.hpp"
 
 template<typename T, int N>
-using event_f = std::function<T(const T&, const vec<T, N>&, const std::vector<T>&)>;
+struct _EventObjFun;
 
 template<typename T, int N>
-using is_event_f = std::function<bool(const T&, const vec<T, N>&, const std::vector<T>&)>;
-
-template<typename T>
-using _LowlevelObjFun = T (*)(const T&, const T*, const T*);
-
-template<typename T>
-using _LowlevelObjFunCheck = bool (*)(const T&, const T*, const T*);
-
-template<typename T, int N>
-struct ObjFun{
-
-    ObjFun(std::nullptr_t f){}
-
-    ObjFun(const event_f<T, N>& f) : objfun(f) {
-        if (f == nullptr){
-            objfun = nullptr;
-        }
-    }
-
-    template<typename LowLevelType>
-    ObjFun(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {
-        if (f == nullptr){
-            objfun = nullptr;
-        }
-    }
-    
-    event_f<T, N> objfun = nullptr;
-
-};
-
-template<typename T, int N>
-struct ObjFunCondition{
-
-    ObjFunCondition(std::nullptr_t f) {}
-
-    ObjFunCondition(const is_event_f<T, N>& f) : objfun(f) {
-        if (f == nullptr){
-            objfun = nullptr;
-        }
-    }
-
-    template<typename LowLevelType>
-    ObjFunCondition(LowLevelType f) : objfun([f](const T& t, const vec<T, N>& q, const std::vector<T>& args){return f(t, q.data(), args.data());}) {
-        if (f == nullptr){
-            objfun = nullptr;
-        }
-    }
-    
-    is_event_f<T, N> objfun = nullptr;
-
-};
+T event_obj_func(const T& t, const void* obj){
+    const _EventObjFun<T, N>* ptr = reinterpret_cast<const _EventObjFun<T, N>*>(obj);
+    ptr->local_interp(ptr->q, t, ptr->obj);
+    return ptr->event->obj_fun(t, ptr->q);
+}
 
 template<typename T, int N>
 class Event{
 
 public:
 
-    virtual bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) = 0;
+    virtual bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) = 0;
 
     virtual bool                    is_stop_event() const;
 
     virtual bool                    is_leathal() const;
-
-    virtual bool                    check(const T& t, const vec<T, N>& q) const;
 
     virtual void                    go_back();
 
@@ -95,6 +47,8 @@ public:
 
     inline const std::string&       name() const;
 
+    inline const int&               dir() const;
+
     inline bool                     is_masked() const;
 
     inline const bool&              hides_mask() const;
@@ -106,6 +60,8 @@ public:
     inline const std::vector<T>&    args() const;
 
     inline void                     remove();
+
+    inline T                        obj_fun(const T& t, const T* q) const;
     
     virtual                         ~Event() = default;
 
@@ -113,9 +69,9 @@ public:
 private:
 
     std::string         _name;
-    event_f<T, N>       _when = nullptr;
-    is_event_f<T, N>    _check_if = nullptr;
-    Functor<T, N>       _mask = nullptr;
+    ObjFun<T>           _when = nullptr;
+    int                 _dir = 1;
+    Func<T>             _mask = nullptr;
     bool                _hide_mask;
     size_t              _counter = 0;
     std::vector<T>      _args = {};
@@ -124,15 +80,17 @@ private:
 
 protected:
 
-    Event(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask);
+    const void*         _obj = nullptr;
+
+    mutable vec<T, N>   _tmp;
+
+    Event(const std::string& name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, const void* obj);
 
     Event() = default;
 
     DEFAULT_RULE_OF_FOUR(Event);
 
-    inline T        obj_fun(const T& t, const vec<T, N>& q) const;
-
-    void            _set(const T& t, const vec<T, N>& q);
+    void                _set(const T& t, const vec<T, N>& q);
 
 };
 
@@ -141,7 +99,7 @@ class PreciseEvent : public Event<T, N>{
 
 public:
 
-    PreciseEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false, const T& event_tol=1e-12): Event<T, N>(name, when, check_if, mask, hide_mask), _event_tol(event_tol){}
+    PreciseEvent(const std::string& name, ObjFun<T> when, int dir=0, Func<T> mask=nullptr, bool hide_mask=false, T event_tol=1e-12, const void* obj = nullptr): Event<T, N>(name, when, dir, mask, hide_mask, obj), _event_tol(event_tol){}
 
     PreciseEvent() = default;
 
@@ -149,7 +107,7 @@ public:
 
     PreciseEvent<T, N>* clone() const override;
 
-    bool                determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
+    bool                determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) override;
 
     inline bool         is_precise() const final;
 
@@ -165,9 +123,9 @@ class PeriodicEvent : public PreciseEvent<T, N>{
 
 public:
 
-    PeriodicEvent(const std::string& name, const T& period, const T& start, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+    PeriodicEvent(const std::string& name, T period, T start, Func<T> mask=nullptr, bool hide_mask=false, const void* obj = nullptr);
 
-    PeriodicEvent(const std::string& name, const T& period, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+    PeriodicEvent(const std::string& name, T period, Func<T> mask=nullptr, bool hide_mask=false, const void* obj = nullptr);
 
     PeriodicEvent() = default;
 
@@ -179,7 +137,7 @@ public:
 
     PeriodicEvent<T, N>*    clone() const override;
 
-    bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) override;
+    bool                    determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) override;
 
     void                    go_back() override;
 
@@ -204,7 +162,7 @@ class RoughEvent : public Event<T, N>{
 
 public:
 
-    RoughEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if=nullptr, Functor<T, N> mask=nullptr, const bool& hide_mask=false);
+    RoughEvent(const std::string& name, ObjFun<T> when, int dir=0, Func<T> mask=nullptr, bool hide_mask=false, const void* obj = nullptr);
 
     RoughEvent() = default;
 
@@ -212,7 +170,7 @@ public:
 
     RoughEvent<T, N>* clone() const override;
 
-    bool              determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) final ;
+    bool              determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) final ;
 
     inline bool       is_precise() const final;
 
@@ -220,6 +178,51 @@ public:
 
 
 
+template<typename EventType, typename ObjType>
+class ObjectOwningEvent : public EventType{
+
+public:
+
+    template<typename... Args>
+    ObjectOwningEvent(const ObjType& obj, Args&&... args): EventType(std::forward<Args>(args)...), _object(obj) {
+        this->_obj = &_object;
+    }
+
+    ObjectOwningEvent(const ObjectOwningEvent& other) : EventType(other), _object(other._object) {
+        this->_obj = &_object;
+    }
+
+    ObjectOwningEvent(ObjectOwningEvent&& other) : EventType(std::move(other)), _object(std::move(other._object)) {
+        this->_obj = &_object;
+    }
+
+    ObjectOwningEvent& operator=(const ObjectOwningEvent& other){
+        if (&other != this){
+            EventType::operator=(other);
+            _object = other._object;
+            this->_obj = &_object;
+        }
+        return *this;
+    }
+
+    ObjectOwningEvent& operator=(ObjectOwningEvent&& other){
+        if (&other != this){
+            EventType::operator=(std::move(other));
+            _object = std::move(other._object);
+            this->_obj = &_object;
+        }
+        return *this;
+    }
+
+    ObjectOwningEvent<EventType, ObjType>* clone() const override{
+        return new ObjectOwningEvent<EventType, ObjType>(*this);
+    }
+
+protected:
+
+    ObjType _object;
+
+};
 
 
 
@@ -246,15 +249,15 @@ public:
 //Event CLASS
 
 template<typename T, int N>
-Event<T, N>::Event(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): _name(name), _when(when.objfun), _check_if(check_if.objfun), _mask(mask), _hide_mask(hide_mask && mask != nullptr){
+Event<T, N>::Event(const std::string& name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, const void* obj): _name(name), _when(when), _dir(sgn(dir)), _mask(mask), _hide_mask(hide_mask && mask != nullptr), _obj(obj){
     if (name == ""){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
 }
 
 template<typename T, int N>
-inline T Event<T, N>::obj_fun(const T& t, const vec<T, N>& q) const{ 
-    return _when(t, q, _args);
+inline T Event<T, N>::obj_fun(const T& t, const T* q) const{ 
+    return _when(t, q, _args.data(), _obj);
 }
 
 template<typename T, int N>
@@ -268,11 +271,6 @@ bool Event<T, N>::is_leathal() const{
 }
 
 template<typename T, int N>
-bool Event<T, N>::check(const T& t, const vec<T, N>& q) const {
-    return (_check_if == nullptr) ? true : _check_if(t, q, _args);
-}
-
-template<typename T, int N>
 void Event<T, N>::set_args(const std::vector<T>& args){
     _args = args;
 }
@@ -280,6 +278,11 @@ void Event<T, N>::set_args(const std::vector<T>& args){
 template<typename T, int N>
 inline const std::string& Event<T, N>::name()const{
     return _name;
+}
+
+template<typename T, int N>
+inline const int& Event<T, N>::dir()const{
+    return _dir;
 }
 
 template<typename T, int N>
@@ -333,7 +336,8 @@ const ViewState<T, N>& Event<T, N>::state() const {
 template<typename T, int N>
 void Event<T, N>::_set(const T& t, const vec<T, N>& q){
     if (_mask != nullptr){
-        _state.set(t, _mask(t, q, _args), q);
+        _mask(this->_tmp.data(), t, q.data(), _args.data(), _obj);
+        _state.set(t, this->_tmp, q);
     }
     else{
         _state.set(t, q);
@@ -344,29 +348,29 @@ void Event<T, N>::_set(const T& t, const vec<T, N>& q){
     }
 }
 
-
-
 //PreciseEvent CLASS
 
 template<typename T, int N>
-bool PreciseEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {
+bool PreciseEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) {
     this->remove();
     T t_determined = t2;
     bool determined = false;
-    if (this->check(t1, q1)){
-        _ObjFun<T> f = [this, &q](const T& t) ->T {
-            return this->obj_fun(t, q(t));
-        };
-        T val1 = this->obj_fun(t1, q1);
-        T val2 = this->obj_fun(t2, q2);
-        if (val1 * val2 <= 0 && val1 != 0){
-            t_determined = bisect(f, t1, t2, this->_event_tol)[2];
-            determined = this->check(t_determined, q(t_determined));
-        }
+
+    T val1 = this->obj_fun(t1, q1.data());
+    T val2 = this->obj_fun(t2, q2.data());
+
+    int t_dir = sgn(t2-t1);
+    const int& d = this->dir();
+    if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
+        this->_tmp.resize(q1.size());
+        _EventObjFun<T, N> _f{obj, this, q, this->_tmp.data()};
+        t_determined = bisect(event_obj_func<T, N>, t1, t2, this->_event_tol, &_f)[2];
+        determined = true;
     }
 
     if (determined){
-        this->_set(t_determined, q(t_determined));
+        q(this->_tmp.data(), t_determined, obj);
+        this->_set(t_determined, this->_tmp);
     }
     return determined;
 
@@ -385,14 +389,14 @@ inline bool PreciseEvent<T, N>::is_precise() const {
 //PeriodicEvent CLASS
 
 template<typename T, int N>
-PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, const T& period, const T& start, Functor<T, N> mask, const bool& hide_mask): PreciseEvent<T, N>(name, nullptr, nullptr, mask, hide_mask, 0), _period(period), _start(start){
+PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, T period, T start, Func<T> mask, bool hide_mask, const void* obj): PreciseEvent<T, N>(name, nullptr, 0, mask, hide_mask, 0, obj), _period(period), _start(start){
     if (period <= 0){
         throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
     }
 }
 
 template<typename T, int N>
-PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, const T& period, Functor<T, N> mask, const bool& hide_mask): PeriodicEvent<T, N>(name, period, inf<T>(), mask, hide_mask){}
+PeriodicEvent<T, N>::PeriodicEvent(const std::string& name, T period, Func<T> mask, bool hide_mask, const void* obj): PeriodicEvent<T, N>(name, period, inf<T>(), mask, hide_mask, obj){}
 
 template<typename T, int N>
 const T& PeriodicEvent<T, N>::t_start() const{
@@ -410,14 +414,16 @@ PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
 }
 
 template<typename T, int N>
-bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {
+bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) {
     this->remove();
     const int direction = (t2 > t1) ? 1 : -1;
     const T next = _has_started ? _start+(_np+direction)*_period : _start;
     if ( (t2*direction >= next*direction) && ((next*direction > t1*direction) || (!_has_started && (next==t1))) ){
         _np_previous = _np;
         _np += direction*this->_has_started;
-        this->_set(next, q(next));
+        this->_tmp.resize(q1.size());
+        q(this->_tmp.data(), next, obj);
+        this->_set(next, this->_tmp);
         this->_has_started = true;
         return true;
     }
@@ -459,7 +465,7 @@ void PeriodicEvent<T, N>::reset(){
 //RoughEvent CLASS
 
 template<typename T, int N>
-RoughEvent<T, N>::RoughEvent(const std::string& name, ObjFun<T, N> when, ObjFunCondition<T, N> check_if, Functor<T, N> mask, const bool& hide_mask): Event<T, N>(name, when, check_if, mask, hide_mask){}
+RoughEvent<T, N>::RoughEvent(const std::string& name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, const void* obj): Event<T, N>(name, when, dir, mask, hide_mask, obj){}
 
 template<typename T, int N>
 RoughEvent<T, N>* RoughEvent<T, N>::clone() const{
@@ -472,15 +478,16 @@ inline bool RoughEvent<T, N>::is_precise() const {
 }
 
 template<typename T, int N>
-bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, const std::function<vec<T, N>(const T&)>& q) {
+bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) {
     this->remove();
-    if (this->check(t1, q1) && this->check(t2, q2)){
-        T val1 = this->obj_fun(t1, q1);
-        T val2 = this->obj_fun(t2, q2);
-        if (val1 * val2 <= 0 && val1 != 0){
-            this->_set(t2, q2);
-            return true;
-        }
+
+    T val1 = this->obj_fun(t1, q1.data());
+    T val2 = this->obj_fun(t2, q2.data());
+    int t_dir = sgn(t2-t1);
+    const int& d = this->dir();
+    if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
+        this->_set(t2, q2);
+        return true;
     }
     return false;
 }
@@ -605,6 +612,14 @@ private:
     std::vector<Event<T, N>*> _events;
     std::unordered_set<std::string> _names;
 
+};
+
+template<typename T, int N>
+struct _EventObjFun{
+    const void* obj;
+    const Event<T, N>* event;
+    FuncLike<T> local_interp;
+    T* q;
 };
 
 

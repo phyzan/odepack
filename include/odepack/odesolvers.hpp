@@ -17,7 +17,6 @@ public:
 
     virtual ~OdeSolver() = default;
 
-    virtual OdeRhs<T, N>                    ode_rhs() const = 0;
     virtual const T&                        t() const = 0;
     virtual const vec<T, N>&                q() const = 0;
     virtual const vec<T, N>&                q_true() const = 0;
@@ -61,6 +60,7 @@ public:
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
     virtual void                            reset() = 0;
+    virtual void                            set_obj(const void* obj) = 0;
 
 protected:
 

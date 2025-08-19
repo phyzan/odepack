@@ -28,7 +28,6 @@ public:
 
     LSODA() = delete;
 
-    OdeRhs<T, N>                    ode_rhs() const final;
     const T&                        t() const final;
     const vec<T, N>&                q() const final;
     const vec<T, N>&                q_true() const final;
@@ -179,11 +178,6 @@ inline OdeSolver<T, N>& LSODA<T, N>::_other_solver(){
 template<typename T, int N>
 inline const OdeSolver<T, N>& LSODA<T, N>::_other_solver() const {
     return !_stiff ? static_cast<const OdeSolver<T, N>&>(_bdf_solver) : static_cast<const OdeSolver<T, N>&>(_rk_solver);
-}
-
-template<typename T, int N>
-OdeRhs<T, N> LSODA<T, N>::ode_rhs() const {
-    return _solver().ode_rhs();
 }
 
 template<typename T, int N>

@@ -8,23 +8,16 @@ const int N = -1;
 using T = double;
 using Ty = vec<T, N>;
 
-T event(const T& t, const T* q, const T* args){
+T event(const T& t, const T* q, const T* args, const void* obj){
     return q[1];
 }
 
-void f(T* df, const T& t, const T* q, const T* args){
+void f(T* df, const T& t, const T* q, const T* args, const void* obj){
     df[0] = q[1];
     df[1] = -q[0] + (1. - pow(q[0], 2.))*args[0]*q[1];
 }
 
-void jac(JacMat<T, N>& result, const T& t, const vec<T, N>& q, const std::vector<T>& args){
-    result(0, 0) = T(0);
-    result(0, 1) = T(1);
-    result(1, 0) = T(-1) + T(-2)*args[0]*q[0]*q[1];
-    result(1, 1) = (T(1) + T(-1)*pow(q[0], T(2)))*args[0];
-}
-
-void jac2(T* jac, const T& t, const T* q, const T* args){
+void jac(T* jac, const T& t, const T* q, const T* args, const void* obj){
     jac[0] = 0;
     jac[1] = 1;
     jac[2] = T(-1) + T(-2)*args[0]*q[0]*q[1];
@@ -35,7 +28,7 @@ int main(){
     
     T t0 = 0;
     Ty q0(2);
-    q0 << 2, 0;
+    q0 << 2, 3;
     T first_step = 0;
     T rtol = 1e-12;
     T atol = 1e-12;
@@ -49,7 +42,7 @@ int main(){
 
     std::vector<Event<T, N>*> evs = {&ev};
 
-    ODE<T, N> ode({f, jac2}, t0, q0, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "BDF");
+    VariationalODE<T, N> ode({f, jac}, t0, q0, 0.4, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "BDF");
 
     ode.integrate(tmax, -1, {}).examine();
 

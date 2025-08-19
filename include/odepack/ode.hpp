@@ -102,6 +102,8 @@ public:
 
     bool                                        save_data(const std::string& filename) const;
 
+    void                                        set_obj(const void* obj);
+
     virtual void                                clear();
 
     virtual void                                reset();
@@ -197,7 +199,7 @@ ODE<T, N>::ODE(const OdeSolver<T, N>& solver) : _Nevents(solver.events().size())
 }
 
 template<typename T, int N>
-ODE<T, N>::ODE(const OdeRhs<T, N>& rhs, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events, std::string method) : ODE(*get_solver(method, ARGS)){}
+ODE<T, N>::ODE(OdeData<T> ode, const T& t0, const vec<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const EventCollection<T, N>& events, std::string method) : ODE(*get_solver(method, ARGS)){}
 
 
 template<typename T, int N>
@@ -413,6 +415,11 @@ bool ODE<T, N>::save_data(const std::string& filename) const{
     }
     file.close(); // Close the file
     return true;
+}
+
+template<typename T, int N>
+void ODE<T, N>::set_obj(const void* obj){
+    _solver->set_obj(obj);
 }
 
 template<typename T, int N>
