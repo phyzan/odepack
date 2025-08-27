@@ -180,7 +180,7 @@ private:
     }
 
     void _register_state(const int& event) override{
-        ODE<T, N>::_register_state();
+        ODE<T, N>::_register_state(event);
         if (event == static_cast<int>(_ind)){
             const NormalizationEvent<T, N>& ev = _main_event();
             _t_lyap.push_back(ev.t_lyap());
