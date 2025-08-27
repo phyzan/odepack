@@ -19,7 +19,7 @@ void normalize(T* res, const T& t, const T* q, const T* args, const void* obj){
 }
 
 template<typename T, int N>
-vec<T, N> normalized(const T& t, const vec<T, N>& q, const std::vector<T>& args){
+vec<T, N> normalized(const vec<T, N>& q){
     vec<T, N> res(q);
     size_t n = q.size()/2;
     auto delq = res.segment(n, n);
@@ -116,7 +116,7 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(OdeData<T> ode, const T& t0, const vec<T, N>& q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const EventCollection<T, N>& events = {}, const std::string& method = "RK45") : ODE<T, N>(*as_variational(*get_solver(method, ode, t0, normalized(t0, q0, args), rtol, atol, min_step, max_step, first_step, args, events), period)) {
+    VariationalODE(OdeData<T> ode, const T& t0, const vec<T, N>& q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, const EventCollection<T, N>& events = {}, const std::string& method = "RK45") : ODE<T, N>(*as_variational(*get_solver(method, ode, t0, normalized(q0), rtol, atol, min_step, max_step, first_step, args, events), period)) {
         _assert_event(this->solver().q());
         _ind = _position_of_main_event();
 

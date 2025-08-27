@@ -84,6 +84,8 @@ protected:
 
     mutable vec<T, N>   _tmp;
 
+    mutable vec<T, N>   _tmp_mask;
+
     Event(const std::string& name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, const void* obj);
 
     Event() = default;
@@ -336,8 +338,9 @@ const ViewState<T, N>& Event<T, N>::state() const {
 template<typename T, int N>
 void Event<T, N>::_set(const T& t, const vec<T, N>& q){
     if (_mask != nullptr){
-        _mask(this->_tmp.data(), t, q.data(), _args.data(), _obj);
-        _state.set(t, this->_tmp, q);
+        this->_tmp_mask.resize(q.size());
+        _mask(this->_tmp_mask.data(), t, q.data(), _args.data(), _obj);
+        _state.set(t, this->_tmp_mask, q);
     }
     else{
         _state.set(t, q);
