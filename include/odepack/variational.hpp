@@ -70,11 +70,11 @@ public:
     }
 
     T lyap() const{
-        return _logksi/(_t_renorm-this->_start);
+        return _logksi/this->t_lyap();
     }
 
     T t_lyap() const{
-        return _t_renorm-this->_start;
+        return _t_renorm-this->_start+this->_period;
     }
 
     NormalizationEvent<T, N>* clone() const override{
