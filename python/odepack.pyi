@@ -103,6 +103,8 @@ class OdeResult:
     An object encapsulating the result returned by the integration of an ode.
     '''
 
+    def __init__(self, result: OdeResult):... #copy constructor
+
     @property
     def t(self)->np.ndarray:
         '''
@@ -200,6 +202,8 @@ class OdeSolution(OdeResult):
 
     It is returned after a rich_integrate call in an ode object.
     '''
+
+    def __init__(self, result: OdeSolution):... #copy constructor
 
     @overload
     def __call__(self, t: float)->np.ndarray:...

@@ -659,10 +659,10 @@ std::vector<std::unique_ptr<Event<T, N>>> to_Events(py::iterable events, const _
 template<typename T, int N>
 void define_ode_module(py::module& m) {
 
-    py::class_<PyOptions>(m, "EventOpt", py::module_local())
+    py::class_<PyOptions>(m, "EventOpt")
         .def(py::init<py::str, int, bool, int>(), py::arg("name"), py::arg("max_events")=-1, py::arg("terminate")=false, py::arg("period")=1);
 
-    py::class_<PyEvent<T, N>>(m, "Event", py::module_local())
+    py::class_<PyEvent<T, N>>(m, "Event")
         .def(py::init<std::string, py::object, int, py::object, bool, T, size_t, size_t>(),
         py::arg("name"),
         py::arg("when"),
@@ -679,7 +679,7 @@ void define_ode_module(py::module& m) {
             return self.hide_mask();
         });
         
-    py::class_<PyPerEvent<T, N>, PyEvent<T, N>>(m, "PeriodicEvent", py::module_local())
+    py::class_<PyPerEvent<T, N>, PyEvent<T, N>>(m, "PeriodicEvent")
         .def(py::init<std::string, T, py::object, py::object, bool, size_t, size_t>(),
             py::arg("name"),
             py::arg("period"),
@@ -693,7 +693,8 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("start", [](const PyPerEvent<T, N>& self){
             return self.start();});
 
-    py::class_<PyOdeResult<T, N>>(m, "OdeResult", py::module_local())
+    py::class_<PyOdeResult<T, N>>(m, "OdeResult")
+        .def(py::init<PyOdeResult<T, N>>(), py::arg("result"))
         .def_property_readonly("t", [](const PyOdeResult<T, N>& self){
             return to_numpy<T>(self.res->t());
         })
@@ -710,11 +711,12 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("message", [](const PyOdeResult<T, N>& self){return self.res->message();})
         .def("examine", [](const PyOdeResult<T, N>& self){return self.res->examine();});
     
-    py::class_<PyOdeSolution<T, N>, PyOdeResult<T, N>>(m, "OdeSolution", py::module_local())
+    py::class_<PyOdeSolution<T, N>, PyOdeResult<T, N>>(m, "OdeSolution")
+        .def(py::init<PyOdeSolution<T, N>>(), py::arg("result"))
         .def("__call__", [](const PyOdeSolution<T, N>& self, const T& t){return self(t);})
         .def("__call__", [](const PyOdeSolution<T, N>& self, const py::array_t<T>& array){return self(array);});
 
-    py::class_<PySolverState<T, N>>(m, "SolverState", py::module_local())
+    py::class_<PySolverState<T, N>>(m, "SolverState")
         .def_property_readonly("t", [](const PySolverState<T, N>& self){return self.t;})
         .def_property_readonly("q", [](const PySolverState<T, N>& self){return to_numpy<T>(self.q, self.shape);})
         .def_property_readonly("event", [](const PySolverState<T, N>& self){return self.event;})
@@ -726,7 +728,7 @@ void define_ode_module(py::module& m) {
         .def("show", [](const PySolverState<T, N>& self){return self.show();});
 
 
-    py::class_<PyODE<T, N>>(m, "LowLevelODE", py::module_local())
+    py::class_<PyODE<T, N>>(m, "LowLevelODE")
         .def(py::init<py::function, T, py::iterable, py::object, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
@@ -776,7 +778,7 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("diverges", [](const PyODE<T, N>& self){return self.ode->diverges();})
         .def_property_readonly("is_dead", [](const PyODE<T, N>& self){return self.ode->is_dead();});
     
-    py::class_<PyVarODE<T, N>, PyODE<T, N>>(m, "VariationalLowLevelODE", py::module_local())
+    py::class_<PyVarODE<T, N>, PyODE<T, N>>(m, "VariationalLowLevelODE")
         .def(py::init<py::function, T, py::iterable, T, py::object, T, T, T, T, T, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
@@ -797,7 +799,7 @@ void define_ode_module(py::module& m) {
         .def_property_readonly("lyap", &PyVarODE<T, N>::py_lyap)
         .def("copy", [](const PyVarODE<T, N>& self){return PyVarODE<T, N>(self);});
 
-    py::class_<PyFuncWrapper<T, N>>(m, "LowLevelFunction", py::module_local())
+    py::class_<PyFuncWrapper<T, N>>(m, "LowLevelFunction")
         .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("Nargs"))
         .def("__call__", &PyFuncWrapper<T, N>::call, py::arg("t"), py::arg("q"));
 
