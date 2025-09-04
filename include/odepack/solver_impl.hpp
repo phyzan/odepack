@@ -1159,3 +1159,31 @@ void interp_func(T* res, const T& t, const void* obj){
 }
 
 #endif
+
+
+
+/*
+TODO
+
+In events:
+---------------
+
+remove go_back, is_precise, RoughEvent
+
+obj_fun/when and dir only in Event classes that need it
+
+remove state(), counter(), reset(), is_determined. Event objects must not change over time. Most methods are const
+
+Add stagnation event -> minimize or maximize
+
+
+General:
+----------------
+
+I remove eigen dependency, only custom functions with pure arrays.
+
+No state classes. Only one basic state struct.
+
+When advancing, I must store all events encountered in that step, and sort them in order of increasing t*integration_direction
+
+*/
