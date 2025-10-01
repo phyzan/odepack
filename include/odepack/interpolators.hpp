@@ -211,8 +211,6 @@ private:
 
 template<typename T, int N, typename STATE>
 class StandardLocalInterpolator final: public LocalInterpolator<T, N>{
-    //The purpose of this class is to provide a continuous output between the naturally adapted states
-    //of an OdeSolver.
     
 public:
 

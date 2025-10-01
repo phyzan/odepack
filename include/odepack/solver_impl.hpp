@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <stdexcept>
-#include <unordered_set>
 #include <memory>
 #include "events.hpp"
 #include "odesolvers.hpp"
