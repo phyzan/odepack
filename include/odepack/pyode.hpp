@@ -3,7 +3,6 @@
 
 
 #include <cstddef>
-#include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
@@ -15,9 +14,15 @@ namespace py = pybind11;
 
 //assumes empty args given as std::vector, use only for ODE instanciated from python directly
 
-_Shape shape(const py::object& arr);
+inline _Shape shape(const py::object& obj) {
+    py::array arr = py::array::ensure(obj);
+    const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
+    size_t ndim = static_cast<size_t>(arr.ndim());  // Number of dimensions
+    std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
+    return res;
+}
 
-_Shape getShape(const size_t& dim1, const _Shape& shape){
+inline _Shape getShape(const size_t& dim1, const _Shape& shape){
     std::vector<size_t> result;
     result.reserve(1 + shape.size()); // Pre-allocate memory for efficiency
     result.push_back(dim1);        // Add the first element
@@ -45,7 +50,7 @@ struct PyOptions : public EventOptions{
 
 };
 
-std::vector<EventOptions> to_Options(py::iterable d) {
+inline std::vector<EventOptions> to_Options(py::iterable d) {
     std::vector<EventOptions> result;
 
     for (const py::handle& item : d) {
@@ -106,7 +111,7 @@ void arrcpy(T* dst, const void* src, size_t size){
 }
 
 template<typename T>
-void py_rhs(T* res, const T& t, const T* q, const T* args, const void* obj){
+void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::array_t<T> pyres = p.rhs(t, py::array_t<T>(p.shape, q), *p.py_args);
@@ -114,7 +119,7 @@ void py_rhs(T* res, const T& t, const T* q, const T* args, const void* obj){
 }
 
 template<typename T>
-void py_jac(T* res, const T& t, const T* q, const T* args, const void* obj){
+void py_jac(T* res, const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::array_t<T> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
@@ -122,7 +127,7 @@ void py_jac(T* res, const T& t, const T* q, const T* args, const void* obj){
 }
 
 template<typename T>
-void py_mask(T* res, const T& t, const T* q, const T* args, const void* obj){
+void py_mask(T* res, const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::array_t<T> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
@@ -130,7 +135,7 @@ void py_mask(T* res, const T& t, const T* q, const T* args, const void* obj){
 }
 
 template<typename T>
-T py_event(const T& t, const T* q, const T* args, const void* obj){
+T py_event(const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();
@@ -598,18 +603,10 @@ Ty toCPP_Array(const py::iterable& obj) {
     return res;
 }
 
-_Shape shape(const py::object& obj) {
-    py::array arr = py::array::ensure(obj);
-    const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
-    size_t ndim = arr.ndim();  // Number of dimensions
-    std::vector<size_t> res(shape_ptr, shape_ptr + ndim);
-    return res;
-}
-
-py::dict to_PyDict(const std::map<std::string, std::vector<size_t>>& _map){
+inline py::dict to_PyDict(const std::map<std::string, std::vector<size_t>>& _map){
     py::dict py_dict;
     for (const auto& [key, vec] : _map) {
-        py::array_t<size_t> np_array(vec.size(), vec.data()); // Create NumPy array
+        py::array_t<size_t> np_array(static_cast<py::ssize_t>(vec.size()), vec.data()); // Create NumPy array
         py_dict[key.c_str()] = np_array; // Assign to dictionary
     }
     return py_dict;

@@ -435,7 +435,7 @@ void BDF<T, N>::adapt_impl(STATE& res, const STATE& state){
         }
 
         if (!converged){
-            T factor = T(1)/T(2);
+            factor = T(1)/T(2);
             if (res.resize_step(factor, h_min, max_step)){
                 res.lu = false;
                 continue;

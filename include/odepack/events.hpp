@@ -417,7 +417,7 @@ PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
 }
 
 template<typename T, int N>
-bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) {
+bool PeriodicEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>&, FuncLike<T> q, const void* obj) {
     this->remove();
     const int direction = (t2 > t1) ? 1 : -1;
     const T next = _has_started ? _start+(_np+direction)*_period : _start;
@@ -481,7 +481,7 @@ inline bool RoughEvent<T, N>::is_precise() const {
 }
 
 template<typename T, int N>
-bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T> q, const void* obj) {
+bool RoughEvent<T, N>::determine(const T& t1, const vec<T, N>& q1, const T& t2, const vec<T, N>& q2, FuncLike<T>, const void*) {
     this->remove();
 
     T val1 = this->obj_fun(t1, q1.data());

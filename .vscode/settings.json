@@ -116,6 +116,4 @@
             "storage": "#00aeff"         // parameters
         }
     },
-
-    // "cmake.sourceDirectory": "/home/senpy/Documents/repos/odepack/python"
 }

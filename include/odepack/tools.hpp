@@ -212,9 +212,9 @@ void mat_T_mat_prod(S* r, const S* a, const S* b, const size_t& m, const size_t&
 
 
 inline std::string format_duration(const double& t){
-    int h = t/3600;
-    int m = (t - h*3600)/60;
-    int s = (t - h*3600 - m*60);
+    int h = int(t/3600);
+    int m = int((t - h*3600)/60);
+    int s = int((t - h*3600 - m*60));
 
     return std::to_string(h) + " h, " + std::to_string(m) + " m, " + std::to_string(s) + " s";  
 }
@@ -280,7 +280,7 @@ public:
 
     const bool& diverges() const {return _diverges;}
 
-    const bool success() const {return _success;}
+    bool success() const {return _success;}
 
     const double& runtime() const {return _runtime;}
 

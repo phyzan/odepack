@@ -1,23 +1,20 @@
-#include "../include/odepack/variational.hpp"
-#include <iostream>
-#include <fstream>
-#include <odepack/events.hpp>
+#include <odepack/ode.hpp>
 #include <string>
 
 const int N =-1;
 using T = double;
 using Ty = vec<T, N>;
 
-T event(const T& t, const T* q, const T* args, const void* obj){
+T event(const T&, const T* q, const T*, const void*){
     return q[1];
 }
 
-void f(T* df, const T& t, const T* q, const T* args, const void* obj){
+void f(T* df, const T&, const T* q, const T* args, const void*){
     df[0] = q[1];
     df[1] = -q[0] + (1. - pow(q[0], 2.))*args[0]*q[1];
 }
 
-void jac(T* jac, const T& t, const T* q, const T* args, const void* obj){
+void jac(T* jac, const T&, const T* q, const T* args, const void*){
     jac[0] = 0;
     jac[1] = 1;
     jac[2] = T(-1) + T(-2)*args[0]*q[0]*q[1];
