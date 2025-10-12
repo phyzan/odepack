@@ -463,13 +463,13 @@ public:
         return res;
     }
 
-    void link_with(Interpolator<T, N>& other) override{}
+    void link_with(Interpolator<T, N>&) override{}
 
-    void link_after(Interpolator<T, N>& other) override{}
+    void link_after(Interpolator<T, N>&) override{}
 
-    void adjust_end(const T& end) override{}
+    void adjust_end(const T&) override{}
 
-    void adjust_start(const T& t_start) override{}
+    void adjust_start(const T&) override{}
 
     void close_end() override{}
 

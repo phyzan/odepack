@@ -9,7 +9,7 @@
 #include <stdexcept>
 
 template<typename T>
-void normalize(T* res, const T& t, const T* q, const T* args, const void* obj){
+void normalize(T* res, const T&, const T* q, const T*, const void* obj){
     const size_t& n = *reinterpret_cast<const size_t*>(obj);
     T N = norm(q+n, n);
     for (size_t i=0; i<n; i++){

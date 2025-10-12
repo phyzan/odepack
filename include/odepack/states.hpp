@@ -216,7 +216,7 @@ private:
 
 
 template<typename T, int N, class Derived>
-inline void DerivedState<T, N, Derived>::adjust(const T& h_abs, const T& dir, const vec<T, N>& diff){
+inline void DerivedState<T, N, Derived>::adjust(const T& h_abs, const T& dir, const vec<T, N>&){
     this->_habs = h_abs;
     this->_direction = sgn(dir);
 }

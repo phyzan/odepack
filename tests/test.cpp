@@ -1,17 +1,24 @@
-#include <odepack/ode.hpp>
+#include "../include/odepack/rk_adaptive.hpp"
 #include <string>
 
-const int N =-1;
+const int N = -1;
 using T = double;
 using Ty = vec<T, N>;
+const T pi = 3.14159265359;
 
 T event(const T&, const T* q, const T*, const void*){
     return q[1];
 }
 
-void f(T* df, const T&, const T* q, const T* args, const void*){
-    df[0] = q[1];
-    df[1] = -q[0] + (1. - pow(q[0], 2.))*args[0]*q[1];
+T obj_fun(const T& t, const T*, const T*, const void*){
+    return t-9.95;
+}
+
+void f(T* df, const T&, const T* q, const T*, const void*){
+    df[0] = q[2];
+    df[1] = q[3];
+    df[2] = -4*pi*pi*q[0];
+    df[3] = -4*pi*pi*q[1];
 }
 
 void jac(T* jac, const T&, const T* q, const T* args, const void*){
@@ -23,25 +30,37 @@ void jac(T* jac, const T&, const T* q, const T* args, const void*){
 
 int main(){
     
-    T t0 = 0;
-    Ty q0(2);
-    q0 << 2, 3;
+    Ty q0(4);
+    q0 << 1, 1, 2.3, 4.5;
     T first_step = 0;
-    T rtol = 1e-12;
-    T atol = 1e-12;
+    T rtol = 1e-10;
+    T atol = 1e-10;
     T min_step = 0;
     T max_step = inf<T>();
     T k = 1000;
 
-    T tmax = 20000;
+    // T tmax = 20000;
 
-    PreciseEvent<T, N> ev("Event", event);
+    PeriodicEvent<T, N> ev_per("Periodic", 0.2);
+    PeriodicEvent<T, N> ev_per2("sd", 0.2);
+    PreciseEvent<T, N> ev_prec("precise", obj_fun, 0);
 
-    std::vector<Event<T, N>*> evs = {&ev};
+    RK45<T, N> solver({f, nullptr, nullptr}, 0, q0, rtol, atol, min_step, max_step, first_step, {k}, {&ev_per, &ev_per2});
+    auto start = std::chrono::high_resolution_clock::now();
 
-    ODE<T, N> ode({f, jac}, t0, q0, rtol, atol, min_step, max_step, first_step, {k}, {&ev}, "RK45");
+    for (size_t i = 0; i < 100000; i++) {
+        solver.advance();
+        solver.state().show(5);
+        std::cin.get();
+    }
 
-    ode.integrate(tmax, -1, {}).examine();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
+    solver.state().show();
+
+    std::cout << "Elapsed time: " << elapsed.count() << " seconds\n";
+    // ode.integrate(tmax, -1, {}).examine();
 
     //g++ -O3 -fopenmp -Wall -std=c++20 tests/test.cpp -o tests/test -lmpfr -lgmp
 

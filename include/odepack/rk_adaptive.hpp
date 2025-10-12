@@ -232,13 +232,11 @@ void RungeKutta<RKDerived, T, N, Nstages, Norder>::adapt_impl(STATE& res, const 
     T& habs = res._habs;
     habs = state.habs();
     T h, err_norm, factor, _factor;
-
     bool step_accepted = false;
     bool step_rejected = false;
     while (!step_accepted){
 
         h = habs * this->direction();
-
         _step_impl(res, state, h);
         _rk_mut.scale = atol + _rk_mut.qabs.cwiseMax(q_new.cwiseAbs())*rtol;
         _rk_mut.err = res._error / _rk_mut.scale;
@@ -268,7 +266,7 @@ typename RungeKutta<RKDerived, T, N, Nstages, Norder>::STATE RungeKutta<RKDerive
 }
 
 template<typename RKDerived, typename T, int N, int Nstages, int Norder>
-void RungeKutta<RKDerived, T, N, Nstages, Norder>::coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE& state1, const STATE& state2) const{
+void RungeKutta<RKDerived, T, N, Nstages, Norder>::coef_matrix(Eigen::Matrix<T, N, -1>& mat, const STATE&, const STATE& state2) const{
     for (size_t i=0; i<this->Nsys(); i++){
         for (int j=0; j<mat.cols(); j++){
             mat(i, j) = 0;

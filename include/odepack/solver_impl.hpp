@@ -1115,7 +1115,7 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_adapt_solver(con
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_adapt_solver_impl(const STATE& new_state){
+inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_adapt_solver_impl(const STATE&){
     //empty by default. A class might want to implement its own method.
     //This is in case a class wants to update some of its variables every time the solver advances by a naturally adapted step to a new_state.
 }
@@ -1129,7 +1129,7 @@ inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_reset_impl(){
 }
 
 template<typename T, int N, typename Derived, typename STATE, typename INTERPOLATOR>
-inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_fin_impl(const T& t0, const vec<T, N>& q0, T first_step){
+inline void DerivedSolver<T, N, Derived, STATE, INTERPOLATOR>::_fin_impl(const T&, const vec<T, N>&, T){
     //empty by default.
     
     // This method is called at the end of a Solver's constructor to finalize the creation of objects that
@@ -1154,7 +1154,6 @@ void interp_func(T* res, const T& t, const void* obj){
     for (size_t i = 0; i < solver->Nsys(); ++i){
         res[i] = data[i];
     }
-    
 }
 
 #endif
