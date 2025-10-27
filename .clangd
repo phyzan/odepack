@@ -1,0 +1,30 @@
+CompileFlags:
+  Add:
+    - "-std=c++20"
+    - "-O3"
+    - "-Wall"
+    - "-Wextra"
+    - "-Wpedantic"
+    - "-Werror"
+    - "-Wconversion"
+    - "-Wshadow"
+    - "-fopenmp"
+    - "-fno-math-errno"
+    - "-I/home/senpy/Documents/repos/newpack"
+    - "-I/usr/include/python3.12"
+    - "-I/usr/include/pybind11"
+  Compiler: clang++
+
+Index:
+  Background: Build
+
+Diagnostics:
+  UnusedIncludes: None
+  Suppress:
+    - unused-function
+    - unused-member-function
+    - unused-template
+    - unused-parameter
+  ClangTidy:
+    Add: [performance-*, modernize-*, readability-*]
+    Remove: ['readability-redundant-declaration', 'modernize-use-trailing-return-type', 'readability-identifier-length', 'readability-redundant-inline-specifier', 'readability-identifier-naming', 'readability-magic-numbers', 'readability-else-after-return', 'readability-function-cognitive-complexity', 'readability-math-missing-parentheses', 'readability-avoid-nested-conditional-operator', 'readability-isolate-declaration', 'performance-avoid-endl', 'readability-named-parameter', 'modernize-use-nodiscard', readability-implicit-bool-conversion]
