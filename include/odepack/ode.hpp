@@ -232,6 +232,7 @@ ODE<T, N>& ODE<T, N>::operator=(const ODE<T, N>& other){
 template<typename T, size_t N>
 ODE<T, N>& ODE<T, N>::operator=(ODE<T, N>&& other) noexcept{
     if (&other != this){
+        delete _solver;
         _solver = other._solver;
         _t_arr = std::move(other._t_arr);
         _q_data = std::move(other._q_data);
