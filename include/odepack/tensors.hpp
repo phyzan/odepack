@@ -20,7 +20,18 @@
 
 #define DYNAMIC_IDX_ASSERT(idx, nd) assert(sizeof...(idx) == ND && "Incorrect number of indices")
 
-#define POS_IDX_ASSERT(idx, ND) assert(((idx > 0) && ...) && "All shape dims must be positive")
+template<typename... Args>
+std::string idx_string(Args... arg){
+    std::string s = "{ " + ((std::to_string(arg) + " ") + ...) + "}";
+    return s;
+}
+
+template<typename... Args>
+void assert_pos_idx(Args... args){
+    if (!((args > 0) && ...)){
+        throw std::runtime_error("All shape dims must be positive. Cause: " + idx_string(args...));
+    }
+}
 
 #define CF_LAYOUT(L) (L == Layout::C || L == Layout::F)
 
@@ -117,7 +128,6 @@ public:
 
     template<INT_T... Args>
     explicit NdSpan(Args... args){
-        POS_IDX_ASSERT(args, ND);
         this->reshape(args...);
     }
 
@@ -340,7 +350,6 @@ public:
         static_assert(new_nd > 0, "Cannot call resize() with no arguments");
 
         if constexpr (ND==0){
-            POS_IDX_ASSERT(shape, new_nd);
             if (new_nd != _nd){
                 if (new_nd > _nd){
                     //only reallocate in this case
@@ -364,7 +373,6 @@ public:
         else if constexpr (N==0){
             //ND > 0, but some template dims are zero
             static_assert((new_nd == ND), "Constructor must be called with as many arguments as the number of template parameters");
-            POS_IDX_ASSERT(shape, ND);
             for (size_t i=0; i<ND; i++){
                 if ((Base::SHAPE[i] > 0) && new_dims[i] != Base::SHAPE[i]){
                     throw std::runtime_error("Runtime dims do not match template dims in Tensor constructor");

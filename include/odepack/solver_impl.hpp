@@ -145,7 +145,7 @@ DerivedSolver<T, N, Derived>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
 
-    if (!all_are_finite(q0.data(), q0.size())){
+    if (!all_are_finite(q0.data(), q0.size()) || !is_finite(t0)){
         throw std::runtime_error("Non finite initial conditions");
     }
     ICS<T, N> ics = {t0, q0};
@@ -157,6 +157,17 @@ DerivedSolver<T, N, Derived>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver
     }
     
     _initialize_events(t0);
+    JacMat<T, N> tmp(this->Nsys(), this->Nsys());
+    this->_rhs(tmp.data(), t0, q0.data());
+    if (!all_are_finite(tmp.data(), this->Nsys())){
+        this->kill("Initial ode rhs is nan or inf");
+    }
+    if (_ode.jacobian != nullptr){
+        this->_jac(tmp, t0, q0);
+        if (!all_are_finite(tmp.data(), tmp.size())){
+            this->kill("Initial Jacobian is nan or inf");
+        }
+    }
 }
 
 
@@ -283,18 +294,10 @@ T DerivedSolver<T, N, Derived>::auto_step(const ICS<T, N>* ics) const {
     for (size_t i=0; i<n; i++){
         scale[i] = _atol + abs(q[i])*_rtol;
     }
-    Array1D<T, N> _dq(n);
-    this->_rhs(_dq.data(), t, q.data());
-
-    Array1D<T, N> tmp(n);
-    for (size_t i=0; i<n; i++){
-        tmp[i] = q[i]/scale[i];
-    }
-    T d0 = rms_norm(tmp.data(), n);
-    for (size_t i=0; i<n; i++){
-        tmp[i] = _dq[i]/scale[i];
-    }
-    T d1 = rms_norm(tmp.data(), n);
+    Array1D<T, N> f0(n);
+    this->_rhs(f0.data(), t, q.data());
+    T d0 = rms_norm(q.data(), scale.data(), n);
+    T d1 = rms_norm(f0.data(), scale.data(), n);
     if (d0 * 100000 < 1 || d1 * 100000 < 1){
         h0 = T(1)/1000000;
     }
@@ -302,13 +305,14 @@ T DerivedSolver<T, N, Derived>::auto_step(const ICS<T, N>* ics) const {
         h0 = d0/d1/100;
     }
     for (size_t i=0; i<n; i++){
-        y1[i] = q[i]+h0*dir*_dq[i];
+        y1[i] = q[i]+h0*dir*f0[i];
     }
     _rhs(f1.data(), t+h0*dir, y1.data());
+    Array1D<T, N> tmp(n);
     for (size_t i=0; i<n; i++){
-        tmp[i] = (f1[i] - _dq[i])/scale[i];
+        tmp[i] = f1[i] - f0[i];
     }
-    d2 = rms_norm(tmp.data(), n) / h0;
+    d2 = rms_norm(tmp.data(), scale.data(), n) / h0;
     
     if (d1 <= 1e-15 && d2 <= 1e-15){
         h1 = std::max(T(1)/1000000, h0/1000);
@@ -356,6 +360,7 @@ inline bool DerivedSolver<T, N, Derived>::advance(){
         this->_warn_paused();
         return false;
     }
+
     if (this->_requires_new_start()){
         _states[_curr_state_idx] = {this->t(), this->true_vector(), this->stepsize()};
         re_adjust();
@@ -519,7 +524,7 @@ inline std::unique_ptr<Interpolator<T, N>> DerivedSolver<T, N, Derived>::state_i
 
 template<typename T, size_t N, typename Derived>
 inline void DerivedSolver<T, N, Derived>::_rhs(T* result, const T& t, const T* q) const{
-    return _ode.rhs(result, t, q, _args.data(), _ode.obj);
+    _ode.rhs(result, t, q, _args.data(), _ode.obj);
 }
 
 template<typename T, size_t N, typename Derived>

@@ -293,7 +293,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
     long int frame_counter = 0;
     int prints = 0;
     size_t Nnew = 0;
-
     _solver->set_tmax(t);
 
     //check that all names in max_events are valid

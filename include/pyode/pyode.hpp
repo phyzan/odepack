@@ -2,7 +2,7 @@
 #define PYODE_HPP
 
 
-#include "include/odepack/variational.hpp"
+#include "../odepack/variational.hpp"
 #include "pytools.hpp"
 
 
