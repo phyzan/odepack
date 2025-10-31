@@ -401,6 +401,9 @@ class VariationalLowLevelODE(LowLevelODE):
     @property
     def lyap(self)->np.ndarray:...
 
+    @property
+    def kicks(self)->np.ndarray:...
+
     def copy(self)->VariationalLowLevelODE:...
 
 

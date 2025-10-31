@@ -431,18 +431,15 @@ bool PeriodicEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T,
     
     int dir = sgn(after.t-before.t);
     long int n = _n_aux;
-    if ((dir*(n*_period+_start)) < dir*before.t){
-        while ((dir*((++n)*_period+_start)) < dir*before.t){}
+    if ((dir*(n*_period+_start)) <= dir*before.t){
+        while ((dir*((++n)*_period+_start)) <= dir*before.t){}
         _n_aux = n;
     }
-    else if ((dir*(n*_period+_start)) > dir*before.t){
+    else{
         while ((dir*(n*_period+_start)) > dir*before.t){
             _n_aux = n;
             n--;
         }
-    }
-    else{
-        return false;
     }
 
     if ((dir*(_n_aux*_period+_start)) <= dir*after.t){
@@ -636,7 +633,7 @@ public:
         
         //reverse the rest of events after the canon event detection time
         size_t j=i;
-        while (j<_N_detect && (state(_event_idx[j]).t == state(_event_idx[i-1]).t)){
+        while (j<_N_detect && (state(_event_idx[j]).t == state(_event_idx[i-1]).t || event(_event_idx[j]).is_pure_temporal())){
             j++;
         }
         size_t tmp = j;
@@ -645,7 +642,6 @@ public:
             const_cast<Event<T,N>&>(event(_event_idx[j])).go_back();
         }
         _N_detect = tmp;
-
         _iter = 0;
     }
 
@@ -680,11 +676,11 @@ public:
         return _canon_idx == _N_tot ? nullptr : _states+_canon_idx;
     }
 
-    void set_start(T t0){
+    void set_start(T t0, int dir){
         for (size_t i=0; i<this->size(); i++){
             if (auto* p = dynamic_cast<PeriodicEvent<T, N>*>(_events[i])){
                 if (abs(p->t_start()) == inf<T>()){
-                    p->set_start(t0+p->period());
+                    p->set_start(t0+p->period()*dir);
                 }
                 else if (p->t_start() == t0){
                     throw std::runtime_error("The starting time of a periodic event cannot be set at the initial time of the ode solver.");

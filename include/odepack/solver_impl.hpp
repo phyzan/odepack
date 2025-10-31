@@ -558,7 +558,7 @@ void DerivedSolver<T, N, Derived>::_register_states(){
 template<typename T, size_t N, typename Derived>
 void DerivedSolver<T, N, Derived>::_initialize_events(const T& t0){
     _events.set_args(this->_args);
-    _events.set_start(t0);
+    _events.set_start(t0, this->direction());
     _events.set_array_size(this->Nsys());
 }
 

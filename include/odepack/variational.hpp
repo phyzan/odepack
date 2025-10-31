@@ -42,6 +42,7 @@ public:
         PeriodicEvent<T, N>::go_back();
         _t_renorm = _t_last;
         _logksi = _logksi_last;
+        _delta_s = _delta_s_last;
     }
 
     const T& logksi() const{
@@ -53,7 +54,11 @@ public:
     }
 
     T t_lyap() const{
-        return _t_renorm-this->_start+this->_period;
+        return abs(_t_renorm-this->_start+this->_period*sgn(_t_renorm-_t_last));
+    }
+
+    T delta_s() const{
+        return _delta_s;
     }
 
     NormalizationEvent<T, N>* clone() const override{
@@ -75,6 +80,9 @@ public:
         _t_last = this->_start;
         _logksi = 0;
         _logksi_last = 0;
+        _delta_s = 0;
+        _delta_s_last = 0;
+
     }
 
 
@@ -84,13 +92,18 @@ private:
         _t_last = _t_renorm;
         _logksi_last = _logksi;
         _t_renorm = res.t;
-        _logksi += log(norm(res.exp_vec().data()+Nsys(), Nsys()));
+        _delta_s_last = _delta_s;
+        _delta_s = log(norm(res.exp_vec().data()+Nsys(), Nsys()));
+        _logksi += _delta_s;
     }
     T _t_renorm;
     T _t_last;
 
     T _logksi=0;
     T _logksi_last=0;
+
+    T _delta_s = 0;
+    T _delta_s_last = 0;
 };
 
 template<typename T, int N>
@@ -126,12 +139,18 @@ public:
         return _lyap_array;
     }
 
+    inline const std::vector<T>& kicks() const{
+        return _delta_s_arr;
+    }
+
     void clear() override{
         ODE<T, N>::clear();
         _t_lyap.clear();
         _t_lyap.shrink_to_fit();
         _lyap_array.clear();
         _lyap_array.shrink_to_fit();
+        _delta_s_arr.clear();
+        _delta_s_arr.shrink_to_fit();
     }
 
     void reset() override {
@@ -140,6 +159,8 @@ public:
         _t_lyap.shrink_to_fit();
         _lyap_array.clear();
         _lyap_array.shrink_to_fit();
+        _delta_s_arr.clear();
+        _delta_s_arr.shrink_to_fit();
     }
 
 
@@ -161,12 +182,14 @@ private:
             const NormalizationEvent<T, N>& ev = _main_event();
             _t_lyap.push_back(ev.t_lyap());
             _lyap_array.push_back(ev.lyap());
+            _delta_s_arr.push_back(ev.delta_s());
         }
     }
 
     size_t _ind = 1;
     std::vector<T> _t_lyap = {};
     std::vector<T> _lyap_array = {};
+    std::vector<T> _delta_s_arr = {};
 
 };
 

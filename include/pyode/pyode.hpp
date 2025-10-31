@@ -607,6 +607,10 @@ public:
         return to_numpy<T>(varode().lyap());
     }
 
+    py::array_t<T> py_kicks() const{
+        return to_numpy<T>(varode().kicks());
+    }
+
 };
 
 template<typename T, size_t N>
@@ -812,6 +816,7 @@ void define_ode_module(py::module& m){
         .def(py::init<PyVarODE<T, N>>(), py::arg("ode"))
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE<T, N>::py_lyap)
+        .def_property_readonly("kicks", &PyVarODE<T, N>::py_kicks)
         .def("copy", [](const PyVarODE<T, N>& self){return PyVarODE<T, N>(self);});
     
     py::class_<PyFuncWrapper<T, N>>(m, "LowLevelFunction")
