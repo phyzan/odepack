@@ -43,6 +43,7 @@ public:
         _t_renorm = _t_last;
         _logksi = _logksi_last;
         _delta_s = _delta_s_last;
+        _dir = _dir_last;
     }
 
     const T& logksi() const{
@@ -54,7 +55,7 @@ public:
     }
 
     T t_lyap() const{
-        return abs(_t_renorm-this->_start+this->_period*sgn(_t_renorm-_t_last));
+        return abs(_t_renorm-this->_start+this->_period*_dir);
     }
 
     T delta_s() const{
@@ -82,6 +83,8 @@ public:
         _logksi_last = 0;
         _delta_s = 0;
         _delta_s_last = 0;
+        _dir = 0;
+        _dir_last = 0;
 
     }
 
@@ -91,10 +94,12 @@ private:
     void _register_it(const EventState<T, N>& res, const State<T, N>& before, const State<T, N>& after) override {
         _t_last = _t_renorm;
         _logksi_last = _logksi;
+        _dir_last = _dir;
         _t_renorm = res.t;
         _delta_s_last = _delta_s;
         _delta_s = log(norm(res.exp_vec().data()+Nsys(), Nsys()));
         _logksi += _delta_s;
+        _dir = sgn(after.t - before.t);
     }
     T _t_renorm;
     T _t_last;
@@ -104,6 +109,9 @@ private:
 
     T _delta_s = 0;
     T _delta_s_last = 0;
+
+    int _dir = 0;
+    int _dir_last = 0;
 };
 
 template<typename T, int N>
