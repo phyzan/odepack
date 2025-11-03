@@ -579,7 +579,7 @@ bool DerivedSolver<T, N, Derived>::_validate_it(const State<T, N>& state){
         this->_diverges = true;
         success = false;
     }
-    else if (state.habs < MIN_STEP){
+    else if (state.habs <= MIN_STEP){
         this->kill("Required stepsize was smaller than machine precision");
         success = false;
     }
