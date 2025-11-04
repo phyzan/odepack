@@ -170,6 +170,15 @@ class OdeSystem(CompileTemplate):
         return len(self.args)
     
     @cached_property
+    def python_funcs(self)->tuple[Callable,...]:
+        res = [None for _ in self.lowlevel_callables]
+        for i in range(len(res)):
+            if self.lowlevel_callables[i] is not None:
+                f = self.lowlevel_callables[i].to_python_callable().lambdify()
+                res[i] = lambda t, q, *args : f(t, q, args)
+        return tuple(res)
+    
+    @cached_property
     def jacmat(self):
         array, symbols = self.ode_sys, self.q
         matrix = [[None for i in range(self.Nsys)] for j in range(self.Nsys)]
@@ -197,18 +206,28 @@ class OdeSystem(CompileTemplate):
     def _event_obj_map(self):
         return {event.name: event for event in self.events}
     
-    @cached_property
-    def true_events(self)->tuple[Event, ...]:
+    def _true_events(self, compiled=True)->tuple[Event, ...]:
         res = []
-        ptrs = self.pointers
+        if compiled:
+            items = self.pointers
+        else:
+            items = self.python_funcs
         i=0
         for event, event_dict in zip(self.events, self._event_data):
             extra_kwargs = {"__Nsys": self.Nsys, "__Nargs": self.Nargs}
             for param_name, lowlevel_callable in event_dict.items():
-                extra_kwargs[param_name] = ptrs[i+2]
+                extra_kwargs[param_name] = items[i+2]
                 i+=1
             res.append(event.toEvent(**extra_kwargs))
         return res
+    
+    @cached_property
+    def true_compiled_events(self):
+        return self._true_events(compiled=True)
+    
+    @cached_property
+    def true_py_events(self):
+        return self._true_events(compiled=False)
     
     @cached_property
     def lowlevel_callables(self)->tuple[LowLevelCallable, ...]:
@@ -218,15 +237,30 @@ class OdeSystem(CompileTemplate):
                 event_objs.append(lowlevel_callable)
         return (self.ode_to_compile, self.jacobian_to_compile, *event_objs)
     
-    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45")->LowLevelODE:
+    def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, period=None)->LowLevelODE:
         if len(q0) != self.Nsys:
             raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {self.Nsys}")
-        return LowLevelODE(self.lowlevel_odefunc, t0=t0, q0=q0, jac=self.lowlevel_jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, args=args, method=method, events=self.true_events)
+        if compiled:
+            events = self.true_compiled_events
+            f = self.lowlevel_odefunc
+            jac = self.lowlevel_jac
+        else:
+            events = self.true_py_events
+            f = self._odefunc
+            jac = self._jac
+        kwargs = dict(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
+        if period is None:
+            CLS = LowLevelODE
+        else:
+            kwargs['period'] = period
+            CLS = VariationalLowLevelODE
+        return CLS(f=f, jac=jac, **kwargs)
     
-    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), method="RK45")->VariationalLowLevelODE:
-        if len(q0) != self.Nsys:
-            raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {self.Nsys}")
-        return VariationalLowLevelODE(self.lowlevel_odefunc, t0=t0, q0=q0, jac=self.lowlevel_jac, period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, args=args, method=method, events=self.true_events)
+    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True)->LowLevelODE:
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, compiled=compiled, period=None)
+    
+    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True)->VariationalLowLevelODE:
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, compiled=compiled, period=period)
     
     @cached_property
     def lowlevel_odefunc(self):

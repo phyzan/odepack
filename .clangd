@@ -10,7 +10,7 @@ CompileFlags:
     - "-Wshadow"
     - "-fopenmp"
     - "-fno-math-errno"
-    - "-I/home/senpy/Documents/repos/newpack"
+    - "-I/home/senpy/Documents/repos/odepack"
     - "-I/usr/include/python3.12"
     - "-I/usr/include/pybind11"
   Compiler: clang++

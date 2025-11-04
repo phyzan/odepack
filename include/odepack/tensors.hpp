@@ -670,7 +670,9 @@ public:
 
     template<INT_T... Args>
     explicit Tensor(const T* arr, Args... shape) : Tensor(shape...){
-        copy_array(this->data(), arr, this->size());
+        if (this->size() > 0){
+            copy_array(this->data(), arr, this->size());
+        }
     }
 
     Tensor(std::initializer_list<T> array) requires (ND<2 && (N == 0)) : Tensor(array.begin(), array.size()) {}
@@ -808,6 +810,9 @@ public:
     inline size_t Ncols() const {return this->shape()[1];}
 
     std::string repr(int digits=8) const {
+        if (this->size() == 0){
+            return "[]";
+        }
         std::vector<size_t> column_str_len(this->Ncols());
         for (size_t j=0; j<this->Ncols(); j++){
             size_t len = to_string((*this)(0, j), digits).size();
@@ -830,7 +835,6 @@ public:
                 result += "\n";
             }
         }
-
         return result;
     }
 };

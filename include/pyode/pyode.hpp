@@ -677,9 +677,9 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple(),
-            py::arg("direction")=1);
+            py::arg("events")=py::tuple());
 
     
     py::class_<PyRK45<T, N>, PySolver<T, N>>(m, "RK45")
@@ -693,9 +693,9 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple(),
-            py::arg("direction")=1);
+            py::arg("events")=py::tuple());
 
     py::class_<PyDOP853<T, N>, PySolver<T, N>>(m, "DOP853")
         .def(py::init<py::function, T, py::array_t<T>, T, T, T, T, T, int, py::iterable, py::iterable>(),
@@ -708,9 +708,9 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple(),
-            py::arg("direction")=1);
+            py::arg("events")=py::tuple());
 
 
     py::class_<PyBDF<T, N>, PySolver<T, N>>(m, "BDF")
@@ -725,9 +725,9 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple(),
-            py::arg("direction")=1);
+            py::arg("events")=py::tuple());
     
     py::class_<PyOdeResult<T, N>>(m, "OdeResult")
         .def(py::init<PyOdeResult<T, N>>(), py::arg("result"))
@@ -765,10 +765,10 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
             py::arg("events")=py::tuple(),
-            py::arg("method")="RK45",
-            py::arg("direction")=1)
+            py::arg("method")="RK45")
         .def(py::init<PyODE<T, N>>(), py::arg("ode"))
         .def("solver", [](const PyODE<T, N>& self){return self.solver_copy();})
         .def("integrate", &PyODE<T, N>::py_integrate,
@@ -815,10 +815,10 @@ void define_ode_module(py::module& m){
             py::arg("min_step")=0.,
             py::arg("max_step")=inf<T>(),
             py::arg("first_step")=0.,
+            py::arg("direction")=1,
             py::arg("args")=py::tuple(),
             py::arg("events")=py::tuple(),
-            py::arg("method")="RK45",
-            py::arg("direction")=1)
+            py::arg("method")="RK45")
         .def(py::init<PyVarODE<T, N>>(), py::arg("ode"))
         .def_property_readonly("t_lyap", &PyVarODE<T, N>::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE<T, N>::py_lyap)

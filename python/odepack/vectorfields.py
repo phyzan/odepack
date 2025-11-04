@@ -61,7 +61,7 @@ class VectorField2D:
         cdot = self.flowdot(line)
         return scint.quad(cdot, *line.lims, args=args, epsabs=1e-10)[0]
     
-    def streamline(self, x0, y0, s, curve_length=True, rich=False, **kwargs):
+    def streamline(self, x0, y0, s, curve_length=True, rich=False, compiled=True, **kwargs):
         '''
         Let F be a vector field.
         A field line R(s) passing through a point (x0, y0) satisfies the equation
@@ -79,8 +79,7 @@ class VectorField2D:
         else:
             A = 1
         odesys = OdeSystem([fx/A, fy/A], t, [self.xvar, self.yvar], self.args, events=kwargs.pop('events', ()))
-
-        ode, kwargs = call_with_consumed(odesys.get, t0=0, q0=[x0, y0], **kwargs)
+        ode, kwargs = call_with_consumed(odesys.get, t0=0, q0=[x0, y0], compiled=compiled, **kwargs)
         if rich:
             res, kwargs = call_builtin_with_consumed(ode.rich_integrate, dict(event_options=[], max_prints=0), s, **kwargs)
         else:
@@ -164,8 +163,9 @@ class ConservativeVectorField2D(VectorField2D):
             Fx, Fy = arg1
         VectorField2D.__init__(self, Fx, Fy, x, y, *args)
 
-    def eigen_lines(self, x0, y0, s, epsilon = 1e-6, safety_dist = 1e-5, curve_length=True, rich=False, **kwargs):
+    def eigen_lines(self, x0, y0, s, epsilon = 1e-6, safety_dist = 1e-5, curve_length=True, rich=False, compiled=True, **kwargs):
         args = kwargs.get('args', ())
+        kwargs_0 = kwargs.copy()
         xn, yn = self.fixed_point(args, x0, y0)
         v_n = np.array([xn, yn])
         eigres = np.linalg.eigh(self.Jac(xn, yn, *args))
@@ -183,15 +183,15 @@ class ConservativeVectorField2D(VectorField2D):
             direction = 1 if forwards_integration else -1
             event = approach_point_event("_loop", x, y, xn, yn, safety_dist, forwards_integration)
             opt = EventOpt("_loop", max_events=1, terminate=True)
-            kwargs['events'] = tuple(kwargs.get('events', ())) + (event,)
-            kwargs['event_options'] = tuple(kwargs.get('event_options', ())) + (opt,)
+            kwargs['events'] = tuple(kwargs_0.get('events', ())) + (event,)
+            kwargs['event_options'] = tuple(kwargs_0.get('event_options', ())) + (opt,)
             for sgn in [1, -1]:
                 v0 = v_n + sgn*epsilon * v
-                res_tmp = self.streamline(*v0, s*direction, curve_length=curve_length, rich=rich, **kwargs)
+                res_tmp = self.streamline(v0[0], v0[1], s, curve_length=curve_length, rich=rich, direction=direction, compiled=compiled, **kwargs)
                 res[l] += (res_tmp,)
         return res
 
 
 def approach_point_event(name, x, y, x_point, y_point, dr, forwards_integration=True):
     direction = -1 if forwards_integration else 1
-    return SymbolicEvent(name, (x-x_point)**2 + (y-y_point)**2 - dr**2, direction)
+    return SymbolicPreciseEvent(name, (x-x_point)**2 + (y-y_point)**2 - dr**2, direction)

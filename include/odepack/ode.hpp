@@ -299,7 +299,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
     const std::vector<EventOptions> options = this->_validate_events(event_options);
 
     EventCounter<T, N> event_counter(options);
-
     while (_solver->is_running()){
         if (_solver->advance()){
             if (_solver->at_event()){
@@ -340,8 +339,7 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
         std::cout << std::endl;
     }
     TimePoint t2 = now();
-
-    OdeResult<T, N> res(subvec(_t_arr, Nt-static_cast<size_t>(include_first)), Array2D<T, 0, N>(_q_data.data()+(Nt-static_cast<size_t>(include_first))*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-static_cast<size_t>(include_first)), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
+    OdeResult<T, N> res(subvec(_t_arr, Nt-static_cast<size_t>(include_first)), Array2D<T, 0, N>(_q_data.data()+(Nt-static_cast<size_t>(include_first))*_solver->Nsys(), Nnew+include_first, _solver->Nsys()), event_map(Nt-static_cast<size_t>(include_first)), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
 
     _runtime += res.runtime();
     return res;
