@@ -119,7 +119,7 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(OdeData<T> ode, const T& t0, Array1D<T, N> q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, const std::vector<T> args = {}, std::vector<const Event<T, N>*> events = {}, const std::string& method = "RK45") : ODE<T, N>(){
+    VariationalODE(OdeData<T> ode, const T& t0, Array1D<T, N> q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, int dir=1, const std::vector<T> args = {}, std::vector<const Event<T, N>*> events = {}, const std::string& method = "RK45") : ODE<T, N>(){
         _assert_event(q0);
         for (size_t i=0; i<events.size(); i++){
             if (dynamic_cast<const NormalizationEvent<T, N>*>(events[i])){

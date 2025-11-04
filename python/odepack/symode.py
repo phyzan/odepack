@@ -121,12 +121,11 @@ class OdeSystem(CompileTemplate):
     q: tuple[Symbol, ...]
     events: tuple[SymbolicEvent, ...]
 
-    def __new__(cls, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
-        obj = CompileTemplate.__new__(cls, module_name=module_name, directory=directory)
-        return cls._process_args(obj, ode_sys, t, q, args=args, events=events)
+    def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
+        CompileTemplate.__init__(self, module_name=module_name, directory=directory)
+        self._process_args(ode_sys, t, q, args=args, events=events)
     
-    @classmethod
-    def _process_args(cls, obj: OdeSystem, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=()):
+    def _process_args(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=()):
         q = tuple([qi for qi in q])
         ode_sys = tuple(ode_sys)
         args = tuple(args)
@@ -146,16 +145,15 @@ class OdeSystem(CompileTemplate):
         else:
             assert len(odesymbols) <= len(given) - 1
         
-        obj.ode_sys = ode_sys
-        obj.args = args
-        obj.t = t
-        obj.q = q
-        obj.events = events
-        for i in range(len(cls._cls_instances)):
-            if cls._cls_instances[i] == obj:
-                return cls._cls_instances[i]
-        cls._cls_instances.append(obj)
-        return obj
+        self.ode_sys = ode_sys
+        self.args = args
+        self.t = t
+        self.q = q
+        self.events = events
+        for i in range(len(self.__class__._cls_instances)):
+            if self.__class__._cls_instances[i] == self:
+                return self.__class__._cls_instances[i]
+        self.__class__._cls_instances.append(self)
 
     def __eq__(self, other: OdeSystem):
         if other is self:

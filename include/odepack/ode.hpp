@@ -126,7 +126,7 @@ protected:
         for (size_t i=0; i<events.size(); i++){
             new_evs[i+1] = events[i];
         }
-        _solver = get_solver(method, ode, t0, q0, rtol, atol, min_step, max_step, first_step, args, new_evs).release();
+        _solver = get_solver(method, ode, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, new_evs).release();
         _register_state();
     }
 

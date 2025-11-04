@@ -3,17 +3,15 @@
 
 #include "odesolvers.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, const std::vector<T>& args={}, const std::vector<const Event<T, N>*>& events={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T, N>*>& events={}
 
-#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<const Event<T, N>*>& events
+#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, const std::vector<const Event<T, N>*>& events
 
-#define SOLVER_CONSTRUCTOR(T, N) std::string name, OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, const std::vector<T>& args, const std::vector<const Event<T, N>*>& events
+#define SOLVER_CONSTRUCTOR(T, N) std::string name, OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, const std::vector<const Event<T, N>*>& events
 
 #define ODE_CONSTRUCTOR(T, N) MAIN_DEFAULT_CONSTRUCTOR(T, N), const std::string& method="RK45"
 
-#define ARGS ode, t0, q0, rtol, atol, min_step, max_step, first_step, args, events
-
-#define PARTIAL_ARGS ode, rtol, atol, min_step, max_step, args, events
+#define ARGS ode, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events
 
 template<typename T, size_t N, typename Derived>
 inline void interp_func(T* res, const T& t, const void* obj);
@@ -140,7 +138,10 @@ private:
 
 
 template<typename T, size_t N, typename Derived>
-DerivedSolver<T, N, Derived>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode(ode), _rtol(rtol), _atol(atol), _min_step(std::max(min_step, MIN_STEP)), _max_step(max_step), _args(args), _n(q0.size()), _name(std::move(name)), _events(events), _direction(first_step<0 ? -1 : 1), _current_linked_interpolator(t0, q0){
+DerivedSolver<T, N, Derived>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver<T, N>(), _ode(ode), _rtol(rtol), _atol(atol), _min_step(std::max(min_step, MIN_STEP)), _max_step(max_step), _args(args), _n(q0.size()), _name(std::move(name)), _events(events), _direction(dir == 0 ? 1 : sgn(dir)), _current_linked_interpolator(t0, q0){
+    if (first_step < 0){
+        throw std::runtime_error("The first_step argument must not be negative");
+    }
     if (_max_step < _min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }

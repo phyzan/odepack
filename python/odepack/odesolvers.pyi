@@ -269,7 +269,7 @@ class OdeSolver:
 
 class RK23(OdeSolver):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., args: Iterable = (), events: Iterable[Event] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = ()):
         '''
         f: The ode rhs. It must behave like f(t: float, q: array, *args) -> array
         '''
@@ -277,19 +277,19 @@ class RK23(OdeSolver):
 
 class RK45(OdeSolver):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., args: Iterable = (), events: Iterable[Event] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = ()):
         pass
 
 
 class DOP853(OdeSolver):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., args: Iterable = (), events: Iterable[Event] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = ()):
         pass
 
 
 class BDF(OdeSolver):
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., args: Iterable = (), events: Iterable[Event] = ()):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = ()):
         pass
 
 
@@ -300,7 +300,7 @@ class LowLevelODE:
     '''
 
     @overload
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: Iterable[Event]=(), method="RK45"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45"):
         '''
         f: f(t, q, ...)->array. Right hand side of the ODE. Must return an array of equal shape as the initial condition q0.
 
@@ -387,7 +387,7 @@ class LowLevelODE:
 class VariationalLowLevelODE(LowLevelODE):
     
     @overload
-    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., args=(), events: list[Event]=None, method="RK45"):...
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: list[Event]=None, method="RK45"):...
 
     @overload
     def __init__(self, ode: VariationalLowLevelODE):...
