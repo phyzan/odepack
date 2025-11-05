@@ -575,7 +575,11 @@ void DerivedSolver<T, N, Derived>::_add_interpolant(std::unique_ptr<Interpolator
 template<typename T, size_t N, typename Derived>
 bool DerivedSolver<T, N, Derived>::_validate_it(const State<T, N>& state){
     bool success = true;
-    if (!all_are_finite(state.vector.data(), state.vector.size())){
+    if (this->is_dead()){
+        // The derived adapt_impl may kill the solver under the conditions that it deems so.
+        success = false;
+    }
+    else if (!all_are_finite(state.vector.data(), state.vector.size())){
         this->kill("Ode solution diverges");
         this->_diverges = true;
         success = false;

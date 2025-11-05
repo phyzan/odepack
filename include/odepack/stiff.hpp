@@ -313,8 +313,7 @@ public:
 
         while(!step_accepted){
             if (res.habs < h_min){
-                _change_D(h_min/res.habs);
-                res.habs = h_min;
+                this->kill("The stepsize for the BDF method dropped below min_step");
                 return;
             }
             else if (res.habs > max_step){
