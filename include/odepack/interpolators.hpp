@@ -364,6 +364,8 @@ private:
 
     inline const INTERPOLATOR&          _get_safe(size_t i) const;
 
+    inline void                         _throw_invalid_interpolant(const Interpolator<T, N>& interpolant) const;
+
     std::vector<INTERPOLATOR> _interpolants = {};
     std::vector<std::unique_ptr<Interpolator<T, N>>> _interp_ptrs = {};
     int _dir = 0;
@@ -947,7 +949,7 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::expand(const INTERPOLATOR& interpol
         }
     }
     else{
-        throw std::runtime_error("Invalid interpolant");
+        this->_throw_invalid_interpolant(interpolant);
     }
 
     if ((interpolant.dir() != 0) && (_dir == 0)){
@@ -967,7 +969,7 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::expand_by_owning(std::unique_ptr<In
         _interp_ptrs[size()-2]->link_with(*_interp_ptrs[size()-1]);
     }
     else{
-        throw std::runtime_error("Invalid interpolant");
+        this->_throw_invalid_interpolant(*interpolant);
     }
 
     if ((dir != 0) && (_dir == 0)){
@@ -1098,4 +1100,9 @@ inline const INTERPOLATOR& LinkedInterpolator<T, N, INTERPOLATOR>::_get_safe(siz
     }
 }
 
+
+template<typename T, size_t N, typename INTERPOLATOR>
+inline void LinkedInterpolator<T, N, INTERPOLATOR>::_throw_invalid_interpolant(const Interpolator<T, N>& interpolant) const {
+    throw std::runtime_error("Invalid interpolant in LinkedInterpolator. Cannot join intervals " + _get_last().interval().signature() + " + " + interpolant.interval().signature());
+}
 #endif
