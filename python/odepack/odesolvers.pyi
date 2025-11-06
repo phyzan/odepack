@@ -261,6 +261,14 @@ class OdeSolver:
         Advance the solver by a single adaptive time step
         '''
 
+    def advance_to_event(self)->bool:
+        '''
+        Advance the solver until the next event. 
+        Returns false if the solver did not reach an event.
+        This can happen because no events have been passed in the solver
+        or because it stopped integrating before reaching an event.
+        '''
+
     def reset(self)->None:
         '''
         Reset the solver to its initial condition

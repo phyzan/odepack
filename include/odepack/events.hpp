@@ -633,7 +633,7 @@ public:
         
         //reverse the rest of events after the canon event detection time
         size_t j=i;
-        while (j<_N_detect && (state(_event_idx[j]).t == state(_event_idx[i-1]).t || event(_event_idx[j]).is_pure_temporal())){
+        while (j<_N_detect && (state(_event_idx[j]).t == state(_event_idx[i-1]).t)){
             j++;
         }
         size_t tmp = j;

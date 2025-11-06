@@ -63,6 +63,7 @@ public:
     inline const State<T, N>&               ics() const final;
 
     bool                                    advance() final;
+    bool                                    advance_to_event() final;
     void                                    stop(std::string text) final;
     void                                    kill(std::string text) final;
     bool                                    resume() final;
@@ -372,6 +373,13 @@ inline bool DerivedSolver<T, N, Derived>::advance(){
         if (_validate_it(_states[_aux_state_idx])){
             _register_states();
             _events.detect_all_between(this->old_state(), this->current_state(), interp_func<T, N, Derived>, this);
+            if (_interp_data){
+                std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);
+                if (const EventState<T, N>* ev = _events.canon_state()){
+                    r->adjust_end(ev->t);
+                }
+                this->_add_interpolant(std::move(r));
+            }
         }
         else{
             return false;
@@ -409,6 +417,20 @@ inline bool DerivedSolver<T, N, Derived>::advance(){
     }
 
     this->_N++;
+    return true;
+}
+
+template<typename T, size_t N, typename Derived>
+inline bool DerivedSolver<T, N, Derived>::advance_to_event(){
+    if (_events.size() == 0){
+        return false;
+    }
+    do {
+        if (!this->advance()){
+            return false;
+        }
+    }while (!this->at_event());
+    
     return true;
 }
 
@@ -550,10 +572,6 @@ void DerivedSolver<T, N, Derived>::_register_states(){
     _aux_state_idx = _old_state_idx;
     _old_state_idx = tmp;
     _event_idx = -1;
-    if (_interp_data){
-        std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);
-        this->_add_interpolant(std::move(r));
-    }
 }
 
 template<typename T, size_t N, typename Derived>

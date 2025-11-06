@@ -664,6 +664,7 @@ void define_ode_module(py::module& m){
         .def_property_readonly("Nsys", [](const PySolver<T, N>& self){return self->Nsys();})
         .def("show_state", [](const PySolver<T, N>& self){return self->state().show();})
         .def("advance", [](PySolver<T, N>& self){return self->advance();})
+        .def("advance_to_event", [](PySolver<T, N>& self){return self->advance_to_event();})
         .def("reset", [](PySolver<T, N>& self){return self.s->reset();});
 
     py::class_<PyRK23<T, N>, PySolver<T, N>>(m, "RK23")

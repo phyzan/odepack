@@ -91,6 +91,7 @@ public:
     //MODIFIERS
 
     virtual bool                            advance()=0;
+    virtual bool                            advance_to_event()=0;
     virtual void                            stop(std::string text = "") = 0;
     virtual void                            kill(std::string text = "") = 0;
     virtual void                            set_tmax(T tmax) = 0;
