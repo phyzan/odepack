@@ -6,9 +6,14 @@
 #include <chrono>
 #include <mpreal.h>
 #include <omp.h>
-#include "tensors.hpp"
+#include "../ndspan/arrays.hpp"
 
-
+#define DEFAULT_RULE_OF_FOUR(CLASSNAME)                  \
+    CLASSNAME(const CLASSNAME& other) = default;      \
+    CLASSNAME(CLASSNAME&& other) = default;           \
+    CLASSNAME& operator=(const CLASSNAME& other) = default; \
+    CLASSNAME& operator=(CLASSNAME&& other) = default;
+    
 template<typename T, size_t N>
 struct State{
     T t;
