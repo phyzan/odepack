@@ -278,10 +278,18 @@ struct DOP_COEFS{
 
 
 template<typename T>
-void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* coef_mat, size_t order, size_t size){
+void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size){
     // coef_mat dimensions: size x order (7 columns for DOP853)
     // Implements the Horner-like scheme from scipy with alternating θ and (1-θ)
     // y(θ) = y_old + sum of terms with alternating θ and (1-θ) multiplications
+    if (t == t1){
+        copy_array(result, y1, size);
+        return;
+    }
+    else if (t == t2){
+        copy_array(result, y2, size);
+        return;
+    }
 
     T h = t2 - t1;
     T x = (t - t1) / h;  // θ
@@ -355,7 +363,7 @@ protected:
 private:
 
     void _call_impl(T* result, const T& t) const override{
-        coef_mat_interp_dop853(result, t, this->_t_min(), this->_t_max(), this->q_start().data(), _coef_mat.data(), order(), this->array_size());
+        coef_mat_interp_dop853(result, t, this->_t_min(), this->_t_max(), this->q_start().data(), this->q_end().data(), _coef_mat.data(), order(), this->array_size());
     }
 
 };
@@ -386,16 +394,16 @@ public:
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : Base("DOP853", ARGS, N_STAGES_EXT) {}
 
     inline void interp(T* result, const T& t) const{
-        _set_coef_matrix();
-        return coef_mat_interp_dop853(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
+        this->_set_coef_matrix();
+        return coef_mat_interp_dop853(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->current_state().vector.data(), this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
     }
 
     inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const{
-        _set_coef_matrix();
+        this->_set_coef_matrix();
         return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->old_state().t, this->t(), this->old_state().vector, this->current_state().vector, bdr1, bdr2));
     }
 
-    static Base::Atype Amatrix(){
+    static typename Base::Atype Amatrix(){
         typename Base::Atype result(N_STAGES, N_STAGES);
         typename DOP_COEFS<T>::DOP_A full_A = DOP_COEFS<T>::make_A();
 
@@ -407,11 +415,11 @@ public:
         return result;
     }
 
-    static Base::Btype Bmatrix(){
+    static typename Base::Btype Bmatrix(){
         return DOP_COEFS<T>::make_B();
     }
 
-    static Base::Ctype Cmatrix(){
+    static typename Base::Ctype Cmatrix(){
         typename Base::Ctype result(N_STAGES);
         auto C = DOP_COEFS<T>::make_C();
         copy_array(result.data(), C.data(), N_STAGES);
@@ -436,15 +444,15 @@ public:
 
     inline static const C_EXTRA_TYPE C_EXTRA = Cmatrix_extra();
 
-    inline static const DOP_COEFS<T>::DOP_D D = DOP_COEFS<T>::make_D();
+    inline static const typename DOP_COEFS<T>::DOP_D D = DOP_COEFS<T>::make_D();
 
-    inline static const DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
+    inline static const typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
 
-    inline static const DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
+    inline static const typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
 
 private:
 
-    void _set_coef_matrix() const{
+    void _set_coef_matrix_impl() const{
 
         const T& h = this->current_state().habs * this->direction();
         const T* y_old = this->old_state().vector.data();

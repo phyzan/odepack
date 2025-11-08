@@ -27,7 +27,7 @@ public:
     static const T MAX_FACTOR;
     static const T SAFETY;
     static const T MIN_FACTOR;
-    static constexpr T MIN_STEP = 100*std::numeric_limits<T>::epsilon();
+    static const T MIN_STEP;
 
     DerivedSolver() = delete;
 
@@ -646,5 +646,8 @@ const T DerivedSolver<T, N, Derived>::SAFETY = T(9)/10;
 
 template<typename T, size_t N, typename Derived>
 const T DerivedSolver<T, N, Derived>::MIN_FACTOR = T(2)/10;
+
+template<typename T, size_t N, typename Derived>
+const T DerivedSolver<T, N, Derived>::MIN_STEP = 100*std::numeric_limits<T>::epsilon();
 
 #endif

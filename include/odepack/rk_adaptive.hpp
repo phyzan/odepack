@@ -32,6 +32,7 @@ public:
 
     void reset() override{
         _K_true.set(0);
+        _mat_is_set = false;
     }
 
     inline void re_adjust(){}
@@ -46,8 +47,16 @@ protected:
         return static_cast<const Derived*>(this)->_estimate_error_norm(K, scale, h);
     }
 
+    inline void _set_coef_matrix_impl() const{ //override
+        static_cast<const Derived*>(this)->_set_coef_matrix_impl();
+    }
+
     inline void _set_coef_matrix() const{
-        static_cast<const Derived*>(this)->_set_coef_matrix();
+        if (!this->_mat_is_set){
+            this->_set_coef_matrix_impl();
+            this->_mat_is_set = true;
+        }
+        
     }
 
     void _step_impl(State<T, N>& result, const T& h);
@@ -57,6 +66,7 @@ protected:
     mutable Array1D<T, N>       _scale_tmp;
     mutable Array1D<T, N>       _error_tmp;
     mutable Array2D<T, N, 0>    _coef_mat;
+    mutable bool                _mat_is_set = false;
 };
 
 
@@ -76,12 +86,12 @@ public:
     inline static const Ptype P = Derived::Pmatrix();
 
     inline void interp(T* result, const T& t) const{
-        _set_coef_matrix();
-        return coef_mat_interp(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
+        this->_set_coef_matrix();
+        return coef_mat_interp(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->current_state().vector.data(), this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
     }
 
     inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const{
-        _set_coef_matrix();
+        this->_set_coef_matrix();
         return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->old_state().t, this->t(), this->old_state().vector, this->current_state().vector, bdr1, bdr2));
     }
 
@@ -92,7 +102,7 @@ protected:
 
     DEFAULT_RULE_OF_FOUR(StandardRungeKutta)
 
-    void _set_coef_matrix() const{
+    void _set_coef_matrix_impl() const{
         for (size_t i=0; i<this->Nsys(); i++){
             for (size_t j=0; j<Derived::INTERP_ORDER; j++){
                 T sum = 0;
@@ -169,11 +179,11 @@ public:
 
     inline static constexpr typename RKbase::Btype Bmatrix();
 
-    inline static constexpr RKbase::Ctype Cmatrix();
+    inline static constexpr typename RKbase::Ctype Cmatrix();
 
-    inline static constexpr RKbase::Etype Ematrix();
+    inline static constexpr typename RKbase::Etype Ematrix();
 
-    inline static constexpr RKbase::Ptype Pmatrix();
+    inline static constexpr typename RKbase::Ptype Pmatrix();
 
 };
 
@@ -281,6 +291,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::adapt_impl(State<T, N>& res
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
 void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& result, const T& h){
+    this->_mat_is_set = false;
     const State<T, N>& state = this->current_state();
     size_t Nsys = this->Nsys();
     T* q = result.vector.data();

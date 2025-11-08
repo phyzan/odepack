@@ -12,8 +12,17 @@ void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, co
 }
 
 template<typename T>
-void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* coef_mat, size_t order, size_t size){
+void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size){
     //coef_mat dimensions: size x order
+    if (t == t1){
+        copy_array(result, y1, size);
+        return;
+    }
+    else if (t == t2){
+        copy_array(result, y2, size);
+        return;
+    }
+
     T h = t2-t1;
     T x = (t-t1)/h;
 
@@ -756,7 +765,7 @@ StandardLocalInterpolator<T, N>* StandardLocalInterpolator<T, N>::clone() const{
 
 template<typename T, size_t N>
 void StandardLocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
-    return coef_mat_interp(result, t, this->_t_min(), this->_t_max(), this->q_start().data(), _coef_mat.data(), this->order(), this->array_size());
+    return coef_mat_interp(result, t, this->_t_min(), this->_t_max(), this->q_start().data(), this->q_end().data(), _coef_mat.data(), this->order(), this->array_size());
 }
 
 

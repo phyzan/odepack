@@ -105,7 +105,7 @@ bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step){
 }
 
 template <typename T>
-inline bool is_finite(T value) {
+inline bool is_finite(const T& value) {
     if constexpr (std::is_floating_point_v<T>) {
         return std::isfinite(value);
     } else if constexpr (std::is_integral_v<T>) {
@@ -116,8 +116,9 @@ inline bool is_finite(T value) {
     }
 }
 
-inline bool is_finite(const mpfr_t& value) {
-    return mpfr_number_p(value) != 0;
+template <>
+inline bool is_finite(const mpfr::mpreal& value) {
+    return mpfr_number_p(value.mpfr_ptr()) != 0;
 }
 
 template<typename T>
@@ -357,6 +358,9 @@ public:
     const std::vector<T>& t() const {return _t;}
 
     const Array2D<T, 0, N>& q() const {return _q;}
+
+    template<std::integral INT1, std::integral INT2>
+    const T& q(INT1 i, INT2 j) const {return _q(i, j);}
 
     const EventMap& event_map() const { return _event_map;}
 
