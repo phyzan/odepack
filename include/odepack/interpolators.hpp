@@ -6,6 +6,7 @@
 
 template<typename T>
 void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size){
+    #pragma omp simd
     for (size_t i=0; i<size; i++){
         result[i] = y1[i] + (y2[i]-y1[i])/(t2-t1) * (t-t1);
     }
@@ -27,10 +28,12 @@ void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y
     T x = (t-t1)/h;
 
     for (size_t i=0; i<size; i++){
-        result[i] = y1[i];
+        T sum = 0;
+        #pragma omp simd reduction(+:sum)
         for (size_t j=0; j<order; j++){
-            result[i] += h*coef_mat[i*order + j] * pow(x, j+1); // C_ij * x^(j+1)
+            sum += coef_mat[i*order + j] * pow(x, j+1); // C_ij * x^(j+1)
         }
+        result[i] = y1[i] + h*sum;
     }
 }
 

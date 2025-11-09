@@ -19,6 +19,7 @@ public:
 
     static constexpr size_t ERR_EST_ORDER = Derived::ERR_EST_ORDER;
     static const T ERR_EXP;
+    static constexpr bool IS_IMPLICIT = false;
 
     using Atype = Array2D<T, Nstages, Nstages>;
     using Btype = Array1D<T, Nstages>;
@@ -304,6 +305,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& res
 
     this->_rhs(K_, state.t, vector);
 
+    #pragma omp simd
     for (size_t j=0; j<Nsys; j++){
         q[j] = vector[j]+B_[0]*K_[j]*h;
     }

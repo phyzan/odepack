@@ -224,6 +224,7 @@ public:
 
     static constexpr size_t NEWTON_MAXITER = 4;
     static constexpr size_t ERR_EST_ORDER = 1;
+    static constexpr bool IS_IMPLICIT = true;
 
     BDF(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : Base("BDF", ARGS), _J(q0.size(), q0.size()), _B(q0.size(), q0.size()), _LU(q0.size()), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(q0.size()), _dy(q0.size()), _b(q0.size()), _scale(q0.size()), _ypred(q0.size()), _psi(q0.size()), _d(q0.size()), _error(q0.size()), _error_m(q0.size()), _error_p(q0.size()) {
         if (ode.jacobian == nullptr){

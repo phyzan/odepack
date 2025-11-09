@@ -296,6 +296,7 @@ void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, con
     T one_minus_x = T(1) - x;  // (1-θ)
 
     // Initialize result with 0 (NOT y_old - that gets added at the end)
+    #pragma omp simd
     for (size_t i = 0; i < size; i++){
         result[i] = T(0);
     }
@@ -310,16 +311,19 @@ void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, con
         size_t i = order - 1 - idx;  // reversed index: 6, 5, 4, 3, 2, 1, 0
 
         // Add F[i] coefficient
+        #pragma omp simd
         for (size_t j = 0; j < size; j++){
             result[j] += coef_mat[j * order + i];
         }
 
         // Multiply by θ or (1-θ) based on iteration
         if (idx % 2 == 0){
+            #pragma omp simd
             for (size_t j = 0; j < size; j++){
                 result[j] *= x;
             }
         } else {
+            #pragma omp simd
             for (size_t j = 0; j < size; j++){
                 result[j] *= one_minus_x;
             }
@@ -327,6 +331,7 @@ void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, con
     }
 
     // Add y_old at the end
+    #pragma omp simd
     for (size_t i = 0; i < size; i++){
         result[i] += y1[i];
     }

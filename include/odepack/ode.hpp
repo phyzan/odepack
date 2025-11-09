@@ -302,8 +302,10 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
     while (_solver->is_running()){
         if (_solver->advance()){
             if (_solver->at_event()){
+                bool any_event = false;
                 for (const size_t& ev : _solver->event_col()){
                     if (ev > 0 && event_counter.count_it(ev-1)){
+                        any_event = true;
                         _register_event(ev-1);
                     }
                 }
@@ -313,8 +315,10 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
-                _register_state();
-                Nnew++;
+                if (any_event){
+                    _register_state();
+                    Nnew++;
+                }
             }
             else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
                 ++frame_counter;

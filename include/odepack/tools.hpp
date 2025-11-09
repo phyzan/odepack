@@ -79,7 +79,7 @@ template<typename T>
 T norm_squared(const T* x, size_t size){
     //optimize
     T res = 0;
-    // #pragma omp simd reduction(+:res)
+    #pragma omp simd reduction(+:res)
     for (size_t i=0; i<size; i++){
         res += x[i]*x[i];
     }
@@ -129,7 +129,7 @@ T rms_norm(const T* x, size_t size){
 template<typename T>
 T rms_norm(const T* x, const T* scale, size_t size){
     T norm_sq = 0;
-    //optimize
+    #pragma omp simd reduction(+:norm_sq)
     for (size_t i=0; i<size; i++){
         norm_sq += x[i]*x[i]/(scale[i]*scale[i]);
     }

@@ -28,6 +28,7 @@ public:
     static const T SAFETY;
     static const T MIN_FACTOR;
     static const T MIN_STEP;
+    static constexpr bool IS_IMPLICIT = Derived::IS_IMPLICIT;
 
     DerivedSolver() = delete;
 
@@ -164,7 +165,7 @@ DerivedSolver<T, N, Derived>::DerivedSolver(SOLVER_CONSTRUCTOR(T, N)): OdeSolver
     if (!all_are_finite(tmp.data(), this->Nsys())){
         this->kill("Initial ode rhs is nan or inf");
     }
-    if (_ode.jacobian != nullptr){
+    if (_ode.jacobian != nullptr && (IS_IMPLICIT)){
         this->_jac(tmp, t0, q0);
         if (!all_are_finite(tmp.data(), tmp.size())){
             this->kill("Initial Jacobian is nan or inf");
