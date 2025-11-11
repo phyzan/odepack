@@ -452,7 +452,7 @@ public:
         return std::unique_ptr<Interpolator<T, N>>(new BDFInterpolator<T, N>(_D[_idx_D], _order, this->old_state(), this->current_state(), bdr1, bdr2));
     }
 
-    inline void interp(T* result, const T& t) const{
+    inline void interp_impl(T* result, const T& t) const{
         bdf_interp(result, t, this->t(), this->current_state().habs*this->direction(), _D[_idx_D].data(), _order, this->Nsys());
     }
 

@@ -334,16 +334,14 @@ class LowLevelODE:
         '''
         pass
 
-    def integrate(self, interval, *, max_frames=-1, event_options: Iterable[EventOpt] = (), max_prints=0, include_first=False)->OdeResult:
+    def integrate(self, interval, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:
         '''
         interval: integration interval (must be positive).
-        max_frames: The number of frames to be stored in the ode object. This is in case not all time steps are needed, but only e.g 100 of them. In many cases the computer might run out of memory, so it is more efficient to store only a few time steps during the ode integration. These will be (approximately) evenly spread throughout the interval, but do not include the time steps corresponding to event occurences (those are separate).
+        t_eval: Times at which to store the computed solution. If None (default), all steps that the solver encounters will be stored.
 
         event_options: Optionally provide Event options for each Event in the ode.
 
         max_prints: Print out the percentage of the ode integration completed. If max_prints=100, then the progress will be printed at 1%, 2%, ... If max_prints = 1000, then the progress will be printed at 0.1%, 0.2%, ... Provide a larger number to diplay the progress with more digits and more frequently (large numbers might affect performance).
-
-        include_first: If True, the initial time step at the start of the integration will be included in the result
 
 
         Returns
@@ -360,7 +358,7 @@ class LowLevelODE:
         This is because they are all required to provide an accurate interpolation in the provided interval, accessible in the OdeSolution object that is returned.
         '''
 
-    def go_to(self, t, *, max_frames=-1, event_options: Iterable[EventOpt] = (), max_prints=0, include_first=False)->OdeResult:...
+    def go_to(self, t, *, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:...
 
     def copy(self)->LowLevelODE:...
 
@@ -412,4 +410,4 @@ class VariationalLowLevelODE(LowLevelODE):
     def copy(self)->VariationalLowLevelODE:...
 
 
-def integrate_all(ode_array: Iterable[LowLevelODE], interval, max_frames=-1, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False):...
+def integrate_all(ode_array: Iterable[LowLevelODE], interval, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False):...

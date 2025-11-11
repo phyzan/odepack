@@ -83,7 +83,7 @@ class VectorField2D:
         if rich:
             res, kwargs = call_builtin_with_consumed(ode.rich_integrate, dict(event_options=[], max_prints=0), s, **kwargs)
         else:
-            res, kwargs = call_builtin_with_consumed(ode.integrate, dict(max_frames=-1, event_options=[], max_prints=0, include_first=False), s, **kwargs)
+            res, kwargs = call_builtin_with_consumed(ode.integrate, dict(t_eval=None, event_options=[], max_prints=0), s, **kwargs)
         if kwargs:
             warnings.warn(f"The keyword arguments {kwargs} had no effect")
         return res

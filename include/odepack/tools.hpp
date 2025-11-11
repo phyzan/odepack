@@ -161,11 +161,11 @@ size_t prod(const Iterable& array){
 }
 
 template<typename T>
-std::vector<T> subvec(const std::vector<T>& x, size_t start) {
+std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size) {
     if (start >= x.size()) {
         return {}; // Return an empty vector if start is out of bounds
     }
-    return std::vector<T>(x.begin() + start, x.end());
+    return std::vector<T>(x.begin() + start, x.begin() + start + size);
 }
 
 template<typename T>

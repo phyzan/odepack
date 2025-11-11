@@ -6,6 +6,20 @@
 #include "pytools.hpp"
 
 
+template<typename T>
+StepSequence<T> to_step_sequence(const py::object& t_eval){
+    if (t_eval.is_none()){
+        return StepSequence<T>();
+    }
+    else if (py::iterable(t_eval)){
+        std::vector<T> vec = toCPP_Array<T, std::vector<T>>(t_eval);
+        return StepSequence<T>(vec.data(), vec.size());
+    }
+    else{
+        throw py::type_error("Expected None, a NumPy array, or an iterable of numeric values.");
+    }
+}
+
 inline py::dict to_PyDict(const EventMap& _map){
     py::dict py_dict;
     for (const auto& [key, vec] : _map) {
@@ -422,7 +436,7 @@ struct PyOdeResult{
         std::vector<T> t_data = this->res->t_filtered(event.cast<std::string>());
         py::array_t<T> t_res = to_numpy<T>(t_data);
         Array2D<T, 0, N> q_data = this->res->q_filtered(event.cast<std::string>());
-        py::array_t<T> q_res = to_numpy<T>(q_data, getShape(q_data.size(), this->q0_shape));
+        py::array_t<T> q_res = to_numpy<T>(q_data, getShape(t_data.size(), this->q0_shape));
         return py::make_tuple(t_res, q_res);
     }
 
@@ -529,8 +543,8 @@ public:
         delete ode;
     }
 
-    PyOdeResult<T, N> py_integrate(const T& interval, int max_frames, const py::iterable& event_options, int max_prints, bool include_first){
-        OdeResult<T, N> res = ode->integrate(interval, max_frames, to_Options(event_options), max_prints, include_first);
+    PyOdeResult<T, N> py_integrate(const T& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
+        OdeResult<T, N> res = ode->integrate(interval, to_step_sequence<T>(t_eval), to_Options(event_options), max_prints);
         PyOdeResult<T, N> py_res(res, data.shape);
         return py_res;
     }
@@ -541,8 +555,8 @@ public:
         return py_res;
     }
 
-    PyOdeResult<T, N> py_go_to(const T& t, const int max_frames, const py::iterable& event_options, int max_prints, bool include_first){
-        OdeResult<T, N> res = ode->go_to(t, max_frames, to_Options(event_options), max_prints, include_first);
+    PyOdeResult<T, N> py_go_to(const T& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
+        OdeResult<T, N> res = ode->go_to(t, to_step_sequence<T>(t_eval), to_Options(event_options), max_prints);
         PyOdeResult<T, N> py_res(res, data.shape);
         return py_res;
     }
@@ -775,10 +789,9 @@ void define_ode_module(py::module& m){
         .def("integrate", &PyODE<T, N>::py_integrate,
             py::arg("interval"),
             py::kw_only(),
-            py::arg("max_frames")=-1,
+            py::arg("t_eval")=py::none(),
             py::arg("event_options")=py::tuple(),
-            py::arg("max_prints")=0,
-            py::arg("include_first")=false)
+            py::arg("max_prints")=0)
         .def("rich_integrate", &PyODE<T, N>::py_rich_integrate,
             py::arg("interval"),
             py::kw_only(),
@@ -787,10 +800,9 @@ void define_ode_module(py::module& m){
         .def("go_to", &PyODE<T, N>::py_go_to,
         py::arg("t"),
         py::kw_only(),
-        py::arg("max_frames")=-1,
+        py::arg("t_eval")=py::none(),
         py::arg("event_options")=py::tuple(),
-        py::arg("max_prints")=0,
-        py::arg("include_first")=false)
+        py::arg("max_prints")=0)
         .def("copy", [](const PyODE<T, N>& self){return PyODE<T, N>(self);})
         .def("reset", [](PyODE<T, N>& self){self.ode->reset();})
         .def("clear", [](PyODE<T, N>& self){self.ode->clear();})
@@ -830,13 +842,13 @@ void define_ode_module(py::module& m){
         .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("Nargs"))
         .def("__call__", &PyFuncWrapper<T, N>::call, py::arg("t"), py::arg("q"));
 
-    m.def("integrate_all", [](const py::object& list, const T& interval, int max_frames, const py::iterable& event_options, int threads, bool display_progress){
+    m.def("integrate_all", [](const py::object& list, const T& interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
             std::vector<ODE<T, N>*> array;
             for (const py::handle& item : list) {
                 array.push_back(item.cast<PyODE<T, N>&>().ode);
             }
-            integrate_all(array, interval, max_frames, to_Options(event_options), threads, display_progress);
-        }, py::arg("ode_array"), py::arg("interval"), py::arg("max_frames")=-1, py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
+            integrate_all(array, interval, to_step_sequence<T>(t_eval), to_Options(event_options), threads, display_progress);
+        }, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 }
 
 

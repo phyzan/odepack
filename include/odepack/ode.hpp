@@ -13,6 +13,68 @@ struct EventOptions{
     int period=1;
 };
 
+template<typename T>
+class StepSequence{
+
+public:
+
+    StepSequence() = default;
+
+    StepSequence(T* data, long int size, bool own_it = false) : _size(size){
+        if (size < 1 || data == nullptr){
+            _data = nullptr;
+        }
+        else if (own_it){
+            _data = data;
+        }
+        else{
+            _data = new T[size];
+            copy_array(_data, data, size);
+        }
+    }
+
+    template<std::integral INT>
+    const T& operator[](INT i) const{
+        return _data[i];
+    }
+
+    StepSequence(const StepSequence& other) : _size(other.size()){
+        if (_size > 0){
+            _data = new T[_size];
+            copy_array(_data, other._data, other._size);
+        }
+        else{
+            _data = nullptr;
+        }
+    }
+
+    StepSequence(StepSequence&& other) noexcept : _data(other._data), _size(other._size) {
+        other._data = nullptr;
+    }
+
+    ~StepSequence(){
+        delete[] _data;
+        _data = nullptr;
+    }
+
+    StepSequence& operator=(const StepSequence& other) = delete; //will not be used for now
+
+    StepSequence& operator=(StepSequence&& other) noexcept = delete; //will not be used for now
+
+    long int size() const{
+        return _size;
+    }
+
+    const T* data() const{
+        return _data;
+    }
+
+private:
+
+    T* _data = nullptr;
+    long int _size = -1;
+};
+
 
 
 template<typename T, size_t N>
@@ -43,9 +105,6 @@ private:
     bool _is_running = true;
 };
 
-
-
-
 template<typename T, size_t N>
 class ODE{
 
@@ -71,9 +130,9 @@ public:
 
     OdeSolution<T, N>                           rich_integrate(const T& interval, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
-    OdeResult<T, N>                             integrate(const T& interval, int max_frames=-1, const std::vector<EventOptions>& event_options={}, int max_prints = 0, bool include_first=false);
+    OdeResult<T, N>                             integrate(const T& interval, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
-    OdeResult<T, N>                             go_to(const T& t, int max_frames=-1, const std::vector<EventOptions>& event_options={}, int max_prints = 0, bool include_first=false);
+    OdeResult<T, N>                             go_to(const T& t, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
     std::map<std::string, std::vector<size_t>>  event_map(size_t start_point=0) const;
 
@@ -136,11 +195,23 @@ private:
 
     std::vector<EventOptions>                   _validate_events(const std::vector<EventOptions>& options)const;
 
+    void _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew){
+        T t_req = t_array[frame_counter];
+        if (t_last*d < t_req*d && t_req*d <= t_curr*d){
+            frame_counter++;
+            Nnew++;
+            size_t tmp = _q_data.size();
+            _t_arr.push_back(t_req);
+            _q_data.insert(_q_data.end(), _solver->q().begin(), _solver->q().end());
+            _solver->interp(_q_data.data()+tmp, t_req);
+        }
+    }
+
 };
 
 
 template<typename T, size_t N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, int max_frames, const std::vector<EventOptions>& event_options, int threads, bool display_progress){
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress){
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
     int tot = 0;
     const int target = list.size();
@@ -148,7 +219,7 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, int m
     clock.start();
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (ODE<T, N>* ode : list){
-        ode->integrate(interval, max_frames, event_options);
+        ode->integrate(interval, t_array, event_options);
         #pragma omp critical
         {
             if (display_progress){
@@ -264,17 +335,17 @@ size_t ODE<T, N>::Nsys() const{
 }
 
 template<typename T, size_t N>
-OdeResult<T, N> ODE<T, N>::integrate(const T& interval, int max_frames, const std::vector<EventOptions>& event_options, int max_prints, bool include_first){
+OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
     if (interval < 0){
         throw std::runtime_error("Integration interval must be positive");
     }
-    return this->go_to(_solver->t()+interval*_solver->direction(), max_frames, event_options, max_prints, include_first);
+    return this->go_to(_solver->t()+interval*_solver->direction(), t_array, event_options, max_prints);
 }
 
 template<typename T, size_t N>
 OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector<EventOptions>& event_options, int max_prints){
     _solver->start_interpolation();
-    OdeResult<T, N> res = this->integrate(interval, -1, event_options, max_prints, true);
+    OdeResult<T, N> res = this->integrate(interval, {}, event_options, max_prints);
     OdeSolution<T, N> rich_res(std::move(res), *_solver->interpolator());
     _solver->stop_interpolation();
     return rich_res;
@@ -282,18 +353,29 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
 
 
 template<typename T, size_t N>
-OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<EventOptions>& event_options, int max_prints, bool include_first){
+OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
     TimePoint t1 = now();
     const T t0 = _solver->t();
-    if (t*_solver->direction() < t0*_solver->direction()){
+    const int d = _solver->direction();
+    const bool save_all = t_array.size() < 0;
+    const bool save_some = t_array.data() != nullptr && t_array.size() > 0;
+    if (t*d < t0*d){
         throw std::runtime_error("Integration can only advance along the initial direction");
     }
-    const T interval = t-t0;
     const size_t Nt = _t_arr.size();
     long int frame_counter = 0;
     int prints = 0;
     size_t Nnew = 0;
     _solver->set_tmax(t);
+    T t_last = _solver->t();
+    T t_curr = t_last;
+    T t_req;
+    bool include_first = false;
+    if (save_all || (save_some && t_array[0] == t0)){
+        include_first = true;
+        Nnew = 1;
+        frame_counter = 1;
+    }
 
     //check that all names in max_events are valid
     const std::vector<EventOptions> options = this->_validate_events(event_options);
@@ -301,12 +383,18 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
     EventCounter<T, N> event_counter(options);
     while (_solver->is_running()){
         if (_solver->advance()){
+            t_last = t_curr;
+            t_curr = _solver->t();
             if (_solver->at_event()){
                 bool any_event = false;
+                bool tmax_event = false;
                 for (const size_t& ev : _solver->event_col()){
                     if (ev > 0 && event_counter.count_it(ev-1)){
                         any_event = true;
                         _register_event(ev-1);
+                    }
+                    else if (ev == 0){
+                        tmax_event = true;
                     }
                 }
                 //the .count_it(ev) in the line above might have stopped the solver.
@@ -319,11 +407,20 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
                     _register_state();
                     Nnew++;
                 }
+                else if (tmax_event && (frame_counter < t_array.size())){
+                    _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
+                }
+                else if (tmax_event && save_all){
+                    Nnew++;
+                }
+
             }
-            else if ( (max_frames == -1) || (abs(_solver->t()-t0)*max_frames >= (frame_counter+1)*interval) ){
-                ++frame_counter;
+            else if (save_all){
                 _register_state();
                 Nnew++;
+            }
+            else if (save_some && frame_counter < t_array.size()){
+                _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
             }
         }
         if (max_prints > 0){
@@ -342,8 +439,11 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, int max_frames, const std::vector<E
     if (max_prints > 0){
         std::cout << std::endl;
     }
+    if (_t_arr.back() != _solver->t()){
+        _register_state();
+    }
     TimePoint t2 = now();
-    OdeResult<T, N> res(subvec(_t_arr, Nt-static_cast<size_t>(include_first)), Array2D<T, 0, N>(_q_data.data()+(Nt-static_cast<size_t>(include_first))*_solver->Nsys(), Nnew+include_first, _solver->Nsys()), event_map(Nt-static_cast<size_t>(include_first)), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
+    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew+include_first, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
 
     _runtime += res.runtime();
     return res;
@@ -427,16 +527,16 @@ void ODE<T, N>::set_obj(const void* obj){
 
 template<typename T, size_t N>
 void ODE<T, N>::clear(){
-    T t = _t_arr[_t_arr.size()-1];
+    T t = _t_arr.back();
     _t_arr.clear();
     _t_arr.shrink_to_fit();
     _t_arr.push_back(t);
 
     _q_data = std::vector<T>(_q_data.begin()+(_t_arr.size()-1)*this->Nsys(), _q_data.end());
 
-    for (size_t i=0; i<_Nevents.size(); i++){
-        _Nevents[i].clear();
-        _Nevents[i].shrink_to_fit();
+    for (auto & _Nevent : _Nevents){
+        _Nevent.clear();
+        _Nevent.shrink_to_fit();
     }
 }
 

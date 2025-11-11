@@ -239,7 +239,7 @@ public:
     }
 
     void go_back() override{
-        Event<T, N>::go_back();;
+        Event<T, N>::go_back();
     }
 
     

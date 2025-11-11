@@ -398,7 +398,7 @@ public:
 
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : Base("DOP853", ARGS, N_STAGES_EXT) {}
 
-    inline void interp(T* result, const T& t) const{
+    inline void interp_impl(T* result, const T& t) const{
         this->_set_coef_matrix();
         return coef_mat_interp_dop853(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->current_state().vector.data(), this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
     }

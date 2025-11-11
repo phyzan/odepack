@@ -62,6 +62,7 @@ public:
     inline bool                             is_interpolating() const final;
     inline bool                             at_event() const final;
     inline const State<T, N>&               ics() const final;
+    inline void                             interp(T* result, const T& t) const final;
 
     bool                                    advance() final;
     bool                                    advance_to_event() final;
@@ -82,7 +83,7 @@ public:
 
     inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;//virtual. return a dynamically allocated object
 
-    inline void                             interp(T* result, const T& t) const;//virtual
+    inline void                             interp_impl(T* result, const T& t) const;//virtual
 
     inline void                             re_adjust();//virtual
 
@@ -558,7 +559,16 @@ inline void DerivedSolver<T, N, Derived>::_jac(JacMat<T, N>& result, const T& t,
 
 template<typename T, size_t N, typename Derived>
 inline void DerivedSolver<T, N, Derived>::interp(T* result, const T& t) const{
-    return THIS_C->interp(result, t);
+    int d = this->direction();
+    if (t*d < this->old_state().t*d || this->current_state().t*d < t*d ){
+        throw std::runtime_error("Cannot perform local interpolation at t = " + to_string(t) + " between the states t_1 = " + to_string(this->old_state().t) + " and t_2 = " + to_string(this->current_state().t));
+    }
+    return interp_impl(result, t);
+}
+
+template<typename T, size_t N, typename Derived>
+inline void DerivedSolver<T, N, Derived>::interp_impl(T* result, const T& t) const{
+    return THIS_C->interp_impl(result, t);
 }
 
 template<typename T, size_t N, typename Derived>
@@ -635,7 +645,7 @@ inline bool DerivedSolver<T, N, Derived>::_equiv_states() const{
 template<typename T, size_t N, typename Derived>
 inline void interp_func(T* res, const T& t, const void* obj){
     const auto* solver = reinterpret_cast<const DerivedSolver<T, N, Derived>*>(obj);
-    solver->interp(res, t);
+    solver->interp_impl(res, t);
 }
 
 

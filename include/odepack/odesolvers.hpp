@@ -100,6 +100,7 @@ public:
     virtual void                            stop_interpolation() = 0;
     virtual void                            reset() = 0;
     virtual void                            set_obj(const void* obj) = 0;
+    virtual void                            interp(T* result, const T& t) const = 0;
 
 protected:
 
