@@ -78,6 +78,11 @@ class VectorField2D:
             A = (fx**2 + fy**2)**Rational(1, 2)
         else:
             A = 1
+        s, direction = abs(s), 1 if s>0 else (-1 if s < 0 else 0)
+        if direction > 0:
+            kwargs['direction'] = kwargs.get('direction', 1)
+        else:
+            kwargs['direction'] = direction
         odesys = OdeSystem([fx/A, fy/A], t, [self.xvar, self.yvar], self.args, events=kwargs.pop('events', ()))
         ode, kwargs = call_with_consumed(odesys.get, t0=0, q0=[x0, y0], compiled=compiled, **kwargs)
         if rich:

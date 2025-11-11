@@ -195,7 +195,7 @@ private:
 
     std::vector<EventOptions>                   _validate_events(const std::vector<EventOptions>& options)const;
 
-    void _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew){
+    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew){
         T t_req = t_array[frame_counter];
         if (t_last*d < t_req*d && t_req*d <= t_curr*d){
             frame_counter++;
@@ -204,7 +204,9 @@ private:
             _t_arr.push_back(t_req);
             _q_data.insert(_q_data.end(), _solver->q().begin(), _solver->q().end());
             _solver->interp(_q_data.data()+tmp, t_req);
+            return true;
         }
+        return false;
     }
 
 };
@@ -419,8 +421,8 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
                 _register_state();
                 Nnew++;
             }
-            else if (save_some && frame_counter < t_array.size()){
-                _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
+            else if (save_some){
+                while (frame_counter < t_array.size() && _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
             }
         }
         if (max_prints > 0){
