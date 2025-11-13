@@ -242,6 +242,13 @@ class OdeSolver:
         pass
 
     @property
+    def stepsize(self)->float:
+        '''
+        Current stepsize that will be used to estimate the next one.
+        '''
+        pass
+
+    @property
     def diverges(self)->bool:...
 
     @property

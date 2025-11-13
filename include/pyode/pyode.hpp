@@ -673,6 +673,7 @@ void define_ode_module(py::module& m){
     py::class_<PySolver<T, N>, std::unique_ptr<PySolver<T, N>>>(m, "OdeSolver")
         .def_property_readonly("t", [](const PySolver<T, N>& self){return self->t();})
         .def_property_readonly("q", [](const PySolver<T, N>& self){return to_numpy<T>(self->q(), self.data.shape);})
+        .def_property_readonly("stepsize", [](const PySolver<T, N>& self){return self->stepsize();})
         .def_property_readonly("diverges", [](const PySolver<T, N>& self){return self->diverges();})
         .def_property_readonly("is_dead", [](const PySolver<T, N>& self){return self->is_dead();})
         .def_property_readonly("Nsys", [](const PySolver<T, N>& self){return self->Nsys();})
