@@ -240,18 +240,19 @@ public:
 
     void go_back() override{
         Event<T, N>::go_back();
+        _t_goal = _t_goal_last;
     }
-
-    
 
 private:
 
     void _register_it(const EventState<T, N>& res, const State<T, N>& before, const State<T, N>& after) override{
         Event<T, N>::_register_it(res, before, after);
+        _t_goal_last = _t_goal;
         _t_goal = inf<T>();
     }
 
     T _t_goal = inf<T>();
+    T _t_goal_last = inf<T>();
 
 };
 
