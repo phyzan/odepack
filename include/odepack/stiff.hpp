@@ -232,7 +232,7 @@ public:
         }
         if (rtol == 0){
             rtol = 100*std::numeric_limits<T>::epsilon();
-            std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol;
+            std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
         }
         _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
         
