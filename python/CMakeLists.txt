@@ -48,6 +48,11 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(odesolvers PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
+# Add MPFR library support
+find_library(MPFR_LIBRARY mpfr REQUIRED)
+find_library(GMP_LIBRARY gmp REQUIRED)
+target_link_libraries(odesolvers PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
+
 # Installation rules
 # Install the compiled module into the odepack package
 install(TARGETS odesolvers
