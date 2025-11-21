@@ -617,6 +617,10 @@ bool DerivedSolver<T, N, Derived>::_validate_it(const State<T, N>& state){
         this->kill("Required stepsize was smaller than machine precision");
         success = false;
     }
+    else if (state.t == this->current_state().t){
+        this->kill("The next time step is identical to the previous one, possibly due to machine rounding error");
+        success = false;
+    }
 
     return success;
 }

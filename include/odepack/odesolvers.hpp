@@ -44,7 +44,7 @@ struct SolverState{
         "\tUpdates    : " << Nt << "\n" <<
         "\tDead       : " << (is_dead ? "true" : "false") << "\n" <<
         "\tState      : " << message << "\n" << 
-        (event_names.size() == 0 ? "\tEvents     : No event\n" : "\tEvents     : " + event_message);
+        (event_names.size() == 0 ? "\tEvents     : No event\n" : "\tEvents     : " + event_message + "\n") << std::endl;
     }
 
 };

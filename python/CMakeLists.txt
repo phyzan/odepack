@@ -34,6 +34,7 @@ target_include_directories(odesolvers PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Add compile options from .clangd
 target_compile_options(odesolvers PRIVATE
     -O3
+    -DNDEBUG
     -Wall
     -Wextra
     -Wno-unused-parameter
