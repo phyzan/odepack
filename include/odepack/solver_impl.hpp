@@ -24,10 +24,10 @@ class DerivedSolver : public OdeSolver<T, N>{
 
 public:
 
-    static const T MAX_FACTOR;
-    static const T SAFETY;
-    static const T MIN_FACTOR;
-    static const T MIN_STEP;
+    T MAX_FACTOR = 10;
+    T SAFETY = T(9)/10;
+    T MIN_FACTOR = T(2)/10;
+    T MIN_STEP = 100*std::numeric_limits<T>::epsilon();
     static constexpr bool IS_IMPLICIT = Derived::IS_IMPLICIT;
 
     DerivedSolver() = delete;
@@ -651,18 +651,5 @@ inline void interp_func(T* res, const T& t, const void* obj){
     const auto* solver = reinterpret_cast<const DerivedSolver<T, N, Derived>*>(obj);
     solver->interp_impl(res, t);
 }
-
-
-template<typename T, size_t N, typename Derived>
-const T DerivedSolver<T, N, Derived>::MAX_FACTOR = T(10);
-
-template<typename T, size_t N, typename Derived>
-const T DerivedSolver<T, N, Derived>::SAFETY = T(9)/10;
-
-template<typename T, size_t N, typename Derived>
-const T DerivedSolver<T, N, Derived>::MIN_FACTOR = T(2)/10;
-
-template<typename T, size_t N, typename Derived>
-const T DerivedSolver<T, N, Derived>::MIN_STEP = 100*std::numeric_limits<T>::epsilon();
 
 #endif

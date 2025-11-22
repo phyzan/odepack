@@ -215,8 +215,6 @@ struct NewtConv{
 template<typename T, size_t N>
 class BDF : public DerivedSolver<T, N, BDF<T, N>>{
 
-    inline static const auto BDF_COEFS = BDFCONSTS<T>{};
-
     using Base = DerivedSolver<T, N, BDF<T, N>>;
     using Dlike = Array2D<T, 0, N>;
 
@@ -605,6 +603,7 @@ private:
     mutable std::vector<T> _R, _U, _RU;
     mutable Array1D<T, N> _f, _dy, _b, _scale, _ypred, _psi, _d, _error, _error_m, _error_p;
     mutable std::array<T, 3> _error_norms;
+    BDFCONSTS<T> BDF_COEFS;
 
 };
 

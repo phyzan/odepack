@@ -114,7 +114,7 @@ private:
     int _dir_last = 0;
 };
 
-template<typename T, int N>
+template<typename T, size_t N>
 class VariationalODE : public ODE<T, N>{
 
 
@@ -126,7 +126,7 @@ public:
                 throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
             }
         }
-        q0 = normalized(q0);
+        q0 = normalized<T, N>(q0);
         size_t Nsys = q0.size()/2;
         NormalizationEvent<T, N> extra_event("Normalization", Nsys, period);
         events.insert(events.begin(), &extra_event);

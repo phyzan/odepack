@@ -18,16 +18,16 @@ class RungeKuttaBase : public DerivedSolver<T, N, Derived>{
 public:
 
     static constexpr size_t ERR_EST_ORDER = Derived::ERR_EST_ORDER;
-    static const T ERR_EXP;
+    T ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
     static constexpr bool IS_IMPLICIT = false;
 
     using Atype = Array2D<T, Nstages, Nstages>;
     using Btype = Array1D<T, Nstages>;
     using Ctype = Array1D<T, Nstages>;
 
-    inline static const Atype A = Derived::Amatrix();
-    inline static const Btype B = Derived::Bmatrix();
-    inline static const Ctype C = Derived::Cmatrix();
+    Atype A = Derived::Amatrix();
+    Btype B = Derived::Bmatrix();
+    Ctype C = Derived::Cmatrix();
 
     void adapt_impl(State<T, N>& res);
 
@@ -83,8 +83,8 @@ public:
     using Etype = Array1D<T, Nstages+1>;
     using Ptype = Array2D<T, Nstages+1, 0>;
 
-    inline static const Etype E = Derived::Ematrix();
-    inline static const Ptype P = Derived::Pmatrix();
+    Etype E = Derived::Ematrix();
+    Ptype P = Derived::Pmatrix();
 
     inline void interp_impl(T* result, const T& t) const{
         this->_set_coef_matrix();
@@ -333,9 +333,6 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& res
     this->_rhs(K_+Nstages*Nsys, state.t+h, q);
     result.t = state.t+h;
 }
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
-const T RungeKuttaBase<Derived, T, N, Nstages, Norder>::ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
 
 
 template<typename T, size_t N>

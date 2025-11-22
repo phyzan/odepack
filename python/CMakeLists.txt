@@ -37,6 +37,7 @@ target_compile_options(odesolvers PRIVATE
     -DNDEBUG
     -Wall
     -Wextra
+    -ftemplate-backtrace-limit=0
     -Wno-unused-parameter
     -fno-math-errno
     -fopenmp

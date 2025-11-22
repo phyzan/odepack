@@ -195,9 +195,19 @@ private:
 
     std::vector<EventOptions>                   _validate_events(const std::vector<EventOptions>& options)const;
 
-    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew){
+    template< bool inclusive = true>
+    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew) {
         T t_req = t_array[frame_counter];
-        if (t_last*d < t_req*d && t_req*d <= t_curr*d){
+
+        // Comparison using the template parameter
+        bool in_range;
+        if constexpr(inclusive){
+            in_range = (t_last*d < t_req*d) && (t_req*d <= t_curr*d);
+        }
+        else{
+            in_range = (t_last*d < t_req*d) && (t_req*d < t_curr*d);
+        }
+        if (in_range) {
             frame_counter++;
             Nnew++;
             size_t tmp = _q_data.size();
@@ -208,6 +218,7 @@ private:
         }
         return false;
     }
+
 
 };
 
@@ -371,7 +382,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
     _solver->set_tmax(t);
     T t_last = _solver->t();
     T t_curr = t_last;
-    T t_req;
     bool include_first = false;
     if (save_all || (save_some && t_array[0] == t0)){
         include_first = true;
@@ -405,6 +415,7 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
+                while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
                 if (any_event){
                     _register_state();
                     Nnew++;
@@ -415,7 +426,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
                 else if (tmax_event && save_all){
                     Nnew++;
                 }
-
             }
             else if (save_all){
                 _register_state();
@@ -445,8 +455,7 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
         _register_state();
     }
     TimePoint t2 = now();
-    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew+include_first, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
-
+    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
     _runtime += res.runtime();
     return res;
 }

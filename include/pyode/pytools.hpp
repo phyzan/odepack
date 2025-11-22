@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include <vector>
+#include "include/ndspan/arrays.hpp"
 
 namespace py = pybind11;
 
@@ -35,20 +35,19 @@ py::array_t<T> array(T* data, const std::vector<py::ssize_t>& shape){
     return py::array_t<T>(shape, data, capsule);
 }
 
-template<typename T, typename Ty>
-Ty toCPP_Array(const py::iterable& obj) {
-    // Try to ensure the object is a NumPy array of compatible type
-    py::array arr = py::array::ensure(obj);
-    if (!arr) {throw std::invalid_argument("Input cannot be converted to a NumPy array");}
+template<typename T, typename Container>
+Container toCPP_Array(const pybind11::iterable &obj) {
 
-    py::array_t<T> converted_A = py::array_t<T>(arr);
-    size_t n = converted_A.size();
-
-    Ty res(n);
-    const T* data = static_cast<const T*>(converted_A.data());
-
-    for (size_t i = 0; i < n; i++) {
-        res[i] = data[i];
+    // Get Python iterable length if possible (optional, for efficiency)
+    size_t len = pybind11::len(obj);
+    Container res(len);
+    int i = 0;
+    for (auto item : obj) {
+        // Cast Python object to double safely
+        double val = pybind11::cast<double>(item);
+        // Construct T from double
+        res[i] = val;
+        i++;
     }
 
     return res;
@@ -141,6 +140,41 @@ T py_event(const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();
+}
+
+// Specializations for mpfr::mpreal
+
+template<>
+void py_rhs<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    // Convert py::object back to Array<mpfr::mpreal>
+    auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
+    arrcpy(res, arr.data(), arr.size());
+}
+
+template<>
+void py_jac<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    // Convert py::object back to Array<mpfr::mpreal>
+    auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
+    arrcpy(res, arr.data(), arr.size());
+}
+
+template<>
+void py_mask<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    // Convert py::object back to Array<mpfr::mpreal>
+    auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
+    arrcpy(res, arr.data(), arr.size());
+}
+
+template<>
+mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
+    return p.event(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args).template cast<mpfr::mpreal>();
 }
 
 #endif

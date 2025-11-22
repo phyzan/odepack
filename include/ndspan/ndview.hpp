@@ -3,10 +3,10 @@
 #include "layoutmap.hpp"
 
 template<typename Derived, Layout L, typename T, size_t... DIMS>
-class AbstractNdView : public NdSpan<T, L, DIMS...>{
+class AbstractNdView : public NdSpan<L, DIMS...>{
 
     using CLS = AbstractNdView<Derived, L, T, DIMS...>;
-    using Base = NdSpan<T, L, DIMS...>;
+    using Base = NdSpan<L, DIMS...>;
 
 protected:
 
@@ -14,79 +14,59 @@ protected:
 
 public:
 
-    inline const T* data() const{
+    using value_type = T;
+    using iterator = T*;
+    using const_iterator = const T*;
+
+    DEFAULT_RULE_OF_FOUR(AbstractNdView)
+
+    template<IsShapeContainer ShapeContainer>
+    AbstractNdView(const ShapeContainer& shape) : Base(shape) {}
+
+    //ACCESSORS
+
+    iterator begin() { return this->data(); }
+    iterator end()   { return this->data() + this->size(); }
+
+    const_iterator begin() const { return this->data(); }
+    const_iterator end() const { return this->data() + this->size(); }
+    
+    INLINE const T* data() const{
         //override
         return THIS_C->data();
     }
 
-    inline T* data() {
-        return CONST_CAST(T*, data());
+    INLINE T* data(){
+        //override
+        return THIS->data();
     }
 
-    inline const T* begin() const{ return data();}
-
-    inline T* begin() {return data();}
-
-    inline const T* end() const {return data()+size();}
-
-    inline T* end() {return data()+size();}
-
     template<INT_T... Idx>
-    inline constexpr const T& operator()(Idx... idx) const noexcept {
+    INLINE constexpr const T& operator()(Idx... idx) const noexcept {
         return data()[this->offset(idx...)];
     }
 
     template<INT_T... Idx>
-    inline constexpr T& operator()(Idx... idx) noexcept {
+    INLINE constexpr T& operator()(Idx... idx) noexcept {
         return data()[this->offset(idx...)];
     }
 
-    inline const T& operator[](size_t i) const{
+    template<INT_T IDX_T>
+    INLINE const T& operator[](IDX_T i) const{
         return data()[i];
     }
 
-    inline T& operator[](size_t i){
+    //MODIFIERS
+
+    template<INT_T IDX_T>
+    INLINE T& operator[](IDX_T i){
         return data()[i];
-    }
-
-
-    // function definitions that only assist C++ parsers
-
-    inline constexpr size_t size() const{
-        return Base::size();
-    }
-
-    inline constexpr size_t ndim() const{
-        return Base::ndim();
-    }
-
-    inline const size_t* shape() const {
-        return Base::shape();
-    }
-
-    inline constexpr size_t shape(size_t i) const {
-        return Base::shape(i);
-    }
-
-    template<INT_T... Idx>
-    inline constexpr size_t offset(Idx... idx) const noexcept {
-        return Base::offset(idx...);
-    }
-
-    template<INT_T... Args>
-    inline void reshape(Args... shape){
-        return Base::reshape(shape...);
-    }
-
-    template<INT_T... Args>
-    inline void resize(Args... shape){
-        return Base::resize(shape...);
     }
 
 };
 
 
-template<typename T, Layout L, size_t... DIMS>
+template<typename T, Layout L = Layout::C, size_t... DIMS>
 class NdView : public AbstractNdView<NdView<T, L, DIMS...>, L, T, DIMS...>{
 
     using Base = AbstractNdView<NdView<T, L, DIMS...>, L, T, DIMS...>;
@@ -98,15 +78,16 @@ public:
     explicit NdView(T* data) requires (Base::N > 0) : Base(), _data(data) {}
 
     template<INT_T... Args>
-    explicit NdView(T* data, Args... shape) : Base(shape...), _data(data) {
-        static_assert(sizeof...(shape) > 0, "NdView: at least one dimension (shape) must be provided");
-    }
+    explicit NdView(T* data, Args... shape) : Base(shape...), _data(data) {}
 
-    inline const T* data() const{
+    template<IsShapeContainer ShapeContainer>
+    explicit NdView(T* data, const ShapeContainer& shape) : Base(shape), _data(data) {}
+
+    INLINE const T* data() const{
         return _data;
     }
 
-    inline T* data() {
+    INLINE T* data() {
         return _data;
     }
 

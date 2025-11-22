@@ -71,7 +71,7 @@ inline double as_duration(const TimePoint& t1, const TimePoint& t2){
 }
 
 template <typename T>
-constexpr T inf() {
+T inf() {
     return std::numeric_limits<T>::infinity();
 }
 
@@ -149,15 +149,6 @@ T abs(const T& x){
 template<typename T>
 int sgn(const T& x){
     return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
-}
-
-template<typename Iterable>
-size_t prod(const Iterable& array){
-    size_t res = 1;
-    for (size_t i=0; i<array.size(); i++){
-        res *= array[i];
-    }
-    return res;
 }
 
 template<typename T>

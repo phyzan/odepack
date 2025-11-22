@@ -267,12 +267,12 @@ struct DOP_COEFS{
     }
 
 
-    inline static const DOP_A A = make_A();
-    inline static const DOP_B B = make_B();
-    inline static const DOP_C C = make_C();
-    inline static const DOP_E E3 = make_E3();
-    inline static const DOP_E E5 = make_E5();
-    inline static const DOP_D D = make_D();
+    DOP_A A = make_A();
+    DOP_B B = make_B();
+    DOP_C C = make_C();
+    DOP_E E3 = make_E3();
+    DOP_E E5 = make_E5();
+    DOP_D D = make_D();
 
 };
 
@@ -445,15 +445,15 @@ public:
         return result;
     }
 
-    inline static const A_EXTRA_TYPE A_EXTRA = Amatrix_extra();
+    A_EXTRA_TYPE A_EXTRA = Amatrix_extra();
 
-    inline static const C_EXTRA_TYPE C_EXTRA = Cmatrix_extra();
+    C_EXTRA_TYPE C_EXTRA = Cmatrix_extra();
 
-    inline static const typename DOP_COEFS<T>::DOP_D D = DOP_COEFS<T>::make_D();
+    typename DOP_COEFS<T>::DOP_D D = DOP_COEFS<T>::make_D();
 
-    inline static const typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
+    typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
 
-    inline static const typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
+    typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
 
 private:
 

@@ -261,7 +261,7 @@ class OdeSolver:
         '''
         pass
 
-    def show_state(self)->None:...
+    def show_state(self, digits: int = 8)->None:...
 
     def advance(self)->bool:
         '''
@@ -418,3 +418,7 @@ class VariationalLowLevelODE(LowLevelODE):
 
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False):...
+
+def set_mpreal_prec(bits: int)->None:...
+
+def mpreal_prec()->int:...

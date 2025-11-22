@@ -37,7 +37,7 @@ struct SolverState{
         std::cout << "\n" << std::setprecision(precision) << 
         "OdeSolver current state:\n---------------------------\n"
         "\tt          : " << state.t << "\n" <<
-        "\tq          : " << state.vector.repr(precision) << "\n" <<
+        "\tq          : " << array_repr<T>(state.vector, precision) << "\n" <<
         "\th          : " << state.habs << "\n" <<
         "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
         "\tRunning    : " << (is_running ? "true" : "false") << "\n" <<
