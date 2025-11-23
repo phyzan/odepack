@@ -426,7 +426,7 @@ PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
 
 template<typename T, size_t N>
 bool PeriodicEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const {
-    if (abs(_start) == inf<T>()){
+    if (!is_finite(_start)){
         return false;
     }
     
@@ -452,7 +452,7 @@ bool PeriodicEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T,
 
 template<typename T, size_t N>
 void PeriodicEvent<T, N>::set_start(const T& t) {
-    if (abs(_start) == inf<T>()){
+    if (!is_finite(_start)){
         _start = t;
     }
     else{
@@ -680,7 +680,7 @@ public:
     void set_start(T t0, int dir){
         for (size_t i=0; i<this->size(); i++){
             if (auto* p = dynamic_cast<PeriodicEvent<T, N>*>(_events[i])){
-                if (abs(p->t_start()) == inf<T>()){
+                if (!is_finite(p->t_start())){
                     p->set_start(t0+p->period()*dir);
                 }
                 else if (p->t_start() == t0){

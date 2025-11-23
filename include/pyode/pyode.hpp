@@ -679,7 +679,11 @@ void define_ode_module(py::module& m){
         .def_property_readonly("diverges", [](const PySolver<T>& self){return self->diverges();})
         .def_property_readonly("is_dead", [](const PySolver<T>& self){return self->is_dead();})
         .def_property_readonly("Nsys", [](const PySolver<T>& self){return self->Nsys();})
-        .def("show_state", [](const PySolver<T>& self, int digits = 8){return self->state().show(digits);})
+        .def("show_state", [](const PySolver<T>& self, int digits){
+                return self->state().show(digits);
+            },
+            py::arg("digits") = 8
+        )
         .def("advance", [](PySolver<T>& self){return self->advance();})
         .def("advance_to_event", [](PySolver<T>& self){return self->advance_to_event();})
         .def("reset", [](PySolver<T>& self){return self.s->reset();});

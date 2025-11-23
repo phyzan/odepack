@@ -40,6 +40,7 @@ target_compile_options(odesolvers PRIVATE
     -ftemplate-backtrace-limit=0
     -Wno-unused-parameter
     -fno-math-errno
+    -fno-trapping-math
     -fopenmp
     -march=x86-64
 )

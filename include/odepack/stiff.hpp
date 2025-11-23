@@ -487,7 +487,7 @@ private:
                 rate = dy_norm/dy_norm_old;
             }
 
-            if (rate != 0 && (rate >= 1 || (pow(rate, NEWTON_MAXITER-k)/(1-rate)*dy_norm>_newton_tol))){
+            if (rate != 0 && (rate >= 1 || (pow(rate, NEWTON_MAXITER-k)*dy_norm > _newton_tol * (1-rate)))){
                 break;
             }
             
@@ -497,7 +497,7 @@ private:
                 d[i] += _dy[i];
             }
 
-            if (dy_norm == 0 || ((rate != 0) && (rate/(1-rate)*dy_norm<_newton_tol))){
+            if (dy_norm == 0 || ((rate != 0) && (rate * dy_norm < _newton_tol * (1-rate)))){
                 converged = true;
                 break;
             }
