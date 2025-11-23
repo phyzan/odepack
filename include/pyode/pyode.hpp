@@ -276,7 +276,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
             throw py::value_error("The array size of the initial conditions differs from the ode system size");
         }
         else if (_f.Nargs != args.size()){
-            throw py::value_error("The array size of the given extra args differs from the number of args specified for this ode system");
+            throw py::value_error("The number of the provided extra args (" + std::to_string(args.size()) + ") differs from the number of args specified for this ode system ("+std::to_string(_f.Nargs)+").");
         }
     }
     else{
