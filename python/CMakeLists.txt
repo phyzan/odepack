@@ -53,22 +53,18 @@ macro(add_ode_backend backend_name source_file)
     target_include_directories(${backend_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
     target_compile_options(${backend_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
 
-    if(OpenMP_CXX_FOUND)
-        target_link_libraries(${backend_name} PRIVATE OpenMP::OpenMP_CXX)
-    endif()
+    target_link_libraries(${backend_name} PRIVATE OpenMP::OpenMP_CXX)
 
     # All backends need MPFR support (for eventual compatibility)
     target_link_libraries(${backend_name} PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
 endmacro()
 
-# Create the main module that defines EventOpt (compiled once, shared by all backends)
-pybind11_add_module(odesolvers src/event_opts.cpp)
-target_include_directories(odesolvers PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_compile_options(odesolvers PRIVATE ${COMMON_COMPILE_OPTIONS})
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(odesolvers PRIVATE OpenMP::OpenMP_CXX)
-endif()
-target_link_libraries(odesolvers PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
+# Create the main module that defines common tools (compiled once, shared by all backends)
+pybind11_add_module(common src/common.cpp)
+target_include_directories(common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_compile_options(common PRIVATE ${COMMON_COMPILE_OPTIONS})
+target_link_libraries(common PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(common PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
 
 # Create backend modules for different precision types
 add_ode_backend(odesolvers_float src/pyode_float.cpp)
@@ -78,7 +74,7 @@ add_ode_backend(odesolvers_mpreal src/pyode_mpreal.cpp)
 
 # Installation rules
 # Install the compiled modules into the odepack package
-install(TARGETS odesolvers odesolvers_float odesolvers_double odesolvers_longdouble odesolvers_mpreal
+install(TARGETS common odesolvers_float odesolvers_double odesolvers_longdouble odesolvers_mpreal
     LIBRARY DESTINATION odepack
 )
 

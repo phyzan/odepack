@@ -8,7 +8,7 @@ Use this as a reference for understanding the template structure.
 from __future__ import annotations
 import numpy as np
 from typing import Callable, Iterable, overload, Any, TypeVar, Generic
-from ._event_opts import * #type: ignore
+from .common import * #type: ignore
 # Type variable for numeric types - specialized per backend implementation
 T = TypeVar('T')
 
@@ -17,7 +17,7 @@ ObjFunc = Callable[[float, np.ndarray], float]
 BoolFunc = Callable[[float, np.ndarray], bool]
 
 
-class Event(Generic[T]):
+class AbstractEvent(Generic[T]):
 
     @property
     def name(self)->str:...
@@ -26,7 +26,7 @@ class Event(Generic[T]):
     def hides_mask(self)->bool:...
 
 
-class PreciseEvent(Event[T]):
+class AbstractPreciseEvent(AbstractEvent[T]):
     '''
     This class represents an event that might occur during an ODE integration.
     This is expressed as an encoutered zero value of an objective function.
@@ -77,7 +77,7 @@ class PreciseEvent(Event[T]):
     def event_tol(self)->float:...
 
 
-class PeriodicEvent(Event[T]):
+class AbstractPeriodicEvent(AbstractEvent[T]):
 
     '''
     Similar to the PreciseEvent class, but an event is triggered periodically at times
@@ -92,13 +92,13 @@ class PeriodicEvent(Event[T]):
     @property
     def start(self)->float:...
 
-class OdeResult(Generic[T]):
+class AbstractOdeResult(Generic[T]):
 
     '''
     An object encapsulating the result returned by the integration of an ode.
     '''
 
-    def __init__(self, result: OdeResult[T]):... #copy constructor
+    def __init__(self, result: AbstractOdeResult[T]):... #copy constructor
 
     @property
     def t(self)->np.ndarray:
@@ -187,7 +187,7 @@ class OdeResult(Generic[T]):
         pass
 
 
-class OdeSolution(OdeResult[T]):
+class AbstractOdeSolution(AbstractOdeResult[T]):
 
     '''
     Inheriting the propertied of the OdeResult, this class
@@ -198,7 +198,7 @@ class OdeSolution(OdeResult[T]):
     It is returned after a rich_integrate call in an ode object.
     '''
 
-    def __init__(self, result: OdeSolution[T]):... #copy constructor
+    def __init__(self, result: AbstractOdeSolution[T]):... #copy constructor
 
     @overload
     def __call__(self, t: float)->np.ndarray:...
@@ -207,7 +207,7 @@ class OdeSolution(OdeResult[T]):
     def __call__(self, t: np.ndarray)->np.ndarray:...
 
 
-class OdeSolver(Generic[T]):
+class AbstractOdeSolver(Generic[T]):
 
     @property
     def t(self)->float:
@@ -264,33 +264,33 @@ class OdeSolver(Generic[T]):
         '''
 
 
-class RK23(OdeSolver[T]):
+class AbstractRK23(AbstractOdeSolver[T]):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event[T]] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[AbstractEvent[T]] = ()):
         '''
         f: The ode rhs. It must behave like f(t: float, q: array, *args) -> array
         '''
 
 
-class RK45(OdeSolver[T]):
+class AbstractRK45(AbstractOdeSolver[T]):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event[T]] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[AbstractEvent[T]] = ()):
         pass
 
 
-class DOP853(OdeSolver[T]):
+class AbstractDOP853(AbstractOdeSolver[T]):
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event[T]] = ()):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[AbstractEvent[T]] = ()):
         pass
 
 
-class BDF(OdeSolver[T]):
+class AbstractBDF(AbstractOdeSolver[T]):
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event[T]] = ()):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events: Iterable[AbstractEvent[T]] = ()):
         pass
 
 
-class LowLevelODE(Generic[T]):
+class AbstractLowLevelODE(Generic[T]):
     '''
     Template class representing an ODE. A LowLevelODE object can dynamically grow every time the user calls methods like .integrate, .advance, .go_to. Every time an integration method is called, the object's variables grow accordingly.
 
@@ -298,7 +298,7 @@ class LowLevelODE(Generic[T]):
     '''
 
     @overload
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: Iterable[AbstractEvent]=(), method="RK45"):
         '''
         f: f(t, q, ...)->array. Right hand side of the ODE. Must return an array of equal shape as the initial condition q0.
 
@@ -316,15 +316,15 @@ class LowLevelODE(Generic[T]):
         pass
 
     @overload
-    def __init__(self, ode: LowLevelODE[T]):...
+    def __init__(self, ode: AbstractLowLevelODE[T]):...
 
-    def solver(self)->OdeSolver:
+    def solver(self)->AbstractOdeSolver[T]:
         '''
         Returns a copy of the underlying OdeSolver in its current state
         '''
         pass
 
-    def integrate(self, interval, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult[T]:
+    def integrate(self, interval, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->AbstractOdeResult[T]:
         '''
         interval: integration interval (must be positive).
         t_eval: Times at which to store the computed solution. If None (default), all steps that the solver encounters will be stored.
@@ -342,15 +342,15 @@ class LowLevelODE(Generic[T]):
         '''
         pass
 
-    def rich_integrate(self, interval, *, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeSolution[T]:
+    def rich_integrate(self, interval, *, event_options: Iterable[EventOpt] = (), max_prints=0)->AbstractOdeSolution[T]:
         '''
         Similar to .integrate(), but all time steps will be stored in the result.
         This is because they are all required to provide an accurate interpolation in the provided interval, accessible in the OdeSolution object that is returned.
         '''
 
-    def go_to(self, t, *, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult[T]:...
+    def go_to(self, t, *, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), max_prints=0)->AbstractOdeResult[T]:...
 
-    def copy(self)->LowLevelODE[T]:...
+    def copy(self)->AbstractLowLevelODE[T]:...
 
     def reset(self):...
 
@@ -380,16 +380,16 @@ class LowLevelODE(Generic[T]):
     def is_dead(self)->bool:...
 
 
-class VariationalLowLevelODE(LowLevelODE[T]):
+class AbstractVariationalLowLevelODE(AbstractLowLevelODE[T]):
     '''
     Template class for variational ODEs (used for Lyapunov exponent calculations).
     '''
 
     @overload
-    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: list[Event[T]]=None, method="RK45"):...
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events: list[AbstractEvent[T]]=None, method="RK45"):...
 
     @overload
-    def __init__(self, ode: VariationalLowLevelODE[T]):...
+    def __init__(self, ode: AbstractVariationalLowLevelODE[T]):...
 
     @property
     def t_lyap(self)->np.ndarray:...
@@ -400,4 +400,11 @@ class VariationalLowLevelODE(LowLevelODE[T]):
     @property
     def kicks(self)->np.ndarray:...
 
-    def copy(self)->VariationalLowLevelODE[T]:...
+    def copy(self)->AbstractVariationalLowLevelODE[T]:...
+
+
+class AbstractLowLevelFunction(Generic[T]):
+
+    def __init__(self, pointer, input_size: int, output_shape: Iterable[int], Nargs: int):...
+
+    def __call__(self, t: float, q: np.ndarray, *args: float)->np.ndarray: ...

@@ -6,19 +6,20 @@ All classes are specialized versions of the generic templates in odesolvers_base
 """
 
 from __future__ import annotations
+from .odesolvers_base import AbstractEvent, AbstractOdeResult, AbstractOdeSolution, AbstractOdeSolver, AbstractLowLevelODE, AbstractVariationalLowLevelODE, AbstractRK23, AbstractRK45, AbstractDOP853, AbstractBDF, AbstractPreciseEvent, AbstractPeriodicEvent, AbstractLowLevelFunction
 import mpmath
-from .odesolvers_base import Event, OdeResult, OdeSolution, OdeSolver, LowLevelODE, VariationalLowLevelODE, RK23, RK45, DOP853, BDF
 
-# Type instantiation names for MPFR arbitrary precision backend
-Event_MpReal = Event[mpmath.mpf]
-PresiceEvent_MpReal = Event[mpmath.mpf]
-PeriodicEvent_MpReal = Event[mpmath.mpf]
-OdeResult_MpReal = OdeResult[mpmath.mpf]
-OdeSolution_MpReal = OdeSolution[mpmath.mpf]
-OdeSolver_MpReal = OdeSolver[mpmath.mpf]
-RK23_MpReal = RK23[mpmath.mpf]
-RK45_MpReal = RK45[mpmath.mpf]
-DOP853_MpReal = DOP853[mpmath.mpf]
-BDF_MpReal = BDF[mpmath.mpf]
-LowLevelODE_MpReal = LowLevelODE[mpmath.mpf]
-VariationalLowLevelODE_MpReal = VariationalLowLevelODE[mpmath.mpf]
+# Type instantiation names for double precision backend
+Event_MpReal = AbstractEvent[mpmath.mpf]
+PreciseEvent_MpReal = AbstractPreciseEvent[mpmath.mpf]
+PeriodicEvent_MpReal = AbstractPeriodicEvent[mpmath.mpf]
+OdeResult_MpReal = AbstractOdeResult[mpmath.mpf]
+OdeSolution_MpReal = AbstractOdeSolution[mpmath.mpf]
+OdeSolver_MpReal = AbstractOdeSolver[mpmath.mpf]
+RK23_MpReal = AbstractRK23[mpmath.mpf]
+RK45_MpReal = AbstractRK45[mpmath.mpf]
+DOP853_MpReal = AbstractDOP853[mpmath.mpf]
+BDF_MpReal = AbstractBDF[mpmath.mpf]
+LowLevelODE_MpReal = AbstractLowLevelODE[mpmath.mpf]
+VariationalLowLevelODE_MpReal = AbstractVariationalLowLevelODE[mpmath.mpf]
+LowLevelFunction_MpReal = AbstractLowLevelFunction[mpmath.mpf]

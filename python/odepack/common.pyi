@@ -1,3 +1,6 @@
+from typing import Iterable
+
+
 class EventOpt:
 
     '''
@@ -14,3 +17,9 @@ class EventOpt:
     '''
 
     def __init__(self, name: str, max_events = -1, terminate = False, period=1):...
+
+def integrate_all(ode_array, interval, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False):...
+
+def set_mpreal_prec(bits: int)->None:...
+
+def mpreal_prec()->int:...

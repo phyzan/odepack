@@ -261,6 +261,22 @@ std::vector<std::unique_ptr<Event<T, 0>>> to_Events(const py::iterable& events, 
 
 template<typename T>
 OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
+    std::string scalar_type;
+    if constexpr (std::is_same_v<T, double>){
+        scalar_type = "double";
+    }
+    else if constexpr (std::is_same_v<T, long double>){
+        scalar_type = "long double";
+    }
+    else if constexpr (std::is_same_v<T, float>){
+        scalar_type = "float";
+    }
+    else if constexpr (std::is_same_v<T, mpfr::mpreal>){
+        scalar_type = "mpreal";
+    }
+    else{
+        static_assert(false, "Unsupported scalar type T");
+    }
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
     size_t _size = prod(data.shape);
@@ -310,8 +326,8 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
         ode_rhs.jacobian = py_jac;
     }
     for (py::handle ev : events){
-        if (!py::isinstance<PyEvent<T>>(ev)){
-            throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class");
+        if (!py::isinstance<PyEvent<T>>(ev)) {
+            throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class with scalar type " + scalar_type + ", not " + py::str(ev.get_type()).cast<std::string>());
         }
         const PyEvent<T>& _ev = ev.cast<const PyEvent<T>&>();
         _ev.check_sizes(_size, args.size());
@@ -868,17 +884,12 @@ void define_ode_module(py::module& m, const std::string& suffix = ""){
         .def_property_readonly("lyap", &PyVarODE<T>::py_lyap)
         .def_property_readonly("kicks", &PyVarODE<T>::py_kicks)
         .def("copy", [](const PyVarODE<T>& self){return PyVarODE<T>(self);});
+    
+        py::class_<PyFuncWrapper<T>>(m, ("LowLevelFunction" + suffix).c_str())
+        .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("Nargs"))
+        .def("__call__", &PyFuncWrapper<T>::call, py::arg("t"), py::arg("q"));
 }
 
 
 
 #endif
-
-/*
-TODO
-
-re-expose LowLevelFunction
-add integrate all, mpfr precestion setter
-fix: previous class names are now invalid. Replace their occurences everywhere
-fix: compiling odes constructs .so locally even if a directory or module name is not provided
-*/

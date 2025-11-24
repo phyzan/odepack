@@ -1,62 +1,77 @@
 from __future__ import annotations
-from typing import Iterable
+from typing import Iterable, Union, TypeAlias, Callable
 from .odesolvers_double import * #type: ignore
 from .odesolvers_float import * #type: ignore
 from .odesolvers_longdouble import * #type: ignore
 from .odesolvers_mpreal import * #type: ignore
-# from . import LowLevelODE_Double, LowLevelODE_Float, LowLevelODE_LongDouble, LowLevelODE_MpReal, VariationalLowLevelODE_Double, VariationalLowLevelODE_Float, VariationalLowLevelODE_LongDouble, VariationalLowLevelODE_MpReal, PreciseEvent_Double, PreciseEvent_Float, PreciseEvent_LongDouble, PreciseEvent_MpReal, PeriodicEvent_Double, PeriodicEvent_Float, PeriodicEvent_LongDouble, PeriodicEvent_MpReal
 from numiphy.lowlevelsupport import *
-from typing import TypeVar
-T = TypeVar('T')
 
 
-def lowlevel_ode(f, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double'):
-    if dtype == 'double':
-        return LowLevelODE_Double(f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'float':
-        return LowLevelODE_Float(f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'long double':
-        return LowLevelODE_LongDouble(f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'mpreal':
-        return LowLevelODE_MpReal(f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    else:
+AnyLowLevelODE : TypeAlias = Union[LowLevelODE_Double, LowLevelODE_Float, LowLevelODE_LongDouble, LowLevelODE_MpReal]
+
+AnyVariationalLowLevelODE: TypeAlias = Union[VariationalLowLevelODE_Double, VariationalLowLevelODE_Float, VariationalLowLevelODE_LongDouble, VariationalLowLevelODE_MpReal]
+
+AnyEvent: TypeAlias = Union[Event_Double, Event_Float, Event_LongDouble, Event_MpReal]
+
+AnyPreciseEvent: TypeAlias = Union[PreciseEvent_Double, PreciseEvent_Float, PreciseEvent_LongDouble, PreciseEvent_MpReal]
+
+AnyPeriodicEvent: TypeAlias = Union[PeriodicEvent_Double, PeriodicEvent_Float, PeriodicEvent_LongDouble, PeriodicEvent_MpReal]
+
+AnyOdeSolver: TypeAlias = Union[OdeSolver_Double, OdeSolver_Float, OdeSolver_LongDouble, OdeSolver_MpReal]
+
+AnyRK45: TypeAlias = Union[RK45_Double, RK45_Float, RK45_LongDouble, RK45_MpReal]
+
+AnyRK23: TypeAlias = Union[RK23_Double, RK23_Float, RK23_LongDouble, RK23_MpReal]
+
+AnyDOP853: TypeAlias = Union[DOP853_Double, DOP853_Float, DOP853_LongDouble, DOP853_MpReal]
+
+AnyBDF: TypeAlias = Union[BDF_Double, BDF_Float, BDF_LongDouble, BDF_MpReal]
+
+OdeResult: TypeAlias = Union[OdeResult_Double, OdeResult_Float, OdeResult_LongDouble, OdeResult_MpReal]
+OdeSolution: TypeAlias = Union[OdeSolution_Double, OdeSolution_Float, OdeSolution_LongDouble, OdeSolution_MpReal]
+
+LowLevelFunction: TypeAlias = Union[LowLevelFunction_Double, LowLevelFunction_Float, LowLevelFunction_LongDouble, LowLevelFunction_MpReal]
+
+_dtype_map = {'double': '_Double', 'long double': '_LongDouble', 'float': '_Float', 'mpreal': '_MpReal'}
+
+def _get_cls_instance(base_getter, dtype, *args, **kwargs):
+    cls = f'{base_getter}{_dtype_map[dtype]}'
+    try:
+        return eval(cls)(*args, **kwargs)
+    except NameError:
         raise ValueError(f"Unsupported dtype '{dtype}'. Supported dtypes are 'float', 'double', 'long double', and 'mpreal'.")
 
-def precise_event(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra):
-    if dtype == 'double':
-        return PreciseEvent_Double(name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
-    elif dtype == 'float':
-        return PresiceEvent_Float(name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
-    elif dtype == 'long double':
-        return PresiceEvent_LongDouble(name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
-    elif dtype == 'mpreal':
-        return PresiceEvent_MpReal(name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
-    else:
-        raise ValueError(f"Unsupported dtype '{dtype}'. Supported dtypes are 'float', 'double', 'long double', and 'mpreal'.")
-    
-def periodic_event(name: str, period: float, start = None, mask=None, hide_mask=False, dtype='double', **__extra):
-    if dtype == 'double':
-        return PeriodicEvent_Double(name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
-    elif dtype == 'float':
-        return PeriodicEvent_Float(name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
-    elif dtype == 'long double':
-        return PeriodicEvent_LongDouble(name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
-    elif dtype == 'mpreal':
-        return PeriodicEvent_MpReal(name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
-    else:
-        raise ValueError(f"Unsupported dtype '{dtype}'. Supported dtypes are 'float', 'double', 'long double', and 'mpreal'.")
 
-def variational_lowlevel_ode(f, t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double'):
-    if dtype == 'double':
-        return VariationalLowLevelODE_Double(f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'float':
-        return VariationalLowLevelODE_Float(f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'long double':
-        return VariationalLowLevelODE_LongDouble(f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    elif dtype == 'mpreal':
-        return VariationalLowLevelODE_MpReal(f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-    else:
-        raise ValueError(f"Unsupported dtype '{dtype}'. Supported dtypes are 'float', 'double', 'long double', and 'mpreal'.")
+def PreciseEvent(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra):
+    return _get_cls_instance('PreciseEvent', dtype, name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
+
+
+def PeriodicEvent(name: str, period: float, start = None, mask=None, hide_mask=False, dtype='double', **__extra):
+    return _get_cls_instance('PeriodicEvent', dtype, name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
+
+
+def LowLevelODE(f, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double')->AnyLowLevelODE:
+    return _get_cls_instance('LowLevelODE', dtype, f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
+
+
+def VariationalLowLevelODE(f, t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double')->AnyVariationalLowLevelODE:
+    return _get_cls_instance('VariationalLowLevelODE', dtype, f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
+
+
+def RK45(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyRK45:
+    return _get_cls_instance('RK45', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
+
+
+def RK23(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyRK23:
+    return _get_cls_instance('RK23', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
+
+
+def BDF(f, jac, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyBDF:
+    return _get_cls_instance('BDF', dtype, f=f, jac=jac, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
+
+
+def DOP853(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyDOP853:
+    return _get_cls_instance('DOP853', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
 
 
 class SymbolicEvent:
@@ -118,7 +133,7 @@ class SymbolicPreciseEvent(SymbolicEvent):
         return dict(**SymbolicEvent.kwargs.__get__(self), dir=self.dir, event_tol=self.event_tol)
     
     def toEvent(self, dtype, when, mask=None, **__extra):
-        return precise_event(dtype=dtype, when=when, mask=mask, **self.kwargs, **__extra)
+        return PreciseEvent(dtype=dtype, when=when, mask=mask, **self.kwargs, **__extra)
     
     def funcs(self, t, *q, args, dtype='double')->dict[str, LowLevelCallable]:
         ev_code = ScalarLowLevelCallable(self.event, t, q=q, args=args, scalar_type=dtype)
@@ -153,7 +168,7 @@ class SymbolicPeriodicEvent(SymbolicEvent):
         '''
         override
         '''
-        return periodic_event(dtype=dtype, **self.kwargs, mask=mask, **__extra)
+        return PeriodicEvent(dtype=dtype, **self.kwargs, mask=mask, **__extra)
 
     def funcs(self, t, *q, args, dtype='double')->dict[str, LowLevelCallable]:
         if self.mask is not None:
@@ -259,10 +274,11 @@ class OdeSystem:
         return generate_cpp_code(self.lowlevel_callables(dtype=dtype), self.module_name(dtype=dtype))
     
     def compile(self, dtype='double')->tuple:
+        CompileTemplate.compile
         if not self.__nan_dir:
             with open(self._cpp_path(dtype=dtype), "w") as f:
                 f.write(self.code(dtype=dtype))
-        result = compile_funcs(self.lowlevel_callables(dtype=dtype), self.directory, self.module_name(dtype=dtype))
+        result = compile_funcs(self.lowlevel_callables(dtype=dtype), None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(dtype=dtype))
         return result
     
     
@@ -335,6 +351,8 @@ class OdeSystem:
     def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", period=None, compiled=True, dtype='double'):
         if len(q0) != self.Nsys:
             raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {self.Nsys}")
+        elif len(args) != self.Nargs:
+            raise ValueError(f"The number of args provided is {len(q0)} instead of {self.Nargs}")
         if compiled:
             pointers = self._pointers(dtype=dtype)
             events = self.true_compiled_events(dtype=dtype)
@@ -345,17 +363,35 @@ class OdeSystem:
             jac = self._jac
         kwargs = dict(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
         if period is None:
-            getter = lowlevel_ode
+            getter = LowLevelODE
         else:
             kwargs['period'] = period
-            getter = variational_lowlevel_ode
-        return getter(f=f, jac=jac, **kwargs)
+            getter = VariationalLowLevelODE
+        return getter(f=f, jac=jac, dtype=dtype, **kwargs)
     
-    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double'):
+    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double')->AnyLowLevelODE:
         return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=None, compiled=compiled, dtype=dtype)
     
-    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double'):
+    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double')->AnyVariationalLowLevelODE:
         return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, dtype=dtype)
+    
+    def _lowlevel_func(self, dtype, func):
+        if func == 'rhs':
+            idx = 0
+            shape = [self.Nsys]
+        elif func == 'jac':
+            idx = 1
+            shape = [self.Nsys, self.Nsys]
+        else:
+            raise ValueError('')
+        p = self._pointers(dtype=dtype)[idx]
+        return _get_cls_instance('LowLevelFunction', dtype, pointer=p, input_size=self.Nsys, output_shape=shape, Nargs=self.Nargs)
+    
+    def lowlevel_odefunc(self, dtype='double'):
+        return self._lowlevel_func(dtype=dtype, func='rhs')
+    
+    def lowlevel_jac(self, dtype='double'):
+        return self._lowlevel_func(dtype=dtype, func='jac')
     
     @cached_property
     def _odefunc(self):

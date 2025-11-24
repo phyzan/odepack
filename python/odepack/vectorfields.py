@@ -11,6 +11,7 @@ from numiphy.symlib.pylambda import ScalarLambdaExpr, VectorLambdaExpr
 from numiphy.symlib.geom import Line2D, Circle
 from numiphy.toolkit.tools import call_with_consumed, call_builtin_with_consumed
 import warnings
+from .common import EventOpt #type: ignore
 
 
 class VectorField2D:
