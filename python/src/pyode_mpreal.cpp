@@ -1,13 +1,9 @@
-#include "include/pyode/mpreal_caster.hpp"
 #include "include/pyode/pyode.hpp"
+#include "include/pyode/mpreal_caster.hpp"
 
-
-PYBIND11_MODULE(odesolvers, m) {
-    // Set a default precision for MPFR at module initialization
-    // This MUST be set before any mpreal objects are created
-    // mpfr::mpreal::set_default_prec(10);
-
-    define_ode_module<double>(m);
+PYBIND11_MODULE(odesolvers_mpreal, m) {
+    m.doc() = "ODE solvers for MPFR arbitrary precision";
+    define_ode_module<mpfr::mpreal>(m, "_MpReal");
 
     m.def("set_mpreal_prec",
       [](int bits) {

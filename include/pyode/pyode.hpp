@@ -265,18 +265,24 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
     data.py_args = py::tuple(py_args);
     size_t _size = prod(data.shape);
     
-    bool f_is_compiled = py::isinstance<PyFuncWrapper<T>>(f);
-    bool jac_is_compiled = !jacobian.is_none() && py::isinstance<PyFuncWrapper<T>>(jacobian);
+    bool f_is_compiled = py::isinstance<PyFuncWrapper<T>>(f) || py::isinstance<py::capsule>(f);
+    bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper<T>>(jacobian) || py::isinstance<py::capsule>(jacobian));
     args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
     OdeData<T> ode_rhs = {nullptr, nullptr, &data};
     if (f_is_compiled){
-        PyFuncWrapper<T>& _f = f.cast<PyFuncWrapper<T>&>();
-        ode_rhs.rhs = _f.rhs;
-        if (_f.Nsys != _size){
-            throw py::value_error("The array size of the initial conditions differs from the ode system size");
+        if (py::isinstance<PyFuncWrapper<T>>(f)){
+            //safe approach
+            PyFuncWrapper<T>& _f = f.cast<PyFuncWrapper<T>&>();
+            ode_rhs.rhs = _f.rhs;
+            if (_f.Nsys != _size){
+                throw py::value_error("The array size of the initial conditions differs from the ode system size");
+            }
+            else if (_f.Nargs != args.size()){
+                throw py::value_error("The number of the provided extra args (" + std::to_string(args.size()) + ") differs from the number of args specified for this ode system ("+std::to_string(_f.Nargs)+").");
+            }
         }
-        else if (_f.Nargs != args.size()){
-            throw py::value_error("The number of the provided extra args (" + std::to_string(args.size()) + ") differs from the number of args specified for this ode system ("+std::to_string(_f.Nargs)+").");
+        else{
+            ode_rhs.rhs = open_capsule<Func<T>>(f.cast<py::capsule>());
         }
     }
     else{
@@ -284,13 +290,19 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
         ode_rhs.rhs = py_rhs;
     }
     if (jac_is_compiled){
-        PyFuncWrapper<T>& _j = jacobian.cast<PyFuncWrapper<T>&>();
-        ode_rhs.jacobian = _j.rhs;
-        if (_j.Nsys != _size){
-            throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
+        if (py::isinstance<PyFuncWrapper<T>>(jacobian)){
+            //safe approach
+            PyFuncWrapper<T>& _j = jacobian.cast<PyFuncWrapper<T>&>();
+            ode_rhs.jacobian = _j.rhs;
+            if (_j.Nsys != _size){
+                throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
+            }
+            else if (_j.Nargs != args.size()){
+                throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
+            }
         }
-        else if (_j.Nargs != args.size()){
-            throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
+        else{
+            ode_rhs.jacobian = open_capsule<Func<T>>(jacobian.cast<py::capsule>());
         }
     }
     else if (!jacobian.is_none()){
@@ -312,7 +324,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
 template<typename T>
 struct PySolver {
 
-    PySolver(const py::function& f, const py::object& jac, T t0, py::iterable py_q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
+    PySolver(const py::object& f, const py::object& jac, T t0, py::iterable py_q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
         std::vector<T> args;
         OdeData<T> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
         auto safe_events = to_Events<T>(py_events, this->data.shape, py_args);
@@ -377,27 +389,27 @@ struct PySolver {
 template<typename T>
 struct PyRK23 : public PySolver<T>{
 
-    PyRK23(const py::function& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "RK23"){}
+    PyRK23(const py::object& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "RK23"){}
 };
 
 
 template<typename T>
 struct PyRK45 : public PySolver<T>{
 
-    PyRK45(const py::function& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "RK45"){}
+    PyRK45(const py::object& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "RK45"){}
 };
 
 template<typename T>
 struct PyDOP853 : public PySolver<T>{
 
-    PyDOP853(const py::function& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "DOP853"){}
+    PyDOP853(const py::object& ode, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "DOP853"){}
 };
 
 
 template<typename T>
 struct PyBDF : public PySolver<T>{
 
-    PyBDF(const py::function& f, const py::function& jac, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(f, jac, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "DOP853"){}
+    PyBDF(const py::object& f, const py::object& jac, T t0, py::iterable q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const py::iterable& args, const py::iterable& events) : PySolver<T>(f, jac, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "DOP853"){}
 };
 
 
@@ -492,7 +504,7 @@ class PyODE{
     
 public:
 
-    PyODE(py::function f, T t0, py::iterable py_q0, py::object jacobian, T rtol, T atol, T min_step, T max_step, T first_step, int dir, py::iterable py_args, py::iterable events, const py::str& method){
+    PyODE(py::object f, T t0, py::iterable py_q0, py::object jacobian, T rtol, T atol, T min_step, T max_step, T first_step, int dir, py::iterable py_args, py::iterable events, const py::str& method){
         
         std::vector<T> args;
         OdeData<T> ode_rhs = init_ode_data<T>(data,args, f, py_q0, jacobian, py_args, events);
@@ -593,7 +605,7 @@ class PyVarODE : public PyODE<T>{
 
 public:
 
-    PyVarODE(py::function f, T t0, py::iterable q0, T period, py::object jac, T rtol, T atol, T min_step, T max_step, T first_step, int dir, py::iterable py_args, py::iterable events, const py::str& method):PyODE<T>(){
+    PyVarODE(py::object f, T t0, py::iterable q0, T period, py::object jac, T rtol, T atol, T min_step, T max_step, T first_step, int dir, py::iterable py_args, py::iterable events, const py::str& method):PyODE<T>(){
         std::vector<T> args;
         OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, f, q0, jac, py_args, events);
         Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
@@ -629,13 +641,15 @@ public:
 
 };
 
-template<typename T>
-void define_ode_module(py::module& m){
-
+inline void define_event_opt(py::module& m){
     py::class_<PyOptions>(m, "EventOpt")
         .def(py::init<py::str, int, bool, int>(), py::arg("name"), py::arg("max_events")=-1, py::arg("terminate")=false, py::arg("period")=1);
-        
-    py::class_<PyEvent<T>>(m, "Event")
+}
+
+template<typename T>
+void define_ode_module(py::module& m, const std::string& suffix = ""){
+
+    py::class_<PyEvent<T>>(m, ("Event" + suffix).c_str())
         .def_property_readonly("name", [](const PyEvent<T>& self){
             return self.name();
         })
@@ -644,7 +658,7 @@ void define_ode_module(py::module& m){
         })
         .def("__eq__", [](const PyEvent<T>& self, const PyEvent<T>& other){return self.equals(other);});
 
-    py::class_<PyPrecEvent<T>, PyEvent<T>>(m, "PreciseEvent")
+    py::class_<PyPrecEvent<T>, PyEvent<T>>(m, ("PreciseEvent" + suffix).c_str())
         .def(py::init<std::string, py::object, int, py::object, bool, T, size_t, size_t>(),
             py::arg("name"),
             py::arg("when"),
@@ -658,7 +672,7 @@ void define_ode_module(py::module& m){
             return self.event_tol();
         });
 
-    py::class_<PyPerEvent<T>, PyEvent<T>>(m, "PeriodicEvent")
+    py::class_<PyPerEvent<T>, PyEvent<T>>(m, ("PeriodicEvent" + suffix).c_str())
         .def(py::init<std::string, T, py::object, py::object, bool, size_t, size_t>(),
             py::arg("name"),
             py::arg("period"),
@@ -672,7 +686,7 @@ void define_ode_module(py::module& m){
         .def_property_readonly("start", [](const PyPerEvent<T>& self){
             return self.start();});
 
-    py::class_<PySolver<T>, std::unique_ptr<PySolver<T>>>(m, "OdeSolver")
+    py::class_<PySolver<T>, std::unique_ptr<PySolver<T>>>(m, ("OdeSolver" + suffix).c_str())
         .def_property_readonly("t", [](const PySolver<T>& self){return py::cast(self->t());})
         .def_property_readonly("q", [](const PySolver<T>& self){return py::cast(self->q());})
         .def_property_readonly("stepsize", [](const PySolver<T>& self){return self->stepsize();})
@@ -688,39 +702,8 @@ void define_ode_module(py::module& m){
         .def("advance_to_event", [](PySolver<T>& self){return self->advance_to_event();})
         .def("reset", [](PySolver<T>& self){return self.s->reset();});
 
-    py::class_<PyRK23<T>, PySolver<T>>(m, "RK23")
-        .def(py::init<py::function, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
-            py::arg("f"),
-            py::arg("t0"),
-            py::arg("q0"),
-            py::kw_only(),
-            py::arg("rtol")=1e-12,
-            py::arg("atol")=1e-12,
-            py::arg("min_step")=0.,
-            py::arg("max_step")=inf<T>(),
-            py::arg("first_step")=0.,
-            py::arg("direction")=1,
-            py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple());
-
-    
-    py::class_<PyRK45<T>, PySolver<T>>(m, "RK45")
-        .def(py::init<py::function, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
-            py::arg("f"),
-            py::arg("t0"),
-            py::arg("q0"),
-            py::kw_only(),
-            py::arg("rtol")=1e-12,
-            py::arg("atol")=1e-12,
-            py::arg("min_step")=0.,
-            py::arg("max_step")=inf<T>(),
-            py::arg("first_step")=0.,
-            py::arg("direction")=1,
-            py::arg("args")=py::tuple(),
-            py::arg("events")=py::tuple());
-
-    py::class_<PyDOP853<T>, PySolver<T>>(m, "DOP853")
-        .def(py::init<py::function, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
+    py::class_<PyRK23<T>, PySolver<T>>(m, ("RK23" + suffix).c_str())
+        .def(py::init<py::object, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -735,8 +718,39 @@ void define_ode_module(py::module& m){
             py::arg("events")=py::tuple());
 
 
-    py::class_<PyBDF<T>, PySolver<T>>(m, "BDF")
-        .def(py::init<py::function, py::function, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
+    py::class_<PyRK45<T>, PySolver<T>>(m, ("RK45" + suffix).c_str())
+        .def(py::init<py::object, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
+            py::arg("f"),
+            py::arg("t0"),
+            py::arg("q0"),
+            py::kw_only(),
+            py::arg("rtol")=1e-12,
+            py::arg("atol")=1e-12,
+            py::arg("min_step")=0.,
+            py::arg("max_step")=inf<T>(),
+            py::arg("first_step")=0.,
+            py::arg("direction")=1,
+            py::arg("args")=py::tuple(),
+            py::arg("events")=py::tuple());
+
+    py::class_<PyDOP853<T>, PySolver<T>>(m, ("DOP853" + suffix).c_str())
+        .def(py::init<py::object, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
+            py::arg("f"),
+            py::arg("t0"),
+            py::arg("q0"),
+            py::kw_only(),
+            py::arg("rtol")=1e-12,
+            py::arg("atol")=1e-12,
+            py::arg("min_step")=0.,
+            py::arg("max_step")=inf<T>(),
+            py::arg("first_step")=0.,
+            py::arg("direction")=1,
+            py::arg("args")=py::tuple(),
+            py::arg("events")=py::tuple());
+
+
+    py::class_<PyBDF<T>, PySolver<T>>(m, ("BDF" + suffix).c_str())
+        .def(py::init<py::object, py::object, T, py::iterable, T, T, T, T, T, int, py::iterable, py::iterable>(),
             py::arg("f"),
             py::arg("jac"),
             py::arg("t0"),
@@ -751,7 +765,7 @@ void define_ode_module(py::module& m){
             py::arg("args")=py::tuple(),
             py::arg("events")=py::tuple());
     
-    py::class_<PyOdeResult<T>>(m, "OdeResult")
+    py::class_<PyOdeResult<T>>(m, ("OdeResult" + suffix).c_str())
         .def(py::init<PyOdeResult<T>>(), py::arg("result"))
         .def_property_readonly("t", [](const PyOdeResult<T>& self){
             return py::cast(NdView<const T>(self.res->t().data(), self.res->t().size()));
@@ -762,7 +776,7 @@ void define_ode_module(py::module& m){
         .def_property_readonly("event_map", [](const PyOdeResult<T>& self){
             return to_PyDict(self.res->event_map());
         })
-        .def("event_data", [](const PyOdeResult<T>& self, const py::str& event){        
+        .def("event_data", [](const PyOdeResult<T>& self, const py::str& event){
             std::vector<T> t_data = self.res->t_filtered(event.cast<std::string>());
             Array<T> t_res(t_data.data(), t_data.size());
             Array2D<T> q_data = self.res->q_filtered(event.cast<std::string>());
@@ -773,15 +787,15 @@ void define_ode_module(py::module& m){
         .def_property_readonly("runtime", [](const PyOdeResult<T>& self){return self.res->runtime();})
         .def_property_readonly("message", [](const PyOdeResult<T>& self){return self.res->message();})
         .def("examine", [](const PyOdeResult<T>& self){return self.res->examine();});
-    
-    py::class_<PyOdeSolution<T>, PyOdeResult<T>>(m, "OdeSolution")
+
+    py::class_<PyOdeSolution<T>, PyOdeResult<T>>(m, ("OdeSolution" + suffix).c_str())
         .def(py::init<PyOdeSolution<T>>(), py::arg("result"))
         .def("__call__", [](const PyOdeSolution<T>& self, const T& t){return self(t);})
         .def("__call__", [](const PyOdeSolution<T>& self, const py::iterable& array){return self(array);});
 
 
-    py::class_<PyODE<T>>(m, "LowLevelODE")
-        .def(py::init<py::function, T, py::iterable, py::object, T, T, T, T, T, int, py::iterable, py::iterable, py::str>(),
+    py::class_<PyODE<T>>(m, ("LowLevelODE" + suffix).c_str())
+        .def(py::init<py::object, T, py::iterable, py::object, T, T, T, T, T, int, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -818,7 +832,7 @@ void define_ode_module(py::module& m){
         .def("copy", [](const PyODE<T>& self){return PyODE<T>(self);})
         .def("reset", [](PyODE<T>& self){self.ode->reset();})
         .def("clear", [](PyODE<T>& self){self.ode->clear();})
-        .def("event_data", [](const PyODE<T>& self, const py::str& event){        
+        .def("event_data", [](const PyODE<T>& self, const py::str& event){
             std::vector<T> t_data = self.ode->t_filtered(event.cast<std::string>());
             Array<T> t_res(t_data.data(), t_data.size());
             Array2D<T> q_data = self.ode->q_filtered(event.cast<std::string>());
@@ -832,8 +846,8 @@ void define_ode_module(py::module& m){
         .def_property_readonly("diverges", [](const PyODE<T>& self){return self.ode->diverges();})
         .def_property_readonly("is_dead", [](const PyODE<T>& self){return self.ode->is_dead();});
 
-    py::class_<PyVarODE<T>, PyODE<T>>(m, "VariationalLowLevelODE")
-        .def(py::init<py::function, T, py::iterable, T, py::object, T, T, T, T, T, int, py::iterable, py::iterable, py::str>(),
+    py::class_<PyVarODE<T>, PyODE<T>>(m, ("VariationalLowLevelODE" + suffix).c_str())
+        .def(py::init<py::object, T, py::iterable, T, py::object, T, T, T, T, T, int, py::iterable, py::iterable, py::str>(),
             py::arg("f"),
             py::arg("t0"),
             py::arg("q0"),
@@ -854,26 +868,17 @@ void define_ode_module(py::module& m){
         .def_property_readonly("lyap", &PyVarODE<T>::py_lyap)
         .def_property_readonly("kicks", &PyVarODE<T>::py_kicks)
         .def("copy", [](const PyVarODE<T>& self){return PyVarODE<T>(self);});
-    
-    py::class_<PyFuncWrapper<T>>(m, "LowLevelFunction")
-        .def(py::init<py::capsule, size_t, py::iterable, size_t>(), py::arg("pointer"), py::arg("input_size"), py::arg("output_shape"), py::arg("Nargs"))
-        .def("__call__", &PyFuncWrapper<T>::call, py::arg("t"), py::arg("q"));
-
-    m.def("integrate_all", [](const py::object& list, const T& interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
-            std::vector<ODE<T, 0>*> array;
-            for (const py::handle& item : list) {
-                try {
-                    // Attempt the cast
-                    PyODE<T>& pyode = item.cast<PyODE<T>&>();
-                    array.push_back(pyode.ode);
-                } catch (const py::cast_error& e) {
-                    throw py::value_error("List item is not a PyODE object of the expected type.");
-                }
-            }
-            integrate_all(array, interval, to_step_sequence<T>(t_eval), to_Options(event_options), threads, display_progress);
-        }, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 }
 
 
 
 #endif
+
+/*
+TODO
+
+re-expose LowLevelFunction
+add integrate all, mpfr precestion setter
+fix: previous class names are now invalid. Replace their occurences everywhere
+fix: compiling odes constructs .so locally even if a directory or module name is not provided
+*/

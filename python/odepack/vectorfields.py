@@ -1,6 +1,5 @@
 from __future__ import annotations
 from numiphy.findiffs import grids
-from .odesolvers import * #type: ignore
 from .symode import *
 from numiphy.symlib.symcore import Symbol, Rational
 from numiphy.toolkit.plotting import *

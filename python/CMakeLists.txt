@@ -25,14 +25,8 @@ if(NOT pybind11_FOUND)
     FetchContent_MakeAvailable(pybind11)
 endif()
 
-# Create the Python extension module
-pybind11_add_module(odesolvers src/pyode.cpp)
-
-# Include directories - point to the parent directory to make includes work
-target_include_directories(odesolvers PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
-
-# Add compile options from .clangd
-target_compile_options(odesolvers PRIVATE
+# Common compile options
+set(COMMON_COMPILE_OPTIONS
     -O3
     -DNDEBUG
     -Wall
@@ -45,26 +39,56 @@ target_compile_options(odesolvers PRIVATE
     -march=x86-64
 )
 
-# Add OpenMP support if available
+# Find MPFR and GMP libraries
+find_library(MPFR_LIBRARY mpfr REQUIRED)
+find_library(GMP_LIBRARY gmp REQUIRED)
+
+# Find OpenMP
 find_package(OpenMP)
+
+# Helper macro to create backend modules
+macro(add_ode_backend backend_name source_file)
+    pybind11_add_module(${backend_name} ${source_file})
+
+    target_include_directories(${backend_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+    target_compile_options(${backend_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
+
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(${backend_name} PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+
+    # All backends need MPFR support (for eventual compatibility)
+    target_link_libraries(${backend_name} PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
+endmacro()
+
+# Create the main module that defines EventOpt (compiled once, shared by all backends)
+pybind11_add_module(odesolvers src/event_opts.cpp)
+target_include_directories(odesolvers PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_compile_options(odesolvers PRIVATE ${COMMON_COMPILE_OPTIONS})
 if(OpenMP_CXX_FOUND)
     target_link_libraries(odesolvers PRIVATE OpenMP::OpenMP_CXX)
 endif()
-
-# Add MPFR library support
-find_library(MPFR_LIBRARY mpfr REQUIRED)
-find_library(GMP_LIBRARY gmp REQUIRED)
 target_link_libraries(odesolvers PRIVATE ${MPFR_LIBRARY} ${GMP_LIBRARY})
 
+# Create backend modules for different precision types
+add_ode_backend(odesolvers_float src/pyode_float.cpp)
+add_ode_backend(odesolvers_double src/pyode_double.cpp)
+add_ode_backend(odesolvers_longdouble src/pyode_longdouble.cpp)
+add_ode_backend(odesolvers_mpreal src/pyode_mpreal.cpp)
+
 # Installation rules
-# Install the compiled module into the odepack package
-install(TARGETS odesolvers
+# Install the compiled modules into the odepack package
+install(TARGETS odesolvers odesolvers_float odesolvers_double odesolvers_longdouble odesolvers_mpreal
     LIBRARY DESTINATION odepack
 )
 
 # Install Python files from the odepack source directory
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/odepack/__init__.py
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_base.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_float.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_double.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_longdouble.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_mpreal.pyi
     DESTINATION odepack
 )
