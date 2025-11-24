@@ -28,10 +28,11 @@ AnyDOP853: TypeAlias = Union[DOP853_Double, DOP853_Float, DOP853_LongDouble, DOP
 
 AnyBDF: TypeAlias = Union[BDF_Double, BDF_Float, BDF_LongDouble, BDF_MpReal]
 
+AnyLowLevelFunction: TypeAlias = Union[LowLevelFunction_Double, LowLevelFunction_Float, LowLevelFunction_LongDouble, LowLevelFunction_MpReal]
+
 OdeResult: TypeAlias = Union[OdeResult_Double, OdeResult_Float, OdeResult_LongDouble, OdeResult_MpReal]
 OdeSolution: TypeAlias = Union[OdeSolution_Double, OdeSolution_Float, OdeSolution_LongDouble, OdeSolution_MpReal]
 
-LowLevelFunction: TypeAlias = Union[LowLevelFunction_Double, LowLevelFunction_Float, LowLevelFunction_LongDouble, LowLevelFunction_MpReal]
 
 _dtype_map = {'double': '_Double', 'long double': '_LongDouble', 'float': '_Float', 'mpreal': '_MpReal'}
 
@@ -61,8 +62,8 @@ def _get_cls_instance(base_getter, dtype, *args, **kwargs):
 
     return cls_obj(*args, **kwargs)
 
-
-
+def LowLevelFunction(pointer, input_size: int, output_shape: Iterable[int], Nargs: int, dtype='double')->AnyLowLevelFunction:
+    return _get_cls_instance('LowLevelFunction', dtype=dtype, pointer=pointer, input_size=input_size, output_shape=output_shape, Nargs=Nargs)
 
 def PreciseEvent(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra)->AnyPreciseEvent:
     return _get_cls_instance('PreciseEvent', dtype, name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
@@ -218,10 +219,10 @@ class OdeSystem:
         self.__module_name = module_name if module_name is not None else 'ode_module'
         self.__nan_dir = directory is None
         self.__nan_modname = module_name is None
-        self._process_args(ode_sys, t, q, args=args, events=events)
-        # Initialize caches for dtype-specific low-level functions
         self._pointers_cache = {}
         self._safe_dir = safe_dir
+        self._process_args(ode_sys, t, q, args=args, events=events)
+        # Initialize caches for dtype-specific low-level functions
     
     def _process_args(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=()):
         q = tuple([qi for qi in q])
@@ -250,7 +251,9 @@ class OdeSystem:
         self.events = events
         for i in range(len(self.__class__._cls_instances)):
             if self.__class__._cls_instances[i] == self:
-                return self.__class__._cls_instances[i]
+                obj = self.__class__._cls_instances[i]
+                self._pointers_cache = obj._pointers_cache
+                return
         self.__class__._cls_instances.append(self)
 
     def __eq__(self, other: OdeSystem):
@@ -304,14 +307,11 @@ class OdeSystem:
         result = compile_funcs(self.lowlevel_callables(dtype=dtype), None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(dtype=dtype))
         return result
     
-    
     def ode_to_compile(self, dtype='double')->TensorLowLevelCallable:
         return TensorLowLevelCallable(self.ode_sys, self.t, q=self.q, scalar_type=dtype, args=self.args)
     
-    
     def jacobian_to_compile(self, dtype='double')->TensorLowLevelCallable:
         return TensorLowLevelCallable(self.jacmat, self.t, q=self.q, scalar_type=dtype, args=self.args)
-    
     
     def _event_data(self, dtype='double')->tuple[dict[str, LowLevelCallable], ...]:
         res = ()
@@ -341,7 +341,7 @@ class OdeSystem:
                     else:
                         self._pointers_cache[dtype] = module_pointers
                         return module_pointers
-                except:
+                except ImportError:
                     pass
             self._pointers_cache[dtype] = self.compile(dtype=dtype)
 
@@ -403,7 +403,7 @@ class OdeSystem:
     def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double')->AnyVariationalLowLevelODE:
         return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, dtype=dtype)
     
-    def _lowlevel_func(self, dtype, func):
+    def _lowlevel_func(self, dtype, func)->AnyLowLevelFunction:
         if func == 'rhs':
             idx = 0
             shape = [self.Nsys]
@@ -413,7 +413,7 @@ class OdeSystem:
         else:
             raise ValueError('')
         p = self._pointers(dtype=dtype)[idx]
-        return _get_cls_instance('LowLevelFunction', dtype, pointer=p, input_size=self.Nsys, output_shape=shape, Nargs=self.Nargs)
+        return LowLevelFunction(pointer=p, input_size=self.Nsys, output_shape=shape, Nargs=self.Nargs, dtype=dtype)
     
     def lowlevel_odefunc(self, dtype='double'):
         return self._lowlevel_func(dtype=dtype, func='rhs')

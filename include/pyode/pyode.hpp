@@ -48,13 +48,14 @@ struct PyFuncWrapper{
         this->output_size = s;
     }
 
-    Array<T> call(const T& t, const std::vector<T>& py_q, py::args py_args) const {
-        if (static_cast<size_t>(py_q.size()) != Nsys || py_args.size() != Nargs){
+    Array<T> call(const T& t, const py::iterable& py_q, py::args py_args) const {   
+        auto q= toCPP_Array<T, Array1D<T>>(py_q);
+        if (static_cast<size_t>(q.size()) != Nsys || py_args.size() != Nargs){
             throw py::value_error("Invalid array sizes in ode function call");
         }
         auto args = toCPP_Array<T, std::vector<T>>(py_args);
         Array<T> res(output_shape);
-        this->rhs(res.data(), t, py_q.data(), args.data(), nullptr);
+        this->rhs(res.data(), t, q.data(), args.data(), nullptr);
         return res;
     }
 };
