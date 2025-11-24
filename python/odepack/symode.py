@@ -215,7 +215,7 @@ class OdeSystem:
 
     def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
         self.__directory = directory if directory is not None else tools.get_source_dir()
-        self.__module_name = module_name if module_name is not None else tools.random_module_name()
+        self.__module_name = module_name if module_name is not None else 'ode_module'
         self.__nan_dir = directory is None
         self.__nan_modname = module_name is None
         self._process_args(ode_sys, t, q, args=args, events=events)
