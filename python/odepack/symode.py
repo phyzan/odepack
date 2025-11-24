@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Iterable, Union, TypeAlias, Callable
+import inspect
 from .odesolvers_double import * #type: ignore
 from .odesolvers_float import * #type: ignore
 from .odesolvers_longdouble import * #type: ignore
@@ -35,18 +36,39 @@ LowLevelFunction: TypeAlias = Union[LowLevelFunction_Double, LowLevelFunction_Fl
 _dtype_map = {'double': '_Double', 'long double': '_LongDouble', 'float': '_Float', 'mpreal': '_MpReal'}
 
 def _get_cls_instance(base_getter, dtype, *args, **kwargs):
-    cls = f'{base_getter}{_dtype_map[dtype]}'
-    try:
-        return eval(cls)(*args, **kwargs)
-    except NameError:
-        raise ValueError(f"Unsupported dtype '{dtype}'. Supported dtypes are 'float', 'double', 'long double', and 'mpreal'.")
+    if dtype not in ['double', 'float', 'long double', 'mpreal']:
+        raise ValueError(
+            f"Unsupported dtype '{dtype}'. Supported dtypes are "
+            "'float', 'double', 'long double', and 'mpreal'."
+        )
+
+    cls_name = f'{base_getter}{_dtype_map[dtype]}'
+
+    # Try to get the class from the caller's global scope first
+    caller_frame = inspect.currentframe().f_back
+    caller_globals = caller_frame.f_globals if caller_frame else {}
+    cls_obj = caller_globals.get(cls_name)
+
+    # Fall back to this module's globals if not found
+    if cls_obj is None:
+        cls_obj = globals().get(cls_name)
+
+    if cls_obj is None:
+        raise ValueError(
+            f"Class '{cls_name}' not found. "
+            f"Make sure a class named '{cls_name}' exists in the global scope."
+        )
+
+    return cls_obj(*args, **kwargs)
 
 
-def PreciseEvent(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra):
+
+
+def PreciseEvent(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra)->AnyPreciseEvent:
     return _get_cls_instance('PreciseEvent', dtype, name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
 
 
-def PeriodicEvent(name: str, period: float, start = None, mask=None, hide_mask=False, dtype='double', **__extra):
+def PeriodicEvent(name: str, period: float, start = None, mask=None, hide_mask=False, dtype='double', **__extra)->AnyPeriodicEvent:
     return _get_cls_instance('PeriodicEvent', dtype, name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
 
 
@@ -304,20 +326,21 @@ class OdeSystem:
         return os.path.join(self.directory, f"ode_callables_{dtype.replace(' ', '_')}.cpp")
     
     def _pointers(self, dtype='double')->tuple[int, ...]:
-        if dtype in self._pointers_cache:
-            return self._pointers_cache[dtype]
-        path = self._cpp_path(dtype=dtype)
-        if os.path.exists(path):
-            try:
-                with open(path, "r") as f:
-                    saved_code = f.read()
-                if saved_code == self.code(dtype=dtype):
-                    return tools.import_lowlevel_module(self.directory, self.module_name(dtype=dtype)).pointers()
-            except:
-                pass
-        res = self.compile(dtype=dtype)
-        self._pointers_cache[dtype] = res
-        return res
+        if dtype not in self._pointers_cache:
+            path = self._cpp_path(dtype=dtype)
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        saved_code = f.read()
+                    if saved_code == self.code(dtype=dtype):
+                        self._pointers_cache[dtype] = tools.import_lowlevel_module(self.directory, self.module_name(dtype=dtype)).pointers()
+
+                except:
+                    pass
+            else:
+                self._pointers_cache[dtype] = self.compile(dtype=dtype)
+
+        return self._pointers_cache[dtype]
     
     def _true_events(self, compiled=True, dtype='double'):
         res = []

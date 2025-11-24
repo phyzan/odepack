@@ -77,14 +77,3 @@ add_ode_backend(odesolvers_mpreal src/pyode_mpreal.cpp)
 install(TARGETS common odesolvers_float odesolvers_double odesolvers_longdouble odesolvers_mpreal
     LIBRARY DESTINATION odepack
 )
-
-# Install Python files from the odepack source directory
-install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/__init__.py
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_base.pyi
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_float.pyi
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_double.pyi
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_longdouble.pyi
-    ${CMAKE_CURRENT_SOURCE_DIR}/odepack/odesolvers_mpreal.pyi
-    DESTINATION odepack
-)
