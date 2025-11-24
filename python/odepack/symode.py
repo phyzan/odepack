@@ -213,7 +213,7 @@ class OdeSystem:
     q: tuple[Symbol, ...]
     events: tuple[SymbolicEvent, ...]
 
-    def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
+    def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None, safe_dir = True):
         self.__directory = directory if directory is not None else tools.get_source_dir()
         self.__module_name = module_name if module_name is not None else 'ode_module'
         self.__nan_dir = directory is None
@@ -221,6 +221,7 @@ class OdeSystem:
         self._process_args(ode_sys, t, q, args=args, events=events)
         # Initialize caches for dtype-specific low-level functions
         self._pointers_cache = {}
+        self._safe_dir = safe_dir
     
     def _process_args(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=()):
         q = tuple([qi for qi in q])
@@ -330,15 +331,19 @@ class OdeSystem:
             path = self._cpp_path(dtype=dtype)
             if os.path.exists(path):
                 try:
-                    with open(path, "r") as f:
-                        saved_code = f.read()
-                    if saved_code == self.code(dtype=dtype):
-                        self._pointers_cache[dtype] = tools.import_lowlevel_module(self.directory, self.module_name(dtype=dtype)).pointers()
-
+                    module_pointers = tools.import_lowlevel_module(self.directory, self.module_name(dtype=dtype)).pointers()
+                    if self._safe_dir:
+                        with open(path, "r") as f:
+                            saved_code = f.read()
+                        if saved_code == self.code(dtype=dtype):
+                            self._pointers_cache[dtype] = module_pointers
+                            return module_pointers
+                    else:
+                        self._pointers_cache[dtype] = module_pointers
+                        return module_pointers
                 except:
                     pass
-            else:
-                self._pointers_cache[dtype] = self.compile(dtype=dtype)
+            self._pointers_cache[dtype] = self.compile(dtype=dtype)
 
         return self._pointers_cache[dtype]
     
