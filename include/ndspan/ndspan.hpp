@@ -192,9 +192,7 @@ struct StaticNdSpan : public AbstractNdSpan<Derived, DIMS...>{
     template<IsShapeContainer ShapeContainer>
     INLINE void reshape(const ShapeContainer& shape){
         assert((shape.size() == this->ndim()) && "Invalid shape in StaticNdSpan::reshape");
-        int I = 0;
-        assert(((shape[I++]==DIMS) && ...) && "Runtime dims do not match template dims in reshape");
-    }
+        assert([&]{int I = 0; return ((shape[I++] == DIMS) && ...);}() &&  "Runtime dims do not match template dims in reshape");}
 
     template<IsShapeContainer ShapeContainer>
     INLINE void resize(const ShapeContainer& shape){

@@ -5,9 +5,58 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "include/ndspan/arrays.hpp"
+#include "../odepack/variational.hpp"
+#include  "mpreal_caster.hpp"
 
 namespace py = pybind11;
 
+
+template<typename T, typename Container>
+Container toCPP_Array(const pybind11::iterable &obj) {
+
+    // Get Python iterable length if possible (optional, for efficiency)
+    size_t len = py::len(obj);
+    Container res(len);
+    int i = 0;
+    for (auto item : obj) {
+        // Cast Python object to double safely
+        auto val = py::cast<T>(item);
+        // Construct T from double
+        res[i] = val;
+        i++;
+    }
+
+    return res;
+}
+
+inline std::vector<EventOptions> to_Options(const py::iterable& d);
+
+
+template<typename T>
+std::vector<std::unique_ptr<Event<T, 0>>> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, py::iterable args);
+
+template<typename T>
+StepSequence<T> to_step_sequence(const py::object& t_eval){
+    if (t_eval.is_none()){
+        return StepSequence<T>();
+    }
+    else if (py::iterable(t_eval)){
+        std::vector<T> vec = toCPP_Array<T, std::vector<T>>(t_eval);
+        return StepSequence<T>(vec.data(), vec.size());
+    }
+    else{
+        throw py::type_error("Expected None, a NumPy array, or an iterable of numeric values.");
+    }
+}
+
+inline py::dict to_PyDict(const EventMap& _map){
+    py::dict py_dict;
+    for (const auto& [key, vec] : _map) {
+        py::array_t<size_t> np_array(static_cast<py::ssize_t>(vec.size()), vec.data()); // Create NumPy array
+        py_dict[key.c_str()] = np_array; // Assign to dictionary
+    }
+    return py_dict;
+}
 
 inline std::vector<py::ssize_t> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
     std::vector<py::ssize_t> result;
@@ -33,24 +82,6 @@ template<typename T>
 py::array_t<T> array(T* data, const std::vector<py::ssize_t>& shape){
     py::capsule capsule = py::capsule(data, [](void* r){T* d = reinterpret_cast<T*>(r); delete[] d;});
     return py::array_t<T>(shape, data, capsule);
-}
-
-template<typename T, typename Container>
-Container toCPP_Array(const pybind11::iterable &obj) {
-
-    // Get Python iterable length if possible (optional, for efficiency)
-    size_t len = pybind11::len(obj);
-    Container res(len);
-    int i = 0;
-    for (auto item : obj) {
-        // Cast Python object to double safely
-        double val = pybind11::cast<double>(item);
-        // Construct T from double
-        res[i] = val;
-        i++;
-    }
-
-    return res;
 }
 
 
@@ -82,20 +113,10 @@ struct PyStruct{
     py::function event;
     std::vector<py::ssize_t> shape;
     py::tuple py_args = py::make_tuple();
-
-    bool operator==(const PyStruct& other) const {
-        std::vector<py::function> _rhs = {this->rhs, jac, mask, event};
-        std::vector<py::function> _lhs = {other.rhs, other.jac, other.mask, other.event};
-        for (size_t i=0; i<_rhs.size(); i++){
-            if (!(PyObject_RichCompareBool(_rhs[i].ptr(), _lhs[i].ptr(), Py_EQ) == 1)){
-                return false;
-            }
-        }
-
-        return (PyObject_RichCompareBool(py_args.ptr(), other.py_args.ptr(), Py_EQ) == 1) && (shape==other.shape);
-    }
-
 };
+
+template<typename T>
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 
 template<typename T>

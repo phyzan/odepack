@@ -142,8 +142,7 @@ INLINE bool equal_arrays(const T* a, const T* b){
 
 template<size_t... Args>
 size_t _validate_size(size_t size){
-    constexpr size_t expected = (Args * ...);
-    assert(size == expected && "Invalid initializer list size");
+    assert((size == (Args * ...)) && "Invalid initializer list size");
     return size;
 }
 
