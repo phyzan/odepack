@@ -256,16 +256,14 @@ class LowLevelODE:
         '''
         pass
 
+    def go_to(self, t, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:...
+
     def rich_integrate(self, interval, *, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeSolution:
         '''
         Similar to .integrate(), but all time steps will be stored in the result.
         This is because they are all required to provide an accurate interpolation in the provided interval, accessible in the OdeSolution object that is returned.
         '''
         pass
-
-    def copy(self)->LowLevelODE:...
-
-    def event_data(self, event: str)->tuple[np.ndarray, np.ndarray]:...
 
     @property
     def t(self)->np.ndarray:...
@@ -274,10 +272,32 @@ class LowLevelODE:
     def q(self)->np.ndarray:...
 
     @property
+    def Nsys(self)->int:...
+
+    @property
+    def runtime(self)->float:...
+
+    @property
+    def diverges(self)->bool:...
+
+    @property
+    def is_dead(self)->bool:...
+    
+    @property
     def event_map(self)->dict[str, np.ndarray[int]]:...
 
     @property
     def scalar_type(self)->str:...
+
+    def copy(self)->LowLevelODE:...
+
+    def event_data(self, event: str)->tuple[np.ndarray, np.ndarray]:...
+
+    def reset(self)->None:...
+
+    def clear(self)->None:...
+
+
 
 
 class VariationalLowLevelODE(LowLevelODE):

@@ -916,12 +916,20 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("t_eval")=py::none(),
             py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0)
+        .def("go_to", &PyODE::py_go_to,
+            py::arg("t"),
+            py::kw_only(),
+            py::arg("t_eval")=py::none(),
+            py::arg("event_options")=py::tuple(),
+            py::arg("max_prints")=0)
         .def("rich_integrate", &PyODE::py_rich_integrate,
             py::arg("interval"),
             py::kw_only(),
             py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0)
         .def("copy", [](const PyODE& self){return self.copy();})
+        .def("reset", [](const PyODE& self){self.reset();})
+        .def("clear", [](const PyODE& self){self.reset();})
         .def_property_readonly("t", [](const PyODE& self){return self.t_array();})
         .def_property_readonly("q", [](const PyODE& self){return self.q_array();})
         .def("event_data", [](const PyODE& self, const py::str& event){
@@ -929,6 +937,18 @@ PYBIND11_MODULE(odesolvers, m) {
         }, py::arg("event"))
         .def_property_readonly("event_map", [](const PyODE& self){
             return self.event_map();
+        })
+        .def_property_readonly("Nsys", [](const PyODE& self){
+            return self.Nsys();
+        })
+        .def_property_readonly("runtime", [](const PyODE& self){
+            return self.runtime();
+        })
+        .def_property_readonly("diverges", [](const PyODE& self){
+            return self.diverges();
+        })
+        .def_property_readonly("is_dead", [](const PyODE& self){
+            return self.is_dead();
         })
         .def_property_readonly("scalar_type", [](const PyODE& self){return SCALAR_TYPE[self.scalar_type];});
 

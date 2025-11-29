@@ -432,6 +432,30 @@ public:
         EXECUTE(return, this->_event_map, ();, return py::none();)
     }
 
+    py::object Nsys() const{
+        PY_GET(ODE, this->ode, ->Nsys())
+    }
+
+    py::object runtime() const{
+        PY_GET(ODE, this->ode, ->runtime())
+    }
+
+    py::object diverges() const{
+        PY_GET(ODE, this->ode, ->diverges())
+    }
+
+    py::object is_dead() const{
+        PY_GET(ODE, this->ode, ->is_dead())
+    }
+
+    void reset() const{
+        PY_DO(ODE, this->ode, reset())
+    }
+
+    void clear() const{
+        PY_DO(ODE, this->ode, clear())
+    }
+
     template<typename T>
     void _init_ode(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method);
 
