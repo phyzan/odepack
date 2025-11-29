@@ -235,7 +235,7 @@ public:
         _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
         
         
-        this->reset();
+        this->_reset();
 
     }
 
@@ -255,13 +255,18 @@ public:
     }
 
     void reset() override{
+        Base::reset();
+        this->_reset();
+    }
+
+    void _reset(){
         T t0 = this->ics().t;
         T h0 = this->ics().habs * this->direction();
         const Array1D<T, N>& q0 = this->ics().vector;
         Array1D<T, N> f(this->Nsys());
         this->_rhs(f.data(), t0, q0.data());
 
-        for (size_t k = 0; k<2; k++){
+        for (size_t k = 0; k<_D.size(); k++){
             _D[k] = Dlike(MAX_ORDER+3, this->Nsys());
             for (size_t j=0; j<this->Nsys(); j++){
                 _D[k](0, j) = q0[j];

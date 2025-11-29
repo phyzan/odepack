@@ -1,100 +1,7 @@
 from __future__ import annotations
-from typing import Iterable, Union, TypeAlias, Callable
-import inspect
-from .odesolvers_double import * #type: ignore
-from .odesolvers_float import * #type: ignore
-from .odesolvers_longdouble import * #type: ignore
-from .odesolvers_mpreal import * #type: ignore
+from typing import Iterable, Callable
+from .odesolvers import * #type: ignore
 from numiphy.lowlevelsupport import *
-
-
-AnyLowLevelODE : TypeAlias = Union[LowLevelODE_Double, LowLevelODE_Float, LowLevelODE_LongDouble, LowLevelODE_MpReal]
-
-AnyVariationalLowLevelODE: TypeAlias = Union[VariationalLowLevelODE_Double, VariationalLowLevelODE_Float, VariationalLowLevelODE_LongDouble, VariationalLowLevelODE_MpReal]
-
-AnyEvent: TypeAlias = Union[Event_Double, Event_Float, Event_LongDouble, Event_MpReal]
-
-AnyPreciseEvent: TypeAlias = Union[PreciseEvent_Double, PreciseEvent_Float, PreciseEvent_LongDouble, PreciseEvent_MpReal]
-
-AnyPeriodicEvent: TypeAlias = Union[PeriodicEvent_Double, PeriodicEvent_Float, PeriodicEvent_LongDouble, PeriodicEvent_MpReal]
-
-AnyOdeSolver: TypeAlias = Union[OdeSolver_Double, OdeSolver_Float, OdeSolver_LongDouble, OdeSolver_MpReal]
-
-AnyRK45: TypeAlias = Union[RK45_Double, RK45_Float, RK45_LongDouble, RK45_MpReal]
-
-AnyRK23: TypeAlias = Union[RK23_Double, RK23_Float, RK23_LongDouble, RK23_MpReal]
-
-AnyDOP853: TypeAlias = Union[DOP853_Double, DOP853_Float, DOP853_LongDouble, DOP853_MpReal]
-
-AnyBDF: TypeAlias = Union[BDF_Double, BDF_Float, BDF_LongDouble, BDF_MpReal]
-
-AnyLowLevelFunction: TypeAlias = Union[LowLevelFunction_Double, LowLevelFunction_Float, LowLevelFunction_LongDouble, LowLevelFunction_MpReal]
-
-OdeResult: TypeAlias = Union[OdeResult_Double, OdeResult_Float, OdeResult_LongDouble, OdeResult_MpReal]
-OdeSolution: TypeAlias = Union[OdeSolution_Double, OdeSolution_Float, OdeSolution_LongDouble, OdeSolution_MpReal]
-
-
-_dtype_map = {'double': '_Double', 'long double': '_LongDouble', 'float': '_Float', 'mpreal': '_MpReal'}
-
-def _get_cls_instance(base_getter, dtype, *args, **kwargs):
-    if dtype not in ['double', 'float', 'long double', 'mpreal']:
-        raise ValueError(
-            f"Unsupported dtype '{dtype}'. Supported dtypes are "
-            "'float', 'double', 'long double', and 'mpreal'."
-        )
-
-    cls_name = f'{base_getter}{_dtype_map[dtype]}'
-
-    # Try to get the class from the caller's global scope first
-    caller_frame = inspect.currentframe().f_back
-    caller_globals = caller_frame.f_globals if caller_frame else {}
-    cls_obj = caller_globals.get(cls_name)
-
-    # Fall back to this module's globals if not found
-    if cls_obj is None:
-        cls_obj = globals().get(cls_name)
-
-    if cls_obj is None:
-        raise ValueError(
-            f"Class '{cls_name}' not found. "
-            f"Make sure a class named '{cls_name}' exists in the global scope."
-        )
-
-    return cls_obj(*args, **kwargs)
-
-def LowLevelFunction(pointer, input_size: int, output_shape: Iterable[int], Nargs: int, dtype='double')->AnyLowLevelFunction:
-    return _get_cls_instance('LowLevelFunction', dtype=dtype, pointer=pointer, input_size=input_size, output_shape=output_shape, Nargs=Nargs)
-
-def PreciseEvent(name: str, when, dir=0, mask=None, hide_mask=False, event_tol=1e-12, dtype='double', **__extra)->AnyPreciseEvent:
-    return _get_cls_instance('PreciseEvent', dtype, name=name, when=when, dir=dir, mask=mask, hide_mask=hide_mask, event_tol=event_tol, **__extra)
-
-
-def PeriodicEvent(name: str, period: float, start = None, mask=None, hide_mask=False, dtype='double', **__extra)->AnyPeriodicEvent:
-    return _get_cls_instance('PeriodicEvent', dtype, name=name, period=period, start=start, mask=mask, hide_mask=hide_mask, **__extra)
-
-
-def LowLevelODE(f, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double')->AnyLowLevelODE:
-    return _get_cls_instance('LowLevelODE', dtype, f=f, t0=t0, q0=q0, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-
-
-def VariationalLowLevelODE(f, t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), events=(), method="RK45", dtype='double')->AnyVariationalLowLevelODE:
-    return _get_cls_instance('VariationalLowLevelODE', dtype, f=f, t0=t0, q0=q0, period=period, jac=jac, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
-
-
-def RK45(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyRK45:
-    return _get_cls_instance('RK45', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
-
-
-def RK23(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyRK23:
-    return _get_cls_instance('RK23', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
-
-
-def BDF(f, jac, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyBDF:
-    return _get_cls_instance('BDF', dtype, f=f, jac=jac, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
-
-
-def DOP853(f, t0: float, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = np.inf, first_step = 0., direction=1, args: Iterable = (), events = (), dtype='double')->AnyDOP853:
-    return _get_cls_instance('DOP853', dtype, f=f, t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events)
 
 
 class SymbolicEvent:
@@ -125,9 +32,9 @@ class SymbolicEvent:
         '''
         return {"name": self.name, "hide_mask": self.hide_mask}
     
-    def toEvent(self, dtype, **kwargs):...
+    def toEvent(self, scalar_type, **kwargs):...
     
-    def funcs(self, t, *q, args, dtype='double')->dict[str, LowLevelCallable]:
+    def funcs(self, t, *q, args, scalar_type='double')->dict[str, LowLevelCallable]:
         '''
         override
         '''
@@ -155,14 +62,14 @@ class SymbolicPreciseEvent(SymbolicEvent):
     def kwargs(self):
         return dict(**SymbolicEvent.kwargs.__get__(self), dir=self.dir, event_tol=self.event_tol)
     
-    def toEvent(self, dtype, when, mask=None, **__extra):
-        return PreciseEvent(dtype=dtype, when=when, mask=mask, **self.kwargs, **__extra)
+    def toEvent(self, scalar_type, when, mask=None, **__extra):
+        return PreciseEvent(scalar_type=scalar_type, when=when, mask=mask, **self.kwargs, **__extra)
     
-    def funcs(self, t, *q, args, dtype='double')->dict[str, LowLevelCallable]:
-        ev_code = ScalarLowLevelCallable(self.event, t, q=q, args=args, scalar_type=dtype)
+    def funcs(self, t, *q, args, scalar_type='double')->dict[str, LowLevelCallable]:
+        ev_code = ScalarLowLevelCallable(self.event, t, q=q, args=args, scalar_type=scalar_type)
 
         if self.mask is not None:
-            mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=dtype)
+            mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=scalar_type)
         else:
             mask = None
         return {"when": ev_code, "mask": mask}
@@ -187,15 +94,15 @@ class SymbolicPeriodicEvent(SymbolicEvent):
     def kwargs(self):
         return dict(**SymbolicEvent.kwargs.__get__(self), period=self.period, start=self.start)
 
-    def toEvent(self, dtype, mask=None, **__extra):
+    def toEvent(self, scalar_type, mask=None, **__extra):
         '''
         override
         '''
-        return PeriodicEvent(dtype=dtype, **self.kwargs, mask=mask, **__extra)
+        return PeriodicEvent(scalar_type=scalar_type, **self.kwargs, mask=mask, **__extra)
 
-    def funcs(self, t, *q, args, dtype='double')->dict[str, LowLevelCallable]:
+    def funcs(self, t, *q, args, scalar_type='double')->dict[str, LowLevelCallable]:
         if self.mask is not None:
-            mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=dtype)
+            mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=scalar_type)
         else:
             mask = None
         return {"mask": mask}
@@ -222,7 +129,7 @@ class OdeSystem:
         self._pointers_cache = {}
         self._safe_dir = safe_dir
         self._process_args(ode_sys, t, q, args=args, events=events)
-        # Initialize caches for dtype-specific low-level functions
+        # Initialize caches for scalar_type-specific low-level functions
     
     def _process_args(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=()):
         q = tuple([qi for qi in q])
@@ -266,8 +173,8 @@ class OdeSystem:
     def directory(self):
         return self.__directory
     
-    def module_name(self, dtype='double'):
-        return f'{self.__module_name}_{dtype.replace(" ", "_")}'
+    def module_name(self, scalar_type='double'):
+        return f'{self.__module_name}_{scalar_type.replace(" ", "_")}'
     
     @property
     def Nsys(self):
@@ -296,94 +203,94 @@ class OdeSystem:
                 matrix[i][j] = array[i].diff(symbols[j])
         return matrix
     
-    def code(self, dtype='double')->str:
-        return generate_cpp_code(self.lowlevel_callables(dtype=dtype), self.module_name(dtype=dtype))
+    def code(self, scalar_type='double')->str:
+        return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type), self.module_name(scalar_type=scalar_type))
     
-    def compile(self, dtype='double')->tuple:
+    def compile(self, scalar_type='double')->tuple:
         CompileTemplate.compile
         if not self.__nan_dir:
-            with open(self._cpp_path(dtype=dtype), "w") as f:
-                f.write(self.code(dtype=dtype))
-        result = compile_funcs(self.lowlevel_callables(dtype=dtype), None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(dtype=dtype))
+            with open(self._cpp_path(scalar_type=scalar_type), "w") as f:
+                f.write(self.code(scalar_type=scalar_type))
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type), None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type))
         return result
     
-    def ode_to_compile(self, dtype='double')->TensorLowLevelCallable:
-        return TensorLowLevelCallable(self.ode_sys, self.t, q=self.q, scalar_type=dtype, args=self.args)
+    def ode_to_compile(self, scalar_type='double')->TensorLowLevelCallable:
+        return TensorLowLevelCallable(self.ode_sys, self.t, q=self.q, scalar_type=scalar_type, args=self.args)
     
-    def jacobian_to_compile(self, dtype='double')->TensorLowLevelCallable:
-        return TensorLowLevelCallable(self.jacmat, self.t, q=self.q, scalar_type=dtype, args=self.args)
+    def jacobian_to_compile(self, scalar_type='double')->TensorLowLevelCallable:
+        return TensorLowLevelCallable(self.jacmat, self.t, q=self.q, scalar_type=scalar_type, args=self.args)
     
-    def _event_data(self, dtype='double')->tuple[dict[str, LowLevelCallable], ...]:
+    def _event_data(self, scalar_type='double')->tuple[dict[str, LowLevelCallable], ...]:
         res = ()
         for ev in self.events:
-            res += (ev.funcs(self.t, *self.q, args=self.args, dtype=dtype),)
+            res += (ev.funcs(self.t, *self.q, args=self.args, scalar_type=scalar_type),)
         return res
     
     @cached_property
     def _event_obj_map(self):
         return {event.name: event for event in self.events}
     
-    def _cpp_path(self, dtype='double'):
-        return os.path.join(self.directory, f"ode_callables_{dtype.replace(' ', '_')}.cpp")
+    def _cpp_path(self, scalar_type='double'):
+        return os.path.join(self.directory, f"ode_callables_{scalar_type.replace(' ', '_')}.cpp")
     
-    def _pointers(self, dtype='double')->tuple[int, ...]:
-        if dtype not in self._pointers_cache:
-            path = self._cpp_path(dtype=dtype)
+    def _pointers(self, scalar_type='double')->tuple[int, ...]:
+        if scalar_type not in self._pointers_cache:
+            path = self._cpp_path(scalar_type=scalar_type)
             if os.path.exists(path):
                 try:
-                    module_pointers = tools.import_lowlevel_module(self.directory, self.module_name(dtype=dtype)).pointers()
+                    module_pointers = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type)).pointers()
                     if self._safe_dir:
                         with open(path, "r") as f:
                             saved_code = f.read()
-                        if saved_code == self.code(dtype=dtype):
-                            self._pointers_cache[dtype] = module_pointers
+                        if saved_code == self.code(scalar_type=scalar_type):
+                            self._pointers_cache[scalar_type] = module_pointers
                             return module_pointers
                     else:
-                        self._pointers_cache[dtype] = module_pointers
+                        self._pointers_cache[scalar_type] = module_pointers
                         return module_pointers
                 except ImportError:
                     pass
-            self._pointers_cache[dtype] = self.compile(dtype=dtype)
+            self._pointers_cache[scalar_type] = self.compile(scalar_type=scalar_type)
 
-        return self._pointers_cache[dtype]
+        return self._pointers_cache[scalar_type]
     
-    def _true_events(self, compiled=True, dtype='double'):
+    def _true_events(self, compiled=True, scalar_type='double'):
         res = []
         if compiled:
-            items = self._pointers(dtype=dtype)
+            items = self._pointers(scalar_type=scalar_type)
         else:
             items = self.python_funcs
         i=0
-        for event, event_dict in zip(self.events, self._event_data(dtype=dtype)):
+        for event, event_dict in zip(self.events, self._event_data(scalar_type=scalar_type)):
             extra_kwargs = {"__Nsys": self.Nsys, "__Nargs": self.Nargs}
             for param_name, lowlevel_callable in event_dict.items():
                 extra_kwargs[param_name] = items[i+2]
                 i+=1
-            res.append(event.toEvent(dtype=dtype, **extra_kwargs))
+            res.append(event.toEvent(scalar_type=scalar_type, **extra_kwargs))
         return res
 
-    def true_compiled_events(self, dtype='double'):
-        return self._true_events(compiled=True, dtype=dtype)
+    def true_compiled_events(self, scalar_type='double'):
+        return self._true_events(compiled=True, scalar_type=scalar_type)
     
     @cached_property
     def true_py_events(self):
         return self._true_events(compiled=False)
     
-    def lowlevel_callables(self, dtype='double')->tuple[LowLevelCallable, ...]:
+    def lowlevel_callables(self, scalar_type='double')->tuple[LowLevelCallable, ...]:
         event_objs: list[LowLevelCallable] = []
-        for event_dict in self._event_data(dtype=dtype):
+        for event_dict in self._event_data(scalar_type=scalar_type):
             for param_name, lowlevel_callable in event_dict.items():
                 event_objs.append(lowlevel_callable)
-        return (self.ode_to_compile(dtype=dtype), self.jacobian_to_compile(dtype=dtype), *event_objs)
+        return (self.ode_to_compile(scalar_type=scalar_type), self.jacobian_to_compile(scalar_type=scalar_type), *event_objs)
     
-    def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", period=None, compiled=True, dtype='double'):
+    def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", period=None, compiled=True, scalar_type='double'):
         if len(q0) != self.Nsys:
             raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {self.Nsys}")
         elif len(args) != self.Nargs:
             raise ValueError(f"The number of args provided is {len(q0)} instead of {self.Nargs}")
         if compiled:
-            pointers = self._pointers(dtype=dtype)
-            events = self.true_compiled_events(dtype=dtype)
+            pointers = self._pointers(scalar_type=scalar_type)
+            events = self.true_compiled_events(scalar_type=scalar_type)
             f, jac = pointers[:2]
         else:
             events = self.true_py_events
@@ -395,15 +302,15 @@ class OdeSystem:
         else:
             kwargs['period'] = period
             getter = VariationalLowLevelODE
-        return getter(f=f, jac=jac, dtype=dtype, **kwargs)
+        return getter(f=f, jac=jac, scalar_type=scalar_type, **kwargs)
     
-    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double')->AnyLowLevelODE:
-        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=None, compiled=compiled, dtype=dtype)
+    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->LowLevelODE:
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=None, compiled=compiled, scalar_type=scalar_type)
     
-    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, dtype='double')->AnyVariationalLowLevelODE:
-        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, dtype=dtype)
+    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->VariationalLowLevelODE:
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, scalar_type=scalar_type)
     
-    def _lowlevel_func(self, dtype, func)->AnyLowLevelFunction:
+    def _lowlevel_func(self, scalar_type, func)->LowLevelFunction:
         if func == 'rhs':
             idx = 0
             shape = [self.Nsys]
@@ -412,14 +319,14 @@ class OdeSystem:
             shape = [self.Nsys, self.Nsys]
         else:
             raise ValueError('')
-        p = self._pointers(dtype=dtype)[idx]
-        return LowLevelFunction(pointer=p, input_size=self.Nsys, output_shape=shape, Nargs=self.Nargs, dtype=dtype)
+        p = self._pointers(scalar_type=scalar_type)[idx]
+        return LowLevelFunction(pointer=p, input_size=self.Nsys, output_shape=shape, Nargs=self.Nargs, scalar_type=scalar_type)
     
-    def lowlevel_odefunc(self, dtype='double'):
-        return self._lowlevel_func(dtype=dtype, func='rhs')
+    def lowlevel_odefunc(self, scalar_type='double'):
+        return self._lowlevel_func(scalar_type=scalar_type, func='rhs')
     
-    def lowlevel_jac(self, dtype='double'):
-        return self._lowlevel_func(dtype=dtype, func='jac')
+    def lowlevel_jac(self, scalar_type='double'):
+        return self._lowlevel_func(scalar_type=scalar_type, func='jac')
     
     @cached_property
     def _odefunc(self):

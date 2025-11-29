@@ -92,8 +92,8 @@ namespace py = pybind11;
 //             size_t total_size = 1;
 //             for (auto s : shape) { total_size *= size_t(s); }
 
-//             // Create numpy array with object dtype
-//             py::array result = py::array(py::dtype("O"), shape);
+//             // Create numpy array with object scalar_type
+//             py::array result = py::array(py::scalar_type("O"), shape);
 
 //             // Only populate if size > 0
 
@@ -122,7 +122,7 @@ namespace py = pybind11;
 //             size_t total_size = 1;
 //             for (auto s : shape) { total_size *= size_t(s); }
 
-//             py::array result = py::array(py::dtype("O"), shape);
+//             py::array result = py::array(py::scalar_type("O"), shape);
 
 //             // Only populate if size > 0
 //             if (src.size() > 0) {
@@ -229,7 +229,7 @@ struct type_caster<ArrayType, std::enable_if_t<
             size_t total_size = 1;
             for (auto s : shape) { total_size *= size_t(s); }
 
-            // Create numpy array with double dtype
+            // Create numpy array with double scalar_type
             py::array_t<double> result(shape);
             auto buf = result.request();
             double* ptr = static_cast<double*>(buf.ptr);

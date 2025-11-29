@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "include/ndspan/arrays.hpp"
-#include "../odepack/variational.hpp"
+#include "include/odepack/variational.hpp"
 #include  "mpreal_caster.hpp"
 
 namespace py = pybind11;
@@ -31,9 +31,6 @@ Container toCPP_Array(const pybind11::iterable &obj) {
 
 inline std::vector<EventOptions> to_Options(const py::iterable& d);
 
-
-template<typename T>
-std::vector<std::unique_ptr<Event<T, 0>>> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, py::iterable args);
 
 template<typename T>
 StepSequence<T> to_step_sequence(const py::object& t_eval){
@@ -116,7 +113,7 @@ struct PyStruct{
 };
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events);
 
 
 template<typename T>

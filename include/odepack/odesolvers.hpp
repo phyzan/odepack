@@ -49,7 +49,7 @@ struct SolverState{
 
 };
 
-template<typename T, size_t N>
+template<typename T, size_t N=0>
 class OdeSolver{
 
 public:

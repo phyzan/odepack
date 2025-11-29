@@ -388,7 +388,7 @@ private:
 
 
 
-template<typename T, size_t N>
+template<typename T, size_t N=0>
 class OdeSolution : public OdeResult<T, N>{
 
 public:
@@ -583,7 +583,7 @@ Interpolator<T, N>::Interpolator(size_t n) : _array_size(n) {}
 template<typename T, size_t N>
 void Interpolator<T, N>::call(T* result, const T& t) const{
     if (this->is_out_of_bounds(t)){
-        throw std::runtime_error("Scalar " + to_string(t) + " is out of bounds in LinkedInterpolator with range " + interval().signature());
+        throw std::runtime_error("Scalar " + to_string(t, 8) + " is out of bounds in LinkedInterpolator with range " + interval().signature(8));
     }
     this->_call_impl(result, t);
 }

@@ -32,6 +32,7 @@ public:
     void adapt_impl(State<T, N>& res);
 
     void reset() override{
+        Base::reset();
         _K_true.set(0);
         _mat_is_set = false;
     }

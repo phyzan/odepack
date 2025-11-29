@@ -335,7 +335,7 @@ struct OdeData{
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
-template<typename T, size_t N>
+template<typename T, size_t N=0>
 class OdeResult{
 
 public:

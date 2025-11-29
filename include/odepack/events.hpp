@@ -697,12 +697,19 @@ public:
     }
 
     void reset(){
+        size_t arr_size;
+        if (this->_N_tot > 0){
+            arr_size = _states[0].exposed_vector.size();
+        }
+         
         for (size_t i=0; i<_N_tot; i++){
             _events[i]->reset();
             _states[i] = EventState<T, N>{};
             _event_idx[i] = 0;
             _event_idx_start[i] = 0;
         }
+
+        this->set_array_size(arr_size);
         _N_detect = 0;
         _Nt = 0;
         _canon_idx = _N_tot;

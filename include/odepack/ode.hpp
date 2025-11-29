@@ -105,7 +105,7 @@ private:
     bool _is_running = true;
 };
 
-template<typename T, size_t N>
+template<typename T, size_t N=0>
 class ODE{
 
 public:
