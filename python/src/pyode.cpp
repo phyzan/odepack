@@ -1,4 +1,5 @@
 #include "pyode.hpp"
+
 //===========================================================================================
 //                                      PyFuncWrapper
 //===========================================================================================
@@ -10,18 +11,6 @@ PyFuncWrapper::PyFuncWrapper(const py::capsule& obj, py::ssize_t Nsys, const py:
         s *= i;
     }
     this->output_size = size_t(s);
-}
-
-template<typename T>
-py::object PyFuncWrapper::call_impl(const py::object& t, const py::iterable& py_q, py::args py_args) const {
-    auto q = toCPP_Array<T, Array1D<T>>(py_q);
-    if (static_cast<size_t>(q.size()) != Nsys || py_args.size() != Nargs){
-        throw py::value_error("Invalid array sizes in ode function call");
-    }
-    auto args = toCPP_Array<T, std::vector<T>>(py_args);
-    Array<T> res(output_shape);
-    reinterpret_cast<Func<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data(), nullptr);
-    return py::cast(res);
 }
 
 py::object PyFuncWrapper::call(const py::object& t, const py::iterable& py_q, const py::args& py_args) const{
@@ -69,20 +58,6 @@ void PyEvent::check_sizes(size_t Nsys, size_t Nargs) const{
     }
 }
 
-template<typename T>
-Func<T> PyEvent::mask() const{
-    if (_py_mask){
-        return py_mask<T>;
-    }
-    else if (this->_mask != nullptr){
-        return reinterpret_cast<Func<T>>(this->_mask);
-    }
-    else{
-        return nullptr;
-    }
-}
-
-PyEvent::~PyEvent(){}
 
 //===========================================================================================
 //                                      PyPrecEvent
@@ -115,21 +90,6 @@ void* PyPrecEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tupl
     EXECUTE(return, this->get_new_event, ();, return nullptr;)
 }
 
-template<typename T>
-ObjFun<T> PyPrecEvent::when() const{
-    if (_when == nullptr){
-        return py_event<T>;
-    }
-    else{
-        return reinterpret_cast<ObjFun<T>>(this->_when);
-    }
-}
-
-template<typename T>
-void* PyPrecEvent::get_new_event(){
-    return new ObjectOwningEvent<PreciseEvent<T, 0>, PyStruct>(this->data, this->name(), this->when<T>(), _dir, this->mask<T>(), this->hide_mask(), this->_event_tol.cast<T>());
-}
-
 //===========================================================================================
 //                                      PyPerEvent
 //===========================================================================================
@@ -148,11 +108,6 @@ void* PyPerEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tuple
     this->data.py_args = args;
     this->data.shape = shape;
     EXECUTE(return, this->get_new_event, ();, return nullptr;)
-}
-
-template<typename T>
-void* PyPerEvent::get_new_event(){
-    return new ObjectOwningEvent<PeriodicEvent<T, 0>, PyStruct>(this->data, this->name(), _period.cast<T>(), (_start.is_none() ? inf<T>() : _start.cast<T>()), this->mask<T>(), this->hide_mask());
 }
 
 py::object PyPerEvent::period() const{
@@ -178,108 +133,12 @@ inline std::vector<EventOptions> to_Options(const py::iterable& d) {
     return result;
 }
 
-
-template<typename T>
-std::vector<Event<T, 0>*> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args){
-    if (events.is_none()){
-        return {};
-    }
-    std::vector<Event<T, 0>*> res;
-    for (py::handle item : events){
-        Event<T, 0>* ev_ptr = reinterpret_cast<Event<T, 0>*>(item.cast<PyEvent&>().toEvent(shape, args));
-        res.push_back(ev_ptr);
-    }
-    return res;
-}
-
-// init_ode_data
-template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events){
-    std::string scalar_type = get_scalar_type<T>();
-    data.shape = shape(q0);
-    data.py_args = py::tuple(py_args);
-    size_t _size = prod(data.shape);
-
-    bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
-    bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
-    args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<T> ode_rhs = {nullptr, nullptr, &data};
-    if (f_is_compiled){
-        if (py::isinstance<PyFuncWrapper>(f)){
-            //safe approach
-            auto& _f = f.cast<PyFuncWrapper&>();
-            ode_rhs.rhs = reinterpret_cast<Func<T>>(_f.rhs);
-            if (_f.Nsys != _size){
-                throw py::value_error("The array size of the initial conditions differs from the ode system size");
-            }
-            else if (_f.Nargs != args.size()){
-                throw py::value_error("The number of the provided extra args (" + std::to_string(args.size()) + ") differs from the number of args specified for this ode system ("+std::to_string(_f.Nargs)+").");
-            }
-        }
-        else{
-            ode_rhs.rhs = open_capsule<Func<T>>(f.cast<py::capsule>());
-        }
-    }
-    else{
-        data.rhs = std::move(f);
-        ode_rhs.rhs = py_rhs;
-    }
-    if (jac_is_compiled){
-        if (py::isinstance<PyFuncWrapper>(jacobian)){
-            //safe approach
-            auto& _j = jacobian.cast<PyFuncWrapper&>();
-            ode_rhs.jacobian = reinterpret_cast<Func<T>>(_j.rhs);
-            if (_j.Nsys != _size){
-                throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
-            }
-            else if (_j.Nargs != args.size()){
-                throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
-            }
-        }
-        else{
-            ode_rhs.jacobian = open_capsule<Func<T>>(jacobian.cast<py::capsule>());
-        }
-    }
-    else if (!jacobian.is_none()){
-        data.jac = std::move(jacobian);
-        ode_rhs.jacobian = py_jac;
-    }
-    for (py::handle ev : events){
-        if (!py::isinstance<PyEvent>(ev)) {
-            throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class, not " + py::str(ev.get_type()).cast<std::string>());
-        }
-        const auto& _ev = ev.cast<const PyEvent&>();
-        if (_ev.scalar_type != DTYPE_MAP.at(scalar_type)){
-            throw py::value_error("All event objects in 'events' must have scalar type " + scalar_type + ".");
-        }
-        _ev.check_sizes(_size, args.size());
-
-    }
-    return ode_rhs;
-}
-
 //===========================================================================================
 //                                      PySolver
 //===========================================================================================
 
 PySolver::PySolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
     EXECUTE(, this->init_solver, (f, jac, t0, py_q0, rtol, atol, min_step, max_step, first_step, dir, py_args, py_events, name);, )
-}
-
-template<typename T>
-void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
-    std::vector<T> args;
-    OdeData<T> ode_data = init_ode_data<T>(this->data, args, std::move(f), py_q0, std::move(jac), py_args, py_events);
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
-    for (size_t i=0; i<evs.size(); i++){
-        evs[i] = safe_events[i];
-    }
-    auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_solver(name, ode_data, py::cast<T>(t0), q0, py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs).release();
-    for (size_t i=0; i<evs.size(); i++){
-        delete safe_events[i];
-    }
 }
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
@@ -410,15 +269,6 @@ PyOdeResult& PyOdeResult::operator=(PyOdeResult&& other) noexcept{
     return *this;
 }
 
-template<typename T>
-py::tuple PyOdeResult::_event_data(const py::str& event) const{
-    auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
-    std::vector<T> t_data = r->t_filtered(event.cast<std::string>());
-    Array<T> t_res(t_data.data());
-    Array2D<T> q_data = r->q_filtered(event.cast<std::string>());
-    return py::make_tuple(py::cast(t_res), py::cast(Array<T>(q_data.release(), getShape(t_res.size(), this->q0_shape), true)));
-}
-
 
 //===========================================================================================
 //                                      PyOdeSolution
@@ -514,81 +364,6 @@ py::object PyODE::solver_copy() const{
     EXECUTE(return, this->_solver_copy, ();, return py::none();)
 }
 
-template<typename T>
-void PyODE::_init_ode(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method){
-    std::vector<T> args;
-    OdeData<T> ode_rhs = init_ode_data<T>(data,args, std::move(f), py_q0, std::move(jacobian), py_args, events);
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
-    for (size_t i=0; i<evs.size(); i++){
-        evs[i] = safe_events[i];
-    }
-    auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0, py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
-    for (size_t i=0; i<evs.size(); i++){
-        delete safe_events[i];
-    }
-}
-
-template<typename T>
-PyOdeResult PyODE::_py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeResult<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->integrate(py::cast<T>(interval), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
-    return PyOdeResult(ptr, this->data.shape, this->scalar_type);
-}
-
-template<typename T>
-PyOdeSolution PyODE::_py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeSolution<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->rich_integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
-    return PyOdeSolution(ptr, this->data.shape, this->scalar_type);
-}
-
-template<typename T>
-PyOdeResult PyODE::_py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeResult<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->go_to(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
-    return PyOdeResult(ptr, this->data.shape, this->scalar_type);
-}
-
-template<typename T>
-py::object PyODE::_t_array() const{
-    auto* r = reinterpret_cast<ODE<T>*>(this->ode);
-    return py::cast(NdView<const T>(r->t().data(), r->t().size()));
-}
-
-template<typename T>
-py::object PyODE::_q_array() const{
-    auto* r = reinterpret_cast<ODE<T>*>(this->ode);
-    return py::cast(NdView<const T>(r->q().data(), getShape(py::ssize_t(r->t().size()), this->data.shape)));
-}
-
-template<typename T>
-py::tuple PyODE::_event_data(const py::str& event) const{
-    std::vector<T> t_data = reinterpret_cast<const ODE<T, 0>*>(ode)->t_filtered(event.cast<std::string>());
-    Array2D<T, 0, 0> q_data = reinterpret_cast<const ODE<T, 0>*>(ode)->q_filtered(event.cast<std::string>());
-    Array<T> q_res(q_data.release(), getShape(py::ssize_t(t_data.size()), data.shape), true);
-    return py::make_tuple(py::cast(Array<T>(t_data.data(), t_data.size())), py::cast(q_res));
-}
-
-template<typename T>
-py::object PyODE::_solver_copy() const{
-    auto* ode_ptr = reinterpret_cast<const ODE<T, 0>*>(ode);
-    auto* solver_clone = ode_ptr->solver()->clone();
-    if (ode_ptr->solver()->name() == "RK45"){
-        return py::cast(PyRK45(solver_clone, data, this->scalar_type));
-    }
-    else if (ode_ptr->solver()->name() == "DOP853"){
-        return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
-    }
-    else if (ode_ptr->solver()->name() == "RK23"){
-        return py::cast(PyRK23(solver_clone, data, this->scalar_type));
-    }
-    else if (ode_ptr->solver()->name() == "BDF"){
-        return py::cast(PyBDF(solver_clone, data, this->scalar_type));
-    }
-    else{
-        throw py::value_error("Unregistered solver!");
-    }
-}
-
 //===========================================================================================
 //                                      PyVarODE
 //===========================================================================================
@@ -614,53 +389,10 @@ py::object PyVarODE::copy() const{
     return py::cast(PyVarODE(*this));
 }
 
-template<typename T>
-void PyVarODE::_init_var_ode(py::object f, const py::object& t0, const py::iterable& q0, const py::object& period, py::object jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method){
-    std::vector<T> args;
-    OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, std::move(f), q0, std::move(jac), py_args, events);
-    Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(events, shape(q0), py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
-    for (size_t i=0; i<evs.size(); i++){
-        evs[i] = safe_events[i];
-    }
-    this->ode = new VariationalODE<T, 0>(ode_rhs, py::cast<T>(t0), q0_, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method.cast<std::string>());
-    for (size_t i=0; i<evs.size(); i++){
-        delete safe_events[i];
-    }
-}
 
-template<typename T>
-VariationalODE<T, 0>& PyVarODE::varode(){
-    return *static_cast<VariationalODE<T, 0>*>(this->ode);
-}
-
-template<typename T>
-const VariationalODE<T, 0>& PyVarODE::varode() const {
-    return *static_cast<const VariationalODE<T, 0>*>(this->ode);
-}
-
-template<typename T>
-py::object PyVarODE::_py_t_lyap() const{
-    const auto& vode = varode<T>();
-    NdView<const T> res(vode.t_lyap().data(), vode.t_lyap().size());
-    return py::cast(res);
-}
-
-template<typename T>
-py::object PyVarODE::_py_lyap() const{
-    const auto& vode = varode<T>();
-    NdView<const T> res(vode.lyap().data(), vode.t_lyap().size());
-    return py::cast(res);
-}
-
-template<typename T>
-py::object PyVarODE::_py_kicks() const{
-    const auto& vode = varode<T>();
-    NdView<const T> res(vode.kicks().data(), vode.t_lyap().size());
-    return py::cast(res);
-}
-
+//===========================================================================================
+//                                      Additional functions
+//===========================================================================================
 
 
 void py_integrate_all(const py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
@@ -674,7 +406,7 @@ void py_integrate_all(const py::object& list, double interval, const py::object&
     for (const py::handle& item : list) {
         try {
             auto& pyode = item.cast<PyODE&>();
-            
+
             // Use the scalar_type to determine which array to add to
             switch (pyode.scalar_type) {
                 case 0:
@@ -717,6 +449,11 @@ void py_integrate_all(const py::object& list, double interval, const py::object&
     }
 }
 
+
+//===========================================================================================
+//                                      PYTHON EXTENSION
+//===========================================================================================
+
 PYBIND11_MODULE(odesolvers, m) {
 
     py::class_<PyFuncWrapper>(m, "LowLevelFunction")
@@ -742,28 +479,22 @@ PYBIND11_MODULE(odesolvers, m) {
 
 
     py::class_<PyEvent>(m, "Event")
-        .def_property_readonly("name", [](const PyEvent& self){
-            return self.name();
-        })
-        .def_property_readonly("hides_mask", [](const PyEvent& self){
-            return self.hide_mask();
-        })
+        .def_property_readonly("name", &PyEvent::name)
+        .def_property_readonly("hides_mask", &PyEvent::hide_mask)
         .def_property_readonly("scalar_type", [](const PyEvent& self){return SCALAR_TYPE[self.scalar_type];});
 
     py::class_<PyPrecEvent, PyEvent>(m, "PreciseEvent")
         .def(py::init<std::string, py::object, int, py::object, bool, py::object, std::string, size_t, size_t>(),
             py::arg("name"),
             py::arg("when"),
-            py::arg("dir")=0,
+            py::arg("direction")=0,
             py::arg("mask")=py::none(),
             py::arg("hide_mask")=false,
             py::arg("event_tol")=1e-12,
             py::arg("scalar_type") = "double",
             py::arg("__Nsys")=0,
             py::arg("__Nargs")=0)
-        .def_property_readonly("event_tol", [](const PyPrecEvent& self){
-            return self.event_tol();
-        });
+        .def_property_readonly("event_tol", &PyPrecEvent::event_tol);
 
     py::class_<PyPerEvent, PyEvent>(m, "PeriodicEvent")
         .def(py::init<std::string, py::object, py::object, py::object, bool, std::string, size_t, size_t>(),
@@ -775,28 +506,24 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("scalar_type") = "double",
             py::arg("__Nsys")=0,
             py::arg("__Nargs")=0)
-        .def_property_readonly("period", [](const PyPerEvent& self){
-                return self.period();})
-        .def_property_readonly("start", [](const PyPerEvent& self){
-            return self.start();});
+        .def_property_readonly("period", &PyPerEvent::period)
+        .def_property_readonly("start", &PyPerEvent::start);
 
 
     py::class_<PySolver>(m, "OdeSolver")
-        .def_property_readonly("t", [](const PySolver& self){return self.t();})
-        .def_property_readonly("q", [](const PySolver& self){return self.q();})
-        .def_property_readonly("stepsize", [](const PySolver& self){return self.stepsize();})
-        .def_property_readonly("diverges", [](const PySolver& self){return self.diverges();})
-        .def_property_readonly("is_dead", [](const PySolver& self){return self.is_dead();})
-        .def_property_readonly("Nsys", [](const PySolver& self){return self.Nsys();})
-        .def("show_state", [](const PySolver& self, int digits){
-                self.show_state(digits);
-            },
+        .def_property_readonly("t", &PySolver::t)
+        .def_property_readonly("q", &PySolver::q)
+        .def_property_readonly("stepsize", &PySolver::stepsize)
+        .def_property_readonly("diverges", &PySolver::diverges)
+        .def_property_readonly("is_dead", &PySolver::is_dead)
+        .def_property_readonly("Nsys", &PySolver::Nsys)
+        .def("show_state", &PySolver::show_state,
             py::arg("digits") = 8
         )
-        .def("advance", [](const PySolver& self){self.advance();})
-        .def("advance_to_event", [](const PySolver& self){self.advance_to_event();})
-        .def("reset", [](const PySolver& self){self.reset();})
-        .def("copy", [](const PySolver& self){return self.copy();})
+        .def("advance", &PySolver::advance)
+        .def("advance_to_event", &PySolver::advance_to_event)
+        .def("reset", &PySolver::reset)
+        .def("copy", &PySolver::copy)
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
 
     py::class_<PyRK23, PySolver>(m, "RK23")
@@ -870,21 +597,15 @@ PYBIND11_MODULE(odesolvers, m) {
 
     py::class_<PyOdeResult>(m, "OdeResult")
         .def(py::init<PyOdeResult>(), py::arg("result"))
-        .def_property_readonly("t", [](const PyOdeResult& self){
-            return self.t();
-        })
-        .def_property_readonly("q", [](const PyOdeResult& self){
-            return self.q();
-        })
-        .def_property_readonly("event_map", [](const PyOdeResult& self){
-            return self.event_map();
-        })
+        .def_property_readonly("t", &PyOdeResult::t)
+        .def_property_readonly("q", &PyOdeResult::q)
+        .def_property_readonly("event_map", &PyOdeResult::event_map)
         .def("event_data", &PyOdeResult::event_data, py::arg("event"))
-        .def_property_readonly("diverges", [](const PyOdeResult& self){return self.diverges();})
-        .def_property_readonly("success", [](const PyOdeResult& self){return self.success();})
-        .def_property_readonly("runtime", [](const PyOdeResult& self){return self.runtime();})
-        .def_property_readonly("message", [](const PyOdeResult& self){return self.message();})
-        .def("examine", [](const PyOdeResult& self){self.examine();})
+        .def_property_readonly("diverges", &PyOdeResult::diverges)
+        .def_property_readonly("success", &PyOdeResult::success)
+        .def_property_readonly("runtime", &PyOdeResult::runtime)
+        .def_property_readonly("message", &PyOdeResult::message)
+        .def("examine", &PyOdeResult::examine)
         .def_property_readonly("scalar_type", [](const PyOdeResult& self){return SCALAR_TYPE[self.scalar_type];});
 
     py::class_<PyOdeSolution, PyOdeResult>(m, "OdeSolution")
@@ -909,7 +630,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("method")="RK45",
             py::arg("scalar_type")="double")
         .def(py::init<PyODE>(), py::arg("result"))
-        .def("solver", [](const PyODE& self){return self.solver_copy();})
+        .def("solver", &PyODE::solver_copy)
         .def("integrate", &PyODE::py_integrate,
             py::arg("interval"),
             py::kw_only(),
@@ -927,29 +648,17 @@ PYBIND11_MODULE(odesolvers, m) {
             py::kw_only(),
             py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0)
-        .def("copy", [](const PyODE& self){return self.copy();})
-        .def("reset", [](const PyODE& self){self.reset();})
-        .def("clear", [](const PyODE& self){self.reset();})
-        .def_property_readonly("t", [](const PyODE& self){return self.t_array();})
-        .def_property_readonly("q", [](const PyODE& self){return self.q_array();})
-        .def("event_data", [](const PyODE& self, const py::str& event){
-            return self.event_data(event);
-        }, py::arg("event"))
-        .def_property_readonly("event_map", [](const PyODE& self){
-            return self.event_map();
-        })
-        .def_property_readonly("Nsys", [](const PyODE& self){
-            return self.Nsys();
-        })
-        .def_property_readonly("runtime", [](const PyODE& self){
-            return self.runtime();
-        })
-        .def_property_readonly("diverges", [](const PyODE& self){
-            return self.diverges();
-        })
-        .def_property_readonly("is_dead", [](const PyODE& self){
-            return self.is_dead();
-        })
+        .def("copy", &PyODE::copy)
+        .def("reset", &PyODE::reset)
+        .def("clear", &PyODE::clear)
+        .def("event_data", &PyODE::event_data, py::arg("event"))
+        .def_property_readonly("t", &PyODE::t_array)
+        .def_property_readonly("q", &PyODE::q_array)
+        .def_property_readonly("event_map", &PyODE::event_map)
+        .def_property_readonly("Nsys", &PyODE::Nsys)
+        .def_property_readonly("runtime", &PyODE::runtime)
+        .def_property_readonly("diverges", &PyODE::diverges)
+        .def_property_readonly("is_dead", &PyODE::is_dead)
         .def_property_readonly("scalar_type", [](const PyODE& self){return SCALAR_TYPE[self.scalar_type];});
 
     py::class_<PyVarODE, PyODE>(m, "VariationalLowLevelODE")
@@ -974,19 +683,15 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("t_lyap", &PyVarODE::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE::py_lyap)
         .def_property_readonly("kicks", &PyVarODE::py_kicks)
-        .def("copy", [](const PyVarODE& self){return self.copy();});
+        .def("copy", &PyVarODE::copy);
 
 
-    
+
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 
     m.def("set_mpreal_prec",
-      [](int bits) {
-          mpfr::mpreal::set_default_prec(bits);
-      },
+      &mpfr::mpreal::set_default_prec,
       py::arg("bits"),
       "Set the default MPFR precision (in bits) for mpfr::mpreal.")
-    .def("mpreal_prec", []() {
-          return mpfr::mpreal::get_default_prec();
-      });
+    .def("mpreal_prec", &mpfr::mpreal::get_default_prec);
 }

@@ -67,7 +67,7 @@ class PreciseEvent(Event):
 
     '''
 
-    def __init__(self, name: str, when: ObjFunc, dir=0, mask: Func=None, hide_mask=False, event_tol=1e-12, scalar_type: str = "double", __Nsys: int = 0, __Nargs: int = 0):
+    def __init__(self, name: str, when: ObjFunc, direction=0, mask: Func=None, hide_mask=False, event_tol=1e-12, scalar_type: str = "double", __Nsys: int = 0, __Nargs: int = 0):
         '''
         Arguments
         ------------------
@@ -75,7 +75,7 @@ class PreciseEvent(Event):
 
         when: objective function (continuous scalar function). A sign change in the function will trigger the exact event occurence, and the time of the event will accurately be determined after solving the equation when(t, q(t)) = 0.
 
-        dir: Direction of zero crossing. 0 means any direction, 1 means positive crossing, -1 means negative crossing.
+        direction: Direction of zero crossing. 0 means any direction, 1 means positive crossing, -1 means negative crossing.
 
         mask: If provided, the current ode solution will change value at the time of the event occurence. It must return an array of equal shape as the ode system.
 

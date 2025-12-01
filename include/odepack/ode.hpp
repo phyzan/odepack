@@ -398,6 +398,10 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
             t_last = t_curr;
             t_curr = _solver->t();
             if (_solver->at_event()){
+                //the .count_it(ev) in the line above might have stopped the solver.
+                //if the solver stopped for any other reason, that takes priority.
+                //only if it is still running but max events have been reached, the solver will display "max events reached".
+                while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
                 bool any_event = false;
                 bool tmax_event = false;
                 for (const size_t& ev : _solver->event_col()){
@@ -409,13 +413,9 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
                         tmax_event = true;
                     }
                 }
-                //the .count_it(ev) in the line above might have stopped the solver.
-                //if the solver stopped for any other reason, that takes priority.
-                //only if it is still running but max events have been reached, the solver will display "max events reached".
                 if (_solver->is_running() && !event_counter.is_running()){
                     _solver->stop("Max events reached");
                 }
-                while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
                 if (any_event){
                     _register_state();
                     Nnew++;

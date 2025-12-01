@@ -44,10 +44,10 @@ class SymbolicEvent:
 
 class SymbolicPreciseEvent(SymbolicEvent):
 
-    def __init__(self, name: str, event: Expr, dir=0, mask: Iterable[Expr]=None, hide_mask=False, event_tol=1e-12):
+    def __init__(self, name: str, event: Expr, direction=0, mask: Iterable[Expr]=None, hide_mask=False, event_tol=1e-12):
         SymbolicEvent.__init__(self, name, mask, hide_mask)
         self.event = event
-        self.dir = dir
+        self.direction = direction
         self.event_tol = event_tol
     
     def __eq__(self, other):
@@ -55,12 +55,12 @@ class SymbolicPreciseEvent(SymbolicEvent):
             if other is self:
                 return True
             else:
-                return (self.event, self.dir, self.event_tol) == (other.event, other.dir, other.event_tol) and SymbolicEvent.__eq__(self, other)
+                return (self.event, self.direction, self.event_tol) == (other.event, other.direction, other.event_tol) and SymbolicEvent.__eq__(self, other)
         return False
     
     @property
     def kwargs(self):
-        return dict(**SymbolicEvent.kwargs.__get__(self), dir=self.dir, event_tol=self.event_tol)
+        return dict(**SymbolicEvent.kwargs.__get__(self), direction=self.direction, event_tol=self.event_tol)
     
     def toEvent(self, scalar_type, when, mask=None, **__extra):
         return PreciseEvent(scalar_type=scalar_type, when=when, mask=mask, **self.kwargs, **__extra)
