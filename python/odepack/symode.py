@@ -226,9 +226,9 @@ class SymbolicPreciseEvent(SymbolicEvent):
 
         if self.mask is not None:
             mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=scalar_type)
+            return {"when": ev_code, "mask": mask}
         else:
-            mask = None
-        return {"when": ev_code, "mask": mask}
+            return {"when": ev_code}
 
 
 class SymbolicPeriodicEvent(SymbolicEvent):
@@ -308,9 +308,10 @@ class SymbolicPeriodicEvent(SymbolicEvent):
     def _funcs(self, t, *q, args, scalar_type='double')->dict[str, LowLevelCallable]:
         if self.mask is not None:
             mask = TensorLowLevelCallable(self.mask, t, q=q, args=args, scalar_type=scalar_type)
+            return {"mask": mask}
         else:
-            mask = None
-        return {"mask": mask}
+            return {}
+        
 
 
 
@@ -359,11 +360,6 @@ class OdeSystem:
         Directory where compiled binary modules (.so/.pyd files) will be saved.
         Only used if module_name is not None. If directory is None but module_name
         is provided, modules are saved to the current working directory (os.getcwd()).
-        C++ source code is always generated in a temporary directory during compilation.
-    safe_dir : bool, default True
-        If True, verify that saved C++ code matches the current OdeSystem
-        before reusing a compiled module from disk. If False, trust the cached module
-        without verification. Only relevant when directory and module_name are both provided.
 
     Attributes
     ----------
@@ -447,22 +443,13 @@ class OdeSystem:
 
     _cls_instances: list[OdeSystem] = []
 
-    _counter = 0
-
-    ode_sys: tuple[Expr, ...]
-    args: tuple[Symbol, ...]
-    t: Symbol
-    q: tuple[Symbol, ...]
-    events: tuple[SymbolicEvent, ...]
-
-    def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None, safe_dir = True):
+    def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
         self.__directory = directory if directory is not None else os.getcwd()
         self.__module_name = module_name if module_name is not None else 'ode_module'
         self.__nan_dir = directory is None
         self.__nan_modname = module_name is None
         self._pointers_cache = {}
         self._pointers_var_cache = {}
-        self._safe_dir = safe_dir
         self._process_args(ode_sys, t, q, args=args, events=events)
         # Initialize caches for scalar_type-specific low-level functions
     
@@ -486,11 +473,12 @@ class OdeSystem:
         else:
             assert len(odesymbols) <= len(given) - 1
         
-        self.ode_sys = ode_sys
-        self.args = args
-        self.t = t
-        self.q = q
-        self.events = events
+        self._cached_expressions = {'odesys': ode_sys, 'jacmat': None, 'odesys_aug': None, 'jacmat_aug': None}
+        self._args = args
+        self._t = t
+        self._q = q
+        self._events = events
+
         for i in range(len(self.__class__._cls_instances)):
             if self.__class__._cls_instances[i] == self:
                 obj = self.__class__._cls_instances[i]
@@ -507,8 +495,46 @@ class OdeSystem:
     # ==================== PROPERTIES ====================
 
     @property
+    def t(self):
+        return self._t
+    
+    @property
+    def q(self):
+        return self._q
+    
+    @property
+    def events(self):
+        return self._events
+    
+    @property
+    def args(self):
+        return self._args
+    
+    @property
+    def ode_sys(self)->tuple[Expr, ...]:
+        return self._cached_expressions['odesys']
+    
+    @property
+    def jacmat(self)->list[list[Expr]]:
+        if self._cached_expressions['jacmat'] is None:
+            self._cached_expressions['jacmat'] = self._get_jacmat
+        return self._cached_expressions['jacmat']
+
+    @property
+    def ode_sys_augmented(self)->tuple[Expr, ...]:
+        if self._cached_expressions['odesys_aug'] is None:
+            self._cached_expressions['odesys_aug'] = self._get_ode_sys_augmented
+        return self._cached_expressions['odesys_aug']
+    
+    @property
+    def jacmat_augmented(self)->list[list[Expr]]:
+        if self._cached_expressions['jacmat_aug'] is None:
+            self._cached_expressions['jacmat_aug'] = self._get_jacmat_augmented
+        return self._cached_expressions['jacmat_aug']
+
+    @property
     def directory(self):
-        """Directory where compiled modules and C++ source files are saved."""
+        """Directory where compiled modules are saved."""
         return self.__directory
 
     @property
@@ -532,6 +558,14 @@ class OdeSystem:
             The number of parameters (equal to len(args))
         """
         return len(self.args)
+    
+    @cached_property
+    def Nptrs(self):
+        '''
+        Number of required pointers required for a fully compiled ode
+        This is the same for both the regular system and the variational one
+        '''
+        return len(self.lowlevel_callables())
 
     # ==================== CACHED PROPERTIES ====================
 
@@ -539,49 +573,6 @@ class OdeSystem:
     def q_augmented(self):
         """Augmented state variables for variational equations."""
         return self.q + tuple([Symbol(f'del_{x}') for x in self.q])
-
-    @cached_property
-    def ode_sys_augmented(self):
-        """ODE system augmented with variational equations."""
-        var_odesys = []
-        q, delq = self.q_augmented[:self.Nsys], self.q_augmented[self.Nsys:]
-        for i in range(self.Nsys):
-            var_odesys.append(sum([self.ode_sys[i].diff(q[j])*delq[j] for j in range(self.Nsys)]))
-
-        full_sys = self.ode_sys + tuple(var_odesys)
-        return full_sys
-
-    @cached_property
-    def jacmat_augmented(self):
-        """Jacobian matrix of the augmented variational system."""
-        array, symbols = self.ode_sys_augmented, self.q_augmented
-        matrix = [[None for i in range(self.Nsys*2)] for j in range(self.Nsys*2)]
-        for i in range(2*self.Nsys):
-            for j in range(2*self.Nsys):
-                matrix[i][j] = array[i].diff(symbols[j])
-        return matrix
-
-    @cached_property
-    def jacmat(self):
-        """Jacobian matrix of the ODE system.
-
-        Returns
-        -------
-        list[list[Expr]]
-            A 2D list where jacmat[i][j] = d(ode_sys[i])/dq[j]. This is the
-            symbolic Jacobian matrix before compilation.
-
-        Notes
-        -----
-        The Jacobian is used by implicit integrators (like BDF) to improve
-        convergence. It is automatically compiled when needed.
-        """
-        array, symbols = self.ode_sys, self.q
-        matrix = [[None for i in range(self.Nsys)] for j in range(self.Nsys)]
-        for i in range(self.Nsys):
-            for j in range(self.Nsys):
-                matrix[i][j] = array[i].diff(symbols[j])
-        return matrix
 
     @cached_property
     def python_funcs(self)->tuple[Callable,...]:
@@ -602,9 +593,8 @@ class OdeSystem:
         llc = self.lowlevel_callables()
         res = [None for _ in llc]
         for i in range(len(res)):
-            if llc[i] is not None:
-                f = llc[i].to_python_callable().lambdify()
-                res[i] = lambda t, q, *args : f(t, q, args)
+            f = llc[i].to_python_callable().lambdify()
+            res[i] = lambda t, q, *args : f(t, q, args)
         return tuple(res)
 
     @cached_property
@@ -666,7 +656,7 @@ class OdeSystem:
         """
         return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational))
 
-    def compile(self, scalar_type='double', variational=False)->tuple:
+    def compile(self, scalar_type='double', variational=False, start_from=0)->tuple:
         """Compile the ODE system to a C++ module.
 
         Generates C++ source code and compiles it to a Python extension module.
@@ -686,8 +676,7 @@ class OdeSystem:
 
         Returns
         -------
-        tuple[int, ...]
-            A tuple of function pointers that can be passed to LowLevelODE.
+        tuple of function pointers that can be passed to LowLevelODE.
             The first element is the ODE right-hand side pointer, the second
             is the Jacobian pointer, followed by event function pointers.
 
@@ -702,16 +691,8 @@ class OdeSystem:
         - If module_name was provided, the binary module (.so/.pyd) is saved to the
           directory specified (or current working directory if directory was None).
           The binary is named 'module_name_<scalar_type>' for each scalar type.
-        - C++ source code is always generated in a temporary directory during compilation.
         """
-        if not self.__nan_dir:
-            #this must be saved anyway
-            with open(self._cpp_path(scalar_type=scalar_type, variational=False), "w") as f:
-                f.write(self.code(scalar_type=scalar_type, variational=False))
-            if variational:
-                with open(self._cpp_path(scalar_type=scalar_type, variational=True), "w") as f:
-                    f.write(self.code(scalar_type=scalar_type, variational=True))
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational))
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational))
         return result
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
@@ -791,6 +772,32 @@ class OdeSystem:
             for param_name, lowlevel_callable in event_dict.items():
                 event_objs.append(lowlevel_callable)
         return (self.ode_to_compile(scalar_type=scalar_type, variational=variational), self.jacobian_to_compile(scalar_type=scalar_type, variational=variational), *event_objs)
+    
+    def override_odesys(self, odesys: Iterable[Expr]):
+        self._cached_expressions['odesys'] = tuple(odesys)
+        return
+    
+    def override_jacmat(self, jacmat: list[list[Expr]]):
+        self._cached_expressions['jacmat'] = jacmat
+        return
+    
+    def override_variational_odesys(self, variational_odesys: Iterable[Expr]):
+        self._cached_expressions['odesys_aug'] = tuple(variational_odesys)
+        return
+    
+    def override_variational_jacmat(self, jacmat: list[list[Expr]]):
+        self._cached_expressions['jacmat_aug'] = jacmat
+        return
+    
+    def override_pointers(self, pointers: dict[str, tuple[Pointer, ...]]):
+        for scalar_type, ptrs in pointers.items():
+            self._pointers_cache[scalar_type] = self._pointers(scalar_type=scalar_type, variational=False, first=ptrs)
+        return
+    
+    def override_varsys_pointers(self, pointers: dict[str, tuple[Pointer, ...]]):
+        for scalar_type, ptrs in pointers.items():
+            self._pointers_cache[scalar_type] = self._pointers(scalar_type=scalar_type, variational=True, first=ptrs)
+        return
     
     def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->LowLevelODE:
         """Create a solver instance for integrating the ODE system.
@@ -995,6 +1002,49 @@ class OdeSystem:
     # ==================== PRIVATE METHODS ====================
 
     @cached_property
+    def _get_jacmat(self):
+        """Jacobian matrix of the ODE system.
+
+        Returns
+        -------
+        list[list[Expr]]
+            A 2D list where jacmat[i][j] = d(ode_sys[i])/dq[j]. This is the
+            symbolic Jacobian matrix before compilation.
+
+        Notes
+        -----
+        The Jacobian is used by implicit integrators (like BDF) to improve
+        convergence. It is automatically compiled when needed.
+        """
+        array, symbols = self.ode_sys, self.q
+        matrix = [[None for i in range(self.Nsys)] for j in range(self.Nsys)]
+        for i in range(self.Nsys):
+            for j in range(self.Nsys):
+                matrix[i][j] = array[i].diff(symbols[j])
+        return matrix
+    
+    @cached_property
+    def _get_ode_sys_augmented(self):
+        """ODE system augmented with variational equations."""
+        var_odesys = []
+        q, delq = self.q_augmented[:self.Nsys], self.q_augmented[self.Nsys:]
+        for i in range(self.Nsys):
+            var_odesys.append(sum([self.ode_sys[i].diff(q[j])*delq[j] for j in range(self.Nsys)]))
+
+        full_sys = self.ode_sys + tuple(var_odesys)
+        return full_sys
+
+    @cached_property
+    def _get_jacmat_augmented(self):
+        """Jacobian matrix of the augmented variational system."""
+        array, symbols = self.ode_sys_augmented, self.q_augmented
+        matrix = [[None for i in range(self.Nsys*2)] for j in range(self.Nsys*2)]
+        for i in range(2*self.Nsys):
+            for j in range(2*self.Nsys):
+                matrix[i][j] = array[i].diff(symbols[j])
+        return matrix
+    
+    @cached_property
     def _event_obj_map(self):
         """Mapping from event names to event objects."""
         return {event.name: event for event in self.events}
@@ -1064,26 +1114,7 @@ class OdeSystem:
             res += (ev._funcs(self.t, *q, args=self.args, scalar_type=scalar_type),)
         return res
 
-    def _cpp_path(self, scalar_type='double', variational=False):
-        """Get the file path where C++ source code will be saved.
-
-        Parameters
-        ----------
-        scalar_type : str, default 'double'
-            The scalar type. Can be 'double', 'float', 'long double', or
-            'mpreal' (arbitrary precision via MPFR)
-        variational : bool, default False
-            Whether generating variational code
-
-        Returns
-        -------
-        str
-            Path to the C++ source file
-        """
-        name = "ode_callables_var" if variational else "ode_callables"
-        return os.path.join(self.directory, f"{name}_{scalar_type.replace(' ', '_')}.cpp")
-
-    def _pointers(self, scalar_type='double', variational=False)->tuple[int, ...]:
+    def _pointers(self, scalar_type='double', variational=False, first = ())->tuple[Pointer, ...]:
         """Get or compile function pointers for the specified scalar type and variational mode.
 
         Tries to load cached compiled pointers. If not found, compiles the code and caches
@@ -1099,32 +1130,17 @@ class OdeSystem:
 
         Returns
         -------
-        tuple[int, ...]
-            Function pointers that can be passed to C++ integrators
+        tuple of function pointers that can be passed to C++ integrators
         """
         cache = self._pointers_var_cache if variational else self._pointers_cache
         if scalar_type not in cache:
-            path = self._cpp_path(scalar_type=scalar_type, variational=variational)
-            if os.path.exists(path):
-                try:
-                    module_pointers = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational)).pointers()
-                    if self._safe_dir:
-                        with open(path, "r") as f:
-                            saved_code = f.read()
-
-                        #the saved code is always that of the non variational system
-                        #if those are equal, then the variational system code must be equal
-                        #it is faster to compare the first.
-                        if saved_code == self.code(scalar_type=scalar_type, variational=False):
-                            cache[scalar_type] = module_pointers
-                            return module_pointers
-                    else:
-                        cache[scalar_type] = module_pointers
-                        return module_pointers
-                except ImportError:
-                    pass
-            cache[scalar_type] = self.compile(scalar_type=scalar_type, variational=variational)
-
+            try:
+                default_ptrs = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational)).pointers()
+            except ImportError:
+                default_ptrs = self.compile(scalar_type=scalar_type, variational=variational)
+            cache[scalar_type] = tuple(first) + default_ptrs[len(first):]
+        else:
+            cache[scalar_type] = tuple(first) + cache[scalar_type][len(first):]
         return cache[scalar_type]
 
     def _true_events(self, compiled=True, scalar_type='double', variational=False):
