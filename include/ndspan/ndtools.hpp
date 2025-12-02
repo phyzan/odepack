@@ -100,13 +100,12 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
 
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
-    static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, 
-                  "T must be numeric or mpreal");
+    static_assert(std::is_arithmetic_v<T>, "T must be numeric or mpreal");
 
     if constexpr (std::is_integral_v<T>) {
         // Integral types
         return std::to_string(value);
-    } else if constexpr (std::is_floating_point_v<T>) {
+    } else {
         // Floating-point types (double, float, long double)
         std::ostringstream out;
         out << std::setprecision(prec) << std::scientific << value;
@@ -115,7 +114,7 @@ std::string to_string(const T& value, int prec = 3) {
 }
 
 template<>
-std::string to_string(const mpfr::mpreal& value, int prec){
+INLINE std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
 

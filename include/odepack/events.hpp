@@ -68,12 +68,7 @@ public:
             T* q_event = (this->_mask == nullptr) ? result.true_vector.data() : result.exposed_vector.data();
             q(q_event, result.t, obj); //q_event has been set
             if (this->_mask != nullptr){
-                if constexpr (N>0){
-                    copy_array<T, N>(result.true_vector.data(), result.exposed_vector.data());
-                }
-                else{
-                    copy_array(result.true_vector.data(), result.exposed_vector.data(), result.true_vector.size());
-                }
+                copy_array(result.true_vector.data(), result.exposed_vector.data(), result.true_vector.size());
                 this->_mask(result.true_vector.data(), result.t, result.exposed_vector.data(), _args.data(), _obj);
                 result.choose_true = !this->hides_mask();
             }
