@@ -147,6 +147,12 @@ int sgn(const T& x){
 }
 
 template<typename T>
+int sgn(const T& t1, const T& t2){
+    //same as sgn(t2-t1), but avoids roundoff error
+    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
+}
+
+template<typename T>
 std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size) {
     if (start >= x.size()) {
         return {}; // Return an empty vector if start is out of bounds

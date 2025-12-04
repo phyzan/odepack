@@ -1219,7 +1219,7 @@ class OdeSystem:
         if len(q0) != self.Nsys*factor:
             raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {factor*self.Nsys}")
         elif len(args) != self.Nargs:
-            raise ValueError(f"The number of args provided is {len(q0)} instead of {factor*self.Nargs}")
+            raise ValueError(f"The number of args provided is {len(args)} instead of {self.Nargs}")
         if compiled:
             pointers = self._pointers(scalar_type=scalar_type, variational=variational)
             events = self.true_compiled_events(scalar_type=scalar_type, variational=variational)

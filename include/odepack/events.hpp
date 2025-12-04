@@ -425,21 +425,21 @@ bool PeriodicEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T,
         return false;
     }
     
-    int dir = sgn(after.t-before.t);
+    int dir = sgn(before.t, after.t);
     long int n = _n_aux;
-    if ((dir*(n*_period+_start)) <= dir*before.t){
-        while ((dir*((++n)*_period+_start)) <= dir*before.t){}
+    if ((n*_period+dir*_start) <= dir*before.t){
+        while (((++n)*_period+dir*_start) <= dir*before.t){}
         _n_aux = n;
     }
     else{
-        while ((dir*(n*_period+_start)) > dir*before.t){
+        while (n*_period + dir*_start > dir*before.t){
             _n_aux = n;
             n--;
         }
     }
 
-    if ((dir*(_n_aux*_period+_start)) <= dir*after.t){
-        t = _n_aux*_period+_start;
+    if ((_n_aux*_period+dir*_start) <= dir*after.t){
+        t = dir*_n_aux*_period+_start;
         return true;
     }
     return false;
