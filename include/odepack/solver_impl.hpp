@@ -439,12 +439,18 @@ inline bool DerivedSolver<T, N, Derived>::advance_to_event(){
 
 template<typename T, size_t N, typename Derived>
 void DerivedSolver<T, N, Derived>::stop(std::string text){
+    if (!this->is_running()){
+        return;
+    }
     _is_running = false;
     _message = (text == "") ? "Stopped by user" : text;
 }
 
 template<typename T, size_t N, typename Derived>
 void DerivedSolver<T, N, Derived>::kill(std::string text){
+    if (this->is_dead()){
+        return;
+    }
     _is_running = false;
     _is_dead = true;
     _message = (text == "") ? "Killed by user" : text;
@@ -466,7 +472,13 @@ bool DerivedSolver<T, N, Derived>::resume(){
 template<typename T, size_t N, typename Derived>
 void DerivedSolver<T, N, Derived>::set_tmax(T tmax){
     _events.set_tmax(tmax);
-    this->resume();
+    if (tmax != this->t()){
+        this->resume();
+    }
+    else{
+        this->stop("t-goal");
+    }
+    
 }
 
 template<typename T, size_t N, typename Derived>
