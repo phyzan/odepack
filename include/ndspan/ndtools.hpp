@@ -8,7 +8,7 @@
 #include <cassert>
 #include <cinttypes>
 #include <iostream>
-#include "mpreal.h"
+#include <mpreal.h>
 
 #define THIS static_cast<Derived*>(this)
 #define THIS_C static_cast<const Derived*>(this)
