@@ -80,11 +80,12 @@ public:
     }
 
     template<IsShapeContainer ShapeContainer>
-    explicit DynamicArray(T* data, const ShapeContainer& shape, bool own_it = false) : DynamicArray(shape){
+    explicit DynamicArray(T* data, const ShapeContainer& shape, bool own_it = false) : Base(shape){
         if (own_it){
             _data = data;
         }
-        else{
+        else if (this->size() > 0){
+            _data = new T[this->size()];
             copy_array<T>(this->data(), data, this->size());
         }
     }
