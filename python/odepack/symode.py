@@ -791,12 +791,12 @@ class OdeSystem:
     
     def override_pointers(self, pointers: dict[str, tuple[Pointer, ...]]):
         for scalar_type, ptrs in pointers.items():
-            self._pointers_cache[scalar_type] = self._pointers(scalar_type=scalar_type, variational=False, first=ptrs)
+            self._pointers(scalar_type=scalar_type, variational=False, first=ptrs)
         return
     
     def override_varsys_pointers(self, pointers: dict[str, tuple[Pointer, ...]]):
         for scalar_type, ptrs in pointers.items():
-            self._pointers_cache[scalar_type] = self._pointers(scalar_type=scalar_type, variational=True, first=ptrs)
+            self._pointers(scalar_type=scalar_type, variational=True, first=ptrs)
         return
     
     def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->LowLevelODE:
