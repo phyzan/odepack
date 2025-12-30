@@ -2,11 +2,15 @@
 #define TOOLS_HPP
 
 
+#include <complex>
 #include <map>
 #include <chrono>
-#include <mpreal.h>
 #include <omp.h>
+#include <cmath>
 #include "../ndspan/arrays.hpp"
+#ifdef MPREAL
+#include "mpreal.h"
+#endif
 
     
 template<typename T, size_t N>
@@ -111,10 +115,12 @@ inline bool is_finite(const T& value) {
     }
 }
 
+#ifdef MPREAL
 template <>
 inline bool is_finite(const mpfr::mpreal& value) {
     return mpfr_number_p(value.mpfr_ptr()) != 0;
 }
+#endif
 
 template<typename T>
 T rms_norm(const T* x, size_t size){

@@ -38,6 +38,7 @@ set(COMMON_COMPILE_OPTIONS
     -fno-trapping-math
     -fopenmp
     -march=x86-64
+    -DMPREAL
 )
 
 # Add optimization and debug flags based on DETAILED_BACKTRACE option

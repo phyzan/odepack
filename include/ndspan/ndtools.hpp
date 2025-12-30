@@ -10,7 +10,6 @@
 #include <cinttypes>
 #include <iostream>
 #include <numeric>
-#include "mpreal.h"
 
 #define THIS static_cast<Derived*>(this)
 #define THIS_C static_cast<const Derived*>(this)
@@ -139,9 +138,10 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
 
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
+#ifdef MPREAL
     static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, 
                   "T must be numeric or mpreal");
-
+#endif
     if constexpr (std::is_integral_v<T>) {
         // Integral types
         return std::to_string(value);
@@ -158,10 +158,12 @@ INLINE T abs(const T& x){
     return x >= 0 ? x : -x;
 }
 
+#ifdef MPREAL
 template<>
 std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
+#endif
 
 template<typename T, typename Array>
 std::string array_repr(const Array& array, int digits) {
