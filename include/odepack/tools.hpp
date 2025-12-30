@@ -137,11 +137,6 @@ T norm(const T* x, size_t size){
 }
 
 template<typename T>
-T abs(const T& x){
-    return (x > 0) ? x : -x;
-}
-
-template<typename T>
 int sgn(const T& x){
     return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
 }

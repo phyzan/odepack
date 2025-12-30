@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <utility>
 #include <array>
 #include <cstring>
@@ -8,18 +9,56 @@
 #include <cassert>
 #include <cinttypes>
 #include <iostream>
-#include <mpreal.h>
+#include <numeric>
+#include "mpreal.h"
 
 #define THIS static_cast<Derived*>(this)
 #define THIS_C static_cast<const Derived*>(this)
 #define CONST_CAST(TYPE, FUNC) const_cast<TYPE>(static_cast<const CLS*>(this)->FUNC);
 #define INLINE __attribute__((always_inline)) inline
+#define LAMBDA_INLINE __attribute__((always_inline))
 
 #define DEFAULT_RULE_OF_FOUR(CLASSNAME)                  \
     CLASSNAME(const CLASSNAME& other) = default;      \
     CLASSNAME(CLASSNAME&& other) = default;           \
     CLASSNAME& operator=(const CLASSNAME& other) = default; \
     CLASSNAME& operator=(CLASSNAME&& other) = default;
+
+
+template<typename... Arg>
+void print(Arg... y){
+    ((std::cout << y << ' '), ...);
+    std::cout << "\n\n";
+}
+
+#define INTS(IntType, I) std::integer_sequence<IntType, I...>
+
+#define MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
+
+#define EXPAND(IntType, N, I, ...) [&]<IntType... I>(INTS(IntType, I)) __attribute__((always_inline)) { \
+    __VA_ARGS__ \
+}(MAKE_INTS(IntType, N))
+
+#define FOR_LOOP(IntType, I, N, ...) [&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline)) { \
+    ([&]<IntType I>(){\
+        __VA_ARGS__ \
+    }.template operator()<IDUMMY>(), ...);\
+}(MAKE_INTS(IntType, N))
+
+template<std::size_t I, typename FirstType, typename... ArgType>
+INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
+    if constexpr (I == 0) {
+        return std::forward<FirstType>(x0);
+    } else {
+        static_assert(sizeof...(x) > 0, "Index out of bounds");
+        return pack_elem<I - 1>(std::forward<ArgType>(x)...);
+    }
+}
+
+#define BOUNDS_ASSERT(i, n) assert((i>=0 && i<n) && "Index out of bounds")
+
+template<typename... Ts>
+concept IsInt = (std::convertible_to<Ts, size_t>  && ...);
 
 template<typename _ShapeContainer>
 concept IsShapeContainer = requires(_ShapeContainer c) {
@@ -100,12 +139,13 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
 
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
-    static_assert(std::is_arithmetic_v<T>, "T must be numeric or mpreal");
+    static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, 
+                  "T must be numeric or mpreal");
 
     if constexpr (std::is_integral_v<T>) {
         // Integral types
         return std::to_string(value);
-    } else {
+    } else if constexpr (std::is_floating_point_v<T>) {
         // Floating-point types (double, float, long double)
         std::ostringstream out;
         out << std::setprecision(prec) << std::scientific << value;
@@ -113,8 +153,13 @@ std::string to_string(const T& value, int prec = 3) {
     }
 }
 
+template<typename T>
+INLINE T abs(const T& x){
+    return x >= 0 ? x : -x;
+}
+
 template<>
-INLINE std::string to_string(const mpfr::mpreal& value, int prec){
+std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
 
@@ -141,7 +186,8 @@ INLINE bool equal_arrays(const T* a, const T* b){
 
 template<size_t... Args>
 size_t _validate_size(size_t size){
-    assert((size == (Args * ...)) && "Invalid initializer list size");
+    constexpr size_t expected = (Args * ...);
+    assert(size == expected && "Invalid initializer list size");
     return size;
 }
 
@@ -156,3 +202,35 @@ template<size_t Head, size_t... Tail>
 struct tail_product<Head, Tail...> {
     static constexpr size_t value = Head * tail_product<Tail...>::value;
 };
+
+
+constexpr size_t factorial(size_t k){
+    size_t res = 1;
+    for (size_t i=1; i<k+1; i++){
+        res *= i;
+    }
+    return res;
+}
+
+constexpr size_t comb(size_t n, size_t k) {
+    assert(n >= k);
+
+    k = std::min(k, n - k);
+
+    size_t res = 1;
+    for (size_t i = 1; i <= k; ++i) {
+        size_t num = n - i + 1;
+        size_t den = i;
+
+        size_t g = std::gcd(num, den);
+        num /= g;
+        den /= g;
+
+        g = std::gcd(res, den);
+        res /= g;
+        den /= g;
+
+        res *= num;   // den is now 1
+    }
+    return res;
+}

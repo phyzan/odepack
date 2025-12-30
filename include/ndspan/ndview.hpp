@@ -21,7 +21,7 @@ public:
     DEFAULT_RULE_OF_FOUR(AbstractNdView)
 
     template<IsShapeContainer ShapeContainer>
-    AbstractNdView(const ShapeContainer& shape) : Base(shape) {}
+    explicit AbstractNdView(const ShapeContainer& shape) : Base(shape) {}
 
     //ACCESSORS
 
@@ -53,14 +53,26 @@ public:
 
     template<INT_T IDX_T>
     INLINE const T& operator[](IDX_T i) const{
+        BOUNDS_ASSERT(i, this->size());
         return data()[i];
+    }
+
+    template<typename... Idx>
+    INLINE auto operator()(Idx... i) const{
+        return tensor_call(THIS_C, i...);
     }
 
     //MODIFIERS
 
     template<INT_T IDX_T>
     INLINE T& operator[](IDX_T i){
+        BOUNDS_ASSERT(i, this->size());
         return data()[i];
+    }
+
+    template<typename... Idx>
+    INLINE auto operator()(Idx... i){
+        return tensor_call(THIS, i...);
     }
 
 };
@@ -99,3 +111,13 @@ private:
 
     T* _data;
 };
+
+template<typename Derived, INT_T... Int>
+inline Derived::value_type& tensor_call(Derived& x, Int... idx){
+    return x(idx...);
+}
+
+template<typename Derived, INT_T... Int>
+inline const Derived::value_type& tensor_call(const Derived& x, Int... idx){
+    return x(idx...);
+}

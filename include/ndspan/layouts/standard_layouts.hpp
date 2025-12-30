@@ -14,7 +14,7 @@ public:
     DEFAULT_RULE_OF_FOUR(StridedDerivedNdSpan)
     
     template<IsShapeContainer ShapeContainer>
-    StridedDerivedNdSpan(const ShapeContainer& shape) : Base(shape) {}
+    explicit StridedDerivedNdSpan(const ShapeContainer& shape) : Base(shape) {}
 
     const size_t* strides() const{
         return THIS_C->strides();
@@ -65,7 +65,7 @@ public:
     DEFAULT_RULE_OF_FOUR(StridedStaticNdSpan)
     
     template<IsShapeContainer ShapeContainer>
-    StridedStaticNdSpan(const ShapeContainer& shape) : Base(shape) {}
+    explicit StridedStaticNdSpan(const ShapeContainer& shape) : Base(shape) {}
     
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
@@ -251,7 +251,7 @@ public:
     DEFAULT_RULE_OF_FOUR(RowMajorSpan)
 
     template<IsShapeContainer ShapeContainer>
-    RowMajorSpan(const ShapeContainer& shape) : Base(shape) {}
+    explicit RowMajorSpan(const ShapeContainer& shape) : Base(shape) {}
 
     template<INT_T... Args>
     explicit constexpr RowMajorSpan(Args... shape) : Base(shape...){}
@@ -286,7 +286,7 @@ public:
     DEFAULT_RULE_OF_FOUR(ColumnMajorSpan)
     
     template<IsShapeContainer ShapeContainer>
-    ColumnMajorSpan(const ShapeContainer& shape) : Base(shape) {}
+    explicit ColumnMajorSpan(const ShapeContainer& shape) : Base(shape) {}
 
     template<INT_T... Args>
     explicit constexpr ColumnMajorSpan(Args... shape) : Base(shape...){}

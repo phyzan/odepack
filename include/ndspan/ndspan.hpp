@@ -54,7 +54,7 @@ struct AbstractNdSpan{
     }
 
     template<size_t Nd>
-    INLINE constexpr size_t offset_from_array(const std::array<size_t, Nd>& idx) const noexcept {
+    INLINE constexpr size_t offset(const std::array<size_t, Nd>& idx) const noexcept {
         return _offset_from_array_aux(idx, std::make_index_sequence<Nd>());
     }
 
@@ -101,12 +101,9 @@ protected:
 
     AbstractNdSpan() = default;
 
-    template<INT_T... ARGS, size_t... I>
-    INLINE void _bounds_check(std::index_sequence<I...>, ARGS... idx) const {
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wsign-compare"
-        assert(((idx >= 0 && idx < this->shape(I)) && ...) && "Out of bounds");
-        #pragma GCC diagnostic pop
+    template<INT_T... IntType, size_t... I>
+    INLINE void _bounds_check(std::index_sequence<I...>, IntType... idx) const {
+        assert(((idx >= IntType(0) && idx < IntType(this->shape(I))) && ...) && "Out of bounds");
     }
 
     template<INT_T... Idx>
@@ -192,7 +189,9 @@ struct StaticNdSpan : public AbstractNdSpan<Derived, DIMS...>{
     template<IsShapeContainer ShapeContainer>
     INLINE void reshape(const ShapeContainer& shape){
         assert((shape.size() == this->ndim()) && "Invalid shape in StaticNdSpan::reshape");
-        assert([&]{int I = 0; return ((shape[I++] == DIMS) && ...);}() &&  "Runtime dims do not match template dims in reshape");}
+        int I = 0;
+        assert(((shape[I++]==DIMS) && ...) && "Runtime dims do not match template dims in reshape");
+    }
 
     template<IsShapeContainer ShapeContainer>
     INLINE void resize(const ShapeContainer& shape){

@@ -28,7 +28,7 @@ protected:
     DEFAULT_RULE_OF_FOUR(AbstractArray)
 
     template<IsShapeContainer ShapeContainer>
-    AbstractArray(const ShapeContainer& shape) : Base(shape) {}
+    explicit AbstractArray(const ShapeContainer& shape) : Base(shape) {}
 
     ~AbstractArray() = default;
 
@@ -47,10 +47,10 @@ class DynamicArray : public AbstractArray<DynamicArray<T, L, DIMS...>, T, L, DIM
     using CLS = DynamicArray<T, L, DIMS...>;
     using Base = AbstractArray<DynamicArray<T, L, DIMS...>, T, L, DIMS...>;
 
+public:
+
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
     inline static constexpr size_t ND = sizeof...(DIMS);
-
-public:
 
     DynamicArray() : Base() {
         _data = (N > 0 ? new T[N] : nullptr);
@@ -189,12 +189,12 @@ class StackArray : public AbstractArray<StackArray<T, L, DIMS...>, T, L, DIMS...
     using CLS = StackArray<T, L, DIMS...>;
     using Base = AbstractArray<StackArray<T, L, DIMS...>, T, L, DIMS...>;
 
+public:
+
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
     inline static constexpr size_t ND = sizeof...(DIMS);
 
     static_assert(N>0, "StackArray requires only positive template dimensions");
-
-public:
 
     using Base::Base;
 
@@ -256,10 +256,9 @@ public:
 
 private:
 
-    T _data[N];
+    T _data[N]{}; //should initialize all values to zero
 
 };
-
 
 
 enum class Allocation : std::uint8_t {Heap, Stack, Auto};

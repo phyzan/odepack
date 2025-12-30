@@ -17,17 +17,13 @@ class RungeKuttaBase : public DerivedSolver<T, N, Derived>{
 
 public:
 
-    static constexpr size_t ERR_EST_ORDER = Derived::ERR_EST_ORDER;
-    T ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
-    static constexpr bool IS_IMPLICIT = false;
-
     using Atype = Array2D<T, Nstages, Nstages>;
     using Btype = Array1D<T, Nstages>;
     using Ctype = Array1D<T, Nstages>;
 
-    Atype A = Derived::Amatrix();
-    Btype B = Derived::Bmatrix();
-    Ctype C = Derived::Cmatrix();
+    static constexpr size_t ERR_EST_ORDER = Derived::ERR_EST_ORDER;
+    T ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
+    static constexpr bool IS_IMPLICIT = false;
 
     void adapt_impl(State<T, N>& res);
 
@@ -40,6 +36,10 @@ public:
     inline void re_adjust(){}
 
 protected:
+
+    Atype A = Derived::Amatrix();
+    Btype B = Derived::Bmatrix();
+    Ctype C = Derived::Cmatrix();
 
     RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows) : Base(name, ARGS), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
 
