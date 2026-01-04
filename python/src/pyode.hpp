@@ -2,7 +2,7 @@
 #define PYODE_HPP
 
 #include "pytools.hpp"
-#include "include/odepack/virtualsolver.hpp"
+#include "../../include/odepack/virtualsolver.hpp"
 
 #define EXECUTE_ANY(DTYPE, ACTION, CppType, EXPR, DEFAULT)  \
     switch (DTYPE) {                                                         \

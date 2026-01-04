@@ -4,8 +4,8 @@
 #include <cstddef>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include "include/ndspan/arrays.hpp"
-#include "include/odepack/variational.hpp"
+#include "../../include/ndspan/arrays.hpp"
+#include "../../include/odepack/variational.hpp"
 #include  "mpreal_caster.hpp"
 
 namespace py = pybind11;
