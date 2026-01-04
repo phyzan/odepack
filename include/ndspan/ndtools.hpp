@@ -10,6 +10,9 @@
 #include <cinttypes>
 #include <iostream>
 #include <numeric>
+#ifdef MPREAL
+#include "mpreal.h"
+#endif
 
 #define THIS static_cast<Derived*>(this)
 #define THIS_C static_cast<const Derived*>(this)
