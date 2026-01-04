@@ -10,6 +10,7 @@ CompileFlags:
     - "-Wshadow"
     - "-fopenmp"
     - "-fno-math-errno"
+    - "-Wno-sign-conversion"
     - "-I/home/senpy/Documents/repos/odepack"
     - "-I/usr/include/python3.12"
     - "-I/usr/include/pybind11"
@@ -27,4 +28,4 @@ Diagnostics:
     - unused-parameter
   ClangTidy:
     Add: [performance-*, modernize-*, readability-*]
-    Remove: ['readability-redundant-declaration', 'modernize-use-trailing-return-type', 'readability-identifier-length', 'readability-redundant-inline-specifier', 'readability-identifier-naming', 'readability-magic-numbers', 'readability-else-after-return', 'readability-function-cognitive-complexity', 'readability-math-missing-parentheses', 'readability-avoid-nested-conditional-operator', 'readability-isolate-declaration', 'performance-avoid-endl', 'readability-named-parameter', 'modernize-use-nodiscard', readability-implicit-bool-conversion]
+    Remove: ['readability-redundant-declaration', 'modernize-use-trailing-return-type', 'readability-identifier-length', 'readability-redundant-inline-specifier', 'readability-identifier-naming', 'readability-magic-numbers', 'readability-else-after-return', 'readability-function-cognitive-complexity', 'readability-math-missing-parentheses', 'readability-avoid-nested-conditional-operator', 'readability-isolate-declaration', 'performance-avoid-endl', 'readability-named-parameter', 'modernize-use-nodiscard', readability-implicit-bool-conversion, readability-convert-member-functions-to-static]

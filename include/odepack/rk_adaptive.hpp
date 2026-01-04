@@ -3,83 +3,73 @@
 
 //https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method
 
-
-#include "solver_impl.hpp"
+#include "rich_solver.hpp"
 
 // Forward declarations
 template<typename T, size_t Nstages>
 T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size);
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
-class RungeKuttaBase : public DerivedSolver<T, N, Derived>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+class RungeKuttaBase : public BaseDispatcher<Derived, T, N, SP>{
 
-    using Base = DerivedSolver<T, N, Derived>;
+protected:
 
-public:
+    // ================ STATIC OVERRIDES ========================
+    static constexpr bool   IS_IMPLICIT = false;
+
+    void adapt_impl(T* res);
+
+    void reset_impl();
+
+    // =========================================================
+
+    using Base = BaseDispatcher<Derived, T, N, SP>;
 
     using Atype = Array2D<T, Nstages, Nstages>;
     using Btype = Array1D<T, Nstages>;
     using Ctype = Array1D<T, Nstages>;
 
-    static constexpr size_t ERR_EST_ORDER = Derived::ERR_EST_ORDER;
-    T ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
-    static constexpr bool IS_IMPLICIT = false;
-
-    void adapt_impl(State<T, N>& res);
-
-    void reset() override{
-        Base::reset();
-        _K_true.set(0);
-        _mat_is_set = false;
-    }
-
-    inline void re_adjust(){}
-
-protected:
-
     Atype A = Derived::Amatrix();
     Btype B = Derived::Bmatrix();
     Ctype C = Derived::Cmatrix();
 
-    RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows) : Base(name, ARGS), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
+    RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows) requires (!is_rich<SP>);
+
+    RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), EVENTS events, size_t Krows) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RungeKuttaBase)
 
-    inline T _estimate_error_norm(const T* K, const T* scale, T h) const {
-        return static_cast<const Derived*>(this)->_estimate_error_norm(K, scale, h);
-    }
+    inline void set_coef_matrix() const;
 
-    inline void _set_coef_matrix_impl() const{ //override
-        static_cast<const Derived*>(this)->_set_coef_matrix_impl();
-    }
+    void        step_impl(T* result, const T& h);
 
-    inline void _set_coef_matrix() const{
-        if (!this->_mat_is_set){
-            this->_set_coef_matrix_impl();
-            this->_mat_is_set = true;
-        }
-        
-    }
+    // ======================= OVERRIDE =======================
+    inline T    estimate_error_norm(const T* K, const T* scale, T h) const;
 
-    void _step_impl(State<T, N>& result, const T& h);
-    
+    inline void set_coef_matrix_impl() const;
+
+    // ========================================================
+
     mutable Array2D<T, 0, N>    _K_true;
     mutable Array1D<T, N>       _df_tmp;
     mutable Array1D<T, N>       _scale_tmp;
     mutable Array1D<T, N>       _error_tmp;
     mutable Array2D<T, N, 0>    _coef_mat;
     mutable bool                _mat_is_set = false;
+    T                           ERR_EXP = T(-1)/T(Derived::ERR_EST_ORDER+1);
 };
 
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
-class StandardRungeKutta : public RungeKuttaBase<Derived, T, N, Nstages, Norder>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+class StandardRungeKutta : public RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>{
 
-    using Base = RungeKuttaBase<Derived, T, N, Nstages, Norder>;
+    using Base = RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>;
 
     friend Base;
 
-public:
+protected:
+
+    friend BaseSolver<Derived, T, N, SP>;
 
     using Etype = Array1D<T, Nstages+1>;
     using Ptype = Array2D<T, Nstages+1, 0>;
@@ -87,63 +77,48 @@ public:
     Etype E = Derived::Ematrix();
     Ptype P = Derived::Pmatrix();
 
-    inline void interp_impl(T* result, const T& t) const{
-        this->_set_coef_matrix();
-        return coef_mat_interp(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->current_state().vector.data(), this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
-    }
+    StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
 
-    inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const{
-        this->_set_coef_matrix();
-        return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->old_state().t, this->t(), this->old_state().vector, this->current_state().vector, bdr1, bdr2));
-    }
-
-protected:
-    
-
-    StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N)) : Base(name, ARGS, Nstages+1) {}
+    StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(StandardRungeKutta)
 
-    void _set_coef_matrix_impl() const{
-        for (size_t i=0; i<this->Nsys(); i++){
-            for (size_t j=0; j<Derived::INTERP_ORDER; j++){
-                T sum = 0;
-                for (size_t k=0; k<Nstages+1; k++){
-                    sum += this->_K_true(k, i) * P(k, j);
-                }
-                this->_coef_mat(i, j) = sum;
-            }
-        }
-    }
+    // ================ STATIC OVERRIDES ========================
 
-private:
+    inline std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
 
-    inline T _estimate_error_norm(const T* K, const T* scale, T h) const {
-        return _error_norm<T, Nstages>(this->_error_tmp.data(), E.data(), K, h, scale, this->Nsys());
-    }
+    inline void                                 interp_impl(T* result, const T& t) const;
 
+    void                                        set_coef_matrix_impl() const;
+
+    inline T                                    estimate_error_norm(const T* K, const T* scale, T h) const;
+
+    // ==========================================================
 };
 
 
 
-template<typename T, size_t N>
-class RK45 : public StandardRungeKutta<RK45<T, N>, T, N, 6, 5>{
+template<typename T, size_t N, SolverPolicy SP>
+class RK45 : public StandardRungeKutta<RK45<T, N, SP>, T, N, 6, 5, SP>{
 
     static const size_t Norder = 5;
     static const size_t Nstages = 6;
-    
 
-    using RKbase = StandardRungeKutta<RK45<T, N>, T, N, Nstages, Norder>;
+
+    using RKbase = StandardRungeKutta<RK45<T, N, SP>, T, N, Nstages, Norder, SP>;
 
 public:
 
-    static constexpr size_t ERR_EST_ORDER = 4;
-    static constexpr size_t INTERP_ORDER = 4;
+    static constexpr const char*    name = "RK45";
+    static constexpr size_t         ERR_EST_ORDER = 4;
+    static constexpr size_t         INTERP_ORDER = 4;
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N));
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK45);
-    
+
     inline static constexpr typename RKbase::Atype Amatrix();
 
     inline static constexpr typename RKbase::Btype Bmatrix();
@@ -159,21 +134,24 @@ public:
 
 
 
-template<typename T, size_t N>
-class RK23 : public StandardRungeKutta<RK23<T, N>, T, N, 3, 3> {
+template<typename T, size_t N, SolverPolicy SP>
+class RK23 : public StandardRungeKutta<RK23<T, N, SP>, T, N, 3, 3, SP> {
 
     static const size_t Norder = 3;
     static const size_t Nstages = 3;
-    
 
-    using RKbase = StandardRungeKutta<RK23<T, N>, T, N, Nstages, Norder>;
-    
+
+    using RKbase = StandardRungeKutta<RK23<T, N, SP>, T, N, Nstages, Norder, SP>;
+
 public:
 
-    static constexpr size_t ERR_EST_ORDER = 2;
-    static constexpr size_t INTERP_ORDER = 3;
+    static constexpr const char*    name = "RK23";
+    static constexpr size_t         ERR_EST_ORDER = 2;
+    static constexpr size_t         INTERP_ORDER = 3;
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N));
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK23);
 
@@ -252,25 +230,61 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 }
 
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
-void RungeKuttaBase<Derived, T, N, Nstages, Norder>::adapt_impl(State<T, N>& res){
+// RungeKuttaBase implementations
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows)
+    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), EVENTS events, size_t Krows)
+    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::reset_impl(){
+    Base::reset_impl();
+    _K_true.set(0);
+    _mat_is_set = false;
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline T RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::estimate_error_norm(const T* K, const T* scale, T h) const {
+    return THIS_C->estimate_error_norm(K, scale, h);
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::set_coef_matrix_impl() const{
+    THIS_C->set_coef_matrix_impl();
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::set_coef_matrix() const{
+    if (!this->_mat_is_set){
+        this->set_coef_matrix_impl();
+        this->_mat_is_set = true;
+    }
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::adapt_impl(T* res){
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
     const T& rtol = this->rtol();
-    const State<T, N>& state = this->current_state();
+    const T* state = this->new_state_ptr();
 
-    res.habs = state.habs;
+    T& habs = res[1];
+    habs = state[1];
     T h, err_norm, factor, _factor;
+    T* q_new = res+2;
+    const T* q = state+2;
 
     bool step_accepted = false;
     bool step_rejected = false;
     while (!step_accepted){
-
-        h = res.habs * this->direction();
-        _step_impl(res, h); //res and K are altered
-        adapt_scale(_scale_tmp.data(), state.vector.data(), res.vector.data(), atol, rtol, this->Nsys());
-        err_norm = this->_estimate_error_norm(_K_true.data(), _scale_tmp.data(), h);
+        h = habs * this->direction();
+        step_impl(res, h); //res and K are altered
+        adapt_scale(_scale_tmp.data(), q, q_new, atol, rtol, this->Nsys());
+        err_norm = this->estimate_error_norm(_K_true.data(), _scale_tmp.data(), h);
         _factor = this->SAFETY*pow(err_norm, ERR_EXP);
         if (err_norm < 1){
             factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
@@ -283,28 +297,27 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::adapt_impl(State<T, N>& res
             factor = std::max(this->MIN_FACTOR, _factor);
             step_rejected = true;
         }
-        if (!resize_step(factor, res.habs, h_min, max_step)){
+        if (!resize_step(factor, habs, h_min, max_step)){
             break;
         }
     }
 }
 
-
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder>
-void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& result, const T& h){
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::step_impl(T* result, const T& h){
     this->_mat_is_set = false;
-    const State<T, N>& state = this->current_state();
+    const T* state = this->new_state_ptr();
     size_t Nsys = this->Nsys();
-    T* q = result.vector.data();
+    T* q = result+2;
     T* K_ = _K_true.data();
-    const T* vector = state.vector.data();
+    const T* vector = state+2;
     // const T* A_ = A.data();
     const T* B_ = B.data();
     const T* C_ = C.data();
     T* r = _df_tmp.data();
+    const T& t = state[0];
 
-    this->_rhs(K_, state.t, vector);
+    this->rhs(K_, t, vector);
 
     #pragma omp simd
     for (size_t j=0; j<Nsys; j++){
@@ -323,7 +336,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& res
                 r[j] += p * _K_true(i, j);
             }
         }
-        this->_rhs(K_+s*Nsys, state.t+C_[s]*h, r);
+        this->rhs(K_+s*Nsys, t+C_[s]*h, r);
         T p = B(s) * h;
         #pragma omp simd
         for (size_t j=0; j<Nsys; j++){
@@ -331,16 +344,60 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder>::_step_impl(State<T, N>& res
         }
     }
 
-    this->_rhs(K_+Nstages*Nsys, state.t+h, q);
-    result.t = state.t+h;
+    this->rhs(K_+Nstages*Nsys, t+h, q);
+    result[0] = t+h;
 }
 
 
-template<typename T, size_t N>
-RK45<T, N>::RK45(MAIN_CONSTRUCTOR(T, N)) : RKbase("RK45", ARGS){}
+// StandardRungeKutta implementations
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N))
+    requires (!is_rich<SP>): Base(ARGS, Nstages+1) {}
 
-template<typename T, size_t N>
-inline constexpr typename RK45<T, N>::RKbase::Atype RK45<T, N>::Amatrix() {
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N), EVENTS events)
+    requires (is_rich<SP>): Base(ARGS, events, Nstages+1) {}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline std::unique_ptr<Interpolator<T, N>> StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::state_interpolator(int bdr1, int bdr2) const{
+    this->set_coef_matrix();
+    return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t(), this->old_state_ptr()+2, this->new_state_ptr(), this->Nsys(), bdr1, bdr2));
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline void StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::interp_impl(T* result, const T& t) const{
+    this->set_coef_matrix();
+    return coef_mat_interp(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+void StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::set_coef_matrix_impl() const{
+    for (size_t i=0; i<this->Nsys(); i++){
+        for (size_t j=0; j<Derived::INTERP_ORDER; j++){
+            T sum = 0;
+            for (size_t k=0; k<Nstages+1; k++){
+                sum += this->_K_true(k, i) * P(k, j);
+            }
+            this->_coef_mat(i, j) = sum;
+        }
+    }
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+inline T StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::estimate_error_norm(const T* K, const T* scale, T h) const {
+    return _error_norm<T, Nstages>(this->_error_tmp.data(), E.data(), K, h, scale, this->Nsys());
+}
+
+
+// RK45 implementations
+template<typename T, size_t N, SolverPolicy SP>
+RK45<T, N, SP>::RK45(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): RKbase(ARGS){}
+
+template<typename T, size_t N, SolverPolicy SP>
+RK45<T, N, SP>::RK45(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
+
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK45<T, N, SP>::RKbase::Atype RK45<T, N, SP>::Amatrix() {
     return {   T(0),        T(0),        T(0),        T(0),        T(0), T(0),
             T(1)/T(5),  T(0),        T(0),        T(0),        T(0), T(0),
             T(3)/T(40), T(9)/T(40), T(0),        T(0),        T(0), T(0),
@@ -349,8 +406,8 @@ inline constexpr typename RK45<T, N>::RKbase::Atype RK45<T, N>::Amatrix() {
             T(9017)/T(3168), T(-355)/T(33), T(46732)/T(5247), T(49)/T(176), T(-5103)/T(18656), T(0)};
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK45<T, N>::RKbase::Btype RK45<T, N>::Bmatrix(){
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK45<T, N, SP>::RKbase::Btype RK45<T, N, SP>::Bmatrix(){
     T q[] = { T(35)/T(384),
             T(0),
             T(500)/T(1113),
@@ -361,9 +418,9 @@ inline constexpr typename RK45<T, N>::RKbase::Btype RK45<T, N>::Bmatrix(){
     return B;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK45<T, N>::RKbase::Ctype RK45<T, N>::Cmatrix(){
-    
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK45<T, N, SP>::RKbase::Ctype RK45<T, N, SP>::Cmatrix(){
+
     T q[] = { T(0),
             T(1)/T(5),
             T(3)/T(10),
@@ -374,9 +431,9 @@ inline constexpr typename RK45<T, N>::RKbase::Ctype RK45<T, N>::Cmatrix(){
     return C;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK45<T, N>::RKbase::Etype RK45<T, N>::Ematrix() {
-    
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK45<T, N, SP>::RKbase::Etype RK45<T, N, SP>::Ematrix() {
+
     T q[] = { T(-71)/T(57600),
             T(0),
             T(71)/T(16695),
@@ -388,9 +445,9 @@ inline constexpr typename RK45<T, N>::RKbase::Etype RK45<T, N>::Ematrix() {
     return E;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK45<T, N>::RKbase::Ptype RK45<T, N>::Pmatrix() {
-    
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK45<T, N, SP>::RKbase::Ptype RK45<T, N, SP>::Pmatrix() {
+
     T q[] = {    T(1),   -T(8048581381)/T(2820520608),   T(8663915743)/T(2820520608),   -T(12715105075)/T(11282082432),
             T(0),    T(0),                          T(0),                          T(0),
             T(0),    T(131558114200)/T(32700410799), -T(68118460800)/T(10900136933), T(87487479700)/T(32700410799),
@@ -403,25 +460,23 @@ inline constexpr typename RK45<T, N>::RKbase::Ptype RK45<T, N>::Pmatrix() {
 }
 
 
+// RK23 implementations
+template<typename T, size_t N, SolverPolicy SP>
+RK23<T, N, SP>::RK23(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): RKbase(ARGS){}
 
+template<typename T, size_t N, SolverPolicy SP>
+RK23<T, N, SP>::RK23(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
 
-
-
-
-
-template<typename T, size_t N>
-RK23<T, N>::RK23(MAIN_CONSTRUCTOR(T, N)) : RKbase("RK23", ARGS){}
-
-template<typename T, size_t N>
-inline constexpr typename RK23<T, N>::RKbase::Atype RK23<T, N>::Amatrix() {
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK23<T, N, SP>::RKbase::Atype RK23<T, N, SP>::Amatrix() {
     return { T(0),    T(0),    T(0),
             T(1)/T(2), T(0),    T(0),
             T(0),    T(3)/T(4), T(0)};
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK23<T, N>::RKbase::Btype RK23<T, N>::Bmatrix(){
-    
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK23<T, N, SP>::RKbase::Btype RK23<T, N, SP>::Bmatrix(){
+
     T q[] = { T(2)/T(9),
             T(1)/T(3),
             T(4)/T(9)};
@@ -429,9 +484,9 @@ inline constexpr typename RK23<T, N>::RKbase::Btype RK23<T, N>::Bmatrix(){
     return B;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK23<T, N>::RKbase::Ctype RK23<T, N>::Cmatrix(){
-    
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK23<T, N, SP>::RKbase::Ctype RK23<T, N, SP>::Cmatrix(){
+
     T q[] = { T(0),
             T(1)/T(2),
             T(3)/T(4)};
@@ -439,8 +494,8 @@ inline constexpr typename RK23<T, N>::RKbase::Ctype RK23<T, N>::Cmatrix(){
     return C;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK23<T, N>::RKbase::Etype RK23<T, N>::Ematrix() {
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK23<T, N, SP>::RKbase::Etype RK23<T, N, SP>::Ematrix() {
     T q[] = { T(5)/T(72),
             T(-1)/T(12),
             T(-1)/T(9),
@@ -449,8 +504,8 @@ inline constexpr typename RK23<T, N>::RKbase::Etype RK23<T, N>::Ematrix() {
     return E;
 }
 
-template<typename T, size_t N>
-inline constexpr typename RK23<T, N>::RKbase::Ptype RK23<T, N>::Pmatrix() {
+template<typename T, size_t N, SolverPolicy SP>
+inline constexpr typename RK23<T, N, SP>::RKbase::Ptype RK23<T, N, SP>::Pmatrix() {
     T q[] = { T(1),   -T(4)/T(3),  T(5)/T(9),
         T(0),    T(1),      -T(2)/T(3),
         T(0),    T(4)/T(3), -T(8)/T(9),

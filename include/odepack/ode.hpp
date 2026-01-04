@@ -76,7 +76,6 @@ private:
 };
 
 
-
 template<typename T, size_t N>
 class EventCounter{
 
@@ -154,7 +153,7 @@ public:
 
     double                                      runtime() const;
 
-    const OdeSolver<T, N>*                      solver() const;
+    const OdeRichSolver<T, N>*                  solver() const;
 
     void                                        set_obj(const void* obj);
 
@@ -166,7 +165,7 @@ protected:
 
     ODE() = default;
 
-    OdeSolver<T, N>* _solver = nullptr;
+    OdeRichSolver<T, N>* _solver = nullptr;
     std::vector<T> _t_arr;
     std::vector<T> _q_data;
     std::vector<std::vector<size_t>> _Nevents;
@@ -179,13 +178,7 @@ protected:
 
     void                                        _init(ODE_CONSTRUCTOR(T, N)){
         _Nevents = std::vector<std::vector<size_t>>(events.size());
-        std::vector<const Event<T, N>*> new_evs(events.size()+1);
-        TmaxEvent<T, N> tmax_ev;
-        new_evs[0] = &tmax_ev;
-        for (size_t i=0; i<events.size(); i++){
-            new_evs[i+1] = events[i];
-        }
-        _solver = get_solver(method, ode, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, new_evs).release();
+        _solver = get_solver(method, ode, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events).release();
         _register_state();
     }
 
@@ -212,7 +205,7 @@ private:
             Nnew++;
             size_t tmp = _q_data.size();
             _t_arr.push_back(t_req);
-            _q_data.insert(_q_data.end(), _solver->q().begin(), _solver->q().end());
+            _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
             _solver->interp(_q_data.data()+tmp, t_req);
             return true;
         }
@@ -292,8 +285,8 @@ inline size_t EventCounter<T, N>::total()const{
 }
 
 template<typename T, size_t N>
-ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T, N), const std::string& method){
-    _init(ARGS, method);
+ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T, N), EVENTS events, const std::string& method){
+    _init(ARGS, events, method);
 }
 
 template<typename T, size_t N>
@@ -525,7 +518,7 @@ double ODE<T, N>::runtime()const{
 }
 
 template<typename T, size_t N>
-const OdeSolver<T, N>* ODE<T, N>::solver()const{
+const OdeRichSolver<T, N>* ODE<T, N>::solver()const{
     return _solver;
 }
 
@@ -570,7 +563,7 @@ void ODE<T, N>::reset(){
 template<typename T, size_t N>
 void ODE<T, N>::_register_state(){
     _t_arr.push_back(_solver->t());
-    _q_data.insert(_q_data.end(), _solver->q().begin(), _solver->q().end());
+    _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
 }
 
 template<typename T, size_t N>
@@ -612,11 +605,11 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
 
     for (size_t i=0; i<Nevs-1; i++){ //the iteration skips the main TmaxEvent
         found = false;
-        for (size_t j=0; j<options.size(); j++){
-            if (options[j].name == _solver->event_col().event(i+1).name()){
+        for (const auto & option : options){
+            if (option.name == _solver->event_col().event(i+1).name()){
                 found = true;
-                res[i] = options[j];
-                res[i].max_events = std::max(options[j].max_events, -1);
+                res[i] = option;
+                res[i].max_events = std::max(option.max_events, -1);
                 break;
             }
         }

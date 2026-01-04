@@ -142,27 +142,27 @@ PySolver::PySolver(const py::object& f, const py::object& jac, const py::object&
 }
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
-    EXECUTE(, reinterpret_cast<OdeSolver, *>(solver)->set_obj(&data);, )
+    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(solver)->set_obj(&data);, )
     this->s = solver;
 }
 
 PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data) {
-    EXECUTE(this->s =, reinterpret_cast<OdeSolver, *>(other.s)->clone();, )
-    EXECUTE(, reinterpret_cast<OdeSolver, *>(this->s)->set_obj(&data);, )
+    EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
+    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
 }
 
 PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)) {
     other.s = nullptr;
-    EXECUTE(, reinterpret_cast<OdeSolver, *>(this->s)->set_obj(&data);, )
+    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
 }
 
 
 PySolver& PySolver::operator=(const PySolver& other){
     if (&other != this){
         data = other.data;
-        EXECUTE(delete, reinterpret_cast<OdeSolver, *>(this->s);, )
-        EXECUTE(this->s =, reinterpret_cast<OdeSolver, *>(other.s)->clone();, )
-        EXECUTE(, reinterpret_cast<OdeSolver, *>(this->s)->set_obj(&data);, )
+        EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
+        EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
+        EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
     }
     return *this;
 }
@@ -171,9 +171,9 @@ PySolver& PySolver::operator=(const PySolver& other){
 PySolver& PySolver::operator=(PySolver&& other) noexcept{
     if (&other != this){
         data = std::move(other.data);
-        EXECUTE(delete, reinterpret_cast<OdeSolver, *>(this->s);, )
+        EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
         this->s = other.s;
-        EXECUTE(, reinterpret_cast<OdeSolver, *>(this->s)->set_obj(&data);, )
+        EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
         other.s = nullptr;
     }
     return *this;
@@ -181,7 +181,7 @@ PySolver& PySolver::operator=(PySolver&& other) noexcept{
 
 
 PySolver::~PySolver(){
-    EXECUTE(delete, reinterpret_cast<OdeSolver, *>(this->s);, )
+    EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
 }
 
 //===========================================================================================
@@ -510,7 +510,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("start", &PyPerEvent::start);
 
 
-    py::class_<PySolver>(m, "OdeSolver")
+    py::class_<PySolver>(m, "OdeRichSolver")
         .def_property_readonly("t", &PySolver::t)
         .def_property_readonly("q", &PySolver::q)
         .def_property_readonly("stepsize", &PySolver::stepsize)

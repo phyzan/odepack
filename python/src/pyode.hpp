@@ -2,6 +2,7 @@
 #define PYODE_HPP
 
 #include "pytools.hpp"
+#include "include/odepack/virtualsolver.hpp"
 
 #define EXECUTE_ANY(DTYPE, ACTION, CppType, EXPR, DEFAULT)  \
     switch (DTYPE) {                                                         \
@@ -199,51 +200,51 @@ struct PySolver : DtypeDispatcher {
     virtual ~PySolver();
 
     py::object t() const{
-        PY_GET(OdeSolver, this->s, ->t())
+        PY_GET(OdeRichSolver, this->s, ->t())
     }
 
     py::object q() const{
-        PY_GET(OdeSolver, this->s, ->q())
+        PY_GET(OdeRichSolver, this->s, ->vector())
     }
 
     py::object stepsize() const{
-        PY_GET(OdeSolver, this->s, ->stepsize())
+        PY_GET(OdeRichSolver, this->s, ->stepsize())
     }
 
     py::object diverges() const{
-        PY_GET(OdeSolver, this->s, ->diverges())
+        PY_GET(OdeRichSolver, this->s, ->diverges())
     }
 
     py::object is_dead() const{
-        PY_GET(OdeSolver, this->s, ->is_dead())
+        PY_GET(OdeRichSolver, this->s, ->is_dead())
     }
 
     py::object Nsys() const{
-        PY_GET(OdeSolver, this->s, ->Nsys())
+        PY_GET(OdeRichSolver, this->s, ->Nsys())
     }
 
     void show_state(int digits) const{
-        PY_DO(OdeSolver, this->s, state().show(digits))
+        PY_DO(OdeRichSolver, this->s, show_state(digits))
     }
 
     py::object advance() const{
-        PY_GET(OdeSolver, this->s, ->advance())
+        PY_GET(OdeRichSolver, this->s, ->advance())
     }
 
     py::object advance_to_event() const{
-        PY_GET(OdeSolver, this->s, ->advance_to_event())
+        PY_GET(OdeRichSolver, this->s, ->advance_to_event())
     }
 
     virtual py::object copy() const = 0;
 
     void reset() const{
-        PY_DO(OdeSolver, this->s, reset())
+        PY_DO(OdeRichSolver, this->s, reset())
     }
 
     template<typename T>
     void init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name);
 
-    void* s = nullptr; //OdeSolver<T, 0>*
+    void* s = nullptr; //OdeRichSolver<T, 0>*
     PyStruct data;
 };
 
@@ -771,16 +772,16 @@ template<typename T>
 py::object PyODE::_solver_copy() const{
     auto* ode_ptr = reinterpret_cast<const ODE<T, 0>*>(ode);
     auto* solver_clone = ode_ptr->solver()->clone();
-    if (ode_ptr->solver()->name() == "RK45"){
+    if (ode_ptr->solver()->method() == "RK45"){
         return py::cast(PyRK45(solver_clone, data, this->scalar_type));
     }
-    else if (ode_ptr->solver()->name() == "DOP853"){
+    else if (ode_ptr->solver()->method() == "DOP853"){
         return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
     }
-    else if (ode_ptr->solver()->name() == "RK23"){
+    else if (ode_ptr->solver()->method() == "RK23"){
         return py::cast(PyRK23(solver_clone, data, this->scalar_type));
     }
-    else if (ode_ptr->solver()->name() == "BDF"){
+    else if (ode_ptr->solver()->method() == "BDF"){
         return py::cast(PyBDF(solver_clone, data, this->scalar_type));
     }
     else{

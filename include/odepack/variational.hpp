@@ -4,7 +4,7 @@
 
 #include "events.hpp"
 #include "ode.hpp"
-#include "odesolvers.hpp"
+#include "virtualsolver.hpp"
 #include <memory>
 #include <stdexcept>
 
@@ -71,8 +71,8 @@ public:
         _t_renorm = t;
     }
 
-    size_t Nsys() const{
-        return static_cast<size_t>(this->_object);
+    inline size_t Nsys() const{
+        return this->_object;
     }
 
     void reset() override{
@@ -91,15 +91,15 @@ public:
 
 private:
 
-    void _register_it(const EventState<T, N>& res, const State<T, N>& before, const State<T, N>& after) override {
+    void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after) override {
         _t_last = _t_renorm;
         _logksi_last = _logksi;
         _dir_last = _dir;
-        _t_renorm = res.t;
+        _t_renorm = res.t();
         _delta_s_last = _delta_s;
-        _delta_s = log(norm(res.exp_vec().data()+Nsys(), Nsys()));
+        _delta_s = log(norm(res.exposed().vector()+Nsys(), Nsys()));
         _logksi += _delta_s;
-        _dir = sgn(after.t - before.t);
+        _dir = sgn(before.t(), after.t());
     }
     T _t_renorm;
     T _t_last;
@@ -130,7 +130,7 @@ public:
         size_t Nsys = q0.size()/2;
         NormalizationEvent<T, N> extra_event("Normalization", Nsys, period);
         events.insert(events.begin(), &extra_event);
-        this->_init(ARGS, method);
+        this->_init(ARGS, events, method);
     }
 
     DEFAULT_RULE_OF_FOUR(VariationalODE);

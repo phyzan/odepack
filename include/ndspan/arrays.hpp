@@ -99,17 +99,17 @@ public:
 
     DynamicArray(std::initializer_list<T> array) requires (N>0) : DynamicArray(array.begin(), (_validate_size<DIMS...>(array.size()), DIMS)...) {}
 
-    //COPY CONSTRUCTORS
+    //COPY CONSTRUCTOR
     DynamicArray(const DynamicArray& other) : Base(static_cast<const Base&>(other)), _data((other.size() > 0) ? new T[other.size()] : nullptr) {
         copy_array(this->data(), other.data(), this->size());
     }
 
-    //MOVE CONSTRUCTORS
+    //MOVE CONSTRUCTOR
     DynamicArray(DynamicArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))), _data(other._data) {
         other._data = nullptr;
     }
 
-    //ASSIGNMENT OPERATORS
+    //ASSIGNMENT OPERATOR
     DynamicArray& operator=(const DynamicArray& other) {
         if (&other != this){
             if (this->size() != other.size()){
@@ -122,8 +122,7 @@ public:
         return *this;
     }
 
-    //MOVE-ASSIGNMENT OPERATORS
-
+    //MOVE-ASSIGNMENT OPERATOR
     DynamicArray& operator=(DynamicArray&& other) noexcept {
         if (&other != this){
             Base::operator=(std::move(other));
@@ -282,11 +281,147 @@ struct ArrayAllocMap<Allocation::Auto, L, T, DIMS...> {
 };
 
 
-template <typename T, Allocation Alloc = Allocation::Heap, Layout L = Layout::C, size_t... DIMS>
-using Array = ArrayAllocMap<Alloc, L, T, DIMS...>::type;
 
-template <typename T, size_t N=0, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
-using Array1D = ArrayAllocMap<Alloc, L, T, N>::type;
+template <typename T, Allocation Alloc = Allocation::Heap, Layout L = Layout::C, size_t... DIMS>
+class Array : public ArrayAllocMap<Alloc, L, T, DIMS...>::type{
+
+    using Base = ArrayAllocMap<Alloc, L, T, DIMS...>::type;
+
+public:
+
+    using value_type = Base::value_type;
+    using iterator = Base::iterator;
+    using const_iterator = Base::const_iterator;
+
+    using Base::Base;
+
+    //=============================== ACCESSORS ===================================
+
+    // NdSpan interface
+    INLINE constexpr size_t size() const{
+        return Base::size();
+    }
+
+    INLINE constexpr size_t ndim() const {
+        return Base::ndim();
+    }
+
+    INLINE const size_t* shape() const {
+        return Base::shape();
+    }
+
+    template<INT_T IDX_T>
+    INLINE constexpr size_t shape(IDX_T i) const {
+        return Base::shape(i);
+    }
+
+    template<INT_T... Idx>
+    INLINE constexpr size_t offset(Idx... idx) const noexcept {
+        return Base::offset(idx...);
+    }
+
+    template<size_t Nd>
+    INLINE constexpr size_t offset(const std::array<size_t, Nd>& idx) const noexcept {
+        return Base::offset(idx);
+    }
+
+    template<INT_T... Idx>
+    INLINE void unpack_idx(size_t offset, Idx&... idx) const noexcept{
+        Base::unpack_idx(offset, idx...);
+    }
+
+    template<std::integral INT, size_t Nd>
+    INLINE void unpack_idx(size_t offset, std::array<INT, Nd>& idx) const noexcept{
+        Base::unpack_idx(offset, idx);
+    }
+
+    // NdView interface
+    const_iterator begin() const { return Base::begin(); }
+    const_iterator end() const { return Base::end(); }
+
+    INLINE const T* data() const{
+        return Base::data();
+    }
+
+    template<INT_T... Int>
+    INLINE const T* data_ptr(Int... idx) const{
+        return Base::data_ptr(idx...);
+    }
+
+    template<INT_T... Idx>
+    INLINE const T& operator()(Idx... idx) const {
+        return Base::operator()(idx...);
+    }
+
+    template<typename... Idx>
+    INLINE auto operator()(Idx... i) const{
+        return Base::operator()(i...);
+    }
+
+    template<INT_T IDX_T>
+    INLINE const T& operator[](IDX_T i) const{
+        return Base::operator[](i);
+    }
+
+
+    //=============================== MODIFIERS ===================================
+
+    // NdSpan interface
+    template<INT_T... Args>
+    INLINE void reshape(Args... shape){
+        Base::reshape(shape...);
+    }
+
+    template<INT_T... Args>
+    INLINE void constexpr resize(Args... shape){
+        Base::resize(shape...);
+    }
+
+    template<IsShapeContainer ShapeContainer>
+    INLINE void reshape(const ShapeContainer& shape){
+        Base::reshape(shape);
+    }
+
+    template<IsShapeContainer ShapeContainer>
+    INLINE void resize(const ShapeContainer& shape){
+        Base::resize(shape);
+    }
+
+
+    // NdView interface
+
+    iterator begin() { return Base::data(); }
+    iterator end()   { return Base::end(); }
+
+    INLINE T* data(){
+        return Base::data();
+    }
+
+    template<INT_T... Idx>
+    INLINE T& operator()(Idx... idx) {
+        return Base::operator()(idx...);
+    }
+
+    template<typename... Idx>
+    INLINE auto operator()(Idx... i){
+        return Base::operator()(i...);
+    }
+
+    template<INT_T IDX_T>
+    INLINE T& operator[](IDX_T i){
+        return Base::operator[](i);
+    }
+
+    template<INT_T... Int>
+    INLINE T* data_ptr(Int... idx){
+        return Base::data_ptr(idx...);
+    }
+
+};
+
+
+template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Heap>
+using Array1D = Array<T, Alloc, Layout::C, SIZE>;
 
 template<typename T, size_t Nr = 0, size_t Nc = 0, Allocation Alloc = Allocation::Auto, Layout L = Layout::C>
 class Array2D : public Array<T, Alloc, L, Nr, Nc>{

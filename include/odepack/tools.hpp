@@ -12,29 +12,156 @@
 #include "mpreal.h"
 #endif
 
+
+enum class Memory : std::uint8_t { View, Own};
+
+template<typename T, Memory Mem=Memory::View>
+class State;
+
+
+template<typename T>
+class State<T, Memory::View>{
+
+    //Does NOT own its data if Memory == Memory::View, only views it.
+    //Do not use this object if the underlying data have gove out of scope.
+
+public:
+
+    State(T* data, size_t Nsys) : _data(data), _nsys(Nsys) {}
+
+    const T& t() const{
+        return _data[0];
+    }
+
+    const T& habs() const{
+        return _data[1];
+    }
+
+    const T* vector() const{
+        return _data+2;
+    }
     
-template<typename T, size_t N>
-struct State{
-    T t;
-    Array1D<T, N> vector;
-    T habs;
+    T* vector(){
+        return _data+2;
+    }
+
+    size_t Nsys() const{
+        return _nsys;
+    }
+
+private:
+
+    T* _data;
+    size_t _nsys;
+};
+
+
+template<typename T>
+class State<T, Memory::Own> : private Array1D<T>{
+
+    //Does NOT own its data if Memory == Memory::View, only views it.
+    //Do not use this object if the underlying data have gove out of scope.
+
+    using Base = Array1D<T>;
+
+public:
+
+    State(const T* data, size_t Nsys) : Base(data, Nsys+2) {}
+
+    const T& t() const{
+        return this->data()[0];
+    }
+
+    const T& habs() const{
+        return this->data()[1];
+    }
+
+    const T* vector() const{
+        return this->data()+2;
+    }
+
+    T* vector(){
+        return this->data()+2;
+    }
+
+    size_t Nsys() const{
+        return this->size();
+    }
+
+protected:
+
+    const T* data() const{
+        return Base::data();
+    }
+
+    T* data(){
+        return Base::data();
+    }
 };
 
 template<typename T, size_t N>
-struct EventState{
-    T t;
-    Array1D<T, N> true_vector;
-    Array1D<T, N> exposed_vector;
+class EventState{
+
+public:
+
+    EventState() = default;
+
+    const T& t() const{
+        return data[0];
+    }
+
+    State<const T> True() const{
+        return {data.data(), Nsys};
+    }
+
+    State<const T> exposed() const{
+        return choose_true ? this->True() : State<const T>{data.data()+Nsys+2, Nsys};
+    }
+
+    T* true_vector(){
+        return data.data()+2;
+    }
+
+    T* exposed_vector(){
+        return data.data() + Nsys+4;
+    }
+
+    void set_t(T t){
+        data[0] = data[Nsys+2] = t;
+    }
+
+    void set_stepsize(T habs){
+        data[1] = data[Nsys+3] = habs;
+    }
+
+    void set_true_vector(const T* vec){
+        copy_array(data.data()+2, vec, Nsys);
+    }
+
+    void set_exposed_vector(const T* vec){
+        copy_array(data.data()+Nsys+4, vec, Nsys);
+    }
+
+    inline void resize(size_t nsys){
+        data.resize(nsys*2+4);
+        Nsys = nsys;
+    }
+
+    inline size_t nsys() const{
+        return Nsys;
+    }
+    
     bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
     bool triggered = false;
 
-    inline const Array1D<T, N>& exp_vec() const{
-        return choose_true ? true_vector : exposed_vector;
-    }
+private:
 
-    inline const Array1D<T, N>& true_vec() const{
-        return true_vector;
-    }
+    static constexpr size_t NTOT = (N > 0 ? 2*N+4 : 0);
+
+    Array1D<T, NTOT, Allocation::Auto> data;
+    size_t Nsys = 0;
+
+
 };
 
 // USEFUL ALIASES
@@ -411,12 +538,5 @@ inline T choose_step(const T& habs, const T& hmin, const T& hmax){
     return std::max(std::min(habs, hmax), hmin);
 }
 
-
-
-template<class T, int N>
-struct ICS{
-    T t;
-    Array1D<T, N> q;
-};
 
 #endif

@@ -12,9 +12,6 @@ public:
     using Base::Base;
 
     DEFAULT_RULE_OF_FOUR(StridedDerivedNdSpan)
-    
-    template<IsShapeContainer ShapeContainer>
-    explicit StridedDerivedNdSpan(const ShapeContainer& shape) : Base(shape) {}
 
     const size_t* strides() const{
         return THIS_C->strides();
@@ -34,9 +31,9 @@ public:
     template<typename... Idx>
     INLINE void unpack_idx_impl(size_t offset, Idx&... idx) const noexcept {
         if constexpr (Base::N > 0) {
-            return Derived::strided_unpack(offset, STRIDES, Base::SHAPE, std::make_index_sequence<sizeof...(idx)>(), idx...);
+            return Derived::strided_unpack(offset, STRIDES, Base::SHAPE, idx...);
         } else {
-            return Derived::strided_unpack(offset, this->strides(), this->shape(), std::make_index_sequence<sizeof...(idx)>(), idx...);
+            return Derived::strided_unpack(offset, this->strides(), this->shape(), idx...);
         }
     }
 
@@ -64,9 +61,6 @@ public:
 
     DEFAULT_RULE_OF_FOUR(StridedStaticNdSpan)
     
-    template<IsShapeContainer ShapeContainer>
-    explicit StridedStaticNdSpan(const ShapeContainer& shape) : Base(shape) {}
-    
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
         return Base::_static_offset_impl(std::make_index_sequence<Base::ND>(), idx...);
@@ -80,7 +74,7 @@ public:
 
 
 template<typename Derived, size_t... DIMS>
-class StridedDynamicNdSpan : public StridedDerivedNdSpan<Derived, DIMS...>{
+class StridedSemiStaticNdSpan : public StridedDerivedNdSpan<Derived, DIMS...>{
 
     using Base = StridedDerivedNdSpan<Derived, DIMS...>;
 
@@ -89,52 +83,95 @@ protected:
     inline static constexpr size_t ND = Base::ND;
     inline static constexpr size_t N = Base::N;
 
-    static_assert(N==0, "For fixed compile time dims, use StridedStaticNdSpan");
+    static_assert(N==0 && ND>0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
+
+    StridedSemiStaticNdSpan() = default;
+
+    template<INT_T... Args>
+    explicit constexpr StridedSemiStaticNdSpan(Args... shape) : Base(shape...) {
+        this->_remake_strides();
+    }
+
+    template<IsShapeContainer ShapeContainer>
+    explicit constexpr StridedSemiStaticNdSpan(const ShapeContainer& shape) : Base(shape) {
+        this->_remake_strides();
+    }
+
+    DEFAULT_RULE_OF_FOUR(StridedSemiStaticNdSpan)
+
+
+public:
+
+    const size_t* strides() const{
+        return _fixed_strides;
+    }
+
+    template<INT_T... Args>
+    void constexpr resize(Args... shape){
+        Base::resize(shape...);
+        this->_remake_strides();
+    }
+
+    template<IsShapeContainer ShapeContainer>
+    void constexpr resize(const ShapeContainer& shape){
+        Base::resize(shape);
+        this->_remake_strides();
+    }
+
+    template<INT_T... Idx>
+    INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
+        return EXPAND(size_t, ND, I,
+            return ((idx * _fixed_strides[I]) + ...);
+        );
+    }
+
+private:
+
+    inline void _remake_strides(){
+        Derived::set_strides(_fixed_strides, this->shape(), this->ndim());
+    }
+    
+    size_t _fixed_strides[ND];
+
+};
+
+template<typename Derived>
+class StridedDynamicNdSpan : public StridedDerivedNdSpan<Derived>{
+
+    using Base = StridedDerivedNdSpan<Derived>;
+public:
+    inline static constexpr size_t ND = 0;
+    inline static constexpr size_t N = 0;
+
+protected:
 
     StridedDynamicNdSpan() = default;
 
     template<INT_T... Args>
     explicit constexpr StridedDynamicNdSpan(Args... shape) : Base(shape...) {
-        if constexpr (ND == 0){
-            _dyn_strides = new size_t[sizeof...(shape)];
-            Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
-        }
-        else{
-            Derived::set_strides(_fixed_strides, this->shape(), this->ndim());
-        }
+        _dyn_strides = new size_t[this->ndim()];
+        Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
     }
 
     template<IsShapeContainer ShapeContainer>
     explicit constexpr StridedDynamicNdSpan(const ShapeContainer& shape) : Base(shape) {
-        if constexpr (ND == 0){
-            _dyn_strides = new size_t[shape.size()];
-            Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
-        }
-        else{
-            Derived::set_strides(_fixed_strides, this->shape(), this->ndim());
-        }
+        _dyn_strides = shape.size() > 0 ? new size_t[shape.size()] : nullptr;
+        Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
     }
 
-    //COPY CONSTRUCTORS
-
-    StridedDynamicNdSpan(const StridedDynamicNdSpan& other) requires (ND>0) = default;
-
-    StridedDynamicNdSpan(const StridedDynamicNdSpan& other) requires (ND==0) : Base(static_cast<const Base&>(other)){
+    //COPY CONSTRUCTOR
+    StridedDynamicNdSpan(const StridedDynamicNdSpan& other) : Base(static_cast<const Base&>(other)){
         _dyn_strides = other.ndim() > 0 ? new size_t[other.ndim()] : nullptr;
         copy_array(_dyn_strides, other._dyn_strides, this->ndim());
     }
 
-    //MOVE CONSTRUCTORS
-    StridedDynamicNdSpan(StridedDynamicNdSpan&& other) requires (ND>0) = default;
-
-    StridedDynamicNdSpan(StridedDynamicNdSpan&& other) noexcept requires (ND==0) : Base(static_cast<Base&&>(other)), _dyn_strides(other._dyn_strides) {
+    //MOVE CONSTRUCTOR
+    StridedDynamicNdSpan(StridedDynamicNdSpan&& other) noexcept : Base(static_cast<Base&&>(other)), _dyn_strides(other._dyn_strides) {
         other._dyn_strides = nullptr;
     }
 
-    //ASSIGNMENT OPERATORS
-    StridedDynamicNdSpan& operator=(const StridedDynamicNdSpan&) requires (ND>0) = default;
-
-    StridedDynamicNdSpan& operator=(const StridedDynamicNdSpan& other) requires (ND==0){
+    //ASSIGNMENT OPERATOR
+    StridedDynamicNdSpan& operator=(const StridedDynamicNdSpan& other){
         if (&other != this){
             size_t nd_old = this->ndim();
             Base::operator=(other);
@@ -152,10 +189,8 @@ protected:
         return *this;
     }
 
-    //MOVE-ASSIGNMENT OPERATORS
-    StridedDynamicNdSpan& operator=(StridedDynamicNdSpan&&) requires (ND>0) = default;
-
-    StridedDynamicNdSpan& operator=(StridedDynamicNdSpan&& other) noexcept requires (ND==0){
+    //MOVE-ASSIGNMENT OPERATOR
+    StridedDynamicNdSpan& operator=(StridedDynamicNdSpan&& other) noexcept {
         if (&other != this){
             Base::operator=(std::move(other));
             delete[] _dyn_strides;
@@ -166,21 +201,14 @@ protected:
     }
 
     ~StridedDynamicNdSpan() {
-        if constexpr (ND==0){
-            delete[] _dyn_strides;
-            _dyn_strides = nullptr;
-        }
+        delete[] _dyn_strides;
+        _dyn_strides = nullptr;
     }
 
 public:
 
     const size_t* strides() const{
-        if constexpr (ND > 0){
-            return _fixed_strides.data();
-        }
-        else{
-            return _dyn_strides;
-        }
+        return _dyn_strides;
     }
 
     template<INT_T... Args>
@@ -201,43 +229,29 @@ public:
 
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
-        return _dynamic_offset_impl(std::make_index_sequence<sizeof...(idx)>(), idx...);
-    }
-
-protected:
-
-    template<size_t... I, INT_T... Idx>
-    INLINE constexpr size_t _dynamic_offset_impl(std::index_sequence<I...>, Idx... idx) const noexcept {
-        if constexpr (ND == 0){
-            return ((static_cast<size_t>(idx) * _dyn_strides[I]) + ...);
-        }
-        return ((static_cast<size_t>(idx) * _fixed_strides[I]) + ...);
+        return EXPAND(size_t, ND, I,
+            return ((idx * _dyn_strides[I]) + ...);
+        );
     }
 
 private:
 
     void _realloc_strides(size_t nd_old){
-        if constexpr (ND == 0){
-            if (this->ndim() > nd_old){
-                //only reallocate in this case
-                delete[] _dyn_strides;
-                _dyn_strides = new size_t[this->ndim()];
-            }
-            Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
+        if (this->ndim() > nd_old){
+            //only reallocate in this case
+            delete[] _dyn_strides;
+            _dyn_strides = new size_t[this->ndim()];
         }
-        else{
-            Derived::set_strides(_fixed_strides, this->shape(), this->ndim());
-        }
+        Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
     }
 
     size_t* _dyn_strides = nullptr;
-    std::array<size_t, ND> _fixed_strides = Base::static_strides();//used when ND > 0
-
 };
 
 
 template<typename Derived, size_t... DIMS>
-using StridedNdSpan = std::conditional_t<(sizeof...(DIMS) > 0 && (DIMS*...*1)>0), StridedStaticNdSpan<Derived, DIMS...>, StridedDynamicNdSpan<Derived, DIMS...>>;
+using StridedNdSpan = std::conditional_t<(sizeof...(DIMS) > 0 && (DIMS*...*1)>0), StridedStaticNdSpan<Derived, DIMS...>, std::conditional_t<(sizeof...(DIMS) > 0), StridedSemiStaticNdSpan<Derived, DIMS...>, StridedDynamicNdSpan<Derived>>>;
+
 
 template<size_t... DIMS>
 class RowMajorSpan : public StridedNdSpan<RowMajorSpan<DIMS...>, DIMS...>{
@@ -245,8 +259,6 @@ class RowMajorSpan : public StridedNdSpan<RowMajorSpan<DIMS...>, DIMS...>{
     using Base = StridedNdSpan<RowMajorSpan<DIMS...>, DIMS...>;
 
 public:
-
-    using Base::Base;
 
     DEFAULT_RULE_OF_FOUR(RowMajorSpan)
 
@@ -265,10 +277,12 @@ public:
         }
     }
 
-    template<typename STRIDE_T, typename  SHAPE_T, typename... Idx, size_t... I>
-    INLINE static void strided_unpack(size_t offset, const STRIDE_T& strides, const SHAPE_T& shape, std::index_sequence<I...>, Idx&... idx) noexcept {
-        ((idx = offset / strides[I],
-        offset %= strides[I]), ...);
+    template<typename STRIDE_T, typename  SHAPE_T, typename... Idx>
+    INLINE static void strided_unpack(size_t offset, const STRIDE_T& strides, const SHAPE_T& shape, Idx&... idx) noexcept {
+        EXPAND(size_t, sizeof...(idx), I,
+            ((idx = offset / strides[I],
+            offset %= strides[I]), ...);
+        );
     }
 
 };
@@ -300,10 +314,12 @@ public:
         }
     }
 
-    template<typename STRIDE_T, typename  SHAPE_T, typename... Idx, size_t... I>
-    INLINE static void strided_unpack(size_t offset, const STRIDE_T& strides, const SHAPE_T& shape, std::index_sequence<I...>, Idx&... idx) noexcept {
-        ((idx = offset % shape[I],
-        offset /= shape[I]), ...);
+    template<typename STRIDE_T, typename  SHAPE_T, typename... Idx>
+    INLINE static void strided_unpack(size_t offset, const STRIDE_T& strides, const SHAPE_T& shape, Idx&... idx) noexcept {
+        EXPAND(size_t, sizeof...(idx), I,
+            ((idx = offset % shape[I],
+            offset /= shape[I]), ...);
+        );
     }
     
 };

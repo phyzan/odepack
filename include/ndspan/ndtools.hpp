@@ -30,7 +30,7 @@
 template<typename... Arg>
 void print(Arg... y){
     ((std::cout << y << ' '), ...);
-    std::cout << "\n\n";
+    std::cout << "\n";
 }
 
 #define INTS(IntType, I) std::integer_sequence<IntType, I...>
@@ -139,12 +139,15 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
     return true;
 }
 
+
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
 #ifdef MPREAL
-    static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, 
-                  "T must be numeric or mpreal");
+    static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, "T must be numeric or mpreal");
+#else
+    static_assert(std::is_arithmetic_v<T>, "T must be numeric or mpreal");
 #endif
+
     if constexpr (std::is_integral_v<T>) {
         // Integral types
         return std::to_string(value);
@@ -156,17 +159,17 @@ std::string to_string(const T& value, int prec = 3) {
     }
 }
 
-template<typename T>
-INLINE T abs(const T& x){
-    return x >= 0 ? x : -x;
-}
-
 #ifdef MPREAL
 template<>
 std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
 #endif
+
+template<typename T>
+INLINE T abs(const T& x){
+    return x >= 0 ? x : -x;
+}
 
 template<typename T, typename Array>
 std::string array_repr(const Array& array, int digits) {
@@ -191,8 +194,7 @@ INLINE bool equal_arrays(const T* a, const T* b){
 
 template<size_t... Args>
 size_t _validate_size(size_t size){
-    constexpr size_t expected = (Args * ...);
-    assert(size == expected && "Invalid initializer list size");
+    assert(size == (Args * ...) && "Invalid initializer list size");
     return size;
 }
 

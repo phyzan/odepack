@@ -11,17 +11,13 @@ class AbstractNdView : public NdSpan<L, DIMS...>{
 protected:
 
     using Base::Base;
+    DEFAULT_RULE_OF_FOUR(AbstractNdView)
 
 public:
 
     using value_type = T;
     using iterator = T*;
     using const_iterator = const T*;
-
-    DEFAULT_RULE_OF_FOUR(AbstractNdView)
-
-    template<IsShapeContainer ShapeContainer>
-    explicit AbstractNdView(const ShapeContainer& shape) : Base(shape) {}
 
     //ACCESSORS
 
@@ -39,6 +35,11 @@ public:
     INLINE T* data(){
         //override
         return THIS->data();
+    }
+
+    template<INT_T... Int>
+    INLINE const T* data_ptr(Int... idx) const{
+        return data()+this->offset(idx...);
     }
 
     template<INT_T... Idx>
@@ -73,6 +74,11 @@ public:
     template<typename... Idx>
     INLINE auto operator()(Idx... i){
         return tensor_call(THIS, i...);
+    }
+
+    template<INT_T... Int>
+    INLINE T* data_ptr(Int... idx){
+        return data()+this->offset(idx...);
     }
 
 };
@@ -111,6 +117,9 @@ private:
 
     T* _data;
 };
+
+template<typename T, size_t Size=0>
+using View1D = NdView<T, Layout::C, Size>;
 
 template<typename Derived, INT_T... Int>
 inline Derived::value_type& tensor_call(Derived& x, Int... idx){

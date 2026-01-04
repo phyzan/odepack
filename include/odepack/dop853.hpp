@@ -10,7 +10,7 @@ struct DOP_COEFS{
     inline static constexpr size_t N_STAGES = 12;
     inline static constexpr size_t N_STAGES_EXT = 16;
     inline static constexpr size_t INTERP_ORDER = 7;
-    inline static constexpr size_t ERR_EST_ORDER = 7;
+    inline static constexpr int ERR_EST_ORDER = 7;
 
     using DOP_A = Array2D<T, N_STAGES_EXT, N_STAGES_EXT>;
     using DOP_B = Array1D<T, N_STAGES>;
@@ -345,10 +345,10 @@ public:
 
     DOP853LocalInterpolator() = delete;
 
-    DOP853LocalInterpolator(const T& t, const Array1D<T, N>& q) : LocalInterpolator<T, N>(t, q){}
+    DOP853LocalInterpolator(const T& t, const T* q, size_t nsys) : LocalInterpolator<T, N>(t, q, nsys){}
 
-    DOP853LocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const Array1D<T, N>& y1, const Array1D<T, N>& y2, int left_bdr, int right_bdr)
-        : LocalInterpolator<T, N>(t1, t2, y1, y2, left_bdr, right_bdr), _coef_mat(coef_mat), _order(coef_mat.Ncols()){}
+    DOP853LocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const T* y1, const T* y2, size_t nsys, int left_bdr, int right_bdr)
+        : LocalInterpolator<T, N>(t1, t2, y1, y2, nsys, left_bdr, right_bdr), _coef_mat(coef_mat), _order(coef_mat.Ncols()){}
 
     DEFAULT_RULE_OF_FOUR(DOP853LocalInterpolator);
 
@@ -374,38 +374,45 @@ private:
 };
 
 
-template<typename T, size_t N>
-class DOP853 : public RungeKuttaBase<DOP853<T, N>, T, N, 12, 8>{
+template<typename T, size_t N, SolverPolicy SP>
+class DOP853 : public RungeKuttaBase<DOP853<T, N, SP>, T, N, 12, 8, SP>{
 
 public:
     static constexpr size_t N_STAGES = 12;
     static constexpr size_t N_ORDER = 8;
     static constexpr size_t N_STAGES_EXTRA = 3;
-    static constexpr size_t ERR_EST_ORDER = 7;
+    static constexpr int ERR_EST_ORDER = 7;
     static constexpr size_t N_STAGES_EXT = DOP_COEFS<T>::N_STAGES_EXT;
     static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
     
 private:
-    using Base = RungeKuttaBase<DOP853<T, N>, T, N, 12, 8>;
+    using Base = RungeKuttaBase<DOP853<T, N, SP>, T, N, 12, 8, SP>;
 
     using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
 
     using C_EXTRA_TYPE = Array1D<T, N_STAGES_EXTRA>;
 
     friend Base;
+    friend BaseSolver<DOP853<T, N, SP>, T, N, SP>;
+
+    static constexpr const char* name = "DOP853";
 
 public:
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N)) : Base("DOP853", ARGS, N_STAGES_EXT) {}
+
+
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
+
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
 
     inline void interp_impl(T* result, const T& t) const{
-        this->_set_coef_matrix();
-        return coef_mat_interp_dop853(result, t, this->old_state().t, this->current_state().t, this->old_state().vector.data(), this->current_state().vector.data(), this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
+        this->set_coef_matrix();
+        return coef_mat_interp_dop853(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
     }
 
     inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const{
-        this->_set_coef_matrix();
-        return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->old_state().t, this->t(), this->old_state().vector, this->current_state().vector, bdr1, bdr2));
+        this->set_coef_matrix();
+        return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t_new(),this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2));
     }
 
     static typename Base::Atype Amatrix(){
@@ -457,11 +464,11 @@ public:
 
 private:
 
-    void _set_coef_matrix_impl() const{
+    void set_coef_matrix_impl() const{
 
-        const T& h = this->current_state().habs * this->direction();
-        const T* y_old = this->old_state().vector.data();
-        const T& t_old = this->old_state().t;
+        const T& h = this->stepsize() * this->direction();
+        const T* y_old = this->old_state_ptr()+2;
+        const T& t_old = this->t_old();
         size_t Nsys = this->Nsys();
         T* K = this->_K_true.data();
 
@@ -477,13 +484,13 @@ private:
             }
 
             // Evaluate K[stage_idx] = f(t_old + C_EXTRA[s] * h, y_old + dy)
-            this->_rhs(K + stage_idx * Nsys, t_old + C_EXTRA(s) * h, this->_df_tmp.data());
+            this->rhs(K + stage_idx * Nsys, t_old + C_EXTRA(s) * h, this->_df_tmp.data());
         }
 
 
         const T* f_old = K;  // K[0]
         const T* f_new = K + N_STAGES * Nsys;  // K[12]
-        const T* y_new = this->current_state().vector.data();
+        const T* y_new = this->new_state_ptr()+2;
 
         // F[0] = delta_y
         for (size_t i = 0; i < Nsys; i++){
@@ -516,7 +523,7 @@ private:
         }
     }
 
-    T _estimate_error_norm(const T* K, const T* scale, T h) const{
+    T estimate_error_norm(const T* K, const T* scale, T h) const{
         // DOP853 uses a combination of 3rd and 5th order error estimates
         // err5 = K.T @ E5 / scale
         // err3 = K.T @ E3 / scale

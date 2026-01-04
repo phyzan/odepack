@@ -183,9 +183,9 @@ public:
 
     LocalInterpolator() = delete;
 
-    LocalInterpolator(const T& t, const Array1D<T, N>& q);
+    LocalInterpolator(const T& t, const T* q, size_t size);
 
-    LocalInterpolator(T t1, T t2, const Array1D<T, N>& y1, const Array1D<T, N>& y2, int left_bdr, int right_bdr);
+    LocalInterpolator(T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
 
     DEFAULT_RULE_OF_FOUR(LocalInterpolator);
 
@@ -260,9 +260,9 @@ public:
 
     StandardLocalInterpolator() = delete;
 
-    StandardLocalInterpolator(const T& t, const Array1D<T, N>& q);
+    StandardLocalInterpolator(const T& t, const T* q, size_t size);
 
-    StandardLocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const Array1D<T, N>& y1, const Array1D<T, N>& y2, int left_bdr, int right_bdr);
+    StandardLocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
 
     DEFAULT_RULE_OF_FOUR(StandardLocalInterpolator);
 
@@ -295,7 +295,7 @@ public:
 
     LinkedInterpolator(const INTERPOLATOR* other);
 
-    LinkedInterpolator(const T& t, const Array1D<T, N>& q);
+    LinkedInterpolator(const T& t, const T* q, size_t size);
 
     LinkedInterpolator(const LinkedInterpolator& other);
 
@@ -606,11 +606,11 @@ std::unique_ptr<Interpolator<T, N>> Interpolator<T, N>::safe_clone() const{
 }
 
 template<typename T, size_t N>
-LocalInterpolator<T, N>::LocalInterpolator(const T& t, const Array1D<T, N>& q) : Interpolator<T, N>(q.size()), _interval(t), _tmin(t), _tmax(t), _q_old(q), _q(q){}
+LocalInterpolator<T, N>::LocalInterpolator(const T& t, const T* q, size_t size) : Interpolator<T, N>(size), _interval(t), _tmin(t), _tmax(t), _q_old(q, size), _q(q, size){}
 
 
 template<typename T, size_t N>
-LocalInterpolator<T, N>::LocalInterpolator(T t1, T t2, const Array1D<T, N>& y1, const Array1D<T, N>& y2, int left_bdr, int right_bdr) : Interpolator<T, N>(y1.size()), _interval(t1, t2, left_bdr, right_bdr), _tmin(t1), _tmax(t2), _q_old(y1), _q(y2){}
+LocalInterpolator<T, N>::LocalInterpolator(T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr) : Interpolator<T, N>(size), _interval(t1, t2, left_bdr, right_bdr), _tmin(t1), _tmax(t2), _q_old(y1, size), _q(y2, size){}
 
 template<typename T, size_t N>
 inline const Interval<T>& LocalInterpolator<T, N>::interval() const{
@@ -665,7 +665,7 @@ inline bool LocalInterpolator<T, N>::is_out_of_bounds(const T& t) const{
 template<typename T, size_t N>
 inline bool LocalInterpolator<T, N>::can_link_with(const Interpolator<T, N>& other) const{
     
-    if (const LocalInterpolator<T, N>* p = dynamic_cast<const LocalInterpolator<T, N>*>(&other)){
+    if (const auto* p = dynamic_cast<const LocalInterpolator<T, N>*>(&other)){
         return _interval.can_link_with(p->_interval);
     }
     else{
@@ -702,7 +702,7 @@ void LocalInterpolator<T, N>::adjust_end(const T& t_end){
 
 template<typename T, size_t N>
 void LocalInterpolator<T, N>::link_with(Interpolator<T, N>& other){
-    if (LocalInterpolator<T, N>* p = dynamic_cast<LocalInterpolator<T, N>*>(&other)){
+    if (auto* p = dynamic_cast<LocalInterpolator<T, N>*>(&other)){
         _interval.link_with(p->_interval);
     }
     else{
@@ -750,10 +750,10 @@ void LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 
 
 template<typename T, size_t N>
-StandardLocalInterpolator<T, N>::StandardLocalInterpolator(const T& t, const Array1D<T, N>& q) : LocalInterpolator<T, N>(t, q){}
+StandardLocalInterpolator<T, N>::StandardLocalInterpolator(const T& t, const T* q, size_t size) : LocalInterpolator<T, N>(t, q, size){}
 
 template<typename T, size_t N>
-StandardLocalInterpolator<T, N>::StandardLocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const Array1D<T, N>& y1, const Array1D<T, N>& y2, int left_bdr, int right_bdr) : LocalInterpolator<T, N>(t1, t2, y1, y2, left_bdr, right_bdr), _coef_mat(coef_mat), _order(coef_mat.Ncols()){}
+StandardLocalInterpolator<T, N>::StandardLocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr) : LocalInterpolator<T, N>(t1, t2, y1, y2, size, left_bdr, right_bdr), _coef_mat(coef_mat), _order(coef_mat.Ncols()){}
 
 template<typename T, size_t N>
 size_t StandardLocalInterpolator<T, N>::order() const{
@@ -787,9 +787,9 @@ LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const INTERPOLATOR* o
 
 
 template<typename T, size_t N, typename INTERPOLATOR>
-LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const T& t, const Array1D<T, N>& q) : Interpolator<T, N>(q.size()){
+LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const T& t, const T* q, size_t size) : Interpolator<T, N>(size){
     if constexpr (_is_void) {
-        _interp_ptrs.push_back(std::unique_ptr<Interpolator<T, N>>(new LocalInterpolator<T, N>(t, q)));
+        _interp_ptrs.push_back(std::unique_ptr<Interpolator<T, N>>(new LocalInterpolator<T, N>(t, q, size)));
     }
     else{
         _interpolants.push_back(INTERPOLATOR(t, q));

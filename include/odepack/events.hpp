@@ -36,11 +36,11 @@ public:
 
     virtual bool                    is_leathal() const;
 
-    inline void                     set_args(const std::vector<T>& args);
+    inline void                     set_args(const T* args, size_t size);
 
     virtual Event<T, N>*            clone() const = 0;
 
-    inline std::string              name() const;
+    inline const std::string&       name() const;
 
     inline bool                     is_masked() const;
 
@@ -62,14 +62,15 @@ public:
         _q_aux.resize(size);
     }
 
-    bool                            determine(EventState<T, N>& result, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) {
-        if (locate(result.t, before, after, q, obj)){
+    bool                            determine(EventState<T, N>& result, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) {
+        if (locate(result, before, after, q, obj)){
             //result.t has been set, and thats all
-            T* q_event = (this->_mask == nullptr) ? result.true_vector.data() : result.exposed_vector.data();
-            q(q_event, result.t, obj); //q_event has been set
+            result.set_stepsize(after.habs());
+            T* q_event = (this->_mask == nullptr) ? result.true_vector() : result.exposed_vector();
+            q(q_event, result.t(), obj); //q_event has been set
             if (this->_mask != nullptr){
-                copy_array(result.true_vector.data(), result.exposed_vector.data(), result.true_vector.size());
-                this->_mask(result.true_vector.data(), result.t, result.exposed_vector.data(), _args.data(), _obj);
+                copy_array(result.true_vector(), result.exposed_vector(), result.nsys());
+                this->_mask(result.true_vector(), result.t(), result.exposed_vector(), _args.data(), _obj);
                 result.choose_true = !this->hides_mask();
             }
             else{
@@ -87,7 +88,7 @@ public:
         _counter = 0;
     }
 
-    virtual bool locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const = 0;
+    virtual bool locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const = 0;
 
     virtual void go_back(){
         if (_counter > 0) {_counter--;}
@@ -103,7 +104,7 @@ protected:
 
     DEFAULT_RULE_OF_FOUR(Event);
 
-    virtual void _register_it(const EventState<T, N>& res, const State<T, N>& before, const State<T, N>& after){
+    virtual void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after){
         this->_counter++;
     }
 
@@ -138,7 +139,7 @@ public:
 
     PreciseEvent<T, N>* clone() const override;
 
-    bool                locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const override;
+    bool                locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
 
     inline bool         is_time_based() const final{
         return false;
@@ -174,7 +175,7 @@ public:
 
     virtual void            set_start(const T& t);
 
-    bool                    locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const override;
+    bool                    locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
 
     inline bool             is_time_based() const final{
         return true;
@@ -213,7 +214,7 @@ public:
         return true;
     }
 
-    inline bool         is_time_based() const final{
+    inline bool is_time_based() const final{
         return true;
     }
 
@@ -222,12 +223,12 @@ public:
         _t_goal = inf<T>();
     }
 
-    bool locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const override {
+    bool locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override {
         if (!goal_is_set()) {return false;}
 
-        int direction = (before.t < after.t) ? 1 : -1;
-        if ((before.t*direction < _t_goal*direction) && (_t_goal*direction <= after.t*direction )){
-            t = _t_goal;
+        int direction = (before.t() < after.t()) ? 1 : -1;
+        if ((before.t()*direction < _t_goal*direction) && (_t_goal*direction <= after.t()*direction )){
+            event.set_t(_t_goal);
             return true;
         }
         return false;
@@ -240,7 +241,7 @@ public:
 
 private:
 
-    void _register_it(const EventState<T, N>& res, const State<T, N>& before, const State<T, N>& after) override{
+    void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after) override{
         Event<T, N>::_register_it(res, before, after);
         _t_goal_last = _t_goal;
         _t_goal = inf<T>();
@@ -334,12 +335,13 @@ bool Event<T, N>::is_leathal() const{
 }
 
 template<typename T, size_t N>
-void Event<T, N>::set_args(const std::vector<T>& args){
-    _args = args;
+void Event<T, N>::set_args(const T* args, size_t size){
+    _args.resize(size);
+    copy_array(_args.data(), args, size);
 }
 
 template<typename T, size_t N>
-inline std::string Event<T, N>::name()const{
+inline const std::string& Event<T, N>::name()const{
     return _name;
 }
 
@@ -367,16 +369,16 @@ inline T PreciseEvent<T, N>::obj_fun(const T& t, const T* q) const{
 }
 
 template<typename T, size_t N>
-bool PreciseEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const {
+bool PreciseEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
 
-    T val1 = this->obj_fun(before.t, before.vector.data());
-    T val2 = this->obj_fun(after.t, after.vector.data());
+    T val1 = this->obj_fun(before.t(), before.vector());
+    T val2 = this->obj_fun(after.t(), after.vector());
 
-    int t_dir = sgn(after.t-before.t);
+    int t_dir = sgn(after.t()-before.t());
     const int& d = this->dir();
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
         _EventObjFun<T, N> _f{obj, this, q, this->_q_aux.data()};
-        t = bisect(event_obj_func<T, N>, before.t, after.t, this->_event_tol, &_f)[2];
+        event.set_t(bisect(event_obj_func<T, N>, before.t(), after.t(), this->_event_tol, &_f)[2]);
         return true;
     }
     return false;
@@ -420,26 +422,26 @@ PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
 }
 
 template<typename T, size_t N>
-bool PeriodicEvent<T, N>::locate(T& t, const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj) const {
+bool PeriodicEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
     if (!is_finite(_start)){
         return false;
     }
     
-    int dir = sgn(before.t, after.t);
+    int dir = sgn(before.t(), after.t());
     long int n = _n_aux;
-    if ((n*_period+dir*_start) <= dir*before.t){
-        while (((++n)*_period+dir*_start) <= dir*before.t){}
+    if ((n*_period+dir*_start) <= dir*before.t()){
+        while (((++n)*_period+dir*_start) <= dir*before.t()){}
         _n_aux = n;
     }
     else{
-        while (n*_period + dir*_start > dir*before.t){
+        while (n*_period + dir*_start > dir*before.t()){
             _n_aux = n;
             n--;
         }
     }
 
-    if ((_n_aux*_period+dir*_start) <= dir*after.t){
-        t = dir*_n_aux*_period+_start;
+    if ((_n_aux*_period+dir*_start) <= dir*after.t()){
+        event.set_t(dir*_n_aux*_period+_start);
         return true;
     }
     return false;
@@ -548,29 +550,27 @@ public:
     }
 
     void set_tmax(T tmax){
-        for (size_t i=0; i< size(); i++){
-            if (auto* p = dynamic_cast<TmaxEvent<T, N>*>(_events[i])){
+        if (this->size() > 0){
+            if (auto* p = dynamic_cast<TmaxEvent<T, N>*>(_events[0])){
                 p->set_goal(tmax);
-                break; //there can be at most one TmaxEvent object
             }
         }
     }
 
     void set_array_size(size_t size) {
         for (size_t i=0; i<_N_tot; i++){
-            _states[i].exposed_vector.resize(size);
-            _states[i].true_vector.resize(size);
+            _states[i].resize(size);
             _events[i]->set_aux_array_size(size);
         }
     }
 
-    void detect_all_between(const State<T, N>& before, const State<T, N>& after, FuncLike<T> q, const void* obj){
+    void detect_all_between(State<const T> before, State<const T> after, FuncLike<T> q, const void* obj){
         if (_N_tot == 0){
             return;
         }
 
         //detect all events and save their indices in order of priority in _event_idx.
-        const int dir = sgn(after.t-before.t);
+        const int dir = sgn(after.t()-before.t());
         _N_detect = 0; //this is how many events have been triggered, and is the next available index in _event_idx_start
         for (size_t i=0; i<this->size(); i++){
             EventState<T, N>& event = _states[i];
@@ -590,7 +590,7 @@ public:
         size_t mark = _N_tot;
         size_t i=0;
         while (i<_N_detect){
-            if ((mark!=_N_tot) && (state(_event_idx[i]).t != state(_event_idx[mark]).t)){
+            if ((mark!=_N_tot) && (state(_event_idx[i]).t() != state(_event_idx[mark]).t())){
                 mark = _N_tot;
             }
             if ((mark==_N_tot) && !event(_event_idx[i]).is_pure_temporal()){
@@ -615,7 +615,7 @@ public:
         _Nt = (_N_detect>0 ? 1 : 0);
         _event_idx_start[0] = 0;
         while (i<_N_detect){
-            if (i>0 && (state(_event_idx[i]).t != state(_event_idx[i-1]).t)){
+            if (i>0 && (state(_event_idx[i]).t() != state(_event_idx[i-1]).t())){
                 _event_idx_start[_Nt] = i;
                 _Nt++;
             }
@@ -629,7 +629,7 @@ public:
         
         //reverse the rest of events after the canon event detection time
         size_t j=i;
-        while (j<_N_detect && (state(_event_idx[j]).t == state(_event_idx[i-1]).t)){
+        while (j<_N_detect && (state(_event_idx[j]).t()== state(_event_idx[i-1]).t())){
             j++;
         }
         size_t tmp = j;
@@ -685,21 +685,21 @@ public:
         }
     }
 
-    void set_args(const std::vector<T>& args){
-        for (size_t i=0; i<size(); i++){
-            _events[i]->set_args(args);
+    void set_args(const T* args, size_t size){
+        for (size_t i=0; i<this->size(); i++){
+            _events[i]->set_args(args, size);
         }
     }
 
     void reset(){
         size_t arr_size;
         if (this->_N_tot > 0){
-            arr_size = _states[0].exposed_vector.size();
+            arr_size = _states[0].nsys();
         }
          
         for (size_t i=0; i<_N_tot; i++){
             _events[i]->reset();
-            _states[i] = EventState<T, N>{};
+            _states[i] = EventState<T, N>();
             _event_idx[i] = 0;
             _event_idx_start[i] = 0;
         }
@@ -735,7 +735,7 @@ private:
         delete[] _event_idx_start;
     }
 
-    template<class Iterator>
+    template<typename Iterator>
     void _clone_events(const Iterator& events){
         _names.clear();
         for (size_t i = 0; i < _N_tot; i++) {
@@ -772,10 +772,10 @@ private:
     }
 
     bool _is_prioritized(size_t i, size_t j, int dir){
-        if (state(i).t*dir < state(j).t*dir){
+        if (state(i).t()*dir < state(j).t()*dir){
             return true;
         }
-        else if (state(i).t==state(j).t){
+        else if (state(i).t()==state(j).t()){
             return i < j;
         }
         return false;
