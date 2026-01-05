@@ -428,7 +428,7 @@ class Clock{
 
 public:
 
-    Clock(){}
+    Clock()= default;
 
     inline void start(){
         _start = now();

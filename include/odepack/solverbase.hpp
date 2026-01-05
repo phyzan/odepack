@@ -166,12 +166,12 @@ private:
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q) const{
-    return _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
+    _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::jac(T* jm, const T& t, const T* q) const{
-    return _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
+    _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
 }
 
 // PUBLIC ACCESSORS
@@ -493,7 +493,7 @@ inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
     _is_running = true;
     _diverges = false;
     _message = "Running";
-    for (int i=1; i<4; i++){
+    for (int i=1; i<5; i++){
         copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }
 }
@@ -589,7 +589,7 @@ void BaseSolver<Derived, T, N, SP>::set_message(const std::string& text){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::warn_paused() const{
-    std::cout << "\n" << "Solver has paused integrating. Please resume the integrator by any means to continue advancing *before* doing so." << std::endl;
+    std::cout << "\n" << "Solver has paused integrating. Resume before advancing." << std::endl;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -649,7 +649,7 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_dat
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
         copy_array(_state_data.data_ptr(0, 2), q0, this->Nsys());
-        for (int i=1; i<4; i++){
+        for (int i=1; i<5; i++){
             copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }
     }else {

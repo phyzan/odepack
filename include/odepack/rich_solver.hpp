@@ -56,9 +56,10 @@ private:
     inline const T&                         t_impl() const;
     inline View1D<const T, N>               vector_impl() const;
     bool                                    adv_impl();
+    inline void             set_args_impl(const T* new_args);
     //=========================================================
 
-    inline void             set_args_impl(const T* new_args);
+
     void                    initialize_events(const T& t0);
     void                    add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant);
     inline bool             requires_new_start() const;
@@ -70,10 +71,10 @@ private:
         return events;
     }
 
-    EventCollection<T, N>                       _events;
-    LinkedInterpolator<T, N>                    _cli;
-    long int                                    _event_idx = -1;
-    bool                                        _interp_data = false;
+    EventCollection<T, N>       _events;
+    LinkedInterpolator<T, N>    _cli;
+    long int                    _event_idx = -1;
+    bool                        _interp_data = false;
 
 };
 

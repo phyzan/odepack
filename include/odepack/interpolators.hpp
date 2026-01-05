@@ -5,39 +5,6 @@
 
 
 template<typename T>
-void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size){
-    #pragma omp simd
-    for (size_t i=0; i<size; i++){
-        result[i] = y1[i] + (y2[i]-y1[i])/(t2-t1) * (t-t1);
-    }
-}
-
-template<typename T>
-void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size){
-    //coef_mat dimensions: size x order
-    if (t == t1){
-        copy_array(result, y1, size);
-        return;
-    }
-    else if (t == t2){
-        copy_array(result, y2, size);
-        return;
-    }
-
-    T h = t2-t1;
-    T x = (t-t1)/h;
-
-    for (size_t i=0; i<size; i++){
-        T sum = 0;
-        #pragma omp simd reduction(+:sum)
-        for (size_t j=0; j<order; j++){
-            sum += coef_mat[i*order + j] * pow(x, j+1); // C_ij * x^(j+1)
-        }
-        result[i] = y1[i] + h*sum;
-    }
-}
-
-template<typename T>
 class Interval{
 
 public:
@@ -436,6 +403,13 @@ private:
     Interpolator<T, N>* _interpolator;
 
 };
+
+
+template<typename T>
+void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size);
+
+template<typename T>
+void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size);
 
 
 
@@ -1117,4 +1091,40 @@ template<typename T, size_t N, typename INTERPOLATOR>
 inline void LinkedInterpolator<T, N, INTERPOLATOR>::_throw_invalid_interpolant(const Interpolator<T, N>& interpolant) const {
     throw std::runtime_error("Invalid interpolant in LinkedInterpolator. Cannot join intervals " + _get_last().interval().signature() + " + " + interpolant.interval().signature());
 }
+
+
+template<typename T>
+void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size){
+    #pragma omp simd
+    for (size_t i=0; i<size; i++){
+        result[i] = y1[i] + (y2[i]-y1[i])/(t2-t1) * (t-t1);
+    }
+}
+
+template<typename T>
+void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size){
+    //coef_mat dimensions: size x order
+    if (t == t1){
+        copy_array(result, y1, size);
+        return;
+    }
+    else if (t == t2){
+        copy_array(result, y2, size);
+        return;
+    }
+
+    T h = t2-t1;
+    T x = (t-t1)/h;
+
+    for (size_t i=0; i<size; i++){
+        T sum = 0;
+        #pragma omp simd reduction(+:sum)
+        for (size_t j=0; j<order; j++){
+            sum += coef_mat[i*order + j] * pow(x, j+1); // C_ij * x^(j+1)
+        }
+        result[i] = y1[i] + h*sum;
+    }
+}
+
+
 #endif

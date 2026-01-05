@@ -6,6 +6,10 @@
 #include "solvers.hpp"
 
 
+// ============================================================================
+// DECLARATIONS
+// ============================================================================
+
 struct EventOptions{
     std::string name;
     int max_events=-1;
@@ -20,54 +24,24 @@ public:
 
     StepSequence() = default;
 
-    StepSequence(T* data, long int size, bool own_it = false) : _size(size){
-        if (size < 1 || data == nullptr){
-            _data = nullptr;
-        }
-        else if (own_it){
-            _data = data;
-        }
-        else{
-            _data = new T[size];
-            copy_array(_data, data, size);
-        }
-    }
+    StepSequence(T* data, long int size, bool own_it = false);
 
     template<std::integral INT>
-    const T& operator[](INT i) const{
-        return _data[i];
-    }
+    const T& operator[](INT i) const;
 
-    StepSequence(const StepSequence& other) : _size(other.size()){
-        if (_size > 0){
-            _data = new T[_size];
-            copy_array(_data, other._data, other._size);
-        }
-        else{
-            _data = nullptr;
-        }
-    }
+    StepSequence(const StepSequence& other);
 
-    StepSequence(StepSequence&& other) noexcept : _data(other._data), _size(other._size) {
-        other._data = nullptr;
-    }
+    StepSequence(StepSequence&& other) noexcept;
 
-    ~StepSequence(){
-        delete[] _data;
-        _data = nullptr;
-    }
+    ~StepSequence();
 
-    StepSequence& operator=(const StepSequence& other) = delete; //will not be used for now
+    StepSequence& operator=(const StepSequence& other) = delete;
 
-    StepSequence& operator=(StepSequence&& other) noexcept = delete; //will not be used for now
+    StepSequence& operator=(StepSequence&& other) noexcept = delete;
 
-    long int size() const{
-        return _size;
-    }
+    long int size() const;
 
-    const T* data() const{
-        return _data;
-    }
+    const T* data() const;
 
 private:
 
@@ -176,11 +150,7 @@ protected:
 
     virtual void                                _register_event(size_t i);
 
-    void                                        _init(ODE_CONSTRUCTOR(T, N)){
-        _Nevents = std::vector<std::vector<size_t>>(events.size());
-        _solver = get_solver(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events).release();
-        _register_state();
-    }
+    void                                        _init(ODE_CONSTRUCTOR(T, N));
 
 private:
 
@@ -189,53 +159,72 @@ private:
     std::vector<EventOptions>                   _validate_events(const std::vector<EventOptions>& options)const;
 
     template< bool inclusive = true>
-    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew) {
-        T t_req = t_array[frame_counter];
-
-        // Comparison using the template parameter
-        bool in_range;
-        if constexpr(inclusive){
-            in_range = (t_last*d < t_req*d) && (t_req*d <= t_curr*d);
-        }
-        else{
-            in_range = (t_last*d < t_req*d) && (t_req*d < t_curr*d);
-        }
-        if (in_range) {
-            frame_counter++;
-            Nnew++;
-            size_t tmp = _q_data.size();
-            _t_arr.push_back(t_req);
-            _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
-            _solver->interp(_q_data.data()+tmp, t_req);
-            return true;
-        }
-        return false;
-    }
-
+    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew);
 
 };
 
-
 template<typename T, size_t N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress){
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    const int target = list.size();
-    Clock clock;
-    clock.start();
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (ODE<T, N>* ode : list){
-        ode->integrate(interval, t_array, event_options);
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress);
+
+
+// ============================================================================
+// IMPLEMENTATIONS
+// ============================================================================
+
+// StepSequence implementations
+template<typename T>
+StepSequence<T>::StepSequence(T* data, long int size, bool own_it) : _size(size){
+    if (size < 1 || data == nullptr){
+        _data = nullptr;
     }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+    else if (own_it){
+        _data = data;
+    }
+    else{
+        _data = new T[size];
+        copy_array(_data, data, size);
+    }
 }
 
+template<typename T>
+template<std::integral INT>
+const T& StepSequence<T>::operator[](INT i) const{
+    return _data[i];
+}
+
+template<typename T>
+StepSequence<T>::StepSequence(const StepSequence& other) : _size(other.size()){
+    if (_size > 0){
+        _data = new T[_size];
+        copy_array(_data, other._data, other._size);
+    }
+    else{
+        _data = nullptr;
+    }
+}
+
+template<typename T>
+StepSequence<T>::StepSequence(StepSequence&& other) noexcept : _data(other._data), _size(other._size) {
+    other._data = nullptr;
+}
+
+template<typename T>
+StepSequence<T>::~StepSequence(){
+    delete[] _data;
+    _data = nullptr;
+}
+
+template<typename T>
+long int StepSequence<T>::size() const{
+    return _size;
+}
+
+template<typename T>
+const T* StepSequence<T>::data() const{
+    return _data;
+}
+
+// EventCounter implementations
 template<typename T, size_t N>
 EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size(), 0) {
     for (size_t i=0; i<options.size(); i++){
@@ -244,7 +233,6 @@ EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _op
         }
     }
 }
-
 
 template<typename T, size_t N>
 inline int EventCounter<T, N>::operator[](size_t i) const{
@@ -278,12 +266,12 @@ inline bool EventCounter<T, N>::can_fit(size_t event)const{
     return (_counter[event] != _options[event].max_events) && _is_running;
 }
 
-
 template<typename T, size_t N>
 inline size_t EventCounter<T, N>::total()const{
     return _total;
 }
 
+// ODE implementations
 template<typename T, size_t N>
 ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T, N), EVENTS events, const std::string& method){
     _init(ARGS, events, method);
@@ -356,7 +344,6 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
     _solver->stop_interpolation();
     return rich_res;
 }
-
 
 template<typename T, size_t N>
 OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
@@ -453,7 +440,6 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
     return res;
 }
 
-
 template<typename T, size_t N>
 std::map<std::string, std::vector<size_t>> ODE<T, N>::event_map(size_t start_point) const{
     std::map<std::string, std::vector<size_t>> res;
@@ -522,12 +508,10 @@ const OdeRichSolver<T, N>* ODE<T, N>::solver()const{
     return _solver;
 }
 
-
 template<typename T, size_t N>
 void ODE<T, N>::set_obj(const void* obj){
     _solver->set_obj(obj);
 }
-
 
 template<typename T, size_t N>
 void ODE<T, N>::clear(){
@@ -559,7 +543,6 @@ void ODE<T, N>::reset(){
     _register_state();
 }
 
-
 template<typename T, size_t N>
 void ODE<T, N>::_register_state(){
     _t_arr.push_back(_solver->t());
@@ -572,6 +555,13 @@ void ODE<T, N>::_register_event(size_t i){
 }
 
 template<typename T, size_t N>
+void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T, N), EVENTS events, const std::string& method){
+    _Nevents = std::vector<std::vector<size_t>>(events.size());
+    _solver = get_solver(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events).release();
+    _register_state();
+}
+
+template<typename T, size_t N>
 void ODE<T, N>::_copy_data(const ODE<T, N>& other){
     delete _solver;
     _solver = other._solver->clone();
@@ -580,8 +570,6 @@ void ODE<T, N>::_copy_data(const ODE<T, N>& other){
     _Nevents = other._Nevents;
     _runtime = other._runtime;
 }
-
-
 
 template<typename T, size_t N>
 std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOptions>& options)const{
@@ -620,6 +608,50 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
     return res;
 }
 
+template<typename T, size_t N>
+template< bool inclusive>
+bool ODE<T, N>::_save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew) {
+    T t_req = t_array[frame_counter];
+
+    // Comparison using the template parameter
+    bool in_range;
+    if constexpr(inclusive){
+        in_range = (t_last*d < t_req*d) && (t_req*d <= t_curr*d);
+    }
+    else{
+        in_range = (t_last*d < t_req*d) && (t_req*d < t_curr*d);
+    }
+    if (in_range) {
+        frame_counter++;
+        Nnew++;
+        size_t tmp = _q_data.size();
+        _t_arr.push_back(t_req);
+        _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
+        _solver->interp(_q_data.data()+tmp, t_req);
+        return true;
+    }
+    return false;
+}
+
+template<typename T, size_t N>
+void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress){
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = list.size();
+    Clock clock;
+    clock.start();
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (ODE<T, N>* ode : list){
+        ode->integrate(interval, t_array, event_options);
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
+    }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+}
 
 
 #endif
