@@ -1,6 +1,7 @@
 #ifndef SOLVERBASE_HPP
 #define SOLVERBASE_HPP
 
+#include "tools.hpp"
 #include "virtualsolver.hpp"
 #include "solverstate.hpp"
 
@@ -57,7 +58,11 @@ public:
     bool                        advance();
     bool                        advance_until(T time);
     void                        reset();
-    bool                        reset_with_ics(T t0, const T* y0, T stepsize = 0); //resets the solver with new ics without reallocating
+
+    template<typename Setter>
+    void                        apply_ics_setter(T t0, Setter&& func, T stepsize = 0);
+
+    bool                        set_ics(T t0, const T* y0, T stepsize = 0); //resets the solver with new ics without reallocating
     void                        stop(const std::string& text = "");
     void                        kill(const std::string& text = "");
     bool                        resume();
@@ -351,8 +356,7 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(T time){
         return false;
     }
 
-    bool success = true;
-
+    bool success = this->is_running();
     while (time*d > this->t_new()*d && this->is_running()){
         success = this->advance();
     }
@@ -381,9 +385,24 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::reset(){
     THIS->reset_impl();
 }
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+template<typename Setter>
+void BaseSolver<Derived, T, N, SP>::apply_ics_setter(T t0, Setter&& func, T stepsize){
+    T* ics = const_cast<T*>(this->ics_ptr());
+    ics[0] = t0;
+    func(ics+2);
+    assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
+    if (stepsize < 0) {
+        throw std::runtime_error("Cannot set negative stepsize in solver initialization");
+    } else if (stepsize == 0) {
+        stepsize = this->auto_step(t0, ics+2);
+    }
+    ics[1] = stepsize;
+    this->reset();
+}
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool BaseSolver<Derived, T, N, SP>::reset_with_ics(T t0, const T* y0, T stepsize){
+bool BaseSolver<Derived, T, N, SP>::set_ics(T t0, const T* y0, T stepsize){
 
     if (this->validate_ics(t0, y0)){
         if (stepsize < 0) {
@@ -471,6 +490,7 @@ inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
     _aux_state_idx = 3;
     _aux2_state_idx = 4;
     _is_dead = false;
+    _is_running = true;
     _diverges = false;
     _message = "Running";
     for (int i=1; i<4; i++){
@@ -621,7 +641,9 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_dat
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
-    if (this->validate_ics_impl(t0, q0)){
+    if (q0 == nullptr){
+        this->kill("Initial conditions not set (nullptr provided)");
+    }else if (this->validate_ics_impl(t0, q0)){
         T habs = (first_step == 0 ? this->auto_step(t0, q0) : abs(first_step));
 
         _state_data(0, 0) = t0;

@@ -322,17 +322,18 @@ BDF<T, N, SP>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, 
     if (ode.jacobian == nullptr){
         throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
     }
-    
-    if (this->validate_ics_impl(t0, q0)){
-        if (rtol == 0){
-            rtol = 100*std::numeric_limits<T>::epsilon();
-            std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
-        }
-        _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
+    if (!this->is_dead()){
+        if (this->validate_ics_impl(t0, q0)){
+            if (rtol == 0){
+                rtol = 100*std::numeric_limits<T>::epsilon();
+                std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
+            }
+            _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
 
-        this->_reset_impl_alone();
-    }else{
-        this->kill("Initial Jacobian contains nan or inf");
+            this->_reset_impl_alone();
+        }else{
+            this->kill("Initial Jacobian contains nan or inf");
+        }
     }
 }
 
