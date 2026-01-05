@@ -423,7 +423,7 @@ public:
 template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Heap>
 using Array1D = Array<T, Alloc, Layout::C, SIZE>;
 
-template<typename T, size_t Nr = 0, size_t Nc = 0, Allocation Alloc = Allocation::Auto, Layout L = Layout::C>
+template<typename T, size_t Nr = 0, size_t Nc = 0, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
 class Array2D : public Array<T, Alloc, L, Nr, Nc>{
 
     using Base = Array<T, Alloc, L, Nr, Nc>;
@@ -467,3 +467,7 @@ public:
         return result;
     }
 };
+
+
+template <typename T, size_t M=0, size_t N=0, size_t K=0, Allocation Alloc = Allocation::Heap>
+using Array3D = Array<T, Alloc, Layout::C, M, N, K>;

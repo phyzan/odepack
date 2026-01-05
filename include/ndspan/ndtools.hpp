@@ -57,7 +57,7 @@ INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
     }
 }
 
-#define BOUNDS_ASSERT(i, n) assert((i>=0 && i<n) && "Index out of bounds")
+#define BOUNDS_ASSERT(i, n) assert((i>=0 && size_t(i)<size_t(n)) && "Index out of bounds")
 
 template<typename... Ts>
 concept IsInt = (std::convertible_to<Ts, size_t>  && ...);
