@@ -42,6 +42,7 @@ public:
     virtual void                show_state(int prec=8) const = 0;
     virtual State<const T>      state() const = 0;
     virtual State<const T>      ics() const = 0;
+    virtual bool                validate_ics(T t0, const T* q0) const = 0;
     virtual const std::string&  method() const = 0;
     virtual void                interp(T* result, const T& t) const = 0;
     virtual VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const = 0;

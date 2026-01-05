@@ -4,15 +4,15 @@
 #include "virtualsolver.hpp"
 #include "solverstate.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
 
-#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
 
-#define SOLVER_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const Array1D<T, N>& q0, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define SOLVER_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
 
 #define ODE_CONSTRUCTOR(T, N) MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events={}, const std::string& method="RK45"
 
-#define ARGS ode, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args
+#define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 class BaseSolver : public BaseInterface<T, N, SP>{
@@ -46,6 +46,7 @@ public:
     void                        show_state(int prec=8) const;
     inline State<const T>       state() const;
     inline State<const T>       ics() const;
+    bool                        validate_ics(T t0, const T* q0) const;
     const std::string&          method() const;
     inline void                 interp(T* result, const T& t) const;
     T                           auto_step(T t, const T* q) const;
@@ -56,6 +57,7 @@ public:
     bool                        advance();
     bool                        advance_until(T time);
     void                        reset();
+    bool                        reset_with_ics(T t0, const T* y0, T stepsize = 0); //resets the solver with new ics without reallocating
     void                        stop(const std::string& text = "");
     void                        kill(const std::string& text = "");
     bool                        resume();
@@ -75,11 +77,12 @@ protected:
     inline void                 interp_impl(T* result, const T& t) const;
     //=================================================================================
 
-    // =================== STATIC OVERRIDES (OPTIONAL) ================================
+    // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
     inline void                 reset_impl();
-    inline void                 set_args_impl(const T* args);
+    inline void                 set_args_impl(const T* new_args);
     inline void                 re_adjust_impl();
-    //============= ALWAYS CALL THE BASE CLASS'S IMPL IN OPTIONAL OVERRIDE ============
+    inline bool                 validate_ics_impl(T t0, const T* q0) const;
+    //========== ALWAYS CALL THE BASE CLASS'S IMPL IN OPTIONAL OVERRIDE FIRST =========
 
 
     // =========================== HELPER METHODS =====================================
@@ -124,24 +127,25 @@ private:
     bool                        validate_it(const T* state);
 
     
-    Array2D<T, 5, (N>0 ? N+2 : 0)>      _state_data;
-    Array1D<T, 4, Allocation::Stack>    _scalar_data;
-    Array1D<T>                          _args;
-    OdeData<T>                          _ode;
-    size_t                              _Nsys;
-    size_t                              _Nupdates=0;
-    std::string                         _message = "Running";
-    std::string                         _name = name;
-    int                                 _direction;
-    int                                 _new_state_idx = 1;
-    int                                 _old_state_idx = 2;
-    int                                 _true_state_idx = 1;
-    int                                 _last_true_state_idx = 2;
-    int                                 _aux_state_idx = 3;
-    int                                 _aux2_state_idx = 4;
-    bool                                _is_dead = false;
-    bool                                _diverges = false;
-    bool                                _is_running = true;
+    Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>        _state_data;
+    mutable Array1D<T, (N>0 ? N+2 : 0), Allocation::Auto>   _dummy_state;
+    Array1D<T, 4, Allocation::Stack>                        _scalar_data;
+    Array1D<T>                                              _args;
+    OdeData<T>                                              _ode;
+    size_t                                                  _Nsys;
+    size_t                                                  _Nupdates=0;
+    std::string                                             _message = "Running";
+    std::string                                             _name = name;
+    int                                                     _direction;
+    int                                                     _new_state_idx = 1;
+    int                                                     _old_state_idx = 2;
+    int                                                     _true_state_idx = 1;
+    int                                                     _last_true_state_idx = 2;
+    int                                                     _aux_state_idx = 3;
+    int                                                     _aux2_state_idx = 4;
+    bool                                                    _is_dead = false;
+    bool                                                    _diverges = false;
+    bool                                                    _is_running = true;
 
     static constexpr int rtol_idx = 0;
     static constexpr int atol_idx = 1;
@@ -375,20 +379,28 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(T time){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::reset(){
-    _Nupdates = 0;
-    _new_state_idx = 1;
-    _old_state_idx = 2;
-    _true_state_idx = 1;
-    _last_true_state_idx = 2;
-    _aux_state_idx = 3;
-    _aux2_state_idx = 4;
-    _is_dead = false;
-    _diverges = false;
-    _message = "Running";
-    for (int i=1; i<4; i++){
-        copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
-    }
     THIS->reset_impl();
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+bool BaseSolver<Derived, T, N, SP>::reset_with_ics(T t0, const T* y0, T stepsize){
+
+    if (this->validate_ics(t0, y0)){
+        if (stepsize < 0) {
+            throw std::runtime_error("Cannot set negative stepsize in solver initialization");
+        } else if (stepsize == 0) {
+            stepsize = this->auto_step(t0, y0);
+        }
+
+        T* ics = const_cast<T*>(this->ics_ptr());
+        ics[0] = t0;
+        ics[1] = stepsize;
+        copy_array(ics+2, y0, this->Nsys());
+        this->reset();
+        return true;
+    }else {
+        return false;
+    }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -430,7 +442,6 @@ void BaseSolver<Derived, T, N, SP>::set_obj(const void* obj){
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::set_args(const T* new_args){
     THIS->set_args_impl(new_args);
-    copy_array(_args.data(), new_args, _args.size());
 }
 
 //====================== STATIC OVERRIDES =====================================
@@ -451,10 +462,26 @@ inline void BaseSolver<Derived, T, N, SP>::interp_impl(T* result, const T& t) co
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void BaseSolver<Derived, T, N, SP>::reset_impl(){}
+inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
+    _Nupdates = 0;
+    _new_state_idx = 1;
+    _old_state_idx = 2;
+    _true_state_idx = 1;
+    _last_true_state_idx = 2;
+    _aux_state_idx = 3;
+    _aux2_state_idx = 4;
+    _is_dead = false;
+    _diverges = false;
+    _message = "Running";
+    for (int i=1; i<4; i++){
+        copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
+    }
+}
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void BaseSolver<Derived, T, N, SP>::set_args_impl(const T* args){}
+inline void BaseSolver<Derived, T, N, SP>::set_args_impl(const T* new_args){
+    copy_array(_args.data(), new_args, _args.size());
+}
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::re_adjust_impl(){}
@@ -556,6 +583,22 @@ void BaseSolver<Derived, T, N, SP>::re_adjust(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
+bool BaseSolver<Derived, T, N, SP>::validate_ics(T t0, const T* q0) const {
+    return THIS_C->validate_ics_impl(t0, q0);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+bool BaseSolver<Derived, T, N, SP>::validate_ics_impl(T t0, const T* q0) const {
+
+    if (!all_are_finite(q0, this->Nsys()) || !is_finite(t0)){
+        return false;
+    }
+
+    this->rhs(_dummy_state.data()+2, t0, q0);
+    return all_are_finite(_dummy_state.data()+2, this->Nsys());
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
     T* state = const_cast<T*>(this->new_state_ptr());
     state[0] = this->t();
@@ -569,7 +612,7 @@ void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, q0.size()+2), _args(args.data(), args.size()), _ode(ode), _Nsys(q0.size()), _direction(dir){
+BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, nsys+2), _dummy_state(nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
 
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){
@@ -578,28 +621,17 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_dat
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
-    
-    if (!all_are_finite(q0.data(), q0.size()) || !is_finite(t0)){
-        throw std::runtime_error("Non finite initial conditions");
-    }
+    if (this->validate_ics_impl(t0, q0)){
+        T habs = (first_step == 0 ? this->auto_step(t0, q0) : abs(first_step));
 
-    T habs = (first_step == 0 ? this->auto_step(t0, q0.data()) : abs(first_step));
-    _state_data(0, 0) = t0;
-    _state_data(0, 1) = habs;
-    copy_array(_state_data.data_ptr(0, 2), q0.data(), this->Nsys());
-    for (int i=1; i<4; i++){
-        copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
-    }
-    JacMat<T, 0> tmp(this->Nsys(), this->Nsys());
-    this->rhs(tmp.data(), t0, q0.data());
-    if (!all_are_finite(tmp.data(), this->Nsys())){
-        this->kill("Initial ode rhs is nan or inf");
-    }
-    if (_ode.jacobian != nullptr && (IS_IMPLICIT)){
-        this->jac(tmp.data(), t0, q0.data());
-        if (!all_are_finite(tmp.data(), tmp.size())){
-            this->kill("Initial Jacobian is nan or inf");
+        _state_data(0, 0) = t0;
+        _state_data(0, 1) = habs;
+        copy_array(_state_data.data_ptr(0, 2), q0, this->Nsys());
+        for (int i=1; i<4; i++){
+            copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }
+    }else {
+        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
     }
 }
 
@@ -615,6 +647,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline T* BaseSolver<Derived, T, N, SP>::aux_state_ptr(){
     return _state_data.data_ptr(_aux_state_idx, 0);
 }
+
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::register_states(){

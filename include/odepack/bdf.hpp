@@ -102,6 +102,7 @@ public:
     inline void                                 interp_impl(T* result, const T& t) const;
     inline void                                 reset_impl();
     void                                        re_adjust_impl();
+    bool                                        validate_ics_impl(T t0, const T* q0) const;
     // ===========================================
 
     DEFAULT_RULE_OF_FOUR(BDF)
@@ -114,6 +115,8 @@ private:
 
     template<typename... Type>
     BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras);
+
+    inline void                                 _reset_impl_alone();
 
     NewtConv _solve_bdf_system(T* y, const T* y_pred, Array1D<T, N>& d, const T& t_new, const T& c, const Array1D<T, N>& psi, const LUResult<T, N>& LU, const Array1D<T, N>& scale);
 
@@ -315,19 +318,22 @@ void BDFInterpolator<T, N>::_call_impl(T* result, const T& t) const {
 
 template<typename T, size_t N, SolverPolicy SP>
 template<typename... Type>
-BDF<T, N, SP>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, extras...), _J(q0.size(), q0.size()), _B(q0.size(), q0.size()), _LU(q0.size()), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(q0.size()), _dy(q0.size()), _b(q0.size()), _scale(q0.size()), _ypred(q0.size()), _psi(q0.size()), _d(q0.size()), _error(q0.size()), _error_m(q0.size()), _error_p(q0.size()) {
+BDF<T, N, SP>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
     if (ode.jacobian == nullptr){
         throw std::runtime_error("Please provide the Jacobian matrix function of the ODE system when using the BDF method");
     }
-    if (rtol == 0){
-        rtol = 100*std::numeric_limits<T>::epsilon();
-        std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
+    
+    if (this->validate_ics_impl(t0, q0)){
+        if (rtol == 0){
+            rtol = 100*std::numeric_limits<T>::epsilon();
+            std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
+        }
+        _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
+
+        this->_reset_impl_alone();
+    }else{
+        this->kill("Initial Jacobian contains nan or inf");
     }
-    _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
-
-
-    this->reset_impl();
-
 }
 
 template<typename T, size_t N, SolverPolicy SP>
@@ -346,7 +352,26 @@ void BDF<T, N, SP>::re_adjust_impl() {
 }
 
 template<typename T, size_t N, SolverPolicy SP>
+bool BDF<T, N, SP>::validate_ics_impl(T t0, const T* q0) const{
+
+    // use _B as it is a dummy variable
+    if (Base::validate_ics_impl(t0, q0)){
+        this->jac(_B.data(), t0, q0);
+        return all_are_finite(_B.data(), _B.size());
+    }else {
+        return false;
+    }
+}
+
+
+template<typename T, size_t N, SolverPolicy SP>
 void BDF<T, N, SP>::reset_impl(){
+    Base::reset_impl();
+    this->_reset_impl_alone();
+}
+
+template<typename T, size_t N, SolverPolicy SP>
+void BDF<T, N, SP>::_reset_impl_alone(){
     T t0 = this->ics().t();
     T h0 = this->ics().habs() * this->direction();
     const T* q0 = this->ics().vector();

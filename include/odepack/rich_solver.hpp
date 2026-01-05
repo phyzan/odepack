@@ -41,12 +41,14 @@ public:
 
 protected:
 
-    RichSolver(SOLVER_CONSTRUCTOR(T, N), std::vector<const Event<T, N>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0.data(), q0.size()){
+    RichSolver(SOLVER_CONSTRUCTOR(T, N), std::vector<const Event<T, N>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
         this->initialize_events(t0);
     }
     
     DEFAULT_RULE_OF_FOUR(RichSolver)
     ~RichSolver() = default;
+
+    void reset_impl();
 
 private:
 
@@ -72,7 +74,6 @@ private:
     LinkedInterpolator<T, N>                    _cli;
     long int                                    _event_idx = -1;
     bool                                        _interp_data = false;
-    bool                                        _is_running = true;
 
 };
 
@@ -289,6 +290,14 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void RichSolver<Derived, T, N, SP>::stop_interpolation(){
     _cli = LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys());
     _interp_data = false;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+void RichSolver<Derived, T, N, SP>::reset_impl(){
+    Base::reset_impl();
+    _events.reset();
+    _event_idx = -1;
+    stop_interpolation();
 }
 
 // PRIVATE METHODS

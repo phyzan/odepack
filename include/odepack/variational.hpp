@@ -18,12 +18,12 @@ void normalize(T* res, const T&, const T* q, const T*, const void* obj){
     }
 }
 
-template<typename T, size_t N>
-Array1D<T, N> normalized(const Array1D<T, N>& q){
-    Array1D<T, N> res(q);
-    size_t n = q.size()/2;
-    normalize<T>(res.data(), T(0), q.data(), nullptr, &n);
-    return res;
+template<typename T>
+void normalized(T* q, size_t nsys){
+    T N = norm(q+nsys, nsys);
+    for (size_t i=0; i<nsys; i++){
+        q[i+nsys] /= N;
+    }
 }
 
 
@@ -119,17 +119,19 @@ class VariationalODE : public ODE<T, N>{
 
 
 public:
-    VariationalODE(OdeData<T> ode, const T& t0, Array1D<T, N> q0, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, int dir=1, const std::vector<T> args = {}, std::vector<const Event<T, N>*> events = {}, const std::string& method = "RK45") : ODE<T, N>(){
-        _assert_event(q0);
+    VariationalODE(OdeData<T> ode, const T& t0, const T* q0_, size_t nsys, const T& period, const T& rtol, const T& atol, const T min_step=0, const T& max_step=inf<T>(), const T first_step=0, int dir=1, const std::vector<T> args = {}, std::vector<const Event<T, N>*> events = {}, const std::string& method = "RK45") : ODE<T, N>(){
         for (size_t i=0; i<events.size(); i++){
             if (dynamic_cast<const NormalizationEvent<T, N>*>(events[i])){
                 throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
             }
         }
-        q0 = normalized<T, N>(q0);
-        size_t Nsys = q0.size()/2;
-        NormalizationEvent<T, N> extra_event("Normalization", Nsys, period);
+
+        Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
+        normalized<T>(tmp.data(), nsys);
+        NormalizationEvent<T, N> extra_event("Normalization", nsys, period);
         events.insert(events.begin(), &extra_event);
+        nsys *= 2;
+        const T* q0 = tmp.data();
         this->_init(ARGS, events, method);
     }
 
@@ -173,12 +175,6 @@ public:
 
 
 private:
-
-    void _assert_event(const Array1D<T, N>& q0)const{
-        if ((q0.size() & 1) != 0){
-            throw std::runtime_error("Variational ODEs require an even number of system size");
-        }
-    }
 
     inline const NormalizationEvent<T, N>& _main_event()const{
         return static_cast<const NormalizationEvent<T, N>&>(this->solver()->event_col().event(_ind));

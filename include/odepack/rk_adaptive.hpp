@@ -233,11 +233,11 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 // RungeKuttaBase implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows)
-    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
+    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), EVENTS events, size_t Krows)
-    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, q0.size()), _df_tmp(q0.size()), _scale_tmp(q0.size()), _error_tmp(q0.size()), _coef_mat(q0.size(), Derived::INTERP_ORDER) {}
+    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::reset_impl(){
