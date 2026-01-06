@@ -71,7 +71,7 @@ class VariationalODE : public ODE<T, N>{
 
 public:
 
-    VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, const std::vector<const Event<T, N>*>& events = {}, const std::string& method = "RK45");
+    VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T, N>*> = {}, const std::string& method = "RK45");
 
     DEFAULT_RULE_OF_FOUR(VariationalODE);
 
@@ -199,7 +199,7 @@ void NormalizationEvent<T, N>::_register_it(const EventState<T, N>& res, State<c
 
 // VariationalODE implementations
 template<typename T, size_t N>
-VariationalODE<T, N>::VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, const std::vector<const Event<T, N>*>& events, const std::string& method) : ODE<T, N>(){
+VariationalODE<T, N>::VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, std::vector<const Event<T, N>*> events, const std::string& method) : ODE<T, N>(){
     for (size_t i=0; i<events.size(); i++){
         if (dynamic_cast<const NormalizationEvent<T, N>*>(events[i])){
             throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");

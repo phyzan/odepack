@@ -76,8 +76,8 @@ private:
 };
 
 
-template<typename T, size_t N, SolverPolicy SP>
-class DOP853 : public RungeKuttaBase<DOP853<T, N, SP>, T, N, 12, 8, SP>{
+template<typename T, size_t N, SolverPolicy SP, typename Derived=void>
+class DOP853 : public RungeKuttaBase<GetDerived<DOP853<T, N, SP, Derived>, Derived>, T, N, 12, 8, SP>{
 
 public:
     static constexpr size_t N_STAGES = 12;
@@ -88,14 +88,14 @@ public:
     static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
 
 private:
-    using Base = RungeKuttaBase<DOP853<T, N, SP>, T, N, 12, 8, SP>;
+    using Base = RungeKuttaBase<GetDerived<DOP853<T, N, SP, Derived>, Derived>, T, N, 12, 8, SP>;
 
     using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
 
     using C_EXTRA_TYPE = Array1D<T, N_STAGES_EXTRA>;
 
     friend Base;
-    friend BaseSolver<DOP853<T, N, SP>, T, N, SP>;
+    friend BaseSolver<DOP853<T, N, SP, Derived>, T, N, SP>;
 
     static constexpr const char* name = "DOP853";
 
@@ -482,26 +482,26 @@ void DOP853LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 }
 
 // DOP853 implementations
-template<typename T, size_t N, SolverPolicy SP>
-DOP853<T, N, SP>::DOP853(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
 
-template<typename T, size_t N, SolverPolicy SP>
-DOP853<T, N, SP>::DOP853(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
 
-template<typename T, size_t N, SolverPolicy SP>
-inline void DOP853<T, N, SP>::interp_impl(T* result, const T& t) const{
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+inline void DOP853<T, N, SP, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     return coef_mat_interp_dop853(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-inline std::unique_ptr<Interpolator<T, N>> DOP853<T, N, SP>::state_interpolator(int bdr1, int bdr2) const{
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+inline std::unique_ptr<Interpolator<T, N>> DOP853<T, N, SP, Derived>::state_interpolator(int bdr1, int bdr2) const{
     this->set_coef_matrix();
     return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t_new(),this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2));
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-typename DOP853<T, N, SP>::Base::Atype DOP853<T, N, SP>::Amatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+typename DOP853<T, N, SP, Derived>::Base::Atype DOP853<T, N, SP, Derived>::Amatrix(){
     typename Base::Atype result(N_STAGES, N_STAGES);
     typename DOP_COEFS<T>::DOP_A full_A = DOP_COEFS<T>::make_A();
 
@@ -513,37 +513,37 @@ typename DOP853<T, N, SP>::Base::Atype DOP853<T, N, SP>::Amatrix(){
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-typename DOP853<T, N, SP>::Base::Btype DOP853<T, N, SP>::Bmatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+typename DOP853<T, N, SP, Derived>::Base::Btype DOP853<T, N, SP, Derived>::Bmatrix(){
     return DOP_COEFS<T>::make_B();
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-typename DOP853<T, N, SP>::Base::Ctype DOP853<T, N, SP>::Cmatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+typename DOP853<T, N, SP, Derived>::Base::Ctype DOP853<T, N, SP, Derived>::Cmatrix(){
     typename Base::Ctype result(N_STAGES);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data(), N_STAGES);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-typename DOP853<T, N, SP>::A_EXTRA_TYPE DOP853<T, N, SP>::Amatrix_extra(){
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+typename DOP853<T, N, SP, Derived>::A_EXTRA_TYPE DOP853<T, N, SP, Derived>::Amatrix_extra(){
     Array2D<T, N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT> result(N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT);
     auto A = DOP_COEFS<T>::make_A();
     copy_array(result.data(), A.data()+(N_STAGES+1)* DOP_COEFS<T>::N_STAGES_EXT, N_STAGES_EXTRA* DOP_COEFS<T>::N_STAGES_EXT);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-typename DOP853<T, N, SP>::C_EXTRA_TYPE DOP853<T, N, SP>::Cmatrix_extra(){
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+typename DOP853<T, N, SP, Derived>::C_EXTRA_TYPE DOP853<T, N, SP, Derived>::Cmatrix_extra(){
     Array1D<T, N_STAGES_EXTRA> result(N_STAGES_EXTRA);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data()+N_STAGES+1, N_STAGES_EXTRA);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-void DOP853<T, N, SP>::set_coef_matrix_impl() const{
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+void DOP853<T, N, SP, Derived>::set_coef_matrix_impl() const{
 
     const T& h = this->stepsize() * this->direction();
     const T* y_old = this->old_state_ptr()+2;
@@ -602,8 +602,8 @@ void DOP853<T, N, SP>::set_coef_matrix_impl() const{
     }
 }
 
-template<typename T, size_t N, SolverPolicy SP>
-T DOP853<T, N, SP>::estimate_error_norm(const T* K, const T* scale, T h) const{
+template<typename T, size_t N, SolverPolicy SP, typename Derived>
+T DOP853<T, N, SP, Derived>::estimate_error_norm(const T* K, const T* scale, T h) const{
     // DOP853 uses a combination of 3rd and 5th order error estimates
     // err5 = K.T @ E5 / scale
     // err3 = K.T @ E3 / scale

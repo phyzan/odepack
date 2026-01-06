@@ -22,6 +22,11 @@ class BaseSolver : public BaseInterface<T, N, SP>{
     using Clone = SolverCloneType<Derived, T, N, SP>;
 
 public:
+
+    using Scalar = T;
+    static constexpr size_t NSYS = N;
+    static constexpr SolverPolicy Policy = SP;
+    
     BaseSolver() = delete;
 
     // ODE PROPERTIES
@@ -66,7 +71,7 @@ public:
     void                        stop(const std::string& text = "");
     void                        kill(const std::string& text = "");
     bool                        resume();
-    void                        set_obj(const void* obj);
+    inline void                 set_obj(const void* obj);
     inline void                 set_args(const T* new_args);
 
 
@@ -83,11 +88,13 @@ protected:
     //=================================================================================
 
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
-    inline void                 reset_impl();
-    inline void                 set_args_impl(const T* new_args);
-    inline void                 re_adjust_impl();
-    inline bool                 validate_ics_impl(T t0, const T* q0) const;
-    //========== ALWAYS CALL THE BASE CLASS'S IMPL IN OPTIONAL OVERRIDE FIRST =========
+    inline void                 rhs_impl(T* dq_dt, const T& t, const T* q) const;
+    inline void                 jac_impl(T* jm, const T& t, const T* q) const;
+    inline void                 reset_impl();                                   //call base class's override first
+    inline void                 set_args_impl(const T* new_args);               //call base class's override first
+    inline void                 re_adjust_impl();                               //call base class's override first
+    inline bool                 validate_ics_impl(T t0, const T* q0) const;     //call base class's override first
+    //=================================================================================
 
 
     // =========================== HELPER METHODS =====================================
@@ -166,12 +173,12 @@ private:
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q) const{
-    _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
+    THIS_C->rhs_impl(dq_dt, t, q);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::jac(T* jm, const T& t, const T* q) const{
-    _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
+    THIS_C->jac_impl(jm, t, q);
 }
 
 // PUBLIC ACCESSORS
@@ -454,7 +461,7 @@ bool BaseSolver<Derived, T, N, SP>::resume(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void BaseSolver<Derived, T, N, SP>::set_obj(const void* obj){
+inline void BaseSolver<Derived, T, N, SP>::set_obj(const void* obj){
     _ode.obj = obj;
 }
 
@@ -478,6 +485,19 @@ inline void BaseSolver<Derived, T, N, SP>::adapt_impl(T* state){
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::interp_impl(T* result, const T& t) const{
     THIS_C->interp_impl(result, t);
+}
+
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline void BaseSolver<Derived, T, N, SP>::rhs_impl(T* dq_dt, const T& t, const T* q) const{
+    assert(_ode.rhs != nullptr && "The ode rhs provided is a null pointer, or has not been properly overriden");
+    _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline void BaseSolver<Derived, T, N, SP>::jac_impl(T* jm, const T& t, const T* q) const{
+    assert(_ode.jacobian != nullptr && "The jacobian provided is a null pointer, or has not been properly overriden");
+    _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -633,7 +653,7 @@ void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, nsys+2), _dummy_state(nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
-
+    assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){
         throw std::runtime_error("The first_step argument must not be negative");
@@ -711,5 +731,9 @@ bool BaseSolver<Derived, T, N, SP>::validate_it(const T* state){
 
     return success;
 }
+
+
+template<typename cls, typename derived>
+using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
 
 #endif

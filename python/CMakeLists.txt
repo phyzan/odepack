@@ -34,8 +34,6 @@ set(COMMON_COMPILE_OPTIONS
     -Wextra
     -ftemplate-backtrace-limit=0
     -Wno-unused-parameter
-    -fno-math-errno
-    -fno-trapping-math
     -fopenmp
     -march=x86-64
     -DMPREAL
@@ -45,7 +43,7 @@ set(COMMON_COMPILE_OPTIONS
 if(DETAILED_BACKTRACE)
     list(APPEND COMMON_COMPILE_OPTIONS -O0 -g -ggdb3 -fno-omit-frame-pointer)
 else()
-    list(APPEND COMMON_COMPILE_OPTIONS -O3 -DNDEBUG)
+    list(APPEND COMMON_COMPILE_OPTIONS -O3 -DNDEBUG -fno-math-errno -fno-trapping-math)
 endif()
 
 # Find MPFR and GMP libraries

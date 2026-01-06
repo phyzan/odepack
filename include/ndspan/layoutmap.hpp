@@ -20,19 +20,18 @@ struct LayoutMap<Layout::C, DIMS...> { using type = RowMajorSpan<DIMS...>; };
 template <size_t... DIMS>
 struct LayoutMap<Layout::F, DIMS...> { using type = ColumnMajorSpan<DIMS...>; };
 
-// template <Layout L, size_t... DIMS>
-// using NdSpan = std::conditional_t<(sizeof...(DIMS)==1 && (DIMS*...*1)==0), SemiStaticSpan1D, typename LayoutMap<L, DIMS...>::type>;
-
 template <Layout L, size_t... DIMS>
 class NdSpan : public std::conditional_t<(sizeof...(DIMS)==1 && (DIMS*...*1)==0), SemiStaticSpan1D, typename LayoutMap<L, DIMS...>::type>{
 
     using Base = std::conditional_t<(sizeof...(DIMS)==1 && (DIMS*...*1)==0), SemiStaticSpan1D, typename LayoutMap<L, DIMS...>::type>;
 
-public:
+protected:
 
     inline static constexpr size_t ND = Base::ND;
     inline static constexpr size_t N = Base::N;
     inline static constexpr std::array<size_t, ND> SHAPE = Base::SHAPE;
+
+public:
 
     template<IsShapeContainer ShapeContainer>
     explicit NdSpan(const ShapeContainer& shape) : Base(shape) {}

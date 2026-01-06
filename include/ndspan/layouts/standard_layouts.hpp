@@ -37,9 +37,8 @@ public:
         }
     }
 
-    inline static constexpr std::array<size_t, Base::ND> STRIDES = static_strides();
-
 protected:
+    inline static constexpr std::array<size_t, Base::ND> STRIDES = static_strides();
 
     template<size_t... I, INT_T... Idx>
     INLINE static constexpr size_t _static_offset_impl(std::index_sequence<I...>, Idx... idx) noexcept {
@@ -229,7 +228,7 @@ public:
 
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
-        return EXPAND(size_t, ND, I,
+        return EXPAND(size_t, sizeof...(idx), I,
             return ((idx * _dyn_strides[I]) + ...);
         );
     }

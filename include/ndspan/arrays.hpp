@@ -9,9 +9,6 @@ class AbstractArray : public AbstractNdView<Derived, L, T, DIMS...>{
     using CLS = AbstractArray<Derived, T, L, DIMS...>;
     using Base = AbstractNdView<Derived, L, T, DIMS...>;
 
-    inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
-    inline static constexpr size_t ND = sizeof...(DIMS);
-
 public:
 
     Derived& set(const T& value){
@@ -20,6 +17,9 @@ public:
     }
 
 protected:
+
+    inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
+    inline static constexpr size_t ND = sizeof...(DIMS);
 
     using Base::Base;
 
@@ -168,7 +168,11 @@ public:
     T* release(){
         T* res = _data;
         _data = nullptr;
-        Base::resize(std::vector<size_t>(this->ndim(), 0));
+        if constexpr (Base::N == 0) {
+            EXPAND(size_t, Base::ND, I,
+                Base::resize((Base::SHAPE[I])...);
+            );
+        }
         return res;
     }
 

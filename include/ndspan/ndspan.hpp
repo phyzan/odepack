@@ -3,14 +3,16 @@
 #include "ndtools.hpp"
 
 template<typename Derived, size_t... DIMS>
-struct AbstractNdSpan{
+class AbstractNdSpan{
 
+protected:
     inline static constexpr size_t ND = sizeof...(DIMS);
     inline static constexpr size_t N = (ND == 0 ? 0 : (DIMS * ... * 1));
     inline static constexpr std::array<size_t, ND> SHAPE = {DIMS...};
 
     using CLS = AbstractNdSpan<Derived, DIMS...>;
 
+public:
     //ACCESSORS
 
     INLINE constexpr size_t size() const{
@@ -109,8 +111,12 @@ protected:
 
     template<IsShapeContainer ShapeContainer>
     INLINE bool _conserves_shape(const ShapeContainer& shape) const{
-        int I = 0;
-        return (( shape[I++]==DIMS) && ...);
+        if (this->ndim() == shape.size() && this->ndim() > 0){
+            int I = 0;
+            return (( shape[I++]==DIMS) && ...);
+        }else {
+            return false;
+        }
     }
 
     template<INT_T... IntType>
@@ -121,10 +127,13 @@ protected:
     }
 
     template<IsShapeContainer ShapeContainer>
-    INLINE static void _shape_check_array(const ShapeContainer& dims) {
+    INLINE static bool _is_valid_shape(const ShapeContainer& dims) {
         for (size_t i=0; i<dims.size(); i++){
-            assert(dims[i] >= 0 && "Invalid dims");
+            if (dims[i] < 0){
+                return false;
+            }
         }
+        return true;
     }
 
     template<INT_T... IntType>
@@ -207,6 +216,7 @@ public:
 
     template<IsShapeContainer ShapeContainer>
     INLINE void reshape(const ShapeContainer& shape){
+        assert(Base::_is_valid_shape(shape) && "Invalid dims");
         assert((shape.size() == this->ndim()) && "Invalid shape in StaticNdSpan::reshape");
         assert(this->_conserves_shape(shape) && "Runtime dims do not match template dims in reshape");
     }
@@ -262,6 +272,7 @@ public:
     template<IsShapeContainer ShapeContainer>
     void constexpr resize(const ShapeContainer& shape){
         assert_integral_data(shape);
+        assert(Base::_is_valid_shape(shape) && "Invalid dims");
         //TODO make sure non of these are zero at runtime, and they are equal to the template parameter
         size_t new_nd = shape.size();
         
@@ -336,7 +347,8 @@ public:
     template<IsShapeContainer ShapeContainer>
     void constexpr resize(const ShapeContainer& shape){
         assert_integral_data(shape);
-        //TODO make sure non of these are zero at runtime, and they are equal to the template parameter        
+        //TODO make sure they are equal to the non zero template dims
+        assert(Base::_is_valid_shape(shape) && "Invalid dims");      
         assert(shape.size() == 1 && "SemiStaticSpan1D::resize invalid shape");
         _size = shape[0];
     }
@@ -391,16 +403,17 @@ class DynamicNdSpan : public AbstractNdSpan<Derived>{
     using Base = AbstractNdSpan<Derived>;
     using CLS = DynamicNdSpan<Derived>;
 
+    static constexpr size_t DEFAULT_DATA[2] = {0, 0};
+
 protected:
 
-    inline static constexpr size_t ND = 0;
-    inline static constexpr size_t N = 0;
+    static constexpr size_t ND = 0;
+    static constexpr size_t N = 0;
+    
 
     static_assert(N==0, "For fixed compile time dims, use StaticNdSpan");
 
-    DynamicNdSpan() : Base() {
-        _data = new size_t[2]{};
-    }
+    DynamicNdSpan() = default;
 
     template<INT_T... Args>
     explicit constexpr DynamicNdSpan(Args... shape){
@@ -411,22 +424,24 @@ protected:
 
     template<IsShapeContainer ShapeContainer>
     explicit DynamicNdSpan(const ShapeContainer& shape) {
-        Base::_shape_check_array(shape);
+        assert(Base::_is_valid_shape(shape) && "Invalid dims");
         _data = new size_t[2+shape.size()](0);
         this->resize(shape);
     }
 
     //COPY CONSTRUCTOR
     DynamicNdSpan(const DynamicNdSpan& other) : Base(other){
-        _data = new size_t[2+other.ndim()];
-        _data[0] = other.ndim();
-        _data[1] = other.size();
-        copy_array(_data+2, other.shape(), this->ndim());
+        if (other.ndim() > 0){
+            _data = new size_t[2+other.ndim()];
+            ptr()[0] = other.ndim();
+            ptr()[1] = other.size();
+            copy_array(ptr()+2, other.shape(), this->ndim());
+        }
     }
 
     //MOVE CONSTRUCTOR
     DynamicNdSpan(DynamicNdSpan&& other) noexcept : Base(other), _data(other._data) {
-        other._data = nullptr;
+        other._data = DEFAULT_DATA;
     }
 
     //ASSIGNMENT OPERATOR
@@ -434,12 +449,18 @@ protected:
         if (&other != this){
             Base::operator=(other);
             if (this->ndim() != other.ndim()){
-                delete[] _data;
-                _data = new size_t[2+other.ndim()];
-                _data[0] = other.ndim();
+                if (this->ndim() > 0){
+                    delete[] ptr();
+                }
+                if (other.ndim() > 0){
+                    _data = new size_t[2+other.ndim()]{other.ndim(), other.size()};
+                }else{
+                    _data = DEFAULT_DATA;
+                }
             }
-            _data[1] = other.size();
-            copy_array(_data+2, other.shape(), other.ndim());
+            if (other.ndim() > 0){
+                copy_array(ptr()+2, other.shape(), other.ndim());
+            }
         }
         return *this;
     }
@@ -449,7 +470,7 @@ protected:
         if (&other != this){
             Base::operator=(std::move(other));
             _data = other._data;
-            other._data = nullptr;
+            other._data = DEFAULT_DATA;
         }
         return *this;
     }
@@ -460,43 +481,60 @@ public:
     void constexpr resize(Args... shape){
 
         constexpr size_t new_nd = sizeof...(shape);
-        if (new_nd != this->ndim()){
-            if (new_nd > this->ndim()){
-                //only reallocate in this case
-                delete[] _data;
-                _data = new size_t[2+new_nd];
+        if constexpr (new_nd == 0) {
+            if (this->ndim() > 0){
+                delete[] ptr();
+                _data = DEFAULT_DATA;
             }
-            _data[0] = new_nd;
-        }
-        _data[1] = new_nd > 0 ? (shape*...) : 0;
+        }else{
+            if (new_nd != this->ndim()){
+                if (this->ndim() > 0){
+                    delete[] ptr();
+                }
+                _data = new size_t[2+new_nd];
+                ptr()[0] = new_nd;
+            }
 
-        EXPAND(size_t, new_nd, I,
-            assert(((shape >= 0 ) && ...) && "Invalid dims");
-            ((_data[I+2] = shape), ...);
-        );
+            ptr()[1] = (shape*...);
+
+            EXPAND(size_t, new_nd, I,
+                assert(((shape >= 0 ) && ...) && "Invalid dims");
+                ((ptr()[I+2] = shape), ...);
+            );
+        }
+        
     }
 
     template<IsShapeContainer ShapeContainer>
     void constexpr resize(const ShapeContainer& shape){
-        assert_integral_data(shape);
-        //TODO make sure non of these are zero at runtime, and they are equal to the template parameter
-        size_t new_nd = shape.size();
 
-        if (new_nd != this->ndim()){
-            if (new_nd > this->ndim()){
-                //only reallocate in this case
-                delete[] _data;
-                _data = new size_t[2+new_nd];
+        assert_integral_data(shape);
+        assert(Base::_is_valid_shape(shape) && "Negative dims not allowed");
+
+        size_t new_nd = shape.size();
+        if (new_nd == 0) {
+            if (this->ndim() > 0){
+                delete[] ptr();
+                _data = DEFAULT_DATA;
             }
-            _data[0] = new_nd;
+        }else{
+            if (new_nd != this->ndim()){
+                if (this->ndim() > 0){
+                    delete[] ptr();
+                }
+                _data = new size_t[2+new_nd];
+
+                ptr()[0] = new_nd;
+            }
+            ptr()[1] = prod(shape);
+
+            copy_array(ptr()+2, shape.data(), new_nd);
         }
-        _data[1] = new_nd > 0 ? prod(shape) : 0;
-        copy_array(_data+2, shape.data(), new_nd);
     }
 
     template<INT_T... Args>
     void constexpr reshape(Args... shape){
-        assert(((shape*...) == this->size()) && "Invalid new shape. The total size of the array is not conserved");
+        assert((size_t((shape*...)) == this->size()) && "Invalid new shape. The total size of the array is not conserved");
         this->resize(shape...);
     }
 
@@ -525,13 +563,18 @@ public:
 protected:
 
     ~DynamicNdSpan() {
-        delete[] _data;
-        _data = nullptr;
+        if (this->ndim() > 0){
+            delete[] ptr();
+        }
     }
 
 private:
 
-    size_t* _data = nullptr; //size is number of dims+2: [nd, n, dims...]
+    inline size_t*& ptr(){
+        return const_cast<size_t*&>(_data);
+    }
+
+    const size_t* _data = DEFAULT_DATA; //size is number of dims+2: [nd, n, dims...]
 
 
 };
