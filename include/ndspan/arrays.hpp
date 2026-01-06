@@ -168,15 +168,18 @@ public:
     T* release(){
         T* res = _data;
         _data = nullptr;
-        if constexpr (Base::N == 0) {
-            EXPAND(size_t, Base::ND, I,
-                Base::resize((Base::SHAPE[I])...);
-            );
-        }
+        _reset_base_to_zero(std::make_index_sequence<Base::ND>());
         return res;
     }
 
 private:
+
+    template<size_t... I>
+    INLINE void _reset_base_to_zero(std::index_sequence<I...>){
+        if constexpr (Base::N == 0) {
+            Base::resize((Base::SHAPE[I])...);
+        }
+    }
 
     T* _data = nullptr;
 
