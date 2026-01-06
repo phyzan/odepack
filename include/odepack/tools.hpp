@@ -198,7 +198,13 @@ inline double as_duration(const TimePoint& t1, const TimePoint& t2){
 
 template <typename T>
 T inf() {
+    // When using -ffast-math, infinity() may cause issues or segfaults
+    // Use a very large finite number instead that's safe with -ffast-math
+    #ifdef __FAST_MATH__
+    return std::numeric_limits<T>::max();
+    #else
     return std::numeric_limits<T>::infinity();
+    #endif
 }
 
 template<typename T>
@@ -233,7 +239,13 @@ bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step){
 template <typename T>
 inline bool is_finite(const T& value) {
     if constexpr (std::is_floating_point_v<T>) {
+        #ifdef __FAST_MATH__
+        // When -ffast-math is enabled, std::isfinite may not work correctly
+        // Use range check instead: value is finite if it's within representable range
+        return (value < std::numeric_limits<T>::max());
+        #else
         return std::isfinite(value);
+        #endif
     } else if constexpr (std::is_integral_v<T>) {
         return true;
     } else {
@@ -428,7 +440,7 @@ class Clock{
 
 public:
 
-    Clock()= default;
+    Clock()=default;
 
     inline void start(){
         _start = now();

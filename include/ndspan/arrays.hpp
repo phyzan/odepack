@@ -105,9 +105,7 @@ public:
     }
 
     //MOVE CONSTRUCTOR
-    DynamicArray(DynamicArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))), _data(other._data) {
-        other._data = nullptr;
-    }
+    DynamicArray(DynamicArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))), _data(other.release()) {}
 
     //ASSIGNMENT OPERATOR
     DynamicArray& operator=(const DynamicArray& other) {
@@ -127,8 +125,7 @@ public:
         if (&other != this){
             Base::operator=(std::move(other));
             delete[] _data;
-            _data = other._data;
-            other._data = nullptr;
+            _data = other.release();
         }
         return *this;
     }
