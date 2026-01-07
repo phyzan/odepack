@@ -14,8 +14,78 @@ constexpr size_t MAX_ORDER = 5;
 template<typename T, size_t N>
 struct LUResult {
     LUResult(size_t Nsys);
-    Array2D<T, N, N> LU;
+    JacMat<T, N> LU;
     Array1D<size_t, N> piv;
+
+    void lu_factor(const JacMat<T, N>& A_input){
+        size_t n = A_input.Nrows();
+        JacMat<T, N>& A = LU;
+
+        // Copy input to output
+        copy_array(A.data(), A_input.data(), A_input.size());
+
+        // Initialize pivot array as identity
+        for (size_t i = 0; i < n; ++i) {
+            piv[i] = i;
+        }
+
+        for (size_t k = 0; k < n - 1; ++k) {
+            // Find pivot row
+            size_t p = k;
+            T max_val = abs(A(k, k));
+            for (size_t i = k + 1; i < n; ++i) {
+                if (abs(A(i, k)) > max_val) {
+                    max_val = abs(A(i, k));
+                    p = i;
+                }
+            }
+
+            // Check singular
+            if (max_val < 1e-15) {
+                throw std::runtime_error("Matrix is singular or nearly singular");
+            }
+
+            // Record and apply pivot
+            if (p != k) {
+                std::swap(piv[k], piv[p]);  // Record which row k was swapped with
+                for (size_t c = 0; c < n; c++) {
+                    std::swap(A(k, c), A(p, c));
+                }
+            }
+
+            // Eliminate below pivot
+            for (size_t i = k + 1; i < n; ++i) {
+                A(i, k) /= A(k, k);
+                for (size_t j = k + 1; j < n; ++j) {
+                    A(i, j) -= A(i, k) * A(k, j);
+                }
+            }
+        }
+    }
+
+    void lu_solve(T* x, const T* b) const {
+        size_t n = piv.size();
+
+        // Apply permutation: x = P*b
+        for (size_t i = 0; i < n; ++i) {
+            x[i] = b[piv[i]];
+        }
+
+        // Forward substitution: L * y = P*b
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < i; ++j) {
+                x[i] -= LU(i, j) * x[j];
+            }
+        }
+
+        // Backward substitution: U * x = y
+        for (size_t i = n; i-- > 0; ) {
+            for (size_t j = i + 1; j < n; ++j) {
+                x[i] -= LU(i, j) * x[j];
+            }
+            x[i] /= LU(i, i);
+        }
+    }
 };
 
 template<typename T>
@@ -34,11 +104,6 @@ struct NewtConv{
 };
 
 // Function declarations
-template<typename T, size_t N>
-void lu_factor(LUResult<T, N>& res, const Array2D<T, N, N>& A_input);
-
-template<typename T, size_t N>
-void lu_solve(T* x, const LUResult<T, N>& LU_struct, const T* b);
 
 template<typename T>
 Array1D<T> arange(size_t a, size_t b);
@@ -152,81 +217,6 @@ private:
 template<typename T, size_t N>
 LUResult<T, N>::LUResult(size_t Nsys) : LU(Nsys, Nsys), piv(Nsys) {}
 
-template<typename T, size_t N>
-void lu_factor(LUResult<T, N>& res, const Array2D<T, N, N>& A_input) {
-    size_t n = A_input.Nrows();
-    Array2D<T, N, N>& A = res.LU;
-    Array1D<size_t, N>& piv = res.piv;
-
-    // Copy input to output
-    copy_array(A.data(), A_input.data(), A_input.size());
-
-    // Initialize pivot array as identity
-    for (size_t i = 0; i < n; ++i) {
-        piv[i] = i;
-    }
-
-    for (size_t k = 0; k < n - 1; ++k) {
-        // Find pivot row
-        size_t p = k;
-        T max_val = abs(A(k, k));
-        for (size_t i = k + 1; i < n; ++i) {
-            if (abs(A(i, k)) > max_val) {
-                max_val = abs(A(i, k));
-                p = i;
-            }
-        }
-
-        // Check singular
-        if (max_val < 1e-15) {
-            throw std::runtime_error("Matrix is singular or nearly singular");
-        }
-
-        // Record and apply pivot
-        if (p != k) {
-            std::swap(piv[k], piv[p]);  // Record which row k was swapped with
-            for (size_t c = 0; c < n; c++) {
-                std::swap(A(k, c), A(p, c));
-            }
-        }
-
-        // Eliminate below pivot
-        for (size_t i = k + 1; i < n; ++i) {
-            A(i, k) /= A(k, k);
-            for (size_t j = k + 1; j < n; ++j) {
-                A(i, j) -= A(i, k) * A(k, j);
-            }
-        }
-    }
-}
-
-template<typename T, size_t N>
-void lu_solve(T* x, const LUResult<T, N>& LU_struct, const T* b) {
-    const Array2D<T, N, N>& LU = LU_struct.LU;
-    const Array1D<size_t, N>& piv = LU_struct.piv;
-    size_t n = piv.size();
-
-    // Apply permutation: x = P*b
-    for (size_t i = 0; i < n; ++i) {
-        x[i] = b[piv[i]];
-    }
-
-    // Forward substitution: L * y = P*b
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < i; ++j) {
-            x[i] -= LU(i, j) * x[j];
-        }
-    }
-
-    // Backward substitution: U * x = y
-    for (size_t i = n; i-- > 0; ) {
-        for (size_t j = i + 1; j < n; ++j) {
-            x[i] -= LU(i, j) * x[j];
-        }
-        x[i] /= LU(i, i);
-    }
-}
-
 template<typename T>
 Array1D<T> arange(size_t a, size_t b){
     Array1D<T> res(b-a);
@@ -319,9 +309,7 @@ void BDFInterpolator<T, N>::_call_impl(T* result, const T& t) const {
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
 template<typename... Type>
 BDF<T, N, SP, Derived>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
-
-    assert((ode.jacobian != nullptr || !std::is_same_v<Derived, void>) && "Provide a jacobian function for the BDF method");
-
+    
     if (!this->is_dead()){
         if (this->validate_ics_impl(t0, q0)){
             if (rtol == 0){
@@ -459,13 +447,12 @@ void BDF<T, N, SP, Derived>::adapt_impl(T* res){
                     for (size_t j=0; j<nsys; j++){
                         if (i == j){
                             _B(i, j) = 1 - c*_J(i, j);
-                        }
-                        else{
+                        }else{
                             _B(i, j) = -c*_J(i, j);
                         }
                     }
                 }
-                lu_factor(_LU, _B);
+                _LU.lu_factor(_B);
                 _valid_LU = true;
             }
 
@@ -597,8 +584,7 @@ NewtConv BDF<T, N, SP, Derived>::_solve_bdf_system(T* y, const T* y_pred, Array1
         for (size_t i=0; i<n; i++){
             _b[i] = c * _f[i] - psi[i] - d[i];
         }
-
-        lu_solve(_dy.data(), LU, _b.data());
+        LU.lu_solve(_dy.data(), _b.data());
         dy_norm = rms_norm(_dy.data(), scale.data(), n);
 
         if (dy_norm_old == 0){

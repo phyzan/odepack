@@ -450,6 +450,7 @@ class OdeSystem:
         self.__nan_modname = module_name is None
         self._pointers_cache = {}
         self._pointers_var_cache = {}
+        self._pointers_jac_cache = {}
         self._process_args(ode_sys, t, q, args=args, events=events)
         # Initialize caches for scalar_type-specific low-level functions
     
@@ -483,6 +484,8 @@ class OdeSystem:
             if self.__class__._cls_instances[i] == self:
                 obj = self.__class__._cls_instances[i]
                 self._pointers_cache = obj._pointers_cache
+                self._pointers_var_cache = obj._pointers_var_cache
+                self._pointers_jac_cache = obj._pointers_jac_cache
                 return
         self.__class__._cls_instances.append(self)
 
@@ -714,7 +717,7 @@ class OdeSystem:
         q, odesys, _ = self._ode_data(variational=variational)
         return TensorLowLevelCallable(array=odesys, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
 
-    def jacobian_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
+    def jacobian_to_compile(self, scalar_type='double', variational=False, layout = 'F')->TensorLowLevelCallable:
         """Get the Jacobian matrix ready for compilation.
 
         Parameters
@@ -731,6 +734,8 @@ class OdeSystem:
             Low-level representation of the Jacobian matrix
         """
         q, _, jacmat = self._ode_data(variational=variational)
+        if layout == 'F':
+            jacmat = [[jacmat[j][i] for j in range(len(jacmat))] for i in range(len(jacmat[0]))]
         return TensorLowLevelCallable(array=jacmat, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
 
     def true_compiled_events(self, scalar_type='double', variational=False):
@@ -1259,8 +1264,9 @@ class OdeSystem:
             idx = 0
             shape = [self.Nsys*factor]
         elif func == 'jac':
-            idx = 1
-            shape = [self.Nsys*factor, self.Nsys*factor]
+            if (scalar_type, variational) not in self._pointers_jac_cache:
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')])[0]
+            return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')
         p = self._pointers(scalar_type=scalar_type, variational=variational)[idx]

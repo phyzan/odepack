@@ -32,6 +32,8 @@ public:
     // ODE PROPERTIES
     inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
     inline void                 jac(T* jm, const T& t, const T* q) const;
+    inline void                 jac_approx(T* j, const T& t, const T* q) const;
+    NdView<T, Layout::F, N, N>  jac_view(T* j) const;
 
     // ACCESSORS
     inline const T&             t() const;
@@ -107,11 +109,12 @@ protected:
     const T&                    t_new() const;
     const T&                    t_old() const;
     const T&                    t_last() const;
-    inline void                 set_message(const std::string& text);
     void                        warn_paused() const;
     void                        warn_dead() const;
+    inline void                 set_message(const std::string& text);
     void                        re_adjust();
     void                        remake_new_state(const T* vector);
+
 
     // ================================================================================
 
@@ -133,6 +136,7 @@ protected:
 
 private:
 
+    inline void                 jac_exact(T* j, const T& t, const T* q) const;
     inline const T*             aux_state_ptr() const;
     inline T*                   aux_state_ptr();
     void                        register_states();
@@ -140,7 +144,7 @@ private:
 
     
     Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>        _state_data;
-    mutable Array1D<T, (N>0 ? N+2 : 0), Allocation::Auto>   _dummy_state;
+    mutable Array1D<T, 4*N, Allocation::Auto>               _dummy_state;
     Array1D<T, 4, Allocation::Stack>                        _scalar_data;
     Array1D<T>                                              _args;
     OdeData<T>                                              _ode;
@@ -171,6 +175,9 @@ private:
 
 // ODE PROPERTIES
 
+template<typename T>
+using Func = void(*)(T*, const T&, const T*, const T*, const void*); // f(t, q, args, void) -> array
+
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q) const{
     THIS_C->rhs_impl(dq_dt, t, q);
@@ -179,6 +186,30 @@ inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q)
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::jac(T* jm, const T& t, const T* q) const{
     THIS_C->jac_impl(jm, t, q);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline void BaseSolver<Derived, T, N, SP>::jac_approx(T* jm, const T& t, const T* q) const{
+    size_t n = this->Nsys();
+    T h = this->stepsize()/1000; // TODO: OPTIMIZE
+    T* x1 = _dummy_state.data();
+    T* x2 = _dummy_state.data()+n;
+    T* f1 = _dummy_state.data()+2*n;
+    T* f2 = _dummy_state.data()+3*n;
+    copy_array(x1, q, n);
+    copy_array(x2, q, n);
+    for (size_t i=0; i<n; i++) {
+        x1[i] = q[i]-h;
+        x2[i] = q[i]+h;
+        this->rhs(f1, t, x1);
+        this->rhs(f2, t, x2);
+        x1[i] = q[i];
+        x2[i] = q[i];
+        T* mat = jm+i*n;
+        for (size_t j=0; j<n; j++){
+            mat[j] = (f2[j]-f1[j])/(2*h);
+        }
+    }
 }
 
 // PUBLIC ACCESSORS
@@ -298,15 +329,16 @@ T BaseSolver<Derived, T, N, SP>::auto_step(T t, const T* q) const{
     }
     size_t n = this->Nsys();
     T h0, d2, h1;
-    Array1D<T> y1(n), f1(n);
-    Array1D<T> scale(n);
+    T* y1 = _dummy_state.data();
+    T* f1 = y1+n;
+    T* scale = y1+2*n;
+    T* f0 = y1+3*n;
     for (size_t i=0; i<n; i++){
         scale[i] = atol() + abs(q[i])*rtol();
     }
-    Array1D<T> f0(n);
-    this->rhs(f0.data(), t, q);
-    T d0 = rms_norm(q, scale.data(), n);
-    T d1 = rms_norm(f0.data(), scale.data(), n);
+    this->rhs(f0, t, q);
+    T d0 = rms_norm(q, scale, n);
+    T d1 = rms_norm(f0, scale, n);
     if (d0 * 100000 < 1 || d1 * 100000 < 1){
         h0 = T(1)/1000000;
     }
@@ -316,12 +348,12 @@ T BaseSolver<Derived, T, N, SP>::auto_step(T t, const T* q) const{
     for (size_t i=0; i<n; i++){
         y1[i] = q[i]+h0*dir*f0[i];
     }
-    this->rhs(f1.data(), t+h0*dir, y1.data());
-    Array1D<T> tmp(n);
+    this->rhs(f1, t+h0*dir, y1);
+    T* tmp = y1; //y1 can be recycled, its not used anymore below
     for (size_t i=0; i<n; i++){
         tmp[i] = f1[i] - f0[i];
     }
-    d2 = rms_norm(tmp.data(), scale.data(), n) / h0;
+    d2 = rms_norm(tmp, scale, n) / h0;
 
     if (d1 <= 1e-15 && d2 <= 1e-15){
         h1 = std::max(T(1)/1000000, h0/1000);
@@ -392,6 +424,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::reset(){
     THIS->reset_impl();
 }
+
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 template<typename Setter>
 void BaseSolver<Derived, T, N, SP>::apply_ics_setter(T t0, Setter&& func, T stepsize){
@@ -462,6 +495,7 @@ bool BaseSolver<Derived, T, N, SP>::resume(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::set_obj(const void* obj){
+    assert(obj != this && "Cannot set obj equal to the pointer of the solver, as that may cause UB when the solver is copied/moved");
     _ode.obj = obj;
 }
 
@@ -496,7 +530,15 @@ inline void BaseSolver<Derived, T, N, SP>::rhs_impl(T* dq_dt, const T& t, const 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::jac_impl(T* jm, const T& t, const T* q) const{
-    assert(_ode.jacobian != nullptr && "The jacobian provided is a null pointer, or has not been properly overriden");
+    if (_ode.jacobian != nullptr){
+        this->jac_exact(jm, t, q);
+    }else {
+        this->jac_approx(jm, t, q);
+    }
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline void BaseSolver<Derived, T, N, SP>::jac_exact(T* jm, const T& t, const T* q) const{
     _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
 }
 
@@ -634,8 +676,8 @@ bool BaseSolver<Derived, T, N, SP>::validate_ics_impl(T t0, const T* q0) const {
         return false;
     }
 
-    this->rhs(_dummy_state.data()+2, t0, q0);
-    return all_are_finite(_dummy_state.data()+2, this->Nsys());
+    this->rhs(_dummy_state.data(), t0, q0);
+    return all_are_finite(_dummy_state.data(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -647,12 +689,23 @@ void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
     this->re_adjust();
 }
 
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+NdView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
+    //returns a high level view of the jacobian matrix, so that its elements
+    //can be accessed using matrix(i, j). This function simply simplifies
+    //the process of constructing the correct object that can safely view the jacobian matrix
+    //by doing
+    // auto matrix = solver->jac_view(jac_ptr);
+    // matrix(i, j) = ...
+    return NdView<T, Layout::F, N, N>(j, this->Nsys(), this->Nsys());
+}
+
 
 
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, nsys+2), _dummy_state(nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){

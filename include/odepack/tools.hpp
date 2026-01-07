@@ -179,7 +179,7 @@ template<typename T>
 using ObjFunLike = T(*)(const T&, const void*); // f(t, void) -> scalar
 
 template<typename T, size_t N>
-using JacMat = Array2D<T, N, N>;
+using JacMat = Array2D<T, N, N, Allocation::Heap, Layout::F>;
 
 using EventMap = std::map<std::string, std::vector<size_t>>;
 
@@ -471,6 +471,27 @@ struct OdeData{
     Func<T> rhs=nullptr;
     Func<T> jacobian=nullptr;
     const void* obj = nullptr; //It will be passed inside rhs and jacobian
+
+    /*
+    IMPORTANT
+    ================
+
+    The jacobian function takes as first input the output matrix (just like the rhs function takes as input the output array).
+    However, the output matrix stores its data in a column-major order, but is passed as the flattened array.
+    Since the output matrix, must behave as J(i, j) = df_i / dx_j, the output array must be accessed
+    as m[j + i*n] = df_i/dx_j, and not m[i + j*n].
+
+    In other words, if the jacobian matrix is
+
+    J_ij = [[a  b],
+            [c  d]]
+    
+    Then the output array must be set as
+
+    m[0] = a, m[1] = c, m[2] = b, m[3] = d
+    and NOT
+    m[0] = a, m[1] = b, m[2] = c, m[3] = d;
+    */
 };
 
 

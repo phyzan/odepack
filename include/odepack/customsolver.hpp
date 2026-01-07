@@ -19,7 +19,7 @@ public:
         static_assert(false, "rhs_impl must be overriden in a derived class");
     }
 
-    inline void jac_impl(T* dq_dt, const T& t, const T* q) const{
+    inline void jac_impl(T* j, const T& t, const T* q) const{
         static_assert(!Base::IS_IMPLICIT, "jac_impl must be overriden when inheriting from an implicit solver (e.g. BDF)");
     }
 
@@ -47,7 +47,7 @@ public:
         ...
     }
 
-    inline void jac_impl(T* jm, const T& t, const T* q) const{
+    inline void jac_impl(T* j, const T& t, const T* q) const{
         // only override this if it is needed
     }
 

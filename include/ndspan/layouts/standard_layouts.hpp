@@ -22,12 +22,6 @@ public:
         Derived::set_strides(s, shape, nd);
     }
 
-    static constexpr std::array<size_t, Base::ND> static_strides(){
-        std::array<size_t, Base::ND> s{};
-        set_strides(s, Base::SHAPE, Base::ND);
-        return s;
-    }
-
     template<typename... Idx>
     INLINE void unpack_idx_impl(size_t offset, Idx&... idx) const noexcept {
         if constexpr (Base::N > 0) {
@@ -38,7 +32,12 @@ public:
     }
 
 protected:
-    inline static constexpr std::array<size_t, Base::ND> STRIDES = static_strides();
+
+    inline static constexpr std::array<size_t, Base::ND> STRIDES = [](){
+        std::array<size_t, Base::ND> s{};
+        set_strides(s, Base::SHAPE, Base::ND);
+        return s;
+        }();
 
     template<size_t... I, INT_T... Idx>
     INLINE static constexpr size_t _static_offset_impl(std::index_sequence<I...>, Idx... idx) noexcept {
