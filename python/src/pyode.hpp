@@ -246,6 +246,7 @@ struct PySolver : DtypeDispatcher {
 
     void* s = nullptr; //OdeRichSolver<T, 0>*
     PyStruct data;
+    bool is_lowlevel;
 };
 
 
@@ -489,6 +490,7 @@ public:
 
     void* ode = nullptr; //cast to ODE<T, 0>*
     PyStruct data;
+    bool is_lowlevel = false;
 };
 
 
@@ -601,8 +603,11 @@ std::vector<Event<T, 0>*> to_Events(const py::iterable& events, const std::vecto
     return res;
 }
 
+
+bool all_are_lowlevel(const py::iterable& events);
+
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events){
+OdeData<T> init_ode_data(bool& is_lowlevel, PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events){
     std::string scalar_type = get_scalar_type<T>();
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
@@ -647,8 +652,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, con
         else{
             ode_rhs.jacobian = open_capsule<Func<T>>(jacobian.cast<py::capsule>());
         }
-    }
-    else if (!jacobian.is_none()){
+    }else if (!jacobian.is_none()){
         data.jac = std::move(jacobian);
         ode_rhs.jacobian = py_jac;
     }
@@ -663,13 +667,15 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, con
         _ev.check_sizes(_size, args.size());
 
     }
+
+    is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);
     return ode_rhs;
 }
 
 template<typename T>
 void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
-    OdeData<T> ode_data = init_ode_data<T>(this->data, args, std::move(f), py_q0, std::move(jac), py_args, py_events);
+    OdeData<T> ode_data = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), py_q0, std::move(jac), py_args, py_events);
     std::vector<Event<T, 0>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
     std::vector<const Event<T, 0>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
@@ -717,7 +723,7 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
 template<typename T>
 void PyODE::_init_ode(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method){
     std::vector<T> args;
-    OdeData<T> ode_rhs = init_ode_data<T>(data,args, std::move(f), py_q0, std::move(jacobian), py_args, events);
+    OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, data,args, f, py_q0, jacobian, py_args, events);
     std::vector<Event<T, 0>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
     std::vector<const Event<T, 0>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
@@ -793,7 +799,7 @@ template<typename T>
 void PyVarODE::_init_var_ode(py::object f, const py::object& t0, const py::iterable& q0, const py::object& period, py::object jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method){
 
     std::vector<T> args;
-    OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, std::move(f), q0, std::move(jac), py_args, events);
+    OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), q0, std::move(jac), py_args, events);
     Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
     if ((q0_.size() & 1) != 0){
         throw py::value_error("Variational ODEs require an even number of system size");

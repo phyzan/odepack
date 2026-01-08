@@ -297,12 +297,12 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
     EXECUTE(, this->_init_ode, (f, t0, py_q0, jacobian, rtol, atol, min_step, max_step, first_step, dir, py_args, events, method);, )
 }
 
-PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
+PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data), is_lowlevel(other.is_lowlevel){
     EXECUTE(this->ode =, reinterpret_cast<ODE, *>(other.ode)->clone();, )
     EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
 }
 
-PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)){
+PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)), is_lowlevel(other.is_lowlevel){
     other.ode = nullptr;
     EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
 }
@@ -314,6 +314,7 @@ PyODE& PyODE::operator=(const PyODE& other){
     EXECUTE(delete, reinterpret_cast<ODE, *>(this->ode);, )
     EXECUTE(this->ode =, reinterpret_cast<ODE, *>(other.ode)->clone();, )
     data = other.data;
+    is_lowlevel = other.is_lowlevel;
     EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
     return *this;
 }
@@ -323,6 +324,7 @@ PyODE& PyODE::operator=(PyODE&& other) noexcept {
         return *this;
     }
     EXECUTE(delete, reinterpret_cast<ODE, *>(this->ode);, )
+    this->is_lowlevel = other.is_lowlevel;
     this->ode = other.ode;
     other.ode = nullptr;
     data = std::move(other.data);
@@ -394,6 +396,18 @@ py::object PyVarODE::copy() const{
 //                                      Additional functions
 //===========================================================================================
 
+bool all_are_lowlevel(const py::iterable& events){
+    if (events.is_none()){
+        return true;
+    }
+    for (py::handle item : events){
+        if (!item.cast<PyEvent&>().is_lowlevel()){
+            return false;
+        }
+    }
+    return true;
+}
+
 
 void py_integrate_all(const py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
     // Separate lists for each numeric type
@@ -408,6 +422,9 @@ void py_integrate_all(const py::object& list, double interval, const py::object&
             auto& pyode = item.cast<PyODE&>();
 
             // Use the scalar_type to determine which array to add to
+            if (!pyode.is_lowlevel) {
+                throw py::value_error("All ODE's in integrate_all must use only compiled functions, and no pure python functions");
+            }
             switch (pyode.scalar_type) {
                 case 0:
                     array_double.push_back(reinterpret_cast<ODE<double>*>(pyode.ode));

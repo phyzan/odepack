@@ -519,10 +519,11 @@ class RK23(OdeSolver):
     --------
     >>> def f(t, q):
     ...     return np.array([q[1], -q[0]])
-    >>> solver = RK23(f, 0, np.array([1.0, 0.0]))
-    >>> while not solver.is_dead:
-    ...     solver.advance()
-    ...     print(solver.t, solver.q)
+    >>> solver = RK23(f, 0, np.array([1.0, 0.0]), rtol=1e-6, atol=1e-9)
+    >>> # Advance 10 steps
+    >>> for _ in range(10):
+    ...     if solver.advance():
+    ...         print(f"t={solver.t:.3f}, q={solver.q}")
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
@@ -586,8 +587,9 @@ class RK45(OdeSolver):
     --------
     >>> def f(t, q):
     ...     return np.array([q[1], -q[0]])
-    >>> solver = RK45(f, 0, np.array([1.0, 0.0]))
-    >>> while not solver.is_dead:
+    >>> solver = RK45(f, 0, np.array([1.0, 0.0]), rtol=1e-6, atol=1e-9)
+    >>> # Integrate until t=1.0
+    >>> while solver.t < 1.0 and not solver.is_dead:
     ...     solver.advance()
     """
 
@@ -652,6 +654,9 @@ class DOP853(OdeSolver):
     >>> def f(t, q):
     ...     return np.array([q[1], -q[0]])
     >>> solver = DOP853(f, 0, np.array([1.0, 0.0]), rtol=1e-13, atol=1e-13)
+    >>> # Integrate to t=10
+    >>> while solver.t < 10.0 and not solver.is_dead:
+    ...     solver.advance()
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
@@ -728,7 +733,10 @@ class BDF(OdeSolver):
     ...     return np.array([-1000*q[0], q[0] - q[1]])
     >>> def jac(t, q):
     ...     return np.array([[-1000, 0], [1, -1]])
-    >>> solver = BDF(f, jac, 0, np.array([1.0, 0.0]))
+    >>> solver = BDF(f, jac, 0, np.array([1.0, 0.0]), rtol=1e-6, atol=1e-9)
+    >>> # Integrate to t=1.0
+    >>> while solver.t < 1.0 and not solver.is_dead:
+    ...     solver.advance()
     """
 
     def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
@@ -1162,13 +1170,16 @@ class VariationalLowLevelODE(LowLevelODE):
 
     Examples
     --------
-    Compute Lyapunov exponent for a 2D Lorenz-like system:
+    Compute Lyapunov exponent for a simple harmonic oscillator:
 
-    >>> def f(t, q):
-    ...     x, y, dx, dy = q
-    ...     return np.array([y, -x, dy, -dx])  # Primary + variational
-    >>> q0 = np.array([1.0, 0.0, 1e-8, 0.0])  # State + perturbation
-    >>> ode = VariationalLowLevelODE(f, 0, q0, period=1.0)
+    >>> # Use OdeSystem.get_variational() to create variational systems
+    >>> from odepack import *
+    >>> t, x, v = symbols('t, x, v')
+    >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
+    >>> # Initial conditions: [x0, v0, dx, dv]
+    >>> # Second half (dx, dv) is variational direction (auto-normalized)
+    >>> q0 = np.array([1.0, 0.0, 1.0, 0.0])
+    >>> ode = system.get_variational(t0=0, q0=q0, period=1.0, compiled=True)
     >>> ode.integrate(100.0)
     >>> lyap_exp = ode.lyap[-1]  # Final Lyapunov exponent estimate
     """
@@ -1491,7 +1502,9 @@ class LowLevelFunction:
     --------
     Do not directly instantiate. Instead use OdeSystem:
 
-    >>> ode_sys = OdeSystem("x' = y, y' = -x")
+    >>> from odepack import *
+    >>> t, x, y = symbols('t, x, y')
+    >>> ode_sys = OdeSystem(ode_sys=[y, -x], t=t, q=[x, y])
     >>> compiled_f = ode_sys.lowlevel_odefunc()  # Returns LowLevelFunction
     >>> q = np.array([1.0, 0.0])
     >>> dq_dt = compiled_f(0.0, q)
@@ -1577,8 +1590,16 @@ def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Ite
     --------
     Integrate 100 ODEs with different initial conditions in parallel:
 
-    >>> odes = [LowLevelODE(f, 0, q0 + delta) for delta in perturbations]
+    >>> from odepack import *
+    >>> t, x, v = symbols('t, x, v')
+    >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
+    >>> # Create 100 slightly different initial conditions
+    >>> perturbations = [np.array([0.01*i, 0.0]) for i in range(100)]
+    >>> q0 = np.array([1.0, 0.0])
+    >>> odes = [system.get(t0=0, q0=q0 + delta, compiled=True) for delta in perturbations]
     >>> integrate_all(odes, interval=10.0, threads=8)
+    >>> # Now each ode has integrated results in ode.t and ode.q
+    >>> print(f"First ODE reached t={odes[0].t[-1]:.3f}")
     """
     ...
 

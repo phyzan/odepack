@@ -179,7 +179,7 @@ class SymbolicPreciseEvent(SymbolicEvent):
     Create an event that triggers when a solution variable equals zero:
 
     >>> from odepack import *
-    >>> x, y, t = symbols('x y t')
+    >>> x, y, t = symbols('x, y, t')
     >>> event = SymbolicPreciseEvent(
     ...     name="zero_crossing",
     ...     event=x,
@@ -383,7 +383,7 @@ class OdeSystem:
     Define and solve a Lotka-Volterra predator-prey system:
 
     >>> from odepack import *
-    >>> t, x, y, a, b, c, d = symbols('t x y a b c d')
+    >>> t, x, y, a, b, c, d = symbols('t, x, y, a, b, c, d')
     >>>
     >>> # Define the ODE system: dx/dt = a*x - b*x*y, dy/dt = c*x*y - d*y
     >>> system = OdeSystem(
@@ -408,7 +408,7 @@ class OdeSystem:
     Define a system with events:
 
     >>> from odepack import *
-    >>> t, x, y = symbols('t x y')
+    >>> t, x, y = symbols('t, x, y')
     >>>
     >>> # Event: detect when x = 1.0
     >>> collision = SymbolicPreciseEvent(
@@ -875,8 +875,10 @@ class OdeSystem:
         t0 : float
             Initial time
         q0 : np.ndarray
-            Initial state vector for the base system. Must have length Nsys.
-            Variational components are initialized as identity perturbations.
+            Initial state vector for the augmented system. Must have length 2*Nsys.
+            The first Nsys elements are the initial conditions for the base system.
+            The last Nsys elements specify the direction of the variational vector
+            (does not need to be normalized; automatic normalization is applied).
         period : float
             Renormalization period for the variational state. The variational
             part is normalized to unit length every 'period' time units to
@@ -1318,7 +1320,7 @@ def HamiltonianSystem2D(V: Expr, t: Symbol, x, y, px, py, args = (), events=()):
     Create a 2D harmonic oscillator with potential V = x^2/2 + y^2/2:
 
     >>> from odepack import *
-    >>> t, x, y, px, py = symbols('t x y px py')
+    >>> t, x, y, px, py = symbols('t, x, y, px, py')
     >>> V = (x**2 + y**2) / 2
     >>>
     >>> system = HamiltonianSystem2D(V, t, x, y, px, py)
@@ -1327,7 +1329,7 @@ def HamiltonianSystem2D(V: Expr, t: Symbol, x, y, px, py, args = (), events=()):
 
     Create a 2D potential well with parameter depth a:
 
-    >>> a = symbols('a')
+    >>> t, x, y, px, py, a = symbols('t, x, y, px, py, a')
     >>> V = x**2 * y**2 - a * x**2 - a * y**2
     >>>
     >>> system = HamiltonianSystem2D(V, t, x, y, px, py, args=[a])
