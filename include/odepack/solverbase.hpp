@@ -175,9 +175,6 @@ private:
 
 // ODE PROPERTIES
 
-template<typename T>
-using Func = void(*)(T*, const T&, const T*, const T*, const void*); // f(t, q, args, void) -> array
-
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q) const{
     THIS_C->rhs_impl(dq_dt, t, q);
@@ -556,7 +553,7 @@ inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
     _diverges = false;
     _message = "Running";
     for (int i=1; i<5; i++){
-        copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
+        copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }
 }
 
@@ -611,22 +608,22 @@ inline const T* BaseSolver<Derived, T, N, SP>::ics_ptr() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline const T* BaseSolver<Derived, T, N, SP>::new_state_ptr() const{
-    return this->_state_data.data_ptr(this->_new_state_idx, 0);
+    return this->_state_data.ptr(this->_new_state_idx, 0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline const T* BaseSolver<Derived, T, N, SP>::old_state_ptr() const{
-    return this->_state_data.data_ptr(this->_old_state_idx, 0);
+    return this->_state_data.ptr(this->_old_state_idx, 0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline const T* BaseSolver<Derived, T, N, SP>::true_state_ptr() const{
-    return this->_state_data.data_ptr(this->_true_state_idx, 0);
+    return this->_state_data.ptr(this->_true_state_idx, 0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline const T* BaseSolver<Derived, T, N, SP>::last_true_state_ptr() const{
-    return this->_state_data.data_ptr(this->_last_true_state_idx, 0);
+    return this->_state_data.ptr(this->_last_true_state_idx, 0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -721,9 +718,9 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_dat
 
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
-        copy_array(_state_data.data_ptr(0, 2), q0, this->Nsys());
+        copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
         for (int i=1; i<5; i++){
-            copy_array(this->_state_data.data_ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
+            copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }
     }else {
         this->kill("Initial conditions contain nan or inf, or ode(ics) does");
@@ -735,12 +732,12 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_dat
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline const T* BaseSolver<Derived, T, N, SP>::aux_state_ptr() const{
-    return _state_data.data_ptr(_aux_state_idx, 0);
+    return _state_data.ptr(_aux_state_idx, 0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline T* BaseSolver<Derived, T, N, SP>::aux_state_ptr(){
-    return _state_data.data_ptr(_aux_state_idx, 0);
+    return _state_data.ptr(_aux_state_idx, 0);
 }
 
 

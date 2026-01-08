@@ -310,14 +310,14 @@ template<typename T, size_t N, SolverPolicy SP, typename Derived>
 template<typename... Type>
 BDF<T, N, SP, Derived>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
     
-    if (!this->is_dead()){
-        if (this->validate_ics_impl(t0, q0)){
-            if (rtol == 0){
-                rtol = 100*std::numeric_limits<T>::epsilon();
-                std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
-            }
-            _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
+    if (rtol == 0){
+        rtol = 100*std::numeric_limits<T>::epsilon();
+        std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
+    }
+    _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
 
+    if (!this->is_dead() && q0 != nullptr){
+        if (this->validate_ics_impl(t0, q0)){
             this->_reset_impl_alone();
         }else{
             this->kill("Initial Jacobian contains nan or inf");

@@ -348,8 +348,8 @@ public:
     }
 
     template<INT_T... Int>
-    INLINE const T* data_ptr(Int... idx) const{
-        return Base::data_ptr(idx...);
+    INLINE const T* ptr(Int... idx) const{
+        return Base::ptr(idx...);
     }
 
     template<INT_T... Idx>
@@ -417,8 +417,8 @@ public:
     }
 
     template<INT_T... Int>
-    INLINE T* data_ptr(Int... idx){
-        return Base::data_ptr(idx...);
+    INLINE T* ptr(Int... idx){
+        return Base::ptr(idx...);
     }
 
 };

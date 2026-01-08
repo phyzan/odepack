@@ -38,7 +38,7 @@ public:
     }
 
     template<INT_T... Int>
-    INLINE const T* data_ptr(Int... idx) const{
+    INLINE const T* ptr(Int... idx) const{
         return data()+this->offset(idx...);
     }
 
@@ -77,7 +77,7 @@ public:
     }
 
     template<INT_T... Int>
-    INLINE T* data_ptr(Int... idx){
+    INLINE T* ptr(Int... idx){
         return data()+this->offset(idx...);
     }
 
