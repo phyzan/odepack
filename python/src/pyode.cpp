@@ -341,10 +341,12 @@ py::object PyODE::py_integrate(const py::object& interval, const py::object& t_e
 }
 
 py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
-    PY_GET_TEMPLATE(this->_py_rich_integrate, (interval, event_options, max_prints))}
+    PY_GET_TEMPLATE(this->_py_rich_integrate, (interval, event_options, max_prints))
+}
 
 py::object PyODE::py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    PY_GET_TEMPLATE(this->_py_go_to, (t, t_eval, event_options, max_prints))}
+    PY_GET_TEMPLATE(this->_py_go_to, (t, t_eval, event_options, max_prints))
+}
 
 py::object PyODE::t_array() const{
     EXECUTE(return, this->_t_array, ();, return py::none();)
@@ -539,6 +541,7 @@ PYBIND11_MODULE(odesolvers, m) {
         )
         .def("advance", &PySolver::advance)
         .def("advance_to_event", &PySolver::advance_to_event)
+        .def("advance_until", &PySolver::advance_until, py::arg("t"))
         .def("reset", &PySolver::reset)
         .def("copy", &PySolver::copy)
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});

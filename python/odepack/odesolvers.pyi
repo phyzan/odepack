@@ -431,6 +431,29 @@ class OdeSolver:
         This requires events to be registered in the solver at initialization.
         """
 
+    def advance_until(self, t: float)->bool:
+        """
+        Advance the solver until precisely reaching a specified time.
+        If the target time t falls between steps, the solver will perform
+        a specialized interpolation step to land exactly on t, so that
+        self.t == t after this call, and self.q is the solution at time t.
+
+        Continuously steps the solver forward by individual steps until the
+        integration time t is reached.
+
+        Parameters
+        ----------
+        t : float
+            Target time to advance to.
+
+        Returns
+        -------
+        bool
+            True if the solver successfully advanced to t.
+            False if advancement failed before reaching t. When False, a
+            diagnostic message is returned in self.message explaining the reason.
+        """
+
     def reset(self)->None:
         """
         Reset the solver to its initial conditions.

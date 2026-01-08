@@ -235,6 +235,10 @@ struct PySolver : DtypeDispatcher {
         PY_GET(OdeRichSolver, this->s, ->advance_to_event())
     }
 
+    py::object advance_until(const py::object& time) const{
+        PY_GET_TEMPLATE(this->advance_until_helper, (time))
+    }
+
     virtual py::object copy() const = 0;
 
     void reset() const{
@@ -243,6 +247,11 @@ struct PySolver : DtypeDispatcher {
 
     template<typename T>
     void init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name);
+
+    template<typename T>
+    bool advance_until_helper(const py::object& time) const{
+        return reinterpret_cast<OdeRichSolver<T>*>(this->s)->advance_until(time.cast<T>());
+    }
 
     void* s = nullptr; //OdeRichSolver<T, 0>*
     PyStruct data;
