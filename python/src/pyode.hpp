@@ -15,6 +15,26 @@
 
 #define EXECUTE(ACTION, CppType, EXPR, DEFAULT) EXECUTE_ANY(this->scalar_type, ACTION, CppType, EXPR, DEFAULT) \
 
+#define CALL_IT(type, func, ...) [&]() {\
+    switch (this->scalar_type) {                               \
+        case 0: return (type)(reinterpret_cast<OdeRichSolver<double>*>(this->s)->func(__VA_ARGS__)); break;              \
+        case 1: return (type)(reinterpret_cast<OdeRichSolver<long double>*>(this->s)->func(__VA_ARGS__)); break;         \
+        case 2: return (type)(reinterpret_cast<OdeRichSolver<mpfr::mpreal>*>(this->s)->func(__VA_ARGS__)); break;        \
+        default: return (type)(reinterpret_cast<OdeRichSolver<float>*>(this->s)->func(__VA_ARGS__));\
+    }\
+}()\
+
+
+#define GET_ATTR(func, ...) [&]() -> py::object {\
+    switch (this->scalar_type) {                               \
+        case 0: return py::cast(this->func<double>(__VA_ARGS__)); break; \
+        case 1: return py::cast(this->func<long double>(__VA_ARGS__)); break;         \
+        case 2: return py::cast(this->func<mpfr::mpreal>(__VA_ARGS__)); break;        \
+        case 3: return py::cast(this->func<float>(__VA_ARGS__)); break;               \
+        default: return py::none();   \
+    }\
+}()\
+
 #define PY_GET_TEMPLATE(TEMPLATE, BODY)                                      \
     switch (this->scalar_type) {                                                         \
         case 0: return py::cast(TEMPLATE<double>BODY); break;              \
@@ -253,7 +273,32 @@ struct PySolver : DtypeDispatcher {
         return reinterpret_cast<OdeRichSolver<T>*>(this->s)->advance_until(time.cast<T>());
     }
 
-    void* s = nullptr; //OdeRichSolver<T, 0>*
+    py::object py_at_event() const{
+        return GET_ATTR(at_event);
+    }
+
+    py::object py_event_located(const py::str& name) const{
+        return GET_ATTR(event_located, name);
+    }
+
+    template<typename T>
+    bool event_located(const py::str& name) const{
+        EventView<T> events = reinterpret_cast<OdeRichSolver<T>*>(this->s)->current_events();
+        std::string ev = name.cast<std::string>();
+        for (size_t i=0; i<events.size(); i++){
+            if (events[i]->name() == ev){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<typename T>
+    bool at_event() const{
+        return reinterpret_cast<OdeRichSolver<T>*>(this->s)->at_event();
+    }
+
+    void* s = nullptr; //OdeRichSolver<T>*
     PyStruct data;
     bool is_lowlevel;
 };
@@ -366,13 +411,14 @@ struct PyOdeResult : DtypeDispatcher{
     template<typename T>
     py::object _t() const{
         auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
-        return py::cast(NdView<const T>(r->t().data(), r->t().size()));
+        return py::cast(View<T>(r->t().data(), r->t().size()));
     }
 
     template<typename T>
     py::object _q() const{
         auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
-        return py::cast(NdView<const T>(r->q().data(), getShape(py::ssize_t(r->t().size()), this->q0_shape)));
+        auto shape = getShape<size_t>(py::ssize_t(r->t().size()), this->q0_shape);
+        return py::cast(View<T>(r->q().data(), shape.data(), shape.size()));
     }
 
     void* res = nullptr;
@@ -497,7 +543,7 @@ public:
         return to_PyDict(result);
     }
 
-    void* ode = nullptr; //cast to ODE<T, 0>*
+    void* ode = nullptr; //cast to ODE<T>*
     PyStruct data;
     bool is_lowlevel = false;
 };
@@ -561,7 +607,7 @@ py::object PyFuncWrapper::call_impl(const py::object& t, const py::iterable& py_
         throw py::value_error("Invalid array sizes in ode function call");
     }
     auto args = toCPP_Array<T, std::vector<T>>(py_args);
-    Array<T> res(output_shape);
+    Array<T> res(output_shape.data(), output_shape.size());
     reinterpret_cast<Func<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data(), nullptr);
     return py::cast(res);
 }
@@ -591,22 +637,22 @@ ObjFun<T> PyPrecEvent::when() const{
 
 template<typename T>
 void* PyPrecEvent::get_new_event(){
-    return new ObjectOwningEvent<PreciseEvent<T, 0>, PyStruct>(this->data, this->name(), this->when<T>(), _dir, this->mask<T>(), this->hide_mask(), this->_event_tol.cast<T>());
+    return new ObjectOwningEvent<PreciseEvent<T>, PyStruct>(this->data, this->name(), this->when<T>(), _dir, this->mask<T>(), this->hide_mask(), this->_event_tol.cast<T>());
 }
 
 template<typename T>
 void* PyPerEvent::get_new_event(){
-    return new ObjectOwningEvent<PeriodicEvent<T, 0>, PyStruct>(this->data, this->name(), _period.cast<T>(), (_start.is_none() ? inf<T>() : _start.cast<T>()), this->mask<T>(), this->hide_mask());
+    return new ObjectOwningEvent<PeriodicEvent<T>, PyStruct>(this->data, this->name(), _period.cast<T>(), (_start.is_none() ? inf<T>() : _start.cast<T>()), this->mask<T>(), this->hide_mask());
 }
 
 template<typename T>
-std::vector<Event<T, 0>*> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args){
+std::vector<Event<T>*> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args){
     if (events.is_none()){
         return {};
     }
-    std::vector<Event<T, 0>*> res;
+    std::vector<Event<T>*> res;
     for (py::handle item : events){
-        Event<T, 0>* ev_ptr = reinterpret_cast<Event<T, 0>*>(item.cast<PyEvent&>().toEvent(shape, args));
+        Event<T>* ev_ptr = reinterpret_cast<Event<T>*>(item.cast<PyEvent&>().toEvent(shape, args));
         res.push_back(ev_ptr);
     }
     return res;
@@ -685,13 +731,13 @@ template<typename T>
 void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
     OdeData<T> ode_data = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), py_q0, std::move(jac), py_args, py_events);
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
+    std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
+    std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
         evs[i] = safe_events[i];
     }
     auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_solver(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs).release();
+    this->s = get_solver<T, 0>(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs).release();
     for (size_t i=0; i<evs.size(); i++){
         delete safe_events[i];
     }
@@ -703,13 +749,14 @@ py::tuple PyOdeResult::_event_data(const py::str& event) const{
     std::vector<T> t_data = r->t_filtered(event.cast<std::string>());
     Array<T> t_res(t_data.data(), t_data.size());
     Array2D<T, 0, 0> q_data = r->q_filtered(event.cast<std::string>());
-    Array<T> q_res(q_data.release(), getShape(py::ssize_t(t_res.size()), this->q0_shape), true);
+    auto shape = getShape<size_t>(py::ssize_t(t_res.size()), this->q0_shape);
+    Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
     return py::make_tuple(py::cast(t_res), py::cast(q_res));
 }
 
 template<typename T>
 py::object PyOdeSolution::_get_frame(const py::object& t) const{
-    return py::cast(Array<T>(reinterpret_cast<OdeSolution<T, 0>*>(this->res)->operator()(t.cast<T>()).data(), this->q0_shape));
+    return py::cast(Array<T>(reinterpret_cast<OdeSolution<T>*>(this->res)->operator()(t.cast<T>()).data(), this->q0_shape.data(), this->q0_shape.size()));
 }
 
 template<typename T>
@@ -717,8 +764,8 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
     const auto nt = size_t(py_array.size());
     std::vector<py::ssize_t> final_shape(py_array.shape(), py_array.shape()+py_array.ndim());
     final_shape.insert(final_shape.end(), this->q0_shape.begin(), this->q0_shape.end());
-    Array<T> res(final_shape);
-    const auto* solution = reinterpret_cast<const OdeSolution<T, 0>*>(this->res);
+    Array<T> res(final_shape.data(), final_shape.size());
+    const auto* solution = reinterpret_cast<const OdeSolution<T>*>(this->res);
 
     // Extract array values and cast them to T using Python's item access
     for (size_t i=0; i<nt; i++){
@@ -733,13 +780,13 @@ template<typename T>
 void PyODE::_init_ode(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method){
     std::vector<T> args;
     OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, data,args, f, py_q0, jacobian, py_args, events);
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
+    std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
+    std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
         evs[i] = safe_events[i];
     }
     auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
+    ode = new ODE<T>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
     for (size_t i=0; i<evs.size(); i++){
         delete safe_events[i];
     }
@@ -747,45 +794,47 @@ void PyODE::_init_ode(const py::object& f, const py::object& t0, const py::itera
 
 template<typename T>
 PyOdeResult PyODE::_py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeResult<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->integrate(py::cast<T>(interval), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
+    auto* ptr = new OdeResult<T>(reinterpret_cast<ODE<T>*>(ode)->integrate(py::cast<T>(interval), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
     return PyOdeResult(ptr, this->data.shape, this->scalar_type);
 }
 
 template<typename T>
 PyOdeSolution PyODE::_py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeSolution<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->rich_integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
+    auto* ptr = new OdeSolution<T>(reinterpret_cast<ODE<T>*>(ode)->rich_integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
     return PyOdeSolution(ptr, this->data.shape, this->scalar_type);
 }
 
 template<typename T>
 PyOdeResult PyODE::_py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    auto* ptr = new OdeResult<T, 0>(reinterpret_cast<ODE<T, 0>*>(ode)->go_to(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
+    auto* ptr = new OdeResult<T>(reinterpret_cast<ODE<T>*>(ode)->go_to(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
     return PyOdeResult(ptr, this->data.shape, this->scalar_type);
 }
 
 template<typename T>
 py::object PyODE::_t_array() const{
     auto* r = reinterpret_cast<ODE<T>*>(this->ode);
-    return py::cast(NdView<const T>(r->t().data(), r->t().size()));
+    return py::cast(View<T>(r->t().data(), r->t().size()));
 }
 
 template<typename T>
 py::object PyODE::_q_array() const{
     auto* r = reinterpret_cast<ODE<T>*>(this->ode);
-    return py::cast(NdView<const T>(r->q().data(), getShape(py::ssize_t(r->t().size()), this->data.shape)));
+    auto shape = getShape<size_t>(py::ssize_t(r->t().size()), this->data.shape);
+    return py::cast(View<T>(r->q().data(), shape.data(), shape.size()));
 }
 
 template<typename T>
 py::tuple PyODE::_event_data(const py::str& event) const{
-    std::vector<T> t_data = reinterpret_cast<const ODE<T, 0>*>(ode)->t_filtered(event.cast<std::string>());
-    Array2D<T, 0, 0> q_data = reinterpret_cast<const ODE<T, 0>*>(ode)->q_filtered(event.cast<std::string>());
-    Array<T> q_res(q_data.release(), getShape(py::ssize_t(t_data.size()), data.shape), true);
+    std::vector<T> t_data = reinterpret_cast<const ODE<T>*>(ode)->t_filtered(event.cast<std::string>());
+    Array2D<T, 0, 0> q_data = reinterpret_cast<const ODE<T>*>(ode)->q_filtered(event.cast<std::string>());
+    auto shape = getShape<size_t>(py::ssize_t(t_data.size()), data.shape);
+    Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
     return py::make_tuple(py::cast(Array<T>(t_data.data(), t_data.size())), py::cast(q_res));
 }
 
 template<typename T>
 py::object PyODE::_solver_copy() const{
-    auto* ode_ptr = reinterpret_cast<const ODE<T, 0>*>(ode);
+    auto* ode_ptr = reinterpret_cast<const ODE<T>*>(ode);
     auto* solver_clone = ode_ptr->solver()->clone();
     if (ode_ptr->solver()->method() == "RK45"){
         return py::cast(PyRK45(solver_clone, data, this->scalar_type));
@@ -813,8 +862,8 @@ void PyVarODE::_init_var_ode(py::object f, const py::object& t0, const py::itera
     if ((q0_.size() & 1) != 0){
         throw py::value_error("Variational ODEs require an even number of system size");
     }
-    std::vector<Event<T, 0>*> safe_events = to_Events<T>(events, shape(q0), py_args);
-    std::vector<const Event<T, 0>*> evs(safe_events.size());
+    std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(q0), py_args);
+    std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
         evs[i] = safe_events[i];
     }
@@ -837,21 +886,21 @@ const VariationalODE<T, 0>& PyVarODE::varode() const {
 template<typename T>
 py::object PyVarODE::_py_t_lyap() const{
     const auto& vode = varode<T>();
-    NdView<const T> res(vode.t_lyap().data(), vode.t_lyap().size());
+    View<T> res(vode.t_lyap().data(), vode.t_lyap().size());
     return py::cast(res);
 }
 
 template<typename T>
 py::object PyVarODE::_py_lyap() const{
     const auto& vode = varode<T>();
-    NdView<const T> res(vode.lyap().data(), vode.t_lyap().size());
+    View<T> res(vode.lyap().data(), vode.t_lyap().size());
     return py::cast(res);
 }
 
 template<typename T>
 py::object PyVarODE::_py_kicks() const{
     const auto& vode = varode<T>();
-    NdView<const T> res(vode.kicks().data(), vode.t_lyap().size());
+    View<T> res(vode.kicks().data(), vode.t_lyap().size());
     return py::cast(res);
 }
 

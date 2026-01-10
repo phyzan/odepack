@@ -172,14 +172,14 @@ public:
 
     DEFAULT_RULE_OF_FOUR(BDF)
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>) : BDF(ARGS, None()) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>) : BDF(ARGS, None()) {}
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>) : BDF(ARGS, None(), events) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>) : BDF(ARGS, None(), events) {}
 
 private:
 
     template<typename... Type>
-    BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras);
+    BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras);
 
     inline void                                 _reset_impl_alone();
 
@@ -308,7 +308,7 @@ void BDFInterpolator<T, N>::_call_impl(T* result, const T& t) const {
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
 template<typename... Type>
-BDF<T, N, SP, Derived>::BDF(MAIN_CONSTRUCTOR(T, N), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
+BDF<T, N, SP, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();

@@ -25,7 +25,7 @@ public:
 
     // ACCESSORS
     virtual const T&            t() const = 0;
-    virtual View1D<const T, N>  vector() const = 0;
+    virtual View1D<T, N>  vector() const = 0;
     virtual const T&            stepsize() const = 0;
     virtual int                 direction() const = 0;
     virtual const T&            rtol() const = 0;
@@ -80,9 +80,9 @@ public:
     using UniqueClone = std::unique_ptr<OdeRichSolver<T, N>>;
 
     // ACCESSORS
-    virtual View1D<const T, N>              true_vector() const = 0;
-    virtual std::vector<const Event<T, N>*> current_events() const = 0;
-    virtual const EventCollection<T, N>&    event_col() const = 0;
+    virtual View1D<T, N>                    true_vector() const = 0;
+    virtual EventView<T>                    current_events() const = 0;
+    virtual const EventCollection<T>&       event_col() const = 0;
     virtual const Interpolator<T, N>*       interpolator() const = 0;
     virtual bool                            is_interpolating() const = 0;
     virtual bool                            at_event() const = 0;

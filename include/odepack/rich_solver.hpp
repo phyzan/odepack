@@ -3,7 +3,7 @@
 
 #include "solverbase.hpp"
 
-#define EVENTS const std::vector<const Event<T, N>*>&
+#define EVENTS const std::vector<const Event<T>*>&
 
 
 
@@ -21,9 +21,9 @@ class RichSolver : public BaseSolver<Derived, T, N, SP>{
 public:
 
     // ACCESSORS
-    inline View1D<const T, N>               true_vector() const;
-    std::vector<const Event<T, N>*>         current_events() const;
-    const EventCollection<T, N>&            event_col() const;
+    inline View1D<T, N>                     true_vector() const;
+    EventView<T>                            current_events() const;
+    const EventCollection<T>&               event_col() const;
     const Interpolator<T, N>*               interpolator() const;
     bool                                    is_interpolating() const;
     State<const T>                          state() const;
@@ -41,7 +41,7 @@ public:
 
 protected:
 
-    RichSolver(SOLVER_CONSTRUCTOR(T, N), std::vector<const Event<T, N>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
+    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
         this->initialize_events(t0);
     }
     
@@ -54,7 +54,7 @@ private:
 
     //================= STATIC OVERRIDES ======================
     inline const T&                         t_impl() const;
-    inline View1D<const T, N>               vector_impl() const;
+    inline View1D<T, N>                     vector_impl() const;
     bool                                    adv_impl();
     inline void             set_args_impl(const T* new_args);
     //=========================================================
@@ -65,13 +65,13 @@ private:
     inline bool             requires_new_start() const;
     inline bool             equiv_states() const;
 
-    inline static std::vector<const Event<T, N>*>& include_tmax_event(std::vector<const Event<T, N>*>& events){
-        static TmaxEvent<T, N> ev;
+    inline static std::vector<const Event<T>*>& include_tmax_event(std::vector<const Event<T>*>& events){
+        static TmaxEvent<T> ev;
         events.insert(events.begin(), &ev);
         return events;
     }
 
-    EventCollection<T, N>       _events;
+    EventCollection<T>       _events;
     LinkedInterpolator<T, N>    _cli;
     long int                    _event_idx = -1;
     bool                        _interp_data = false;
@@ -90,39 +90,34 @@ inline const T& RichSolver<Derived, T, N, SP>::t_impl() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<const T, N> RichSolver<Derived, T, N, SP>::vector_impl() const{
+inline View1D<T, N> RichSolver<Derived, T, N, SP>::vector_impl() const{
     switch (_event_idx) {
         case -1:
             return Base::vector_impl();
         default:
             const T* vec = _events.state(_event_idx).exposed().vector();
-            return View1D<const T, N>(vec, this->Nsys());
+            return View1D<T, N>(vec, this->Nsys());
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<const T, N> RichSolver<Derived, T, N, SP>::true_vector() const{
+inline View1D<T, N> RichSolver<Derived, T, N, SP>::true_vector() const{
     switch (_event_idx) {
         case -1:
             return Base::vector_impl();
         default:
             const T* vec = _events.state(_event_idx).True().vector();
-            return View1D<const T, N>(vec, this->Nsys());
+            return View1D<T, N>(vec, this->Nsys());
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-std::vector<const Event<T, N>*> RichSolver<Derived, T, N, SP>::current_events() const{
-    std::vector<const Event<T, N>*> events(0);
-    for (const size_t* i=_events.begin(); i != _events.end(); ++i){
-        events.push_back(&_events.event(*i));
-    }
-    events.shrink_to_fit();
-    return events;
+EventView<T> RichSolver<Derived, T, N, SP>::current_events() const{
+    return _events.event_view();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-const EventCollection<T, N>& RichSolver<Derived, T, N, SP>::event_col() const{
+const EventCollection<T>& RichSolver<Derived, T, N, SP>::event_col() const{
     return _events;
 }
 
@@ -173,7 +168,7 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
             _events.detect_all_between(last_state, true_state, interp_func<Derived, T, N, SP>, this);
             if (_interp_data){
                 std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);
-                if (const EventState<T, N>* ev = _events.canon_state()){
+                if (const EventState<T>* ev = _events.canon_state()){
                     r->adjust_end(ev->t());
                 }
                 this->add_interpolant(std::move(r));

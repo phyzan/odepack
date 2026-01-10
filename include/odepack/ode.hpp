@@ -83,7 +83,7 @@ class ODE{
 
 public:
 
-    ODE(ODE_CONSTRUCTOR(T, N));
+    ODE(ODE_CONSTRUCTOR(T));
 
     ODE(const ODE<T, N>& other);
 
@@ -121,9 +121,9 @@ public:
 
     const T&                                    t(size_t i) const;
 
-    NdView<const T, Layout::C, 0, N>            q() const;
+    View<T, Layout::C, 0, N>                    q() const;
 
-    NdView<const T, Layout::C, N>               q(size_t i) const;
+    View<T, Layout::C, N>                       q(size_t i) const;
 
     double                                      runtime() const;
 
@@ -150,7 +150,7 @@ protected:
 
     virtual void                                _register_event(size_t i);
 
-    void                                        _init(ODE_CONSTRUCTOR(T, N));
+    void                                        _init(ODE_CONSTRUCTOR(T));
 
 private:
 
@@ -273,7 +273,7 @@ inline size_t EventCounter<T, N>::total()const{
 
 // ODE implementations
 template<typename T, size_t N>
-ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T, N), EVENTS events, const std::string& method){
+ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
     _init(ARGS, events, method);
 }
 
@@ -445,7 +445,7 @@ std::map<std::string, std::vector<size_t>> ODE<T, N>::event_map(size_t start_poi
     std::map<std::string, std::vector<size_t>> res;
     size_t index;
     for (size_t i=1; i<_solver->event_col().size(); i++){
-        const Event<T, N>& ev = _solver->event_col().event(i);
+        const Event<T>& ev = _solver->event_col().event(i);
         res[ev.name()] = {};
         std::vector<size_t>& list = res[ev.name()];
         for (size_t j=0; j<_Nevents[i-1].size(); j++){
@@ -484,8 +484,8 @@ const std::vector<T>& ODE<T, N>::t()const{
 }
 
 template<typename T, size_t N>
-NdView<const T, Layout::C, 0, N> ODE<T, N>::q()const{
-    return NdView<const T, Layout::C, 0, N>(_q_data.data(), _t_arr.size(), Nsys());
+View<T, Layout::C, 0, N> ODE<T, N>::q()const{
+    return View<T, Layout::C, 0, N>(_q_data.data(), _t_arr.size(), Nsys());
 }
 
 template<typename T, size_t N>
@@ -494,8 +494,8 @@ const T& ODE<T, N>::t(size_t i)const{
 }
 
 template<typename T, size_t N>
-NdView<const T, Layout::C, N> ODE<T, N>::q(size_t i)const{
-    return NdView<const T, Layout::C, N>(_q_data.data() + i*this->Nsys(), this->Nsys());
+View<T, Layout::C, N> ODE<T, N>::q(size_t i)const{
+    return View<T, Layout::C, N>(_q_data.data() + i*this->Nsys(), this->Nsys());
 }
 
 template<typename T, size_t N>
@@ -555,9 +555,9 @@ void ODE<T, N>::_register_event(size_t i){
 }
 
 template<typename T, size_t N>
-void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T, N), EVENTS events, const std::string& method){
+void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
     _Nevents = std::vector<std::vector<size_t>>(events.size());
-    _solver = get_solver(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events).release();
+    _solver = get_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events).release();
     _register_state();
 }
 

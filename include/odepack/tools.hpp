@@ -13,6 +13,73 @@
 #endif
 
 
+template<typename Type>
+class PolyWrapper{
+
+    /*
+    Takes ownership of a pointer to a heap-allocated object.
+    Is constructed by passing the pointer, so make sure
+    noone else has ownership.
+
+    MUST:
+        Type has a clone() method that returns a new Type*,
+        so that it creates a perfect copy.
+    */
+
+public:
+    
+    PolyWrapper(Type* object) : ptr(object) {}
+
+    PolyWrapper(const PolyWrapper& other) : ptr(other.new_ptr()) {}
+
+    PolyWrapper(PolyWrapper&& other) noexcept : ptr(other.release()) {}
+
+    PolyWrapper& operator=(const PolyWrapper& other){
+        if (&other != this){
+            delete ptr;
+            ptr = other.new_ptr();
+        }
+        return *this;
+    }
+
+    PolyWrapper& operator=(PolyWrapper&& other) noexcept{
+        if (&other != this){
+            delete ptr;
+            ptr = other.release();
+        }
+        return *this;
+    }
+
+    ~PolyWrapper(){
+        delete ptr;
+        ptr = nullptr;
+    }
+    
+    inline Type* operator->(){
+        assert(ptr != nullptr && "pointer is null");
+        return ptr;
+    }
+
+    inline const Type* operator->() const{
+        assert(ptr != nullptr && "pointer is null");
+        return ptr;
+    }
+
+    inline Type* new_ptr() const{
+        return ptr == nullptr ? nullptr : ptr->clone();
+    }
+
+    inline Type* release() {
+        Type* tmp = ptr;
+        ptr = nullptr;
+        return tmp;
+    }
+
+private:
+
+    Type* ptr;
+};
+
 enum class Memory : std::uint8_t { View, Own};
 
 template<typename T, Memory Mem=Memory::View>
@@ -99,7 +166,7 @@ protected:
     }
 };
 
-template<typename T, size_t N>
+template<typename T>
 class EventState{
 
 public:
@@ -156,9 +223,8 @@ public:
 
 private:
 
-    static constexpr size_t NTOT = (N > 0 ? 2*N+4 : 0);
 
-    Array1D<T, NTOT, Allocation::Auto> data;
+    Array1D<T> data;
     size_t Nsys = 0;
 
 

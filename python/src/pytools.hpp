@@ -55,6 +55,18 @@ inline py::dict to_PyDict(const EventMap& _map){
     return py_dict;
 }
 
+template<typename Int>
+inline std::vector<Int> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
+    std::vector<Int> result;
+    result.reserve(1 + shape.size()); // Pre-allocate memory for efficiency
+    result.push_back(Int(dim1));        // Add the first element
+    for (size_t i=0; i<shape.size(); i++){
+        result.push_back(shape[i]);
+    }
+    return result;
+}
+
+template<>
 inline std::vector<py::ssize_t> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
     std::vector<py::ssize_t> result;
     result.reserve(1 + shape.size()); // Pre-allocate memory for efficiency
@@ -165,7 +177,7 @@ T py_event(const T& t, const T* q, const T*, const void* obj){
 template<>
 void py_rhs<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
     auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
     arrcpy(res, arr.data(), arr.size());
@@ -174,7 +186,7 @@ void py_rhs<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::
 template<>
 void py_jac<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
     auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
     arrcpy(res, arr.data(), arr.size());
@@ -183,7 +195,7 @@ void py_jac<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::
 template<>
 void py_mask<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args);
+    py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
     auto arr = toCPP_Array<mpfr::mpreal, Array1D<mpfr::mpreal, 0>>(pyres);
     arrcpy(res, arr.data(), arr.size());
@@ -192,7 +204,7 @@ void py_mask<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr:
 template<>
 mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    return p.event(t, Array<mpfr::mpreal>(q, p.shape), *p.py_args).template cast<mpfr::mpreal>();
+    return p.event(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args).template cast<mpfr::mpreal>();
 }
 
 #endif

@@ -90,8 +90,8 @@ protected:
         this->_remake_strides();
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit constexpr StridedSemiStaticNdSpan(const ShapeContainer& shape) : Base(shape) {
+    template<INT_T Int>
+    explicit constexpr StridedSemiStaticNdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {
         this->_remake_strides();
     }
 
@@ -110,9 +110,9 @@ public:
         this->_remake_strides();
     }
 
-    template<IsShapeContainer ShapeContainer>
-    void constexpr resize(const ShapeContainer& shape){
-        Base::resize(shape);
+    template<INT_T Int>
+    void resize(const Int* shape, size_t ndim){
+        Base::resize(shape, ndim);
         this->_remake_strides();
     }
 
@@ -151,9 +151,9 @@ protected:
         Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit constexpr StridedDynamicNdSpan(const ShapeContainer& shape) : Base(shape) {
-        _dyn_strides = shape.size() > 0 ? new size_t[shape.size()] : nullptr;
+    template<INT_T Int>
+    explicit constexpr StridedDynamicNdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {
+        _dyn_strides = ndim > 0 ? new size_t[ndim] : nullptr;
         Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
     }
 
@@ -216,10 +216,10 @@ public:
         this->_realloc_strides(nd_old);
     }
 
-    template<IsShapeContainer ShapeContainer>
-    void constexpr resize(const ShapeContainer& shape){
+    template<INT_T Int>
+    void resize(const Int* shape, size_t ndim){
         size_t nd_old = this->ndim();
-        Base::resize(shape);
+        Base::resize(shape, ndim);
         this->_realloc_strides(nd_old);
     }
 
@@ -260,8 +260,8 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RowMajorSpan)
 
-    template<IsShapeContainer ShapeContainer>
-    explicit RowMajorSpan(const ShapeContainer& shape) : Base(shape) {}
+    template<INT_T Int>
+    explicit RowMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
     template<INT_T... Args>
     explicit constexpr RowMajorSpan(Args... shape) : Base(shape...){}
@@ -296,9 +296,9 @@ public:
     using Base::Base;
 
     DEFAULT_RULE_OF_FOUR(ColumnMajorSpan)
-    
-    template<IsShapeContainer ShapeContainer>
-    explicit ColumnMajorSpan(const ShapeContainer& shape) : Base(shape) {}
+
+    template<INT_T Int>
+    explicit ColumnMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
     template<INT_T... Args>
     explicit constexpr ColumnMajorSpan(Args... shape) : Base(shape...){}

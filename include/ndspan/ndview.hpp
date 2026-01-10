@@ -2,16 +2,28 @@
 
 #include "layoutmap.hpp"
 
-template<typename Derived, Layout L, typename T, size_t... DIMS>
-class AbstractNdView : public NdSpan<L, DIMS...>{
 
-    using CLS = AbstractNdView<Derived, L, T, DIMS...>;
+
+template<typename Derived, Layout L, typename T, size_t... DIMS>
+class AbstractView : public NdSpan<L, DIMS...>{
+
+    using CLS = AbstractView<Derived, L, T, DIMS...>;
     using Base = NdSpan<L, DIMS...>;
 
 protected:
 
     using Base::Base;
-    DEFAULT_RULE_OF_FOUR(AbstractNdView)
+
+    // place resize in protected, so that derived classes resize their internal data before resizing in NdSpan
+    template<INT_T... Args>
+    INLINE void constexpr resize(Args... shape){
+        Base::resize(shape...);
+    }
+
+    template<INT_T Int>
+    INLINE void resize(const Int* shape, size_t ndim){
+        Base::resize(shape, ndim);
+    }
 
 public:
 
@@ -21,9 +33,6 @@ public:
 
     //ACCESSORS
 
-    iterator begin() { return this->data(); }
-    iterator end()   { return this->data() + this->size(); }
-
     const_iterator begin() const { return this->data(); }
     const_iterator end() const { return this->data() + this->size(); }
     
@@ -32,23 +41,13 @@ public:
         return THIS_C->data();
     }
 
-    INLINE T* data(){
-        //override
-        return THIS->data();
-    }
-
     template<INT_T... Int>
     INLINE const T* ptr(Int... idx) const{
         return data()+this->offset(idx...);
     }
 
     template<INT_T... Idx>
-    INLINE constexpr const T& operator()(Idx... idx) const noexcept {
-        return data()[this->offset(idx...)];
-    }
-
-    template<INT_T... Idx>
-    INLINE constexpr T& operator()(Idx... idx) noexcept {
+    INLINE constexpr const T& operator()(Idx... idx) const {
         return data()[this->offset(idx...)];
     }
 
@@ -63,7 +62,33 @@ public:
         return tensor_call(THIS_C, i...);
     }
 
+};
+
+template<typename Derived, Layout L, typename T, size_t... DIMS>
+class AbstractMutView : public AbstractView<Derived, L, T, DIMS...>{
+
+    using CLS = AbstractMutView<Derived, L, T, DIMS...>;
+    using Base = AbstractView<Derived, L, T, DIMS...>;
+
+protected:
+
+    using Base::Base;
+
+public:
+
+    using value_type = T;
+    using iterator = T*;
+    using const_iterator = const T*;
+
     //MODIFIERS
+
+    iterator begin() { return this->data(); }
+    iterator end()   { return this->data() + this->size(); }
+
+    INLINE T* data(){
+        //override
+        return THIS->data();
+    }
 
     template<INT_T IDX_T>
     INLINE T& operator[](IDX_T i){
@@ -71,35 +96,77 @@ public:
         return data()[i];
     }
 
-    template<typename... Idx>
-    INLINE auto operator()(Idx... i){
-        return tensor_call(THIS, i...);
-    }
-
     template<INT_T... Int>
     INLINE T* ptr(Int... idx){
         return data()+this->offset(idx...);
     }
 
+    template<INT_T... Idx>
+    INLINE constexpr T& operator()(Idx... idx) noexcept {
+        return data()[this->offset(idx...)];
+    }
+
+    template<typename... Idx>
+    INLINE auto operator()(Idx... i){
+        return tensor_call(THIS, i...);
+    }
+
+    using Base::data;
+    using Base::operator();
+    using Base::operator[];
+    using Base::ptr;
+
 };
 
 
 template<typename T, Layout L = Layout::C, size_t... DIMS>
-class NdView : public AbstractNdView<NdView<T, L, DIMS...>, L, T, DIMS...>{
+class View : public AbstractView<View<T, L, DIMS...>, L, T, DIMS...>{
 
-    using Base = AbstractNdView<NdView<T, L, DIMS...>, L, T, DIMS...>;
+    using Base = AbstractView<View<T, L, DIMS...>, L, T, DIMS...>;
 
 public:
 
     using Base::Base;
 
-    explicit NdView(T* data) requires (Base::N > 0) : Base(), _data(data) {}
+    explicit View(const T* data) requires (Base::N > 0) : Base(), _data(data) {}
 
     template<INT_T... Args>
-    explicit NdView(T* data, Args... shape) : Base(shape...), _data(data) {}
+    explicit View(const T* data, Args... shape) : Base(shape...), _data(data) {}
 
-    template<IsShapeContainer ShapeContainer>
-    explicit NdView(T* data, const ShapeContainer& shape) : Base(shape), _data(data) {}
+    template<INT_T Int>
+    explicit View(const T* data, const Int* shape, size_t ndim) : Base(shape, ndim), _data(data) {}
+
+
+    INLINE const T* data() const{
+        return _data;
+    }
+
+    void set_data(const T* data) {
+        _data = data;
+    }
+
+private:
+
+    const T* _data;
+};
+
+
+template<typename T, Layout L = Layout::C, size_t... DIMS>
+class MutView : public AbstractMutView<MutView<T, L, DIMS...>, L, T, DIMS...>{
+
+    using Base = AbstractMutView<MutView<T, L, DIMS...>, L, T, DIMS...>;
+
+public:
+
+    using Base::Base;
+
+    explicit MutView(T* data) requires (Base::N > 0) : Base(), _data(data) {}
+
+    template<INT_T... Args>
+    explicit MutView(T* data, Args... shape) : Base(shape...), _data(data) {}
+
+    template<INT_T Int>
+    explicit MutView(T* data, const Int* shape, size_t ndim) : Base(shape, ndim), _data(data) {}
 
     INLINE const T* data() const{
         return _data;
@@ -118,8 +185,12 @@ private:
     T* _data;
 };
 
+
 template<typename T, size_t Size=0>
-using View1D = NdView<T, Layout::C, Size>;
+using MutView1D = MutView<T, Layout::C, Size>;
+
+template<typename T, size_t Size=0>
+using View1D = View<T, Layout::C, Size>;
 
 template<typename Derived, INT_T... Int>
 inline Derived::value_type& tensor_call(Derived& x, Int... idx){

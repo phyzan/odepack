@@ -5,7 +5,7 @@
 #include "bdf.hpp"
 
 template<typename T, size_t N>
-std::unique_ptr<OdeRichSolver<T, N>> get_solver(const std::string& name, MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) {
+std::unique_ptr<OdeRichSolver<T, N>> get_solver(const std::string& name, MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) {
 
     if (name == "RK23") {
         return std::make_unique<RK23<T, N, SolverPolicy::RichVirtual>>(ARGS, events);

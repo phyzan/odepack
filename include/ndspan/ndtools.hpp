@@ -61,28 +61,6 @@ INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
 
 template<typename... Ts>
 concept IsInt = (std::convertible_to<Ts, size_t>  && ...);
-
-template<typename _ShapeContainer>
-concept IsShapeContainer = requires(_ShapeContainer c) {
-    { c.data() } -> std::same_as<std::remove_cv_t<std::remove_reference_t<decltype(c.data())>>>;
-} && std::is_pointer_v<std::decay_t<decltype(std::declval<_ShapeContainer>().data())>> &&
-    std::is_integral_v<std::remove_pointer_t<std::decay_t<decltype(std::declval<_ShapeContainer>().data())>>>;
-
-template<typename Container>
-inline void constexpr assert_integral_data(const Container& obj){
-    using DataType = decltype(obj.data());
-
-    // Ensure it's a pointer
-    static_assert(std::is_pointer_v<DataType>, "data() must return a pointer");
-
-    // Ensure it's a pointer to const
-    static_assert(std::is_const_v<std::remove_pointer_t<DataType>>,
-                  "data() must return a pointer to const");
-
-    // Ensure the pointee is an integral type
-    static_assert(std::is_integral_v<std::remove_pointer_t<DataType>>,
-                  "data() must return a pointer to an integral type");
-}
     
 template<typename... Args>
 auto max_of_pack(Args... args) {
@@ -103,6 +81,18 @@ size_t prod(const Iterable& array){
     size_t res = 1;
     for (size_t i=0; i<array.size(); i++){
         res *= array[i];
+    }
+    return res;
+}
+
+template<std::integral Int>
+size_t prod(const Int* array, size_t size){
+    if (size == 0){
+        return 0;
+    }
+    size_t res = 1;
+    for (size_t i=0; i<size; i++){
+        res *= Int(array[i]);
     }
     return res;
 }

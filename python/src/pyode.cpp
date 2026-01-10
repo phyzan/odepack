@@ -142,18 +142,17 @@ PySolver::PySolver(const py::object& f, const py::object& jac, const py::object&
 }
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
-    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(solver)->set_obj(&data);, )
-    this->s = solver;
+    CALL_IT(void, set_obj, &data);
 }
 
 PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data) {
-    EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
-    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
+    this->s = CALL_IT(void*, clone);
+    CALL_IT(void, set_obj, &data);
 }
 
 PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)) {
     other.s = nullptr;
-    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
+    CALL_IT(void, set_obj, &data);
 }
 
 
@@ -529,13 +528,15 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("start", &PyPerEvent::start);
 
 
-    py::class_<PySolver>(m, "OdeRichSolver")
+    py::class_<PySolver>(m, "OdeSolver")
         .def_property_readonly("t", &PySolver::t)
         .def_property_readonly("q", &PySolver::q)
         .def_property_readonly("stepsize", &PySolver::stepsize)
         .def_property_readonly("diverges", &PySolver::diverges)
         .def_property_readonly("is_dead", &PySolver::is_dead)
         .def_property_readonly("Nsys", &PySolver::Nsys)
+        .def_property_readonly("at_event", &PySolver::py_at_event)
+        .def("event_located", &PySolver::py_event_located, py::arg("event"))
         .def("show_state", &PySolver::show_state,
             py::arg("digits") = 8
         )

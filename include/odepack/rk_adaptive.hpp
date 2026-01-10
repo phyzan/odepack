@@ -34,9 +34,9 @@ protected:
     Btype B = Derived::Bmatrix();
     Ctype C = Derived::Cmatrix();
 
-    RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows) requires (!is_rich<SP>);
+    RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows) requires (!is_rich<SP>);
 
-    RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), EVENTS events, size_t Krows) requires (is_rich<SP>);
+    RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RungeKuttaBase)
 
@@ -78,9 +78,9 @@ protected:
     Etype E = Derived::Ematrix();
     Ptype P = Derived::Pmatrix();
 
-    StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+    StandardRungeKutta(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>);
+    StandardRungeKutta(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(StandardRungeKutta)
 
@@ -113,9 +113,9 @@ public:
     static constexpr size_t         ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>);
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK45);
 
@@ -148,9 +148,9 @@ public:
     static constexpr size_t         ERR_EST_ORDER = 2;
     static constexpr size_t         INTERP_ORDER = 3;
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>);
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK23);
 
@@ -231,11 +231,11 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 
 // RungeKuttaBase implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
-RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), size_t Krows)
+RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows)
     requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
-RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T, N), EVENTS events, size_t Krows)
+RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows)
     requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
@@ -350,11 +350,11 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::step_impl(T* result, co
 
 // StandardRungeKutta implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
-StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N))
+StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T))
     requires (!is_rich<SP>): Base(ARGS, Nstages+1) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
-StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T, N), EVENTS events)
+StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVER_CONSTRUCTOR(T), EVENTS events)
     requires (is_rich<SP>): Base(ARGS, events, Nstages+1) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
@@ -390,10 +390,10 @@ inline T StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::estimate_error_
 
 // RK45 implementations
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-RK45<T, N, SP, Derived>::RK45(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): RKbase(ARGS){}
+RK45<T, N, SP, Derived>::RK45(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): RKbase(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-RK45<T, N, SP, Derived>::RK45(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
+RK45<T, N, SP, Derived>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
 inline constexpr typename RK45<T, N, SP, Derived>::RKbase::Atype RK45<T, N, SP, Derived>::Amatrix() {
@@ -461,10 +461,10 @@ inline constexpr typename RK45<T, N, SP, Derived>::RKbase::Ptype RK45<T, N, SP, 
 
 // RK23 implementations
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-RK23<T, N, SP, Derived>::RK23(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): RKbase(ARGS){}
+RK23<T, N, SP, Derived>::RK23(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): RKbase(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-RK23<T, N, SP, Derived>::RK23(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
+RK23<T, N, SP, Derived>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
 inline constexpr typename RK23<T, N, SP, Derived>::RKbase::Atype RK23<T, N, SP, Derived>::Amatrix() {

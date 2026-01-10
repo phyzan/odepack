@@ -4,10 +4,10 @@
 
 
 template<typename Derived, typename T, Layout L, size_t... DIMS>
-class AbstractArray : public AbstractNdView<Derived, L, T, DIMS...>{
+class AbstractArray : public AbstractMutView<Derived, L, T, DIMS...>{
 
     using CLS = AbstractArray<Derived, T, L, DIMS...>;
-    using Base = AbstractNdView<Derived, L, T, DIMS...>;
+    using Base = AbstractMutView<Derived, L, T, DIMS...>;
 
 public:
 
@@ -27,8 +27,8 @@ protected:
 
     DEFAULT_RULE_OF_FOUR(AbstractArray)
 
-    template<IsShapeContainer ShapeContainer>
-    explicit AbstractArray(const ShapeContainer& shape) : Base(shape) {}
+    template<INT_T Int>
+    explicit AbstractArray(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
     ~AbstractArray() = default;
 
@@ -67,20 +67,20 @@ public:
         }
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit DynamicArray(const ShapeContainer& shape) : Base(shape){
+    template<INT_T Int>
+    explicit DynamicArray(const Int* shape, size_t ndim) : Base(shape, ndim){
         if (this->size() > 0){
             _data = new T[this->size()];
         }
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit DynamicArray(const T* data, const ShapeContainer& shape) : DynamicArray(shape){
+    template<INT_T Int>
+    explicit DynamicArray(const T* data, const Int* shape, size_t ndim) : DynamicArray(shape, ndim){
         copy_array<T>(this->data(), data, this->size());
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit DynamicArray(T* data, const ShapeContainer& shape, bool own_it = false) : Base(shape){
+    template<INT_T Int>
+    explicit DynamicArray(T* data, const Int* shape, size_t ndim, bool own_it = false) : Base(shape, ndim){
         if (own_it){
             _data = data;
         }
@@ -143,11 +143,11 @@ public:
         return _data;
     }
 
-    template<IsShapeContainer ShapeContainer>
-    void resize(const ShapeContainer& newsize){
+    template<INT_T Int>
+    void resize(const Int* newsize, size_t ndim){
         size_t current_size = this->size();
-        Base::resize(newsize);//if the new size is invalid, this will throw an error before the execution moves to resizing the _data below.
-        size_t total_size = prod(newsize);
+        Base::resize(newsize, ndim);//if the new size is invalid, this will throw an error before the execution moves to resizing the _data below.
+        size_t total_size = prod(newsize, ndim);
         if (total_size != current_size){
             delete[] _data;
             if (total_size == 0){
@@ -162,7 +162,7 @@ public:
     template<INT_T... Size>
     void resize(Size... newsize){
         std::array<size_t, sizeof...(newsize)> new_size = {static_cast<size_t>(newsize)...};
-        this->resize(new_size);
+        this->resize(new_size.data(), new_size.size());
     }
 
     T* release(){
@@ -212,8 +212,8 @@ public:
         copy_array<T>(this->data(), data, this->size());
     }
 
-    template<IsShapeContainer ShapeContainer>
-    explicit StackArray(const T* data, const ShapeContainer& shape) : StackArray(shape){
+    template<INT_T Int>
+    explicit StackArray(const T* data, const Int* shape, size_t ndim) : StackArray(shape, ndim){
         copy_array<T>(this->data(), data, this->size());
     }
 
@@ -339,7 +339,7 @@ public:
         Base::unpack_idx(offset, idx);
     }
 
-    // NdView interface
+    // View interface
     const_iterator begin() const { return Base::begin(); }
     const_iterator end() const { return Base::end(); }
 
@@ -350,6 +350,19 @@ public:
     template<INT_T... Int>
     INLINE const T* ptr(Int... idx) const{
         return Base::ptr(idx...);
+    }
+
+    INLINE View<T, L, DIMS...> view() const{
+        if constexpr (Base::N > 0){
+            return View<T, L, DIMS...>(this->data());
+        }else if (Base::ND > 0) {
+            const size_t* s = this->shape();
+            return EXPAND(size_t, Base::ND, I,
+                View<T, L, DIMS...>(this->data(), s[I]...);
+            );
+        }else {
+            return View<T, L, DIMS...>(this->data(), this->shape(), this->ndim());
+        }
     }
 
     template<INT_T... Idx>
@@ -381,18 +394,18 @@ public:
         Base::resize(shape...);
     }
 
-    template<IsShapeContainer ShapeContainer>
-    INLINE void reshape(const ShapeContainer& shape){
-        Base::reshape(shape);
+    template<INT_T Int>
+    INLINE void reshape(const Int* shape, size_t ndim){
+        Base::reshape(shape, ndim);
     }
 
-    template<IsShapeContainer ShapeContainer>
-    INLINE void resize(const ShapeContainer& shape){
-        Base::resize(shape);
+    template<INT_T Int>
+    INLINE void resize(const Int* shape, size_t ndim){
+        Base::resize(shape, ndim);
     }
 
 
-    // NdView interface
+    // MutView interface
 
     iterator begin() { return Base::data(); }
     iterator end()   { return Base::end(); }

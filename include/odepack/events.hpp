@@ -18,13 +18,13 @@ During an ode integration, we might want to save specific events that are encout
 // DECLARATIONS
 // ============================================================================
 
-template<typename T, size_t N>
+template<typename T>
 struct _EventObjFun;
 
-template<typename T, size_t N>
+template<typename T>
 T event_obj_func(const T& t, const void* obj);
 
-template<typename T, size_t N>
+template<typename T>
 class Event{
 
     // The obj parameter in "determine" is passed inside any functions that are passed in an Event object.
@@ -48,7 +48,7 @@ public:
 
     inline void                     set_aux_array_size(size_t size) const;
 
-    bool                            determine(EventState<T, N>& result, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj);
+    bool                            determine(EventState<T>& result, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj);
 
     virtual void                    reset();
 
@@ -58,9 +58,9 @@ public:
 
     virtual bool                    is_leathal() const;
 
-    virtual bool                    locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const = 0;
+    virtual bool                    locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const = 0;
 
-    virtual Event<T, N>*            clone() const = 0;
+    virtual Event<T>*            clone() const = 0;
 
     inline virtual bool             is_time_based() const = 0;
 
@@ -74,7 +74,7 @@ protected:
 
     DEFAULT_RULE_OF_FOUR(Event);
 
-    virtual void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after);
+    virtual void _register_it(const EventState<T>& res, State<const T> before, State<const T> after);
 
 private:
 
@@ -87,11 +87,11 @@ private:
 
 protected:
     const void* _obj;
-    mutable Array1D<T, N>       _q_aux;
+    mutable Array1D<T>       _q_aux;
 };
 
-template<typename T, size_t N>
-class PreciseEvent : public Event<T, N>{
+template<typename T>
+class PreciseEvent : public Event<T>{
 
 public:
 
@@ -105,9 +105,9 @@ public:
 
     inline const int&   dir() const;
 
-    PreciseEvent<T, N>* clone() const override;
+    PreciseEvent<T>* clone() const override;
 
-    bool                locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
+    bool                locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
 
     inline bool         is_time_based() const final;
 
@@ -120,8 +120,8 @@ private:
 };
 
 
-template<typename T, size_t N>
-class PeriodicEvent : public Event<T, N>{
+template<typename T>
+class PeriodicEvent : public Event<T>{
 
 public:
 
@@ -137,11 +137,11 @@ public:
 
     const T&                t_start() const;
 
-    PeriodicEvent<T, N>*    clone() const override;
+    PeriodicEvent<T>*    clone() const override;
 
     virtual void            set_start(const T& t);
 
-    bool                    locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
+    bool                    locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
 
     inline bool             is_time_based() const final;
 
@@ -153,8 +153,8 @@ protected:
 };
 
 
-template<typename T, size_t N>
-class TmaxEvent : public Event<T, N>{
+template<typename T>
+class TmaxEvent : public Event<T>{
 
 public:
 
@@ -166,7 +166,7 @@ public:
 
     inline bool goal_is_set() const;
 
-    TmaxEvent<T, N>* clone() const override;
+    TmaxEvent<T>* clone() const override;
 
     bool is_stop_event() const override;
 
@@ -174,13 +174,13 @@ public:
 
     void reset() override;
 
-    bool locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
+    bool locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const override;
 
     void go_back() override;
 
 private:
 
-    void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after) override;
+    void _register_it(const EventState<T>& res, State<const T> before, State<const T> after) override;
 
     T _t_goal = inf<T>();
     T _t_goal_last = inf<T>();
@@ -212,10 +212,35 @@ protected:
 
 };
 
-template<typename T, size_t N>
-bool discard_event(const Event<T, N>& event, const Event<T, N>& mark);
+template<typename T>
+bool discard_event(const Event<T>& event, const Event<T>& mark);
 
-template<typename T, size_t N>
+
+template<typename T>
+class EventView : private View1D<size_t>{
+
+    using Base = View1D<size_t>;
+
+public:
+
+    EventView(const Event<T>*const* events, const size_t* detection, size_t size) : Base(detection, size), event_data(events) {};
+
+    template<std::integral Int>
+    const Event<T>* operator[](Int i) const{
+        return event_data[Base::operator[](i)];
+    }
+
+    size_t size() const{
+        return Base::size();
+    }
+
+    const Event<T>*const* event_data;
+
+};
+
+
+
+template<typename T>
 class EventCollection{
 
 public:
@@ -223,7 +248,7 @@ public:
     template<typename EventIterator>
     EventCollection(const EventIterator& events);
 
-    EventCollection(std::initializer_list<const Event<T, N>*> events);
+    EventCollection(std::initializer_list<const Event<T>*> events);
 
     EventCollection() = default;
 
@@ -233,13 +258,13 @@ public:
 
     ~EventCollection();
 
-    EventCollection<T, N>& operator=(const EventCollection<T, N>& other);
+    EventCollection<T>& operator=(const EventCollection<T>& other);
 
-    EventCollection<T, N>& operator=(EventCollection<T, N>&& other) noexcept;
+    EventCollection<T>& operator=(EventCollection<T>&& other) noexcept;
 
-    inline const Event<T, N>& event(size_t i) const;
+    inline const Event<T>& event(size_t i) const;
 
-    inline const EventState<T, N>& state(size_t i) const;
+    inline const EventState<T>& state(size_t i) const;
 
     inline size_t size()const;
 
@@ -253,6 +278,8 @@ public:
 
     void detect_all_between(State<const T> before, State<const T> after, FuncLike<T> q, const void* obj);
 
+    EventView<T> event_view() const;
+
     const size_t* begin() const;
 
     const size_t* end() const;
@@ -261,9 +288,9 @@ public:
 
     inline void restart_iter();
 
-    const Event<T, N>* canon_event() const;
+    const Event<T>* canon_event() const;
 
-    const EventState<T, N>* canon_state() const;
+    const EventState<T>* canon_state() const;
 
     void set_start(T t0, int dir);
 
@@ -280,13 +307,13 @@ private:
     template<typename Iterator>
     void _clone_events(const Iterator& events);
 
-    void _copy(const EventCollection<T, N>& other);
+    void _copy(const EventCollection<T>& other);
 
     bool _is_prioritized(size_t i, size_t j, int dir);
 
-    Event<T, N>** _events = nullptr;
+    Event<T>** _events = nullptr;
     std::unordered_set<std::string> _names;
-    EventState<T, N>* _states = nullptr;
+    EventState<T>* _states = nullptr;
     size_t _N_tot=0;
 
     //member variables that concern event detection
@@ -301,10 +328,10 @@ private:
 
 };
 
-template<typename T, size_t N>
+template<typename T>
 struct _EventObjFun{
     const void* obj;
-    const PreciseEvent<T, N>* event;
+    const PreciseEvent<T>* event;
     FuncLike<T> local_interp;
     T* q;
 };
@@ -314,74 +341,74 @@ struct _EventObjFun{
 // IMPLEMENTATIONS
 // ============================================================================
 
-template<typename T, size_t N>
+template<typename T>
 T event_obj_func(const T& t, const void* obj){
-    const auto* ptr = reinterpret_cast<const _EventObjFun<T, N>*>(obj);
+    const auto* ptr = reinterpret_cast<const _EventObjFun<T>*>(obj);
     ptr->local_interp(ptr->q, t, ptr->obj);
     return ptr->event->obj_fun(t, ptr->q);
 }
 
 // Event CLASS implementations
-template<typename T, size_t N>
-Event<T, N>::Event(std::string name, Func<T> mask, bool hide_mask, const void* obj): _name(std::move(name)), _mask(mask), _hide_mask(hide_mask && mask != nullptr), _obj(obj){
+template<typename T>
+Event<T>::Event(std::string name, Func<T> mask, bool hide_mask, const void* obj): _name(std::move(name)), _mask(mask), _hide_mask(hide_mask && mask != nullptr), _obj(obj){
     if (_name.empty()){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
 }
 
-template<typename T, size_t N>
-bool Event<T, N>::is_stop_event() const{
+template<typename T>
+bool Event<T>::is_stop_event() const{
     return false;
 }
 
-template<typename T, size_t N>
-bool Event<T, N>::is_leathal() const{
+template<typename T>
+bool Event<T>::is_leathal() const{
     return false;
 }
 
-template<typename T, size_t N>
-void Event<T, N>::set_args(const T* args, size_t size){
+template<typename T>
+void Event<T>::set_args(const T* args, size_t size){
     _args.resize(size);
     copy_array(_args.data(), args, size);
 }
 
-template<typename T, size_t N>
-inline const std::string& Event<T, N>::name()const{
+template<typename T>
+inline const std::string& Event<T>::name()const{
     return _name;
 }
 
-template<typename T, size_t N>
-inline bool Event<T, N>::is_masked() const{
+template<typename T>
+inline bool Event<T>::is_masked() const{
     return _mask != nullptr;
 }
 
-template<typename T, size_t N>
-inline bool Event<T, N>::hides_mask() const{
+template<typename T>
+inline bool Event<T>::hides_mask() const{
     return _hide_mask;
 }
 
-template<typename T, size_t N>
-inline const std::vector<T>& Event<T, N>::args()const{
+template<typename T>
+inline const std::vector<T>& Event<T>::args()const{
     return _args;
 }
 
-template<typename T, size_t N>
-inline bool Event<T, N>::is_pure_temporal() const{
+template<typename T>
+inline bool Event<T>::is_pure_temporal() const{
     return this->is_time_based() && !this->is_masked();
 }
 
-template<typename T, size_t N>
-inline size_t Event<T, N>::counter() const{
+template<typename T>
+inline size_t Event<T>::counter() const{
     return _counter;
 }
 
-template<typename T, size_t N>
-inline void Event<T, N>::set_aux_array_size(size_t size) const{
+template<typename T>
+inline void Event<T>::set_aux_array_size(size_t size) const{
     _q_aux.resize(size);
 }
 
-template<typename T, size_t N>
-bool Event<T, N>::determine(EventState<T, N>& result, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) {
+template<typename T>
+bool Event<T>::determine(EventState<T>& result, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) {
     if (locate(result, before, after, q, obj)){
         //result.t has been set, and thats all
         result.set_stepsize(after.habs());
@@ -403,32 +430,32 @@ bool Event<T, N>::determine(EventState<T, N>& result, State<const T> before, Sta
     return false;
 }
 
-template<typename T, size_t N>
-void Event<T, N>::reset(){
+template<typename T>
+void Event<T>::reset(){
     _counter = 0;
 }
 
-template<typename T, size_t N>
-void Event<T, N>::go_back(){
+template<typename T>
+void Event<T>::go_back(){
     if (_counter > 0) {_counter--;}
 }
 
-template<typename T, size_t N>
-void Event<T, N>::_register_it(const EventState<T, N>& res, State<const T> before, State<const T> after){
+template<typename T>
+void Event<T>::_register_it(const EventState<T>& res, State<const T> before, State<const T> after){
     this->_counter++;
 }
 
 // PreciseEvent CLASS implementations
-template<typename T, size_t N>
-PreciseEvent<T, N>::PreciseEvent(std::string name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, T event_tol, const void* obj): Event<T, N>(name, mask, hide_mask, obj), _when(when), _dir(sgn(dir)), _event_tol(event_tol){}
+template<typename T>
+PreciseEvent<T>::PreciseEvent(std::string name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, T event_tol, const void* obj): Event<T>(name, mask, hide_mask, obj), _when(when), _dir(sgn(dir)), _event_tol(event_tol){}
 
-template<typename T, size_t N>
-inline T PreciseEvent<T, N>::obj_fun(const T& t, const T* q) const{
+template<typename T>
+inline T PreciseEvent<T>::obj_fun(const T& t, const T* q) const{
     return _when(t, q, this->args().data(), this->_obj);
 }
 
-template<typename T, size_t N>
-bool PreciseEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
+template<typename T>
+bool PreciseEvent<T>::locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
 
     T val1 = this->obj_fun(before.t(), before.vector());
     T val2 = this->obj_fun(after.t(), after.vector());
@@ -436,56 +463,56 @@ bool PreciseEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, 
     int t_dir = sgn(after.t()-before.t());
     const int& d = this->dir();
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
-        _EventObjFun<T, N> _f{obj, this, q, this->_q_aux.data()};
-        event.set_t(bisect(event_obj_func<T, N>, before.t(), after.t(), this->_event_tol, &_f)[2]);
+        _EventObjFun<T> _f{obj, this, q, this->_q_aux.data()};
+        event.set_t(bisect(event_obj_func<T>, before.t(), after.t(), this->_event_tol, &_f)[2]);
         return true;
     }
     return false;
 }
 
-template<typename T, size_t N>
-inline const int& PreciseEvent<T, N>::dir()const{
+template<typename T>
+inline const int& PreciseEvent<T>::dir()const{
     return _dir;
 }
 
-template<typename T, size_t N>
-PreciseEvent<T, N>* PreciseEvent<T, N>::clone() const{
-    return new PreciseEvent<T, N>(*this);
+template<typename T>
+PreciseEvent<T>* PreciseEvent<T>::clone() const{
+    return new PreciseEvent<T>(*this);
 }
 
-template<typename T, size_t N>
-inline bool PreciseEvent<T, N>::is_time_based() const{
+template<typename T>
+inline bool PreciseEvent<T>::is_time_based() const{
     return false;
 }
 
 // PeriodicEvent CLASS implementations
-template<typename T, size_t N>
-PeriodicEvent<T, N>::PeriodicEvent(std::string name, T period, T start, Func<T> mask, bool hide_mask, const void* obj): Event<T, N>(name, mask, hide_mask, obj), _period(period), _start(start){
+template<typename T>
+PeriodicEvent<T>::PeriodicEvent(std::string name, T period, T start, Func<T> mask, bool hide_mask, const void* obj): Event<T>(name, mask, hide_mask, obj), _period(period), _start(start){
     if (period <= 0){
         throw std::runtime_error("Period in PeriodicEvent must be positive. If integrating backwards, events are still counted.");
     }
 }
 
-template<typename T, size_t N>
-PeriodicEvent<T, N>::PeriodicEvent(std::string name, T period, Func<T> mask, bool hide_mask, const void* obj): PeriodicEvent<T, N>(name, period, inf<T>(), mask, hide_mask, obj){}
+template<typename T>
+PeriodicEvent<T>::PeriodicEvent(std::string name, T period, Func<T> mask, bool hide_mask, const void* obj): PeriodicEvent<T>(name, period, inf<T>(), mask, hide_mask, obj){}
 
-template<typename T, size_t N>
-const T& PeriodicEvent<T, N>::t_start() const{
+template<typename T>
+const T& PeriodicEvent<T>::t_start() const{
     return _start;
 }
 
-template<typename T, size_t N>
-const T& PeriodicEvent<T, N>::period() const{
+template<typename T>
+const T& PeriodicEvent<T>::period() const{
     return _period;
 }
 
-template<typename T, size_t N>
-PeriodicEvent<T, N>* PeriodicEvent<T, N>::clone() const{
-    return new PeriodicEvent<T, N>(*this);
+template<typename T>
+PeriodicEvent<T>* PeriodicEvent<T>::clone() const{
+    return new PeriodicEvent<T>(*this);
 }
 
-template<typename T, size_t N>
-bool PeriodicEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
+template<typename T>
+bool PeriodicEvent<T>::locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
     if (!is_finite(_start)){
         return false;
     }
@@ -510,8 +537,8 @@ bool PeriodicEvent<T, N>::locate(EventState<T, N>& event, State<const T> before,
     return false;
 }
 
-template<typename T, size_t N>
-void PeriodicEvent<T, N>::set_start(const T& t) {
+template<typename T>
+void PeriodicEvent<T>::set_start(const T& t) {
     if (!is_finite(_start)){
         _start = t;
     }
@@ -520,48 +547,48 @@ void PeriodicEvent<T, N>::set_start(const T& t) {
     }
 }
 
-template<typename T, size_t N>
-inline bool PeriodicEvent<T, N>::is_time_based() const{
+template<typename T>
+inline bool PeriodicEvent<T>::is_time_based() const{
     return true;
 }
 
 // TmaxEvent CLASS implementations
-template<typename T, size_t N>
-TmaxEvent<T, N>::TmaxEvent() : Event<T, N>("t-goal", nullptr, false) {}
+template<typename T>
+TmaxEvent<T>::TmaxEvent() : Event<T>("t-goal", nullptr, false) {}
 
-template<typename T, size_t N>
-inline void TmaxEvent<T, N>::set_goal(T tmax){
+template<typename T>
+inline void TmaxEvent<T>::set_goal(T tmax){
     _t_goal = tmax;
 }
 
-template<typename T, size_t N>
-inline bool TmaxEvent<T, N>::goal_is_set() const{
+template<typename T>
+inline bool TmaxEvent<T>::goal_is_set() const{
     return is_finite(_t_goal);
 }
 
-template<typename T, size_t N>
-TmaxEvent<T, N>* TmaxEvent<T, N>::clone() const{
-    return new TmaxEvent<T, N>(*this);
+template<typename T>
+TmaxEvent<T>* TmaxEvent<T>::clone() const{
+    return new TmaxEvent<T>(*this);
 }
 
-template<typename T, size_t N>
-bool TmaxEvent<T, N>::is_stop_event() const{
+template<typename T>
+bool TmaxEvent<T>::is_stop_event() const{
     return true;
 }
 
-template<typename T, size_t N>
-inline bool TmaxEvent<T, N>::is_time_based() const{
+template<typename T>
+inline bool TmaxEvent<T>::is_time_based() const{
     return true;
 }
 
-template<typename T, size_t N>
-void TmaxEvent<T, N>::reset(){
-    Event<T, N>::reset();
+template<typename T>
+void TmaxEvent<T>::reset(){
+    Event<T>::reset();
     _t_goal = inf<T>();
 }
 
-template<typename T, size_t N>
-bool TmaxEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
+template<typename T>
+bool TmaxEvent<T>::locate(EventState<T>& event, State<const T> before, State<const T> after, FuncLike<T> q, const void* obj) const {
     if (!goal_is_set()) {return false;}
 
     int direction = (before.t() < after.t()) ? 1 : -1;
@@ -572,15 +599,15 @@ bool TmaxEvent<T, N>::locate(EventState<T, N>& event, State<const T> before, Sta
     return false;
 }
 
-template<typename T, size_t N>
-void TmaxEvent<T, N>::go_back(){
-    Event<T, N>::go_back();
+template<typename T>
+void TmaxEvent<T>::go_back(){
+    Event<T>::go_back();
     _t_goal = _t_goal_last;
 }
 
-template<typename T, size_t N>
-void TmaxEvent<T, N>::_register_it(const EventState<T, N>& res, State<const T> before, State<const T> after){
-    Event<T, N>::_register_it(res, before, after);
+template<typename T>
+void TmaxEvent<T>::_register_it(const EventState<T>& res, State<const T> before, State<const T> after){
+    Event<T>::_register_it(res, before, after);
     _t_goal_last = _t_goal;
     _t_goal = inf<T>();
 }
@@ -628,8 +655,8 @@ ObjectOwningEvent<EventType, ObjType>* ObjectOwningEvent<EventType, ObjType>::cl
 }
 
 // discard_event function
-template<typename T, size_t N>
-bool discard_event(const Event<T, N>& event, const Event<T, N>& mark){
+template<typename T>
+bool discard_event(const Event<T>& event, const Event<T>& mark){
     if (!mark.is_masked() || mark.hides_mask()){
         return event.is_masked();
     }
@@ -637,26 +664,26 @@ bool discard_event(const Event<T, N>& event, const Event<T, N>& mark){
 }
 
 // EventCollection implementations
-template<typename T, size_t N>
+template<typename T>
 template<typename EventIterator>
-EventCollection<T, N>::EventCollection(const EventIterator& events) {
+EventCollection<T>::EventCollection(const EventIterator& events) {
     _realloc(events.size());
     _clone_events(events.begin());
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>::EventCollection(std::initializer_list<const Event<T, N>*> events){
+template<typename T>
+EventCollection<T>::EventCollection(std::initializer_list<const Event<T>*> events){
     _realloc(events.size());
     _clone_events(events.begin());
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>::EventCollection(const EventCollection& other){
+template<typename T>
+EventCollection<T>::EventCollection(const EventCollection& other){
     _copy(other);
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>::EventCollection(EventCollection&& other) noexcept: _events(other._events), _names(std::move(other._names)), _states(other._states), _N_tot(other._N_tot), _N_detect(other._N_detect), _Nt(other._Nt), _canon_idx(other._canon_idx), _event_idx(other._event_idx), _event_idx_start(other._event_idx_start), _iter(other._iter){
+template<typename T>
+EventCollection<T>::EventCollection(EventCollection&& other) noexcept: _events(other._events), _names(std::move(other._names)), _states(other._states), _N_tot(other._N_tot), _N_detect(other._N_detect), _Nt(other._Nt), _canon_idx(other._canon_idx), _event_idx(other._event_idx), _event_idx_start(other._event_idx_start), _iter(other._iter){
     other._events = nullptr;
     other._states = nullptr;
     other._event_idx = nullptr;
@@ -664,21 +691,21 @@ EventCollection<T, N>::EventCollection(EventCollection&& other) noexcept: _event
     other._N_tot = 0;
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>::~EventCollection(){
+template<typename T>
+EventCollection<T>::~EventCollection(){
     _clear();
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>& EventCollection<T, N>::operator=(const EventCollection<T, N>& other){
+template<typename T>
+EventCollection<T>& EventCollection<T>::operator=(const EventCollection<T>& other){
     if (&other != this){
         _copy(other);
     }
     return *this;
 }
 
-template<typename T, size_t N>
-EventCollection<T, N>& EventCollection<T, N>::operator=(EventCollection<T, N>&& other) noexcept {
+template<typename T>
+EventCollection<T>& EventCollection<T>::operator=(EventCollection<T>&& other) noexcept {
     if (&other != this){
         _clear();
         _events = other._events;
@@ -701,50 +728,50 @@ EventCollection<T, N>& EventCollection<T, N>::operator=(EventCollection<T, N>&& 
     return *this;
 }
 
-template<typename T, size_t N>
-inline const Event<T, N>& EventCollection<T, N>::event(size_t i) const{
+template<typename T>
+inline const Event<T>& EventCollection<T>::event(size_t i) const{
     return *_events[i];
 }
 
-template<typename T, size_t N>
-inline const EventState<T, N>& EventCollection<T, N>::state(size_t i) const{
+template<typename T>
+inline const EventState<T>& EventCollection<T>::state(size_t i) const{
     return _states[i];
 }
 
-template<typename T, size_t N>
-inline size_t EventCollection<T, N>::size()const{
+template<typename T>
+inline size_t EventCollection<T>::size()const{
     return _N_tot;
 }
 
-template<typename T, size_t N>
-inline size_t EventCollection<T, N>::detection_size() const{
+template<typename T>
+inline size_t EventCollection<T>::detection_size() const{
     return _N_detect;
 }
 
-template<typename T, size_t N>
-inline size_t EventCollection<T, N>::detection_times() const{
+template<typename T>
+inline size_t EventCollection<T>::detection_times() const{
     return _Nt;
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::set_tmax(T tmax){
+template<typename T>
+void EventCollection<T>::set_tmax(T tmax){
     if (this->size() > 0){
-        if (auto* p = dynamic_cast<TmaxEvent<T, N>*>(_events[0])){
+        if (auto* p = dynamic_cast<TmaxEvent<T>*>(_events[0])){
             p->set_goal(tmax);
         }
     }
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::set_array_size(size_t size) {
+template<typename T>
+void EventCollection<T>::set_array_size(size_t size) {
     for (size_t i=0; i<_N_tot; i++){
         _states[i].resize(size);
         _events[i]->set_aux_array_size(size);
     }
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::detect_all_between(State<const T> before, State<const T> after, FuncLike<T> q, const void* obj){
+template<typename T>
+void EventCollection<T>::detect_all_between(State<const T> before, State<const T> after, FuncLike<T> q, const void* obj){
     if (_N_tot == 0){
         return;
     }
@@ -753,8 +780,8 @@ void EventCollection<T, N>::detect_all_between(State<const T> before, State<cons
     const int dir = sgn(after.t()-before.t());
     _N_detect = 0; //this is how many events have been triggered, and is the next available index in _event_idx_start
     for (size_t i=0; i<this->size(); i++){
-        EventState<T, N>& event = _states[i];
-        Event<T, N>* event_obj = _events[i];
+        EventState<T>& event = _states[i];
+        Event<T>* event_obj = _events[i];
         if (event_obj->determine(event, before, after, q, obj)){
             long int j=static_cast<long int>(_N_detect)-1;
             while (j>=0 && _is_prioritized(i, j, dir)){
@@ -815,24 +842,29 @@ void EventCollection<T, N>::detect_all_between(State<const T> before, State<cons
     size_t tmp = j;
     _event_idx_start[_Nt] = j;
     for (; j<_N_detect; j++){
-        const_cast<Event<T,N>&>(event(_event_idx[j])).go_back();
+        const_cast<Event<T>&>(event(_event_idx[j])).go_back();
     }
     _N_detect = tmp;
     _iter = 0;
 }
 
-template<typename T, size_t N>
-const size_t* EventCollection<T, N>::begin() const{
+template<typename T>
+EventView<T> EventCollection<T>::event_view() const{
+    return (_iter < _Nt) ? EventView<T>(_events, _event_idx + _event_idx_start[_iter], this->detection_size()) : EventView<T>(nullptr, nullptr, 0);
+}
+
+template<typename T>
+const size_t* EventCollection<T>::begin() const{
     return (_iter < _Nt) ? _event_idx + _event_idx_start[_iter] : nullptr;
 }
 
-template<typename T, size_t N>
-const size_t* EventCollection<T, N>::end() const{
+template<typename T>
+const size_t* EventCollection<T>::end() const{
     return (_iter < _Nt) ? _event_idx + _event_idx_start[_iter+1] : nullptr;
 }
 
-template<typename T, size_t N>
-inline bool EventCollection<T, N>::next_result() {
+template<typename T>
+inline bool EventCollection<T>::next_result() {
     if (_iter+1 < _Nt){
         _iter++;
         return true;
@@ -843,25 +875,25 @@ inline bool EventCollection<T, N>::next_result() {
     return false;
 }
 
-template<typename T, size_t N>
-inline void EventCollection<T, N>::restart_iter(){
+template<typename T>
+inline void EventCollection<T>::restart_iter(){
     _iter = 0;
 }
 
-template<typename T, size_t N>
-const Event<T, N>* EventCollection<T, N>::canon_event() const{
+template<typename T>
+const Event<T>* EventCollection<T>::canon_event() const{
     return _canon_idx == _N_tot ? nullptr : _events[_canon_idx];
 }
 
-template<typename T, size_t N>
-const EventState<T, N>* EventCollection<T, N>::canon_state() const{
+template<typename T>
+const EventState<T>* EventCollection<T>::canon_state() const{
     return _canon_idx == _N_tot ? nullptr : _states+_canon_idx;
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::set_start(T t0, int dir){
+template<typename T>
+void EventCollection<T>::set_start(T t0, int dir){
     for (size_t i=0; i<this->size(); i++){
-        if (auto* p = dynamic_cast<PeriodicEvent<T, N>*>(_events[i])){
+        if (auto* p = dynamic_cast<PeriodicEvent<T>*>(_events[i])){
             if (!is_finite(p->t_start())){
                 p->set_start(t0+p->period()*dir);
             }
@@ -872,15 +904,15 @@ void EventCollection<T, N>::set_start(T t0, int dir){
     }
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::set_args(const T* args, size_t size){
+template<typename T>
+void EventCollection<T>::set_args(const T* args, size_t size){
     for (size_t i=0; i<this->size(); i++){
         _events[i]->set_args(args, size);
     }
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::reset(){
+template<typename T>
+void EventCollection<T>::reset(){
     size_t arr_size;
     if (this->_N_tot > 0){
         arr_size = _states[0].nsys();
@@ -888,7 +920,7 @@ void EventCollection<T, N>::reset(){
 
     for (size_t i=0; i<_N_tot; i++){
         _events[i]->reset();
-        _states[i] = EventState<T, N>();
+        _states[i] = EventState<T>();
         _event_idx[i] = 0;
         _event_idx_start[i] = 0;
     }
@@ -901,19 +933,19 @@ void EventCollection<T, N>::reset(){
     _event_idx_start[_N_tot] = 0;
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::_realloc(size_t events){
+template<typename T>
+void EventCollection<T>::_realloc(size_t events){
     _clear();
-    _events = new Event<T, N>*[events];
-    _states = new EventState<T, N>[events];
+    _events = new Event<T>*[events];
+    _states = new EventState<T>[events];
     _event_idx = new size_t[events];
     _event_idx_start = new size_t[events+1];
     _N_tot = events;
     _canon_idx = _N_tot;
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::_clear(){
+template<typename T>
+void EventCollection<T>::_clear(){
     for (size_t i=0; i<_N_tot; i++){
         delete _events[i];
         _events[i] = nullptr;
@@ -924,9 +956,9 @@ void EventCollection<T, N>::_clear(){
     delete[] _event_idx_start;
 }
 
-template<typename T, size_t N>
+template<typename T>
 template<typename Iterator>
-void EventCollection<T, N>::_clone_events(const Iterator& events){
+void EventCollection<T>::_clone_events(const Iterator& events){
     _names.clear();
     for (size_t i = 0; i < _N_tot; i++) {
         if (!_names.insert(events[i]->name()).second) {
@@ -936,8 +968,8 @@ void EventCollection<T, N>::_clone_events(const Iterator& events){
     }
 }
 
-template<typename T, size_t N>
-void EventCollection<T, N>::_copy(const EventCollection<T, N>& other){
+template<typename T>
+void EventCollection<T>::_copy(const EventCollection<T>& other){
     //events must have been deleted, and all arrays must have been allocated
     if (other._N_tot != _N_tot){
         _realloc(other._N_tot);
@@ -962,8 +994,8 @@ void EventCollection<T, N>::_copy(const EventCollection<T, N>& other){
 
 }
 
-template<typename T, size_t N>
-bool EventCollection<T, N>::_is_prioritized(size_t i, size_t j, int dir){
+template<typename T>
+bool EventCollection<T>::_is_prioritized(size_t i, size_t j, int dir){
     if (state(i).t()*dir < state(j).t()*dir){
         return true;
     }

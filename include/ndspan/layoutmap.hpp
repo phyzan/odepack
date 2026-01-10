@@ -1,6 +1,7 @@
 #pragma once
 
 #include "layouts/standard_layouts.hpp"
+#include "layouts/morton.hpp"
 
 
 /*
@@ -20,6 +21,9 @@ struct LayoutMap<Layout::C, DIMS...> { using type = RowMajorSpan<DIMS...>; };
 template <size_t... DIMS>
 struct LayoutMap<Layout::F, DIMS...> { using type = ColumnMajorSpan<DIMS...>; };
 
+template <size_t... DIMS>
+struct LayoutMap<Layout::Z, DIMS...> { using type = ZorderNdSpan<DIMS...>; };
+
 template <Layout L, size_t... DIMS>
 class NdSpan : public std::conditional_t<(sizeof...(DIMS)==1 && (DIMS*...*1)==0), SemiStaticSpan1D, typename LayoutMap<L, DIMS...>::type>{
 
@@ -33,8 +37,8 @@ protected:
 
 public:
 
-    template<IsShapeContainer ShapeContainer>
-    explicit NdSpan(const ShapeContainer& shape) : Base(shape) {}
+    template<INT_T Int>
+    explicit NdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
     template<INT_T... Args>
     explicit constexpr NdSpan(Args... shape) : Base(shape...){}
@@ -88,13 +92,13 @@ public:
         Base::resize(shape...);
     }
 
-    template<IsShapeContainer ShapeContainer>
-    INLINE void reshape(const ShapeContainer& shape){
-        Base::reshape(shape);
+    template<INT_T Int>
+    INLINE void reshape(const Int* shape, size_t ndim){
+        Base::reshape(shape, ndim);
     }
 
-    template<IsShapeContainer ShapeContainer>
-    INLINE void resize(const ShapeContainer& shape){
-        Base::resize(shape);
+    template<INT_T Int>
+    INLINE void resize(const Int* shape, size_t ndim){
+        Base::resize(shape, ndim);
     }
 };

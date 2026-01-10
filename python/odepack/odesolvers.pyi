@@ -382,6 +382,34 @@ class OdeSolver:
         """
         pass
 
+    @property
+    def at_event(self)->bool:
+        """
+        Check if the solver is currently at any event time.
+
+        Returns
+        -------
+        bool
+            True if the current step landed exactly on an event time, False otherwise.
+        """
+        ...
+
+    def event_located(self, event: str)->bool:
+        """
+        Check if a specific event is located at the current step.
+
+        Parameters
+        ----------
+        event : str
+            Name of the event to check.
+
+        Returns
+        -------
+        bool
+            True if the specified event was detected at the current step, False otherwise.
+        """
+        ...
+
     def show_state(self, digits: int = 8)->None:
         """
         Print detailed information about the solver's current state.

@@ -37,10 +37,9 @@ struct SolverState{
 template<typename T, size_t N>
 struct SolverRichState : public SolverState<T, N>{
 
-    std::vector<const Event<T, N>*> events;
     std::vector<std::string> event_names;
 
-    SolverRichState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, const std::string& message, const std::vector<const Event<T, N>*>& events) : SolverState<T, N>(vector, t, habs, Nsys, diverges, is_running, is_dead, Nt, message), events(events), event_names(events.size()) {
+    SolverRichState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, const std::string& message, const EventView<T>& events) : SolverState<T, N>(vector, t, habs, Nsys, diverges, is_running, is_dead, Nt, message), event_names(events.size()) {
         for (size_t i=0; i<events.size(); i++){
             event_names[i] = events[i]->name();
         }
@@ -59,7 +58,7 @@ struct SolverRichState : public SolverState<T, N>{
         }
 
         SolverState<T, N>::show(precision);
-        std::cout << (event_names.size() == 0 ? "\tEvents     : No event\n" : "\tEvents     : " + event_message + "\n") << std::endl;
+        std::cout << "\tEvents     : " + event_message + "\n" << std::endl;
     }
 
 };

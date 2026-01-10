@@ -5,13 +5,13 @@
 #include "virtualsolver.hpp"
 #include "solverstate.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
 
-#define MAIN_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define MAIN_CONSTRUCTOR(T) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
 
-#define SOLVER_CONSTRUCTOR(T, N) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define SOLVER_CONSTRUCTOR(T) OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
 
-#define ODE_CONSTRUCTOR(T, N) MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events={}, const std::string& method="RK45"
+#define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, const std::string& method="RK45"
 
 #define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args
 
@@ -33,11 +33,11 @@ public:
     inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
     inline void                 jac(T* jm, const T& t, const T* q) const;
     inline void                 jac_approx(T* j, const T& t, const T* q) const;
-    NdView<T, Layout::F, N, N>  jac_view(T* j) const;
+    MutView<T, Layout::F, N, N> jac_view(T* j) const;
 
     // ACCESSORS
     inline const T&             t() const;
-    inline View1D<const T, N>   vector() const;
+    inline View1D<T, N>   vector() const;
     inline const T&             stepsize() const;
     inline int                  direction() const;
     inline const T&             rtol() const;
@@ -120,13 +120,13 @@ protected:
 
     //============================= OVERRIDEN IN RICH SOLVER ==========================
     inline const T&             t_impl() const;
-    inline View1D<const T, N>   vector_impl() const;
+    inline View1D<T, N>   vector_impl() const;
     inline bool                 adv_impl();
     //=================================================================================
 
     DEFAULT_RULE_OF_FOUR(BaseSolver)
 
-    BaseSolver(SOLVER_CONSTRUCTOR(T, N));
+    BaseSolver(SOLVER_CONSTRUCTOR(T));
     ~BaseSolver() = default;
 
     T                                   MAX_FACTOR = 10;
@@ -217,7 +217,7 @@ inline const T& BaseSolver<Derived, T, N, SP>::t() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<const T, N> BaseSolver<Derived, T, N, SP>::vector() const{
+inline View1D<T, N> BaseSolver<Derived, T, N, SP>::vector() const{
     return THIS_C->vector_impl();
 }
 
@@ -575,8 +575,8 @@ inline const T& BaseSolver<Derived, T, N, SP>::t_impl() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<const T, N> BaseSolver<Derived, T, N, SP>::vector_impl() const{
-    return View1D<const T, N>{this->true_state_ptr()+2, this->Nsys()};
+inline View1D<T, N> BaseSolver<Derived, T, N, SP>::vector_impl() const{
+    return View1D<T, N>{this->true_state_ptr()+2, this->Nsys()};
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -687,14 +687,14 @@ void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-NdView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
+MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
     //returns a high level view of the jacobian matrix, so that its elements
     //can be accessed using matrix(i, j). This function simply simplifies
     //the process of constructing the correct object that can safely view the jacobian matrix
     //by doing
     // auto matrix = solver->jac_view(jac_ptr);
     // matrix(i, j) = ...
-    return NdView<T, Layout::F, N, N>(j, this->Nsys(), this->Nsys());
+    return MutView<T, Layout::F, N, N>(j, this->Nsys(), this->Nsys());
 }
 
 
@@ -702,7 +702,7 @@ NdView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T, N)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){

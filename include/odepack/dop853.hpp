@@ -101,9 +101,9 @@ private:
 
 public:
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N)) requires (!is_rich<SP>);
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T, N), EVENTS events = {}) requires (is_rich<SP>);
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
     inline void interp_impl(T* result, const T& t) const;
 
@@ -483,10 +483,10 @@ void DOP853LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 
 // DOP853 implementations
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T, N)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
+DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
-DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T, N), EVENTS events) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
+DOP853<T, N, SP, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived>
 inline void DOP853<T, N, SP, Derived>::interp_impl(T* result, const T& t) const{

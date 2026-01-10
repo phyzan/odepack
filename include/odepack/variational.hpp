@@ -20,10 +20,10 @@ template<typename T>
 void normalized(T* q, size_t nsys);
 
 
-template<typename T, size_t N>
-class NormalizationEvent: public ObjectOwningEvent<PeriodicEvent<T, N>, size_t>{
+template<typename T>
+class NormalizationEvent: public ObjectOwningEvent<PeriodicEvent<T>, size_t>{
 
-    using Base = ObjectOwningEvent<PeriodicEvent<T, N>, size_t>;
+    using Base = ObjectOwningEvent<PeriodicEvent<T>, size_t>;
 
 public:
 
@@ -41,7 +41,7 @@ public:
 
     T delta_s() const;
 
-    NormalizationEvent<T, N>* clone() const override;
+    NormalizationEvent<T>* clone() const override;
 
     void set_start(const T& t) override;
 
@@ -51,7 +51,7 @@ public:
 
 private:
 
-    void _register_it(const EventState<T, N>& res, State<const T> before, State<const T> after) override;
+    void _register_it(const EventState<T>& res, State<const T> before, State<const T> after) override;
 
     T _t_renorm;
     T _t_last;
@@ -71,7 +71,7 @@ class VariationalODE : public ODE<T, N>{
 
 public:
 
-    VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T, N>*> = {}, const std::string& method = "RK45");
+    VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> = {}, const std::string& method = "RK45");
 
     DEFAULT_RULE_OF_FOUR(VariationalODE);
 
@@ -89,7 +89,7 @@ public:
 
 private:
 
-    inline const NormalizationEvent<T, N>& _main_event()const;
+    inline const NormalizationEvent<T>& _main_event()const;
 
     void _register_event(size_t event) override;
 
@@ -124,57 +124,57 @@ void normalized(T* q, size_t nsys){
 }
 
 // NormalizationEvent implementations
-template<typename T, size_t N>
-NormalizationEvent<T, N>::NormalizationEvent(const std::string& name, size_t Nsys, const T& period, const T& start): Base(Nsys, name, period, start, normalize<T>, true, nullptr), _t_renorm(start), _t_last(start){}
+template<typename T>
+NormalizationEvent<T>::NormalizationEvent(const std::string& name, size_t Nsys, const T& period, const T& start): Base(Nsys, name, period, start, normalize<T>, true, nullptr), _t_renorm(start), _t_last(start){}
 
-template<typename T, size_t N>
-void NormalizationEvent<T, N>::go_back(){
-    PeriodicEvent<T, N>::go_back();
+template<typename T>
+void NormalizationEvent<T>::go_back(){
+    PeriodicEvent<T>::go_back();
     _t_renorm = _t_last;
     _logksi = _logksi_last;
     _delta_s = _delta_s_last;
     _dir = _dir_last;
 }
 
-template<typename T, size_t N>
-const T& NormalizationEvent<T, N>::logksi() const{
+template<typename T>
+const T& NormalizationEvent<T>::logksi() const{
     return _logksi;
 }
 
-template<typename T, size_t N>
-T NormalizationEvent<T, N>::lyap() const{
+template<typename T>
+T NormalizationEvent<T>::lyap() const{
     return _logksi/this->t_lyap();
 }
 
-template<typename T, size_t N>
-T NormalizationEvent<T, N>::t_lyap() const{
+template<typename T>
+T NormalizationEvent<T>::t_lyap() const{
     return abs(_t_renorm-this->_start+this->_period*_dir);
 }
 
-template<typename T, size_t N>
-T NormalizationEvent<T, N>::delta_s() const{
+template<typename T>
+T NormalizationEvent<T>::delta_s() const{
     return _delta_s;
 }
 
-template<typename T, size_t N>
-NormalizationEvent<T, N>* NormalizationEvent<T, N>::clone() const{
-    return new NormalizationEvent<T, N>(*this);
+template<typename T>
+NormalizationEvent<T>* NormalizationEvent<T>::clone() const{
+    return new NormalizationEvent<T>(*this);
 }
 
-template<typename T, size_t N>
-void NormalizationEvent<T, N>::set_start(const T& t){
-    PeriodicEvent<T, N>::set_start(t);
+template<typename T>
+void NormalizationEvent<T>::set_start(const T& t){
+    PeriodicEvent<T>::set_start(t);
     _t_renorm = t;
 }
 
-template<typename T, size_t N>
-inline size_t NormalizationEvent<T, N>::Nsys() const{
+template<typename T>
+inline size_t NormalizationEvent<T>::Nsys() const{
     return this->_object;
 }
 
-template<typename T, size_t N>
-void NormalizationEvent<T, N>::reset(){
-    PeriodicEvent<T, N>::reset();
+template<typename T>
+void NormalizationEvent<T>::reset(){
+    PeriodicEvent<T>::reset();
     _t_renorm = this->_start;
     _t_last = this->_start;
     _logksi = 0;
@@ -185,8 +185,8 @@ void NormalizationEvent<T, N>::reset(){
     _dir_last = 0;
 }
 
-template<typename T, size_t N>
-void NormalizationEvent<T, N>::_register_it(const EventState<T, N>& res, State<const T> before, State<const T> after){
+template<typename T>
+void NormalizationEvent<T>::_register_it(const EventState<T>& res, State<const T> before, State<const T> after){
     _t_last = _t_renorm;
     _logksi_last = _logksi;
     _dir_last = _dir;
@@ -199,16 +199,16 @@ void NormalizationEvent<T, N>::_register_it(const EventState<T, N>& res, State<c
 
 // VariationalODE implementations
 template<typename T, size_t N>
-VariationalODE<T, N>::VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, std::vector<const Event<T, N>*> events, const std::string& method) : ODE<T, N>(){
+VariationalODE<T, N>::VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, const std::string& method) : ODE<T, N>(){
     for (size_t i=0; i<events.size(); i++){
-        if (dynamic_cast<const NormalizationEvent<T, N>*>(events[i])){
+        if (dynamic_cast<const NormalizationEvent<T>*>(events[i])){
             throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
         }
     }
 
     Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
     normalized<T>(tmp.data(), nsys);
-    NormalizationEvent<T, N> extra_event("Normalization", nsys, period);
+    NormalizationEvent<T> extra_event("Normalization", nsys, period);
     events.insert(events.begin(), &extra_event);
     nsys *= 2;
     const T* q0 = tmp.data();
@@ -258,15 +258,15 @@ void VariationalODE<T, N>::reset(){
 }
 
 template<typename T, size_t N>
-inline const NormalizationEvent<T, N>& VariationalODE<T, N>::_main_event()const{
-    return static_cast<const NormalizationEvent<T, N>&>(this->solver()->event_col().event(_ind));
+inline const NormalizationEvent<T>& VariationalODE<T, N>::_main_event()const{
+    return static_cast<const NormalizationEvent<T>&>(this->solver()->event_col().event(_ind));
 }
 
 template<typename T, size_t N>
 void VariationalODE<T, N>::_register_event(size_t event){
     ODE<T, N>::_register_event(event);
     if (event == _ind-1){
-        const NormalizationEvent<T, N>& ev = _main_event();
+        const NormalizationEvent<T>& ev = _main_event();
         _t_lyap.push_back(ev.t_lyap());
         _lyap_array.push_back(ev.lyap());
         _delta_s_arr.push_back(ev.delta_s());
