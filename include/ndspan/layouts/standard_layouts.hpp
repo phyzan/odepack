@@ -13,10 +13,6 @@ public:
 
     DEFAULT_RULE_OF_FOUR(StridedDerivedNdSpan)
 
-    const size_t* strides() const{
-        return THIS_C->strides();
-    }
-
     template<typename StrideType, typename ShapeType>
     static constexpr void set_strides(StrideType& s, const ShapeType& shape, size_t nd) {
         Derived::set_strides(s, shape, nd);
@@ -27,7 +23,7 @@ public:
         if constexpr (Base::N > 0) {
             return Derived::strided_unpack(offset, STRIDES, Base::SHAPE, idx...);
         } else {
-            return Derived::strided_unpack(offset, this->strides(), this->shape(), idx...);
+            return Derived::strided_unpack(offset, THIS->strides(), this->shape(), idx...);
         }
     }
 
@@ -111,7 +107,7 @@ public:
     }
 
     template<INT_T Int>
-    void resize(const Int* shape, size_t ndim){
+    void constexpr resize(const Int* shape, size_t ndim){
         Base::resize(shape, ndim);
         this->_remake_strides();
     }
@@ -130,6 +126,57 @@ private:
     }
     
     size_t _fixed_strides[ND];
+
+};
+
+
+template<typename Derived, size_t N>
+class StridedSemiStaticNdSpan<Derived, N> : public StridedDerivedNdSpan<Derived, N>{
+
+    //Specialization for the 1D case.
+    //Its only  benefit is that it does not store the strides array.
+
+    using Base = StridedDerivedNdSpan<Derived, N>;
+
+protected:
+
+    inline static constexpr size_t ND = 1;
+
+    static_assert(N==0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
+
+    StridedSemiStaticNdSpan() = default;
+
+    template<INT_T... Args>
+    explicit constexpr StridedSemiStaticNdSpan(Args... shape) : Base(shape...) {}
+
+    template<INT_T Int>
+    explicit constexpr StridedSemiStaticNdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
+
+};
+
+template<typename Derived, size_t R, size_t C>
+class StridedSemiStaticNdSpan<Derived, R, C> : public StridedDerivedNdSpan<Derived, R, C>{
+
+    //Specialization for the 1D case
+
+    using Base = StridedDerivedNdSpan<Derived, R, C>;
+
+protected:
+
+    inline static constexpr size_t ND = 2;
+    inline static constexpr size_t N = R*C;
+
+    static_assert(N==0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
+
+    StridedSemiStaticNdSpan() = default;
+
+    template<INT_T... Args>
+    explicit constexpr StridedSemiStaticNdSpan(Args... shape) : Base(shape...) {}
+
+    template<INT_T Int>
+    explicit constexpr StridedSemiStaticNdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
+
+    DEFAULT_RULE_OF_FOUR(StridedSemiStaticNdSpan)
 
 };
 
@@ -154,7 +201,7 @@ protected:
     template<INT_T Int>
     explicit constexpr StridedDynamicNdSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {
         _dyn_strides = ndim > 0 ? new size_t[ndim] : nullptr;
-        Derived::set_strides(_dyn_strides, this->shape(), this->ndim());
+        Derived::set_strides(_dyn_strides, shape, ndim);
     }
 
     //COPY CONSTRUCTOR
@@ -217,7 +264,7 @@ public:
     }
 
     template<INT_T Int>
-    void resize(const Int* shape, size_t ndim){
+    void constexpr resize(const Int* shape, size_t ndim){
         size_t nd_old = this->ndim();
         Base::resize(shape, ndim);
         this->_realloc_strides(nd_old);
@@ -286,6 +333,44 @@ public:
 };
 
 
+template<size_t R, size_t C>
+class RowMajorSpan<R, C> : public StridedNdSpan<RowMajorSpan<R, C>, R, C>{
+
+    using Base = StridedNdSpan<RowMajorSpan<R, C>, R, C>;
+
+public:
+
+    DEFAULT_RULE_OF_FOUR(RowMajorSpan)
+
+    template<INT_T Int>
+    explicit RowMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
+
+    template<INT_T... Args>
+    explicit constexpr RowMajorSpan(Args... shape) : Base(shape...){}
+
+    template<INT_T Int1, INT_T Int2>
+    INLINE constexpr size_t offset_impl(Int1 i, Int2 j) const {
+        if constexpr (C > 0){
+            return i*C + j;
+        }else {
+            return i*this->shape(1) + j;
+        }
+    }
+
+    template<INT_T Int1, INT_T Int2>
+    INLINE void unpack_idx_impl(size_t offset, Int1& i, Int2& j) const {
+        if constexpr (C > 0) {
+            i = offset/C;
+            j = offset % C;
+        }else {
+            i = offset/this->shape(1);
+            j = offset % this->shape(1);
+        }
+    }
+
+};
+
+
 template<size_t... DIMS>
 class ColumnMajorSpan : public StridedNdSpan<ColumnMajorSpan<DIMS...>, DIMS...>{
 
@@ -296,7 +381,7 @@ public:
     using Base::Base;
 
     DEFAULT_RULE_OF_FOUR(ColumnMajorSpan)
-
+    
     template<INT_T Int>
     explicit ColumnMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
@@ -319,5 +404,46 @@ public:
             offset /= shape[I]), ...);
         );
     }
+    
+};
+
+
+template<size_t R, size_t C>
+class ColumnMajorSpan<R, C> : public StridedNdSpan<ColumnMajorSpan<R, C>, R, C>{
+
+    using Base = StridedNdSpan<ColumnMajorSpan<R, C>, R, C>;
+
+public:
+
+    using Base::Base;
+
+    DEFAULT_RULE_OF_FOUR(ColumnMajorSpan)
+    
+    template<INT_T Int>
+    explicit ColumnMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
+
+    template<INT_T... Args>
+    explicit constexpr ColumnMajorSpan(Args... shape) : Base(shape...){}
+
+    template<INT_T Int1, INT_T Int2>
+    INLINE constexpr size_t offset_impl(Int1 i, Int2 j) const {
+        if constexpr (R > 0){
+            return j*R + i;
+        }else {
+            return j*this->shape(0) + i;
+        }
+    }
+
+    template<INT_T Int1, INT_T Int2>
+    INLINE void unpack_idx_impl(size_t offset, Int1& i, Int2& j) const {
+        if constexpr (R > 0) {
+            i = offset % R;
+            j = offset / R;
+        }else {
+            i = offset % this->shape(0);
+            j = offset / this->shape(0);
+        }
+    }
+
     
 };
