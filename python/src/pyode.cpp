@@ -545,6 +545,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def("advance_to_event", &PySolver::advance_to_event)
         .def("advance_until", &PySolver::advance_until, py::arg("t"))
         .def("reset", &PySolver::reset)
+        .def("resume", &PySolver::resume)
         .def("copy", &PySolver::copy)
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
 

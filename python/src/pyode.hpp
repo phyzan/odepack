@@ -265,6 +265,10 @@ struct PySolver : DtypeDispatcher {
         PY_DO(OdeRichSolver, this->s, reset())
     }
 
+    bool resume() {
+        return CALL_IT(bool, resume);
+    }
+
     template<typename T>
     void init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name);
 

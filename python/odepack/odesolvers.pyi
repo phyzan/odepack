@@ -490,6 +490,21 @@ class OdeSolver:
         The solver is ready to begin integration again from the start.
         """
 
+    def resume(self)->bool:
+        """
+        Resume the solver after being stopped.
+
+        If the solver was previously halted due to an event or user stop,
+        this method allows continuation of integration from the current state.
+
+        Returns
+        -------
+        bool
+            True if the solver was successfully resumed.
+            False if the solver is not in a stoppable state (e.g., dead).
+            If False, call message to see the reason.
+        """
+
     def copy(self)->OdeSolver:
         """
         Create a deep copy of the solver in its current state.
