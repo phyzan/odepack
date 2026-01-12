@@ -147,8 +147,8 @@ PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispa
 }
 
 PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data) {
-    this->s = CALL_IT(void*, clone);
-    CALL_IT(void, set_obj, &data);
+    EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
+    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
 }
 
 PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)) {
@@ -550,7 +550,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
 
     py::class_<PyRK23, PySolver>(m, "RK23")
-        .def(py::init<PyRK23>(), py::arg("result"))
+        .def(py::init<PyRK23>(), py::arg("solver"))
         .def(py::init<py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
             py::arg("f"),
             py::arg("t0"),
@@ -567,7 +567,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("scalar_type")="double");
 
     py::class_<PyRK45, PySolver>(m, "RK45")
-        .def(py::init<PyRK45>(), py::arg("result"))
+        .def(py::init<PyRK45>(), py::arg("solver"))
         .def(py::init<py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
             py::arg("f"),
             py::arg("t0"),
@@ -584,7 +584,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("scalar_type")="double");
 
     py::class_<PyDOP853, PySolver>(m, "DOP853")
-        .def(py::init<PyDOP853>(), py::arg("result"))
+        .def(py::init<PyDOP853>(), py::arg("solver"))
         .def(py::init<py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
             py::arg("f"),
             py::arg("t0"),
@@ -601,7 +601,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("scalar_type")="double");
 
     py::class_<PyBDF, PySolver>(m, "BDF")
-        .def(py::init<PyBDF>(), py::arg("result"))
+        .def(py::init<PyBDF>(), py::arg("solver"))
         .def(py::init<py::object, py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
             py::arg("f"),
             py::arg("jac"),
@@ -652,7 +652,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("events")=py::tuple(),
             py::arg("method")="RK45",
             py::arg("scalar_type")="double")
-        .def(py::init<PyODE>(), py::arg("result"))
+        .def(py::init<PyODE>(), py::arg("ode"))
         .def("solver", &PyODE::solver_copy)
         .def("integrate", &PyODE::py_integrate,
             py::arg("interval"),
@@ -702,7 +702,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("events")=py::tuple(),
             py::arg("method")="RK45",
             py::arg("scalar_type")="double")
-        .def(py::init<PyVarODE>(), py::arg("result"))
+        .def(py::init<PyVarODE>(), py::arg("ode"))
         .def_property_readonly("t_lyap", &PyVarODE::py_t_lyap)
         .def_property_readonly("lyap", &PyVarODE::py_lyap)
         .def_property_readonly("kicks", &PyVarODE::py_kicks)
