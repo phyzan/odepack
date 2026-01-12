@@ -142,6 +142,7 @@ PySolver::PySolver(const py::object& f, const py::object& jac, const py::object&
 }
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
+    this->s = solver;
     CALL_IT(void, set_obj, &data);
 }
 
