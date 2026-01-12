@@ -360,7 +360,7 @@ StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::StandardRungeKutta(SOLVE
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 inline std::unique_ptr<Interpolator<T, N>> StandardRungeKutta<Derived, T, N, Nstages, Norder, SP>::state_interpolator(int bdr1, int bdr2) const{
     this->set_coef_matrix();
-    return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t(), this->old_state_ptr()+2, this->new_state_ptr(), this->Nsys(), bdr1, bdr2));
+    return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2));
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>

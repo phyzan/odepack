@@ -26,7 +26,7 @@ public:
     const EventCollection<T>&               event_col() const;
     const Interpolator<T, N>*               interpolator() const;
     bool                                    is_interpolating() const;
-    State<const T>                          state() const;
+    State<T>                          state() const;
     bool                                    at_event() const;
     void                                    show_state(int prec=8) const;
 
@@ -132,7 +132,7 @@ bool RichSolver<Derived, T, N, SP>::is_interpolating() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-State<const T> RichSolver<Derived, T, N, SP>::state() const{
+State<T> RichSolver<Derived, T, N, SP>::state() const{
     switch (_event_idx) {
         case -1:
             return Base::state();
@@ -163,8 +163,8 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
 
     if (this->equiv_states()){
         if (Base::adv_impl()){
-            State<const T> last_state = {this->last_true_state_ptr(), this->Nsys()};
-            State<const T> true_state = {this->true_state_ptr(), this->Nsys()};
+            State<T> last_state = {this->last_true_state_ptr(), this->Nsys()};
+            State<T> true_state = {this->true_state_ptr(), this->Nsys()};
             _events.detect_all_between(last_state, true_state, interp_func<Derived, T, N, SP>, this);
             if (_interp_data){
                 std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);

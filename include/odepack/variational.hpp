@@ -51,7 +51,7 @@ public:
 
 private:
 
-    void _register_it(const EventState<T>& res, State<const T> before, State<const T> after) override;
+    void _register_it(const EventState<T>& res, State<T> before, State<T> after) override;
 
     T _t_renorm;
     T _t_last;
@@ -186,7 +186,7 @@ void NormalizationEvent<T>::reset(){
 }
 
 template<typename T>
-void NormalizationEvent<T>::_register_it(const EventState<T>& res, State<const T> before, State<const T> after){
+void NormalizationEvent<T>::_register_it(const EventState<T>& res, State<T> before, State<T> after){
     _t_last = _t_renorm;
     _logksi_last = _logksi;
     _dir_last = _dir;

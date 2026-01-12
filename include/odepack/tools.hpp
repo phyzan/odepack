@@ -80,91 +80,51 @@ private:
     Type* ptr;
 };
 
-enum class Memory : std::uint8_t { View, Own};
-
-template<typename T, Memory Mem=Memory::View>
-class State;
 
 
 template<typename T>
-class State<T, Memory::View>{
+class State{
 
-    //Does NOT own its data if Memory == Memory::View, only views it.
-    //Do not use this object if the underlying data have gove out of scope.
+    //provides a view of data, does not own it. The lifetime of a State object must be shorter
+    //than that of the underlying data, otherwise the program will crash or behave incorrectly
 
 public:
 
-    State(T* data, size_t Nsys) : _data(data), _nsys(Nsys) {}
+    State(const T* data, size_t Nsys) : _data(data), _nsys(Nsys) {}
 
-    const T& t() const{
+    inline const T& t() const{
         return _data[0];
     }
 
-    const T& habs() const{
+    inline const T& habs() const{
         return _data[1];
     }
 
-    const T* vector() const{
-        return _data+2;
-    }
-    
-    T* vector(){
+    inline const T* vector() const{
         return _data+2;
     }
 
-    size_t Nsys() const{
+    inline size_t Nsys() const{
         return _nsys;
-    }
-
-private:
-
-    T* _data;
-    size_t _nsys;
-};
-
-
-template<typename T>
-class State<T, Memory::Own> : private Array1D<T>{
-
-    //Does NOT own its data if Memory == Memory::View, only views it.
-    //Do not use this object if the underlying data have gove out of scope.
-
-    using Base = Array1D<T>;
-
-public:
-
-    State(const T* data, size_t Nsys) : Base(data, Nsys+2) {}
-
-    const T& t() const{
-        return this->data()[0];
-    }
-
-    const T& habs() const{
-        return this->data()[1];
-    }
-
-    const T* vector() const{
-        return this->data()+2;
-    }
-
-    T* vector(){
-        return this->data()+2;
-    }
-
-    size_t Nsys() const{
-        return this->size();
     }
 
 protected:
 
-    const T* data() const{
-        return Base::data();
+    const T* _data;
+    size_t _nsys;
+};
+
+template<typename T>
+class MutState : State<T>{
+
+    MutState(T* data, size_t Nsys) : State<T>(data, Nsys) {}
+
+    inline T* vector(){
+        return const_cast<T*>(this->_data)+2;
     }
 
-    T* data(){
-        return Base::data();
-    }
 };
+
 
 template<typename T>
 class EventState{
@@ -177,12 +137,12 @@ public:
         return data[0];
     }
 
-    State<const T> True() const{
+    State<T> True() const{
         return {data.data(), Nsys};
     }
 
-    State<const T> exposed() const{
-        return choose_true ? this->True() : State<const T>{data.data()+Nsys+2, Nsys};
+    State<T> exposed() const{
+        return choose_true ? this->True() : State<T>{data.data()+Nsys+2, Nsys};
     }
 
     T* true_vector(){

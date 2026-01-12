@@ -37,7 +37,7 @@ public:
 
     // ACCESSORS
     inline const T&             t() const;
-    inline View1D<T, N>   vector() const;
+    inline View1D<T, N>         vector() const;
     inline const T&             stepsize() const;
     inline int                  direction() const;
     inline const T&             rtol() const;
@@ -52,8 +52,10 @@ public:
     inline bool                 diverges() const;
     inline const std::string&   message() const;
     void                        show_state(int prec=8) const;
-    inline State<const T>       state() const;
-    inline State<const T>       ics() const;
+    inline State<T>             new_state() const;
+    inline State<T>             old_state() const;
+    inline State<T>             state() const;
+    inline State<T>             ics() const;
     bool                        validate_ics(T t0, const T* q0) const;
     const std::string&          method() const;
     inline void                 interp(T* result, const T& t) const;
@@ -292,13 +294,23 @@ inline void BaseSolver<Derived, T, N, SP>::show_state(int prec) const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline State<const T> BaseSolver<Derived, T, N, SP>::state() const{
-    return State<const T>(this->true_state_ptr(), this->Nsys());
+inline State<T> BaseSolver<Derived, T, N, SP>::new_state() const{
+    return State<T>(this->new_state_ptr(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline State<const T> BaseSolver<Derived, T, N, SP>::ics() const{
-    return State<const T>(this->ics_ptr(), this->Nsys());
+inline State<T> BaseSolver<Derived, T, N, SP>::old_state() const{
+    return State<T>(this->old_state_ptr(), this->Nsys());
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline State<T> BaseSolver<Derived, T, N, SP>::state() const{
+    return State<T>(this->true_state_ptr(), this->Nsys());
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline State<T> BaseSolver<Derived, T, N, SP>::ics() const{
+    return State<T>(this->ics_ptr(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>

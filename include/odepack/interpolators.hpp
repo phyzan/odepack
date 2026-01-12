@@ -425,7 +425,7 @@ void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y
 
 
 template<typename T>
-Interval<T>::Interval(const T& a, const T& b, int left_bdr, int right_bdr) : _a(a), _b(b), _h(b-a), _left(sgn(left_bdr)), _right(sgn(right_bdr)), _dir(sgn(b-a)){
+Interval<T>::Interval(const T& a, const T& b, int left_bdr, int right_bdr) : _a(a), _b(b), _h(b-a), _left(sgn(left_bdr)), _right(sgn(right_bdr)), _dir(sgn(a, b)){
     if (a == b){
         throw std::runtime_error("Zero interval not allowed");
     }
@@ -496,7 +496,7 @@ inline void Interval<T>::close_start(){
 
 template<typename T>
 inline void Interval<T>::adjust_start(const T& new_start){
-    if (sgn(_b-new_start) == _dir){
+    if (sgn(new_start, _b) == _dir){
         _a = new_start;
         _h = _b - _a;
     }
@@ -507,7 +507,7 @@ inline void Interval<T>::adjust_start(const T& new_start){
 
 template<typename T>
 inline void Interval<T>::adjust_end(const T& new_end){
-    if (sgn(new_end-_a) == _dir){
+    if (sgn(_a, new_end) == _dir){
         _b = new_end;
         _h = _b - _a;
     }

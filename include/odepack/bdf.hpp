@@ -286,8 +286,8 @@ BDFInterpolator<T, N>::BDFInterpolator(const T& t, const T* q, size_t nsys) : Lo
 template<typename T, size_t N>
 BDFInterpolator<T, N>::BDFInterpolator(const Array2D<T, 0, N>& D, size_t order, const T* state1, const T* state2, size_t nsys, int bdr1, int bdr2) : LocalInterpolator<T, N>(state1[0], state2[0], state1+2, state2+2, nsys, bdr1, bdr2), _order(order), _D(order+1, D.Ncols()) {
     int dir = sgn(state1[0], state2[0]);
-    _h = state2[1]*dir;
     _t2 = state2[0];
+    _h = state2[1]*dir;    
     copy_array(_D.data(), D.data(), _D.size()); //keeping the first (order+1) rows
 }
 

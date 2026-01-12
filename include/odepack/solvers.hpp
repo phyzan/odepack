@@ -3,11 +3,14 @@
 
 #include "dop853.hpp"
 #include "bdf.hpp"
+#include "euler.hpp"
 
 template<typename T, size_t N>
 std::unique_ptr<OdeRichSolver<T, N>> get_solver(const std::string& name, MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) {
-
-    if (name == "RK23") {
+    if (name == "Euler"){
+        return std::make_unique<Euler<T, N, SolverPolicy::RichVirtual>>(ode, t0, q0, nsys, first_step, dir, args, events);
+    }
+    else if (name == "RK23") {
         return std::make_unique<RK23<T, N, SolverPolicy::RichVirtual>>(ARGS, events);
     }
     else if (name == "RK45") {
