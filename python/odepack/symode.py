@@ -927,6 +927,24 @@ class OdeSystem:
         VariationalOdeSystem : Helper to create systems with explicit variational equations
         """
         return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, scalar_type=scalar_type)
+    
+    def get_var_solver(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double'):
+        '''
+        All events in the OdeSystem are ignored
+        '''
+        if compiled:
+            f, jac = self._pointers(scalar_type=scalar_type, variational=True)[:2]
+        else:
+            f, jac = self._var_odefunc, self._var_jac
+
+        if len(q0) != 2*self.Nsys:
+            raise ValueError(f"Invalid length of initial state vector : {len(q0)} instead of {2*self.Nsys}")
+        if period <= 0:
+            raise ValueError("Renormalization period must be positive")
+        if len(args) != len(self.args):
+            raise ValueError(f"The provided number of args must be {len(self.args), not {len(args)}}")
+
+        return VariationalSolver(f=f, jac=jac, t0=t0, q0=q0, period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, scalar_type=scalar_type)
 
     def lowlevel_odefunc(self, scalar_type='double'):
         """Get the compiled ODE right-hand side function.

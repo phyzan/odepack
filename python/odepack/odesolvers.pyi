@@ -829,6 +829,24 @@ class BDF(OdeSolver):
         pass
 
 
+class VariationalSolver(OdeSolver):
+
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
+        ...
+
+    @property
+    def logksi(self)->float:...
+
+    @property
+    def lyap(self)->float:...
+
+    @property
+    def t_lyap(self)->float:...
+
+    @property
+    def delta_s(self)->float:...
+
+
 class LowLevelODE:
     """
     Container for an ODE problem with dynamic solution history accumulation.

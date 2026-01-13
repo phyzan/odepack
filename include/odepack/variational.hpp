@@ -66,6 +66,45 @@ private:
     int _dir_last = 0;
 };
 
+
+template<typename T, size_t N>
+class VariationalSolver : public PolyWrapper<OdeRichSolver<T, N>>{
+
+    using Base = PolyWrapper<OdeRichSolver<T, N>>;
+
+public:
+
+    VariationalSolver(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, const std::string& method = "RK45") : Base() {
+        Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
+        normalized<T>(tmp.data(), nsys);
+        NormalizationEvent<T> event("Normalization", nsys, period);
+        nsys *= 2;
+        const T* q0 = tmp.data();
+        this->ptr = get_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, {&event}).release();
+    }
+
+    inline const NormalizationEvent<T>& main_event() const{
+        return static_cast<const NormalizationEvent<T>&>(this->ptr->event_col().event(1));
+    }
+
+    inline const T& logksi() const{
+        return this->main_event().logksi();
+    }
+
+    inline T lyap() const{
+        return this->main_event().lyap();
+    }
+
+    inline T t_lyap() const{
+        return this->main_event().t_lyap();
+    }
+
+    inline T delta_s() const{
+        return this->main_event().delta_s();
+    }
+
+};
+
 template<typename T, size_t N>
 class VariationalODE : public ODE<T, N>{
 

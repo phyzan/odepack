@@ -75,9 +75,11 @@ public:
         return tmp;
     }
 
-private:
+protected:
 
-    Type* ptr;
+    PolyWrapper()=default;
+
+    Type* ptr = nullptr;
 };
 
 

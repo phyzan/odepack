@@ -315,6 +315,75 @@ struct PySolver : DtypeDispatcher {
     bool is_lowlevel;
 };
 
+struct PyVarSolver : public PySolver{
+
+    PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const std::string& method, const std::string& scalar_type) : PySolver(scalar_type) {
+        EXECUTE(, this->init_var, (f, jac, t0, q0, period, rtol, atol, min_step, max_step, first_step, dir, args, method);, )
+    }
+
+    template<typename T>
+    void init_var(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const std::string& name){
+        std::vector<T> args;
+        OdeData<T> ode_data = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), py_q0, std::move(jac), py_args, py::list());
+        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        if ((q0.size() & 1) != 0){
+            throw py::value_error("Variational solvers require an even number of system size");
+        }
+        this->s = VariationalSolver<T, 0>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), first_step.cast<T>(), dir, args, name).release();
+    }
+
+    PyVarSolver(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+
+    DEFAULT_RULE_OF_FOUR(PyVarSolver)
+
+    template<typename T>
+    inline const NormalizationEvent<T>& main_event() const{
+
+        return static_cast<const NormalizationEvent<T>&>(reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(1));
+    }
+
+    inline py::object py_logksi() const{
+        return GET_ATTR(logksi);
+    }
+
+    inline py::object py_lyap() const{
+        return GET_ATTR(lyap);
+    }
+
+    inline py::object py_t_lyap() const{
+        return GET_ATTR(t_lyap);
+    }
+
+    inline py::object py_delta_s() const{
+        return GET_ATTR(delta_s);
+    }
+
+    template<typename T>
+    inline T logksi() const{
+        return this->main_event<T>().logksi();
+    }
+
+    template<typename T>
+    inline T lyap() const{
+        return this->main_event<T>().lyap();
+    }
+
+    template<typename T>
+    inline T t_lyap() const{
+        return this->main_event<T>().t_lyap();
+    }
+
+    template<typename T>
+    inline T delta_s() const{
+        return this->main_event<T>().delta_s();
+    }
+
+    py::object copy() const override{
+        return py::cast(PyVarSolver(*this));
+    }
+
+};
+
 
 struct PyRK23 : public PySolver{
 
