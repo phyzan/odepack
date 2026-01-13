@@ -929,9 +929,108 @@ class OdeSystem:
         return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, scalar_type=scalar_type)
     
     def get_var_solver(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double'):
-        '''
-        All events in the OdeSystem are ignored
-        '''
+        """Create a low-level VariationalSolver for step-by-step integration.
+
+        This method creates a VariationalSolver (low-level iterator) for variational
+        equations, bypassing the history-accumulating wrapper. Unlike get_variational()
+        which returns VariationalLowLevelODE (high-level with history), this returns
+        the underlying VariationalSolver that maintains only current state.
+
+        All events defined in the OdeSystem are ignored. The solver only includes
+        the automatic normalization event required for Lyapunov exponent calculation.
+
+        The variational system integrates 2*Nsys equations: the first Nsys equations
+        are the original system, and the last Nsys are the linearized perturbation
+        equations. The perturbation is automatically normalized at initialization and
+        periodically during integration.
+
+        Parameters
+        ----------
+        t0 : float
+            Initial time
+        q0 : np.ndarray
+            Initial state vector for the augmented system. Must have length 2*Nsys.
+            The first Nsys elements are the initial conditions for the base system.
+            The last Nsys elements specify the direction of the variational vector
+            (does not need to be normalized; automatic normalization is applied).
+        period : float
+            Renormalization period for the variational state. The variational
+            part is normalized to unit length every 'period' time units to
+            prevent numerical overflow. Must be positive. Used for Lyapunov
+            exponent calculation.
+        rtol : float, default 1e-6
+            Relative tolerance for the integrator
+        atol : float, default 1e-12
+            Absolute tolerance for the integrator
+        min_step : float, default 0.
+            Minimum allowed step size
+        max_step : float, default np.inf
+            Maximum allowed step size
+        first_step : float, default 0.
+            Suggested first step size
+        direction : {-1, 1}, default 1
+            Integration direction: 1 for forward, -1 for backward
+        args : tuple, default ()
+            Parameter values. Must have length equal to Nargs.
+        method : str, default "RK45"
+            Integration method: "RK23", "RK45", "DOP853", "BDF"
+        compiled : bool, default True
+            Use compiled C++ functions (much faster). If False, uses Python functions.
+        scalar_type : str, default 'double'
+            Scalar type for computation:
+            - 'double': IEEE 754 double precision
+            - 'float': IEEE 754 single precision
+            - 'long double': Extended precision
+            - 'mpreal': Arbitrary precision via MPFR library
+
+        Returns
+        -------
+        VariationalSolver
+            A low-level solver for step-by-step integration. Access current state
+            via solver.t, solver.q. Advance with solver.advance(). Access Lyapunov
+            metrics via solver.logksi, solver.lyap, solver.t_lyap, solver.delta_s.
+
+        Raises
+        ------
+        ValueError
+            If q0 length is not 2*Nsys
+            If period is not positive
+            If args length doesn't match Nargs
+
+        Notes
+        -----
+        This is a low-level method for advanced users who need direct access to the
+        solver iterator without history accumulation. For typical use cases, prefer
+        get_variational() which provides a higher-level interface with full integration
+        history.
+
+        The returned VariationalSolver maintains only current state (t, q, logksi, lyap,
+        etc.) and does not accumulate integration history. Use this when you need
+        fine-grained control over integration or want to minimize memory usage.
+
+        Examples
+        --------
+        Create a low-level variational solver:
+
+        >>> from odepack import *
+        >>> t, x, v = symbols('t, x, v')
+        >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
+        >>> # Initial state: [x0, v0, dx, dv]
+        >>> q0 = np.array([1.0, 0.0, 1.0, 0.0])
+        >>> solver = system.get_var_solver(
+        ...     t0=0, q0=q0, period=1.0, compiled=True
+        ... )
+        >>> # Step through integration manually
+        >>> for _ in range(100):
+        ...     solver.advance()
+        >>> print(f"t={solver.t:.3f}, Lyapunov={solver.lyap:.6f}")
+
+        See Also
+        --------
+        get_variational : High-level method returning VariationalLowLevelODE with history
+        VariationalSolver : The returned solver class
+        VariationalLowLevelODE : High-level wrapper with history accumulation
+        """
         if compiled:
             f, jac = self._pointers(scalar_type=scalar_type, variational=True)[:2]
         else:

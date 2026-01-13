@@ -830,21 +830,196 @@ class BDF(OdeSolver):
 
 
 class VariationalSolver(OdeSolver):
+    """
+    Low-level ODE solver for variational equations with real-time Lyapunov exponent tracking.
+
+    VariationalSolver is the step-by-step iterator for variational equations, similar to
+    how OdeSolver iterates through standard ODE solutions. Unlike VariationalLowLevelODE
+    (which accumulates full integration history), VariationalSolver maintains only the
+    current state and provides real-time access to Lyapunov exponent calculations.
+
+    This class integrates both the primary system and its variational equations
+    (linearized perturbation dynamics) simultaneously. At regular intervals (determined
+    by the period parameter), the variational state is renormalized to prevent numerical
+    overflow, and Lyapunov exponent metrics are updated.
+
+    The state vector has even length: the first half is the primary state, the second
+    half is the variational state (perturbation vector). The variational state is
+    automatically normalized to unit length at initialization and at each renormalization.
+
+    Parameters
+    ----------
+    f : callable
+        Right-hand side function for the augmented variational system: f(t, q, *args) -> array.
+        The input q has even length (primary state + variational state), and the output
+        must match this length. Typically obtained from compiled variational equations.
+
+    jac : callable
+        Jacobian matrix function for the augmented system: jac(t, q, *args) -> matrix.
+        Required for BDF method. The Jacobian should have shape (2*Nsys, 2*Nsys) for
+        the augmented variational system.
+
+    t0 : float
+        Initial time.
+
+    q0 : np.ndarray
+        Initial state vector with even length. The first half is the primary state,
+        the second half is the initial perturbation direction. The perturbation is
+        automatically normalized to unit length at initialization.
+
+    period : float
+        Renormalization period for the variational state. The perturbation vector is
+        renormalized to unit length every 'period' time units. The growth rate at each
+        renormalization contributes to the Lyapunov exponent calculation.
+
+    rtol : float, optional
+        Relative tolerance for adaptive step control. Default is 1e-12.
+
+    atol : float, optional
+        Absolute tolerance for adaptive step control. Default is 1e-12.
+
+    min_step : float, optional
+        Minimum allowed step size. Default is 0 (no minimum).
+
+    max_step : float, optional
+        Maximum allowed step size. Default is None (no limit).
+
+    first_step : float, optional
+        Initial step size estimate. If 0 (default), automatically determined.
+
+    direction : {-1, 1}, optional
+        Integration direction. 1 for forward (default), -1 for backward.
+
+    args : tuple, optional
+        Extra arguments passed to f and jac. Default is ().
+
+    method : str, optional
+        Integration method: "RK23", "RK45" (default), "DOP853", or "BDF".
+
+    scalar_type : str, optional
+        Numerical precision: "double" (default), "float", "long double", or "mpreal".
+
+    Attributes
+    ----------
+    t : float
+        Current integration time (inherited from OdeSolver).
+
+    q : np.ndarray
+        Current state vector (primary state + variational state) (inherited from OdeSolver).
+
+    logksi : float
+        Cumulative logarithm of the variational state norm growth.
+        This is the sum of log(|delta_q|) at each renormalization event.
+
+    lyap : float
+        Current estimate of the Lyapunov exponent: logksi / t_lyap.
+        This is the average exponential growth rate of the perturbation.
+
+    t_lyap : float
+        Total time elapsed for Lyapunov exponent computation.
+        This is the time since the first renormalization event.
+
+    delta_s : float
+        Most recent logarithmic growth "kick" from the last renormalization:
+        delta_s = log(|delta_q|) before normalization.
+
+    Notes
+    -----
+    This is a low-level iterator class. For most use cases, prefer using
+    OdeSystem.get_variational() which returns VariationalLowLevelODE (a higher-level
+    wrapper that accumulates history).
+
+    The Lyapunov exponent is computed as:
+    lambda = logksi / t_lyap = (1/T) * sum(log(|delta_q_i|))
+
+    Positive Lyapunov exponents indicate chaos, negative indicate stability, and
+    zero indicates neutral directions.
+
+    Examples
+    --------
+    Create a variational solver for a simple oscillator:
+
+    >>> from odepack import *
+    >>> t, x, v = symbols('t, x, v')
+    >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
+    >>> # Get compiled variational functions
+    >>> f_ptr, jac_ptr = system._pointers(scalar_type='double', variational=True)[:2]
+    >>> # Initial state: [x0, v0, dx, dv]
+    >>> q0 = np.array([1.0, 0.0, 1.0, 0.0])
+    >>> solver = VariationalSolver(
+    ...     f=f_ptr, jac=jac_ptr, t0=0, q0=q0, period=1.0,
+    ...     method="RK45", scalar_type="double"
+    ... )
+    >>> # Step through integration
+    >>> while solver.t < 10.0:
+    ...     solver.advance()
+    >>> print(f"Lyapunov exponent: {solver.lyap}")
+
+    See Also
+    --------
+    VariationalLowLevelODE : High-level wrapper with history accumulation
+    OdeSystem.get_variational : Recommended way to create variational solvers
+    OdeSystem.get_var_solver : Alternative method returning VariationalSolver directly
+    OdeSolver : Base class for step-by-step ODE integration
+    """
 
     def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
         ...
 
     @property
-    def logksi(self)->float:...
+    def logksi(self)->float:
+        """
+        Cumulative logarithm of variational state norm growth.
+
+        Returns
+        -------
+        float
+            Sum of log(|delta_q|) over all renormalization events, where delta_q is
+            the variational state vector before normalization. This accumulates the
+            total logarithmic growth of the perturbation.
+        """
+        ...
 
     @property
-    def lyap(self)->float:...
+    def lyap(self)->float:
+        """
+        Current Lyapunov exponent estimate.
+
+        Returns
+        -------
+        float
+            The Lyapunov exponent: logksi / t_lyap. This is the average exponential
+            growth rate of perturbations. Positive values indicate chaos, negative
+            values indicate stability, and values near zero indicate neutral dynamics.
+        """
+        ...
 
     @property
-    def t_lyap(self)->float:...
+    def t_lyap(self)->float:
+        """
+        Total time elapsed for Lyapunov exponent computation.
+
+        Returns
+        -------
+        float
+            Time since the first renormalization event. Used as the denominator in
+            the Lyapunov exponent calculation: lyap = logksi / t_lyap.
+        """
+        ...
 
     @property
-    def delta_s(self)->float:...
+    def delta_s(self)->float:
+        """
+        Most recent logarithmic growth from the last renormalization.
+
+        Returns
+        -------
+        float
+            The logarithm of the variational state norm at the most recent
+            renormalization: log(|delta_q|). This represents the "kick" or
+            instantaneous growth contribution from the last renormalization period.
+        """
+        ...
 
 
 class LowLevelODE:
@@ -1704,6 +1879,77 @@ def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Ite
     >>> integrate_all(odes, interval=10.0, threads=8)
     >>> # Now each ode has integrated results in ode.t and ode.q
     >>> print(f"First ODE reached t={odes[0].t[-1]:.3f}")
+    """
+    ...
+
+def advance_all(solvers: Iterable[OdeSolver], t_goal: float, threads=-1, display_progress = False)->None:
+    """
+    Advance multiple OdeSolver objects to a target time in parallel.
+
+    This function provides efficient batch advancement of low-level OdeSolver objects
+    using multi-threaded parallelization. Unlike integrate_all which operates on
+    LowLevelODE objects (which accumulate integration history), advance_all operates
+    on the underlying OdeSolver objects which maintain only their current state.
+
+    Each OdeSolver is advanced step-by-step from its current time to the target time
+    t_goal, updating only its internal state (t, q, t_old, q_old) at each step without
+    accumulating history. This is useful for advancing solvers obtained via the
+    LowLevelODE.solver() method or when working directly with step-by-step integration.
+
+    All solvers must use compiled functions (compiled=True). Solvers with different
+    scalar types (double, float, long double, mpreal) are automatically grouped for
+    efficient processing.
+
+    Parameters
+    ----------
+    solvers : iterable of OdeSolver
+        Collection of OdeSolver objects to advance. Each solver will be advanced from
+        its current time to t_goal. All solvers must use compiled functions (not pure
+        Python functions). Can include RK23, RK45, DOP853, BDF, or VariationalSolver.
+
+    t_goal : float
+        Target time. Each solver advances from its current time (solver.t) to this
+        target time using its adaptive stepping algorithm.
+
+    threads : int, optional
+        Number of worker threads for parallel execution.
+        - 0 or -1 (default): Use number of CPU threads
+        - n >= 1: Use n threads
+
+    display_progress : bool, optional
+        If True, print progress information during advancement. Default is False.
+
+    Raises
+    ------
+    ValueError
+        If any solver uses pure Python functions (compiled=False).
+        If a list item is not a recognized OdeSolver object type.
+
+    Notes
+    -----
+    All solvers are advanced synchronously. The function returns when all have
+    reached t_goal.
+
+    Unlike integrate_all (which works with LowLevelODE objects that accumulate
+    integration history), advance_all works with the underlying OdeSolver objects
+    that only maintain current state (t, q, t_old, q_old). The solvers are modified
+    in place.
+
+    Examples
+    --------
+    Advance multiple solvers to the same target time:
+
+    >>> from odepack import *
+    >>> t, x, v = symbols('t, x, v')
+    >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
+    >>> # Create LowLevelODE objects
+    >>> odes = [system.get(t0=0, q0=[1.0+0.01*i, 0.0], compiled=True) for i in range(10)]
+    >>> # Extract underlying solvers
+    >>> solvers = [ode.solver() for ode in odes]
+    >>> # Advance all solvers to t=10.0
+    >>> advance_all(solvers, t_goal=10.0, threads=4)
+    >>> # Check final states
+    >>> print(f"First solver at t={solvers[0].t:.3f}, q={solvers[0].q}")
     """
     ...
 

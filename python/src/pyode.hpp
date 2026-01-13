@@ -676,7 +676,9 @@ public:
 };
 
 
-void py_integrate_all(const py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress);
+void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress);
+
+void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress);
 
 /*
 IMPLEMENTATIONS

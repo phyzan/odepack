@@ -411,7 +411,7 @@ bool all_are_lowlevel(const py::iterable& events){
 }
 
 
-void py_integrate_all(const py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
+void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
     // Separate lists for each numeric type
     std::vector<ODE<double, 0>*> array_double;
     std::vector<ODE<float, 0>*> array_float;
@@ -466,6 +466,58 @@ void py_integrate_all(const py::object& list, double interval, const py::object&
     if (!array_mpreal.empty()) {
         integrate_all<mpfr::mpreal, 0>(array_mpreal, mpfr::mpreal(interval), to_step_sequence<mpfr::mpreal>(t_eval), options, threads, display_progress);
     }
+}
+
+void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress){
+    // Separate lists for each numeric type
+    std::vector<OdeSolver<double, 0>*> array_double;
+    std::vector<OdeSolver<float, 0>*> array_float;
+    std::vector<OdeSolver<long double, 0>*> array_longdouble;
+    std::vector<OdeSolver<mpfr::mpreal, 0>*> array_mpreal;
+
+    // Iterate through the list and identify each PySolver type
+    for (const py::handle& item : list) {
+        try {
+            auto& pysolver = item.cast<PySolver&>();
+
+            // Use the scalar_type to determine which array to add to
+            if (!pysolver.is_lowlevel) {
+                throw py::value_error("All ODE's in advance_all must use only compiled functions, and no pure python functions");
+            }
+            switch (pysolver.scalar_type) {
+                case 0:
+                    array_double.push_back(reinterpret_cast<OdeSolver<double>*>(pysolver.s));
+                    break;
+                case 1:
+                    array_longdouble.push_back(reinterpret_cast<OdeSolver<long double>*>(pysolver.s));
+                    break;
+                case 2:
+                    array_mpreal.push_back(reinterpret_cast<OdeSolver<mpfr::mpreal>*>(pysolver.s));
+                    break;
+                case 3:
+                    array_float.push_back(reinterpret_cast<OdeSolver<float>*>(pysolver.s));
+                    break;
+                default:
+                    throw py::value_error("Unregistered scalar_type in PySolver object.");
+            }
+        } catch (const py::cast_error&) {
+            // If cast failed, throw an error
+            throw py::value_error("List item is not a recognized PySolver object type.");
+        }
+    }
+
+    // Call integrate_all for each type group that has elements
+    if (!array_double.empty()) {
+        advance_all<double, 0>(array_double, t_goal, threads, display_progress);
+    }
+    if (!array_float.empty()) {
+        advance_all<float, 0>(array_float, float(t_goal), threads, display_progress);
+    }
+    if (!array_longdouble.empty()) {
+        advance_all<long double, 0>(array_longdouble, (long double)(t_goal), threads, display_progress);
+    }
+    if (!array_mpreal.empty()) {
+        advance_all<mpfr::mpreal, 0>(array_mpreal, t_goal, threads, display_progress);    }
 }
 
 
@@ -736,6 +788,8 @@ PYBIND11_MODULE(odesolvers, m) {
 
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
+
+    m.def("advance_all", &py_advance_all, py::arg("solvers"), py::arg("t_goal"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
     m.def("set_mpreal_prec",
       &mpfr::mpreal::set_default_prec,
