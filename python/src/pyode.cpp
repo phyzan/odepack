@@ -532,6 +532,8 @@ PYBIND11_MODULE(odesolvers, m) {
     py::class_<PySolver>(m, "OdeSolver")
         .def_property_readonly("t", &PySolver::t)
         .def_property_readonly("q", &PySolver::q)
+        .def_property_readonly("t_old", &PySolver::t_old)
+        .def_property_readonly("q_old", &PySolver::q_old)
         .def_property_readonly("stepsize", &PySolver::stepsize)
         .def_property_readonly("diverges", &PySolver::diverges)
         .def_property_readonly("is_dead", &PySolver::is_dead)

@@ -324,12 +324,32 @@ class OdeSolver:
     @property
     def q(self)->np.ndarray:
         """
-        The current solution state vector.
+        The current state vector.
 
         Returns
         -------
         np.ndarray
             State vector q(t) at the current time, with the same shape as initial condition.
+        """
+        pass
+
+    @property
+    def t_old(self)->float:
+        """
+        The previous integration time that was automatically adapted using the solver's method.
+        Events are not considered.
+
+        Returns
+        -------
+        float
+            Value of the integration variable at the step before the current one.
+        """
+        pass
+
+    @property
+    def q_old(self)->np.ndarray:
+        """
+        The previous state vector before the current step, corresponding to t_old.
         """
         pass
 

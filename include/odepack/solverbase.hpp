@@ -37,7 +37,9 @@ public:
 
     // ACCESSORS
     inline const T&             t() const;
+    const T&                    t_old() const;
     inline View1D<T, N>         vector() const;
+    inline View1D<T, N>         vector_old() const;
     inline const T&             stepsize() const;
     inline int                  direction() const;
     inline const T&             rtol() const;
@@ -109,7 +111,6 @@ protected:
     inline const T*             last_true_state_ptr() const;
 
     const T&                    t_new() const;
-    const T&                    t_old() const;
     const T&                    t_last() const;
     void                        warn_paused() const;
     void                        warn_dead() const;
@@ -122,7 +123,7 @@ protected:
 
     //============================= OVERRIDEN IN RICH SOLVER ==========================
     inline const T&             t_impl() const;
-    inline View1D<T, N>   vector_impl() const;
+    inline View1D<T, N>         vector_impl() const;
     inline bool                 adv_impl();
     //=================================================================================
 
@@ -221,6 +222,11 @@ inline const T& BaseSolver<Derived, T, N, SP>::t() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline View1D<T, N> BaseSolver<Derived, T, N, SP>::vector() const{
     return THIS_C->vector_impl();
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline View1D<T, N> BaseSolver<Derived, T, N, SP>::vector_old() const{
+    return View1D<T, N>(this->old_state_ptr()+2, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>

@@ -223,8 +223,16 @@ struct PySolver : DtypeDispatcher {
         PY_GET(OdeRichSolver, this->s, ->t())
     }
 
+    py::object t_old() const{
+        PY_GET(OdeRichSolver, this->s, ->t_old())
+    }
+
     py::object q() const{
         PY_GET(OdeRichSolver, this->s, ->vector())
+    }
+
+    py::object q_old() const{
+        PY_GET(OdeRichSolver, this->s, ->vector_old())
     }
 
     py::object stepsize() const{
