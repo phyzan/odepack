@@ -28,58 +28,76 @@ class PolyWrapper{
 
 public:
     
-    PolyWrapper(Type* object) : ptr(object) {}
+    PolyWrapper(Type* object) : _ptr(object) {}
 
-    PolyWrapper(const PolyWrapper& other) : ptr(other.new_ptr()) {}
+    PolyWrapper(const PolyWrapper& other) : _ptr(other.new_ptr()) {}
 
-    PolyWrapper(PolyWrapper&& other) noexcept : ptr(other.release()) {}
+    PolyWrapper(PolyWrapper&& other) noexcept : _ptr(other.release()) {}
 
     PolyWrapper& operator=(const PolyWrapper& other){
         if (&other != this){
-            delete ptr;
-            ptr = other.new_ptr();
+            delete _ptr;
+            _ptr = other.new_ptr();
         }
         return *this;
     }
 
     PolyWrapper& operator=(PolyWrapper&& other) noexcept{
         if (&other != this){
-            delete ptr;
-            ptr = other.release();
+            delete _ptr;
+            _ptr = other.release();
         }
         return *this;
     }
 
-    ~PolyWrapper(){
-        delete ptr;
-        ptr = nullptr;
+    inline ~PolyWrapper(){
+        delete _ptr;
+        _ptr = nullptr;
     }
     
     inline Type* operator->(){
-        assert(ptr != nullptr && "pointer is null");
-        return ptr;
+        assert(_ptr != nullptr && "pointer is null");
+        return _ptr;
     }
 
     inline const Type* operator->() const{
-        assert(ptr != nullptr && "pointer is null");
-        return ptr;
+        assert(_ptr != nullptr && "pointer is null");
+        return _ptr;
+    }
+
+    inline const Type* ptr() const{
+        return _ptr;
+    }
+
+    inline Type* ptr() {
+        return _ptr;
     }
 
     inline Type* new_ptr() const{
-        return ptr == nullptr ? nullptr : ptr->clone();
+        return _ptr == nullptr ? nullptr : _ptr->clone();
     }
 
     inline Type* release() {
-        Type* tmp = ptr;
-        ptr = nullptr;
+        Type* tmp = _ptr;
+        _ptr = nullptr;
         return tmp;
     }
 
+    template<typename Base>
+    inline Base* cast(){
+        return dynamic_cast<Base*>(this->_ptr);
+    }
+
+    inline void own(Type* ptr){
+        delete _ptr;
+        _ptr = ptr;
+    }
+
+    PolyWrapper() = default;
+    
 protected:
 
-    PolyWrapper()=default;
-
-    Type* ptr = nullptr;
+    Type* _ptr = nullptr;
 };
 
 

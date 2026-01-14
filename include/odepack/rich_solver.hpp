@@ -245,11 +245,12 @@ bool RichSolver<Derived, T, N, SP>::advance_to_event(){
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void RichSolver<Derived, T, N, SP>::set_tmax(T tmax){
     _events.set_tmax(tmax);
-    if (tmax != this->t()){
+    if (tmax*this->direction() > this->t()*this->direction()){
         this->resume();
-    }
-    else{
+    } else if (tmax == this->t()){
         this->stop("t-goal");
+    } else{
+        throw std::runtime_error("Cannot integrate to given tmax, as it requires integration to the opposite direction");
     }
 }
 

@@ -80,7 +80,7 @@ public:
         NormalizationEvent<T> event("Normalization", nsys, period);
         nsys *= 2;
         const T* q0 = tmp.data();
-        this->ptr = get_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, {&event}).release();
+        this->_ptr = get_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, {&event}).release();
     }
 
     inline const NormalizationEvent<T>& main_event() const{

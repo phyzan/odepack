@@ -215,6 +215,8 @@ protected:
 template<typename T>
 bool discard_event(const Event<T>& event, const Event<T>& mark);
 
+template<typename T>
+using AnyEvent = PolyWrapper<Event<T>>;
 
 template<typename T>
 class EventView : private View1D<size_t>{
@@ -223,18 +225,18 @@ class EventView : private View1D<size_t>{
 
 public:
 
-    EventView(const Event<T>*const* events, const size_t* detection, size_t size) : Base(detection, size), event_data(events) {};
+    EventView(const AnyEvent<T>* events, const size_t* detection, size_t size) : Base(detection, size), event_data(events) {};
 
     template<std::integral Int>
     const Event<T>* operator[](Int i) const{
-        return event_data[Base::operator[](i)];
+        return event_data[Base::operator[](i)].ptr();
     }
 
     size_t size() const{
         return Base::size();
     }
 
-    const Event<T>*const* event_data;
+    const AnyEvent<T>* event_data;
 
 };
 
@@ -245,22 +247,15 @@ class EventCollection{
 
 public:
 
-    template<typename EventIterator>
-    EventCollection(const EventIterator& events);
+    EventCollection(const Event<T>*const* events, size_t size);
 
-    EventCollection(std::initializer_list<const Event<T>*> events);
+    EventCollection(const std::vector<const Event<T>*>& events);
 
     EventCollection() = default;
 
-    EventCollection(const EventCollection& other);
+    DEFAULT_RULE_OF_FOUR(EventCollection)
 
-    EventCollection(EventCollection&& other) noexcept;
-
-    ~EventCollection();
-
-    EventCollection<T>& operator=(const EventCollection<T>& other);
-
-    EventCollection<T>& operator=(EventCollection<T>&& other) noexcept;
+    ~EventCollection() = default;
 
     inline const Event<T>& event(size_t i) const;
 
@@ -300,31 +295,19 @@ public:
 
 private:
 
-    void _realloc(size_t events);
-
-    void _clear();
-
-    template<typename Iterator>
-    void _clone_events(const Iterator& events);
-
-    void _copy(const EventCollection<T>& other);
-
     bool _is_prioritized(size_t i, size_t j, int dir);
 
-    Event<T>** _events = nullptr;
-    std::unordered_set<std::string> _names;
-    EventState<T>* _states = nullptr;
-    size_t _N_tot=0;
+    Array1D<AnyEvent<T>>    _events;
+    Array1D<EventState<T>>  _states;
+    Array1D<size_t>         _event_idx;
+    Array1D<size_t>         _event_idx_start;
 
     //member variables that concern event detection
-    size_t _N_detect=0;
-    size_t _Nt=0;
-    size_t _canon_idx;
-    size_t* _event_idx=nullptr;
-    size_t* _event_idx_start=nullptr;
-
+    size_t                  _canon_idx;
+    size_t                  _N_detect=0;
+    size_t                  _Nt=0;
     //iteration variable
-    size_t _iter=0;
+    size_t                  _iter=0;
 
 };
 
@@ -665,72 +648,28 @@ bool discard_event(const Event<T>& event, const Event<T>& mark){
 
 // EventCollection implementations
 template<typename T>
-template<typename EventIterator>
-EventCollection<T>::EventCollection(const EventIterator& events) {
-    _realloc(events.size());
-    _clone_events(events.begin());
-}
+EventCollection<T>::EventCollection(const std::vector<const Event<T>*>& events) : EventCollection(events.data(), events.size()) {}
 
 template<typename T>
-EventCollection<T>::EventCollection(std::initializer_list<const Event<T>*> events){
-    _realloc(events.size());
-    _clone_events(events.begin());
-}
+EventCollection<T>::EventCollection(const Event<T>*const* events, size_t size) : _events(size), _states(size), _event_idx(size), _event_idx_start(size+1), _canon_idx(size) {
+    if (size == 0){return;}
 
-template<typename T>
-EventCollection<T>::EventCollection(const EventCollection& other){
-    _copy(other);
-}
-
-template<typename T>
-EventCollection<T>::EventCollection(EventCollection&& other) noexcept: _events(other._events), _names(std::move(other._names)), _states(other._states), _N_tot(other._N_tot), _N_detect(other._N_detect), _Nt(other._Nt), _canon_idx(other._canon_idx), _event_idx(other._event_idx), _event_idx_start(other._event_idx_start), _iter(other._iter){
-    other._events = nullptr;
-    other._states = nullptr;
-    other._event_idx = nullptr;
-    other._event_idx_start = nullptr;
-    other._N_tot = 0;
-}
-
-template<typename T>
-EventCollection<T>::~EventCollection(){
-    _clear();
-}
-
-template<typename T>
-EventCollection<T>& EventCollection<T>::operator=(const EventCollection<T>& other){
-    if (&other != this){
-        _copy(other);
+    for (size_t i=0; i<size-1; i++){
+        for (size_t j=i+1; j<size; j++){
+            if (events[i]->name() == events[j]->name()){
+                throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
+            }
+        }
     }
-    return *this;
-}
 
-template<typename T>
-EventCollection<T>& EventCollection<T>::operator=(EventCollection<T>&& other) noexcept {
-    if (&other != this){
-        _clear();
-        _events = other._events;
-        _names = std::move(other._names);
-        _states = other._states;
-        _N_tot = other._N_tot;
-        _N_detect = other._N_detect;
-        _Nt = other._Nt;
-        _canon_idx = other._canon_idx;
-        _event_idx = other._event_idx;
-        _event_idx_start = other._event_idx_start;
-        _iter = other._iter;
-
-        other._events = nullptr;
-        other._states = nullptr;
-        other._event_idx = nullptr;
-        other._event_idx_start = nullptr;
-        other._N_tot = 0;
+    for (size_t i=0; i<size; i++){
+        _events[i].own(events[i]->clone());
     }
-    return *this;
 }
 
 template<typename T>
 inline const Event<T>& EventCollection<T>::event(size_t i) const{
-    return *_events[i];
+    return *_events[i].ptr();
 }
 
 template<typename T>
@@ -740,7 +679,7 @@ inline const EventState<T>& EventCollection<T>::state(size_t i) const{
 
 template<typename T>
 inline size_t EventCollection<T>::size()const{
-    return _N_tot;
+    return _events.size();
 }
 
 template<typename T>
@@ -756,7 +695,7 @@ inline size_t EventCollection<T>::detection_times() const{
 template<typename T>
 void EventCollection<T>::set_tmax(T tmax){
     if (this->size() > 0){
-        if (auto* p = dynamic_cast<TmaxEvent<T>*>(_events[0])){
+        if (TmaxEvent<T>* p = _events[0].template cast<TmaxEvent<T>>()){
             p->set_goal(tmax);
         }
     }
@@ -764,15 +703,15 @@ void EventCollection<T>::set_tmax(T tmax){
 
 template<typename T>
 void EventCollection<T>::set_array_size(size_t size) {
-    for (size_t i=0; i<_N_tot; i++){
+    for (size_t i=0; i< this->size(); i++){
         _states[i].resize(size);
-        _events[i]->set_aux_array_size(size);
+        _events[i] ->set_aux_array_size(size);
     }
 }
 
 template<typename T>
 void EventCollection<T>::detect_all_between(State<T> before, State<T> after, FuncLike<T> q, const void* obj){
-    if (_N_tot == 0){
+    if (this->size() == 0){
         return;
     }
 
@@ -781,7 +720,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
     _N_detect = 0; //this is how many events have been triggered, and is the next available index in _event_idx_start
     for (size_t i=0; i<this->size(); i++){
         EventState<T>& event = _states[i];
-        Event<T>* event_obj = _events[i];
+        Event<T>* event_obj = _events[i].ptr();
         if (event_obj->determine(event, before, after, q, obj)){
             long int j=static_cast<long int>(_N_detect)-1;
             while (j>=0 && _is_prioritized(i, j, dir)){
@@ -794,13 +733,13 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
     }
 
     //discard "bad" events after the event that determines the main state vector
-    size_t mark = _N_tot;
+    size_t mark = this->size();
     size_t i=0;
     while (i<_N_detect){
-        if ((mark!=_N_tot) && (state(_event_idx[i]).t() != state(_event_idx[mark]).t())){
-            mark = _N_tot;
+        if ((mark!=this->size()) && (state(_event_idx[i]).t() != state(_event_idx[mark]).t())){
+            mark = this->size();
         }
-        if ((mark==_N_tot) && !event(_event_idx[i]).is_pure_temporal()){
+        if ((mark==this->size()) && !event(_event_idx[i]).is_pure_temporal()){
             mark = i;
         }
         else if (!event(_event_idx[i]).is_pure_temporal()){
@@ -818,7 +757,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
 
     //split the rest of events in groups of identical detection times and find canon (masked) event
     i=0;
-    _canon_idx = _N_tot;
+    _canon_idx = this->size();
     _Nt = (_N_detect>0 ? 1 : 0);
     _event_idx_start[0] = 0;
     while (i<_N_detect){
@@ -850,17 +789,17 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
 
 template<typename T>
 EventView<T> EventCollection<T>::event_view() const{
-    return (_iter < _Nt) ? EventView<T>(_events, _event_idx + _event_idx_start[_iter], this->detection_size()) : EventView<T>(nullptr, nullptr, 0);
+    return (_iter < _Nt) ? EventView<T>(_events.data(), _event_idx.data() + _event_idx_start[_iter], this->detection_size()) : EventView<T>(nullptr, nullptr, 0);
 }
 
 template<typename T>
 const size_t* EventCollection<T>::begin() const{
-    return (_iter < _Nt) ? _event_idx + _event_idx_start[_iter] : nullptr;
+    return (_iter < _Nt) ? _event_idx.data() + _event_idx_start[_iter] : nullptr;
 }
 
 template<typename T>
 const size_t* EventCollection<T>::end() const{
-    return (_iter < _Nt) ? _event_idx + _event_idx_start[_iter+1] : nullptr;
+    return (_iter < _Nt) ? _event_idx.data() + _event_idx_start[_iter+1] : nullptr;
 }
 
 template<typename T>
@@ -882,18 +821,18 @@ inline void EventCollection<T>::restart_iter(){
 
 template<typename T>
 const Event<T>* EventCollection<T>::canon_event() const{
-    return _canon_idx == _N_tot ? nullptr : _events[_canon_idx];
+    return _canon_idx == this->size() ? nullptr : _events[_canon_idx].ptr();
 }
 
 template<typename T>
 const EventState<T>* EventCollection<T>::canon_state() const{
-    return _canon_idx == _N_tot ? nullptr : _states+_canon_idx;
+    return _canon_idx == this->size() ? nullptr : _states.data()+_canon_idx;
 }
 
 template<typename T>
 void EventCollection<T>::set_start(T t0, int dir){
     for (size_t i=0; i<this->size(); i++){
-        if (auto* p = dynamic_cast<PeriodicEvent<T>*>(_events[i])){
+        if (PeriodicEvent<T>* p = _events[i].template cast<PeriodicEvent<T>>()){
             if (!is_finite(p->t_start())){
                 p->set_start(t0+p->period()*dir);
             }
@@ -914,11 +853,11 @@ void EventCollection<T>::set_args(const T* args, size_t size){
 template<typename T>
 void EventCollection<T>::reset(){
     size_t arr_size;
-    if (this->_N_tot > 0){
+    if (this->size() > 0){
         arr_size = _states[0].nsys();
     }
 
-    for (size_t i=0; i<_N_tot; i++){
+    for (size_t i=0; i<this->size(); i++){
         _events[i]->reset();
         _states[i] = EventState<T>();
         _event_idx[i] = 0;
@@ -928,71 +867,12 @@ void EventCollection<T>::reset(){
     this->set_array_size(arr_size);
     _N_detect = 0;
     _Nt = 0;
-    _canon_idx = _N_tot;
+    _canon_idx = this->size();
     _iter = 0;
-    _event_idx_start[_N_tot] = 0;
+    _event_idx_start[this->size()] = 0;
 }
 
-template<typename T>
-void EventCollection<T>::_realloc(size_t events){
-    _clear();
-    _events = new Event<T>*[events];
-    _states = new EventState<T>[events];
-    _event_idx = new size_t[events];
-    _event_idx_start = new size_t[events+1];
-    _N_tot = events;
-    _canon_idx = _N_tot;
-}
 
-template<typename T>
-void EventCollection<T>::_clear(){
-    for (size_t i=0; i<_N_tot; i++){
-        delete _events[i];
-        _events[i] = nullptr;
-    }
-    delete[] _events;
-    delete[] _states;
-    delete[] _event_idx;
-    delete[] _event_idx_start;
-}
-
-template<typename T>
-template<typename Iterator>
-void EventCollection<T>::_clone_events(const Iterator& events){
-    _names.clear();
-    for (size_t i = 0; i < _N_tot; i++) {
-        if (!_names.insert(events[i]->name()).second) {
-            throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
-        }
-        _events[i] = events[i]->clone();
-    }
-}
-
-template<typename T>
-void EventCollection<T>::_copy(const EventCollection<T>& other){
-    //events must have been deleted, and all arrays must have been allocated
-    if (other._N_tot != _N_tot){
-        _realloc(other._N_tot);
-        _N_tot = other._N_tot;
-    }
-    else{
-        for (size_t i=0; i<_N_tot; i++){
-            delete _events[i];
-        }
-    }
-
-    _N_detect = other._N_detect;
-    _Nt = other._Nt;
-    _canon_idx = other._canon_idx;
-    _iter = other._iter;
-    _clone_events(other._events);
-    copy_array(_states, other._states, _N_tot);
-    copy_array(_event_idx, other._event_idx, _N_tot);
-    if (_N_tot>0){
-        copy_array(_event_idx_start, other._event_idx_start, _N_tot+1);
-    }
-
-}
 
 template<typename T>
 bool EventCollection<T>::_is_prioritized(size_t i, size_t j, int dir){
