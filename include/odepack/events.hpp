@@ -60,7 +60,7 @@ public:
 
     virtual bool                    locate(EventState<T>& event, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const = 0;
 
-    virtual Event<T>*            clone() const = 0;
+    virtual Event<T>*               clone() const = 0;
 
     inline virtual bool             is_time_based() const = 0;
 
@@ -77,17 +77,20 @@ protected:
     virtual void _register_it(const EventState<T>& res, State<T> before, State<T> after);
 
 private:
-
     std::string             _name;
+    std::vector<T>          _args = {};
+protected:
+    mutable Array1D<T>      _q_aux;
+    const void*             _obj;
+private:
+    size_t                  _counter = 0;
     Func<T>                 _mask = nullptr;
     bool                    _hide_mask;
-    std::vector<T>          _args = {};
-    size_t                  _counter = 0;
+
 
 
 protected:
-    const void* _obj;
-    mutable Array1D<T>       _q_aux;
+
 };
 
 template<typename T>
@@ -137,7 +140,7 @@ public:
 
     const T&                t_start() const;
 
-    PeriodicEvent<T>*    clone() const override;
+    PeriodicEvent<T>*       clone() const override;
 
     virtual void            set_start(const T& t);
 
@@ -333,7 +336,7 @@ T event_obj_func(const T& t, const void* obj){
 
 // Event CLASS implementations
 template<typename T>
-Event<T>::Event(std::string name, Func<T> mask, bool hide_mask, const void* obj): _name(std::move(name)), _mask(mask), _hide_mask(hide_mask && mask != nullptr), _obj(obj){
+Event<T>::Event(std::string name, Func<T> mask, bool hide_mask, const void* obj): _name(std::move(name)), _obj(obj), _mask(mask), _hide_mask(hide_mask && mask != nullptr){
     if (_name.empty()){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
@@ -401,16 +404,16 @@ bool Event<T>::determine(EventState<T>& result, State<T> before, State<T> after,
             copy_array(result.true_vector(), result.exposed_vector(), result.nsys());
             this->_mask(result.true_vector(), result.t(), result.exposed_vector(), _args.data(), _obj);
             result.choose_true = !this->hides_mask();
-        }
-        else{
+        }else{
             result.choose_true = true;
         }
         result.triggered = true;
         _register_it(result, before, after);
         return true;
+    }else{
+        result.triggered = false;
+        return false;
     }
-    result.triggered = false;
-    return false;
 }
 
 template<typename T>

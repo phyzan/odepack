@@ -149,6 +149,9 @@ class MutState : State<T>{
 template<typename T>
 class EventState{
 
+    Array1D<T> data;
+    size_t Nsys = 0;
+
 public:
 
     EventState() = default;
@@ -200,14 +203,6 @@ public:
     
     bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
     bool triggered = false;
-
-private:
-
-
-    Array1D<T> data;
-    size_t Nsys = 0;
-
-
 };
 
 // USEFUL ALIASES
