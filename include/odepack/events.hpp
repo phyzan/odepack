@@ -19,12 +19,6 @@ During an ode integration, we might want to save specific events that are encout
 // ============================================================================
 
 template<typename T>
-struct _EventObjFun;
-
-template<typename T>
-T event_obj_func(const T& t, const void* obj);
-
-template<typename T>
 class Event{
 
     // The obj parameter in "determine" is passed inside any functions that are passed in an Event object.
@@ -314,25 +308,10 @@ private:
 
 };
 
-template<typename T>
-struct _EventObjFun{
-    const void* obj;
-    const PreciseEvent<T>* event;
-    FuncLike<T> local_interp;
-    T* q;
-};
-
-
 // ============================================================================
 // IMPLEMENTATIONS
 // ============================================================================
 
-template<typename T>
-T event_obj_func(const T& t, const void* obj){
-    const auto* ptr = reinterpret_cast<const _EventObjFun<T>*>(obj);
-    ptr->local_interp(ptr->q, t, ptr->obj);
-    return ptr->event->obj_fun(t, ptr->q);
-}
 
 // Event CLASS implementations
 template<typename T>
@@ -449,8 +428,15 @@ bool PreciseEvent<T>::locate(EventState<T>& event, State<T> before, State<T> aft
     int t_dir = sgn(before.t(), after.t());
     const int& d = this->dir();
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
-        _EventObjFun<T> _f{obj, this, q, this->_q_aux.data()};
-        event.set_t(bisect(event_obj_func<T>, before.t(), after.t(), this->_event_tol, &_f)[2]);
+        T* vec = this->_q_aux.data();
+
+        auto obj_fun = [&](T t) LAMBDA_INLINE{
+            q(vec, t, obj); // interpolate the state vector at time t, and pass the value on vec
+            return this->obj_fun(t, vec);
+        };
+        
+        T event_time = bisect<T, RootPolicy::Right>(obj_fun, before.t(), after.t(), this->_event_tol);
+        event.set_t(event_time);
         return true;
     }
     return false;

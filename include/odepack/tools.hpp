@@ -376,15 +376,17 @@ Array2D<T, 0, N> _q_event_data(const T* q, const EventMap& event_map, const std:
 
 //BISECTION USED FOR EVENTS IN ODES
 
-template<typename T>
-std::vector<T> bisect(ObjFunLike<T> f, const T& a, const T& b, const T& atol, const void* obj){
+enum class RootPolicy : std::uint8_t { Left, Middle, Right};
+
+template<typename T, RootPolicy RP, typename Callable>
+T bisect(Callable&& f, const T& a, const T& b, const T& atol){
     T err = 2*atol+1;
     T _a = a;
     T _b = b;
     T c = a;
     T fm;
 
-    if (f(a, obj)*f(b, obj) > 0){
+    if (f(a)*f(b) > 0){
         throw std::runtime_error("Root not bracketed");
     }
 
@@ -393,8 +395,8 @@ std::vector<T> bisect(ObjFunLike<T> f, const T& a, const T& b, const T& atol, co
         if (c == _a || c == _b){
             break;
         }
-        fm = f(c, obj);
-        if (f(_a, obj) * fm  > 0){
+        fm = f(c);
+        if (f(_a) * fm  > 0){
             _a = c;
         }
         else{
@@ -402,7 +404,14 @@ std::vector<T> bisect(ObjFunLike<T> f, const T& a, const T& b, const T& atol, co
         }
         err = abs(fm);
     }
-    return {_a, c, _b};
+
+    if constexpr (RP == RootPolicy::Left) {
+        return _a;
+    }else if constexpr (RP == RootPolicy::Middle) {
+        return c;
+    }else {
+        return _b;
+    }
 }
 
 
