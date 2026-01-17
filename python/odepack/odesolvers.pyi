@@ -206,8 +206,8 @@ class PeriodicEvent(Event):
     """
     An event triggered periodically at fixed time intervals.
 
-    This event type triggers at regular time intervals specified by period, starting
-    from an optional offset. Unlike PreciseEvent, the timing is pre-determined by the
+    This event type triggers at regular time intervals specified by period.
+    Unlike PreciseEvent, the timing is pre-determined by the
     period rather than detected from a function value.
 
     Parameters
@@ -217,10 +217,6 @@ class PeriodicEvent(Event):
 
     period : float
         Time interval between successive events. Must be positive.
-
-    start : float, optional
-        Time of the first event. If None (default), the first event occurs at
-        t0 + period. Subsequent events occur at start + n*period for n = 1, 2, 3, ...
 
     mask : callable, optional
         State modification function with signature mask(t, q, *args) -> array.
@@ -249,10 +245,6 @@ class PeriodicEvent(Event):
 
     >>> event = PeriodicEvent("record", period=0.1)
 
-    Record every 1.0 time units starting at t=0.5:
-
-    >>> event = PeriodicEvent("record", period=1.0, start=0.5)
-
     Apply periodic velocity reversal (e.g., for perturbation):
 
     >>> def kick(t, q):
@@ -262,7 +254,7 @@ class PeriodicEvent(Event):
     >>> event = PeriodicEvent("kick", period=2.0, mask=kick)
     """
 
-    def __init__(self, name: str, period: float, start: float=None, mask: Func=None, hide_mask=False, scalar_type: str = "double", __Nsys: int = 0, __Nargs: int = 0):...
+    def __init__(self, name: str, period: float, mask: Func=None, hide_mask=False, scalar_type: str = "double", __Nsys: int = 0, __Nargs: int = 0):...
 
     @property
     def period(self)->float:
@@ -273,18 +265,6 @@ class PeriodicEvent(Event):
         -------
         float
             Period in time units.
-        """
-        ...
-
-    @property
-    def start(self)->float:
-        """
-        The time of the first event.
-
-        Returns
-        -------
-        float
-            Start time, or None if events start from initial time.
         """
         ...
 

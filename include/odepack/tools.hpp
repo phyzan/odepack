@@ -200,10 +200,17 @@ public:
     inline size_t nsys() const{
         return Nsys;
     }
+
+    inline bool is_valid() const{
+        return triggered;
+    }
     
     bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
     bool triggered = false;
 };
+
+template<typename cls, typename derived>
+using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
 
 // USEFUL ALIASES
 

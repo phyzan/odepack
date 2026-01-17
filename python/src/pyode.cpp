@@ -94,7 +94,7 @@ void* PyPrecEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tupl
 //                                      PyPerEvent
 //===========================================================================================
 
-PyPerEvent::PyPerEvent(std::string name, py::object period, py::object start, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs):PyEvent(std::move(name), std::move(mask), hide_mask, scalar_type, Nsys, Nargs), _period(std::move(period)), _start(std::move(start)){}
+PyPerEvent::PyPerEvent(std::string name, py::object period, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs):PyEvent(std::move(name), std::move(mask), hide_mask, scalar_type, Nsys, Nargs), _period(std::move(period)) {}
 
 void* PyPerEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tuple& args) {
 
@@ -112,10 +112,6 @@ void* PyPerEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tuple
 
 py::object PyPerEvent::period() const{
     return _period;
-}
-
-py::object PyPerEvent::start() const{
-    return _start;
 }
 
 //===========================================================================================
@@ -568,17 +564,15 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("event_tol", &PyPrecEvent::event_tol);
 
     py::class_<PyPerEvent, PyEvent>(m, "PeriodicEvent")
-        .def(py::init<std::string, py::object, py::object, py::object, bool, std::string, size_t, size_t>(),
+        .def(py::init<std::string, py::object, py::object, bool, std::string, size_t, size_t>(),
             py::arg("name"),
             py::arg("period"),
-            py::arg("start")=py::none(),
             py::arg("mask")=py::none(),
             py::arg("hide_mask")=false,
             py::arg("scalar_type") = "double",
             py::arg("__Nsys")=0,
             py::arg("__Nargs")=0)
-        .def_property_readonly("period", &PyPerEvent::period)
-        .def_property_readonly("start", &PyPerEvent::start);
+        .def_property_readonly("period", &PyPerEvent::period);
 
 
     py::class_<PySolver>(m, "OdeSolver")

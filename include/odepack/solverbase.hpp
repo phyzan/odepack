@@ -800,8 +800,4 @@ bool BaseSolver<Derived, T, N, SP>::validate_it(const T* state){
     return success;
 }
 
-
-template<typename cls, typename derived>
-using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
-
 #endif

@@ -42,7 +42,7 @@ public:
 protected:
 
     RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
-        this->initialize_events(t0);
+        _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
     }
     
     DEFAULT_RULE_OF_FOUR(RichSolver)
@@ -60,7 +60,6 @@ private:
     //=========================================================
 
 
-    void                    initialize_events(const T& t0);
     void                    add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant);
     inline bool             requires_new_start() const;
     inline bool             equiv_states() const;
@@ -196,7 +195,7 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
         _event_idx = -1;
     }
     for (size_t idx : _events){
-        if (_events.event(idx).is_leathal()){
+        if (_events.event(idx).is_lethal()){
             this->kill(_events.event(idx).name());
         }
         else if (_events.event(idx).is_stop_event()){
@@ -303,13 +302,6 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void RichSolver<Derived, T, N, SP>::set_args_impl(const T* new_args){
     Base::set_args_impl(new_args);
     _events.set_args(new_args, this->args().size());
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::initialize_events(const T& t0){
-    _events.set_args(this->args().data(), this->args().size());
-    _events.set_start(t0, this->direction());
-    _events.set_array_size(this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>

@@ -14,56 +14,66 @@
 // ============================================================================
 
 template<typename T>
-void normalize(T* res, const T&, const T* q, const T*, const void* obj);
+void normalize(T* res, const T&, const T* q, const T*, size_t nsys);
 
 template<typename T>
 void normalized(T* q, size_t nsys);
 
+template<typename T, typename Derived = void>
+class NormalizationEvent : public PeriodicEvent<T, GetDerived<NormalizationEvent<T, Derived>, Derived>>{
 
-template<typename T>
-class NormalizationEvent: public ObjectOwningEvent<PeriodicEvent<T>, size_t>{
-
-    using Base = ObjectOwningEvent<PeriodicEvent<T>, size_t>;
+    using Base = PeriodicEvent<T, GetDerived<NormalizationEvent<T, Derived>, Derived>>;
+    friend typename Base::Main;
 
 public:
 
-    NormalizationEvent(const std::string& name, size_t Nsys, const T& period, const T& start = inf<T>());
+    NormalizationEvent(const std::string& name, T period) : Base(name, period, nullptr, true, nullptr) {}
 
-    DEFAULT_RULE_OF_FOUR(NormalizationEvent);
+    const T& logksi() const{
+        return _logksi;
+    }
 
-    void go_back() override;
+    T lyap() const{
+        return _logksi/(this->delta_t_abs());
+    }
 
-    const T& logksi() const;
+    T delta_s() const{
+        return _delta_s;
+    }
 
-    T lyap() const;
+    size_t Nsys_main() const{
+        return this->Nsys()/2;
+    }
 
-    T t_lyap() const;
+protected:
 
-    T delta_s() const;
+    inline void register_impl(){
+        //call Base::register_impl() first
+        Base::register_impl();
+        _delta_s = log(norm(this->state()->exposed().vector()+Nsys_main(), Nsys_main()));
+    }
 
-    NormalizationEvent<T>* clone() const override;
+    inline void reset_impl(){
+        //call Base::reset_impl() first
+        Base::reset_impl();
+        _logksi = 0;
+        _delta_s = 0;
+    }
 
-    void set_start(const T& t) override;
+    inline void mask_impl(T* out, const T& t, const T* q) const{
+        normalize<T>(out, t, q, this->args().data(), this->Nsys_main());
+    }
 
-    inline size_t Nsys() const;
-
-    void reset() override;
+    inline bool is_masked_impl() const{
+        return true;
+    }
 
 private:
 
-    void _register_it(const EventState<T>& res, State<T> before, State<T> after) override;
-
-    T _t_renorm;
-    T _t_last;
-
-    T _logksi=0;
-    T _logksi_last=0;
-
+    T _logksi = 0;
     T _delta_s = 0;
-    T _delta_s_last = 0;
 
-    int _dir = 0;
-    int _dir_last = 0;
+
 };
 
 
@@ -77,7 +87,7 @@ public:
     VariationalSolver(OdeData<T> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, const std::string& method = "RK45") : Base() {
         Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
         normalized<T>(tmp.data(), nsys);
-        NormalizationEvent<T> event("Normalization", nsys, period);
+        NormalizationEvent<T> event("Normalization", period);
         nsys *= 2;
         const T* q0 = tmp.data();
         this->_ptr = get_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, {&event}).release();
@@ -96,7 +106,7 @@ public:
     }
 
     inline T t_lyap() const{
-        return this->main_event().t_lyap();
+        return this->main_event().delta_t_abs();
     }
 
     inline T delta_s() const{
@@ -145,12 +155,11 @@ private:
 // ============================================================================
 
 template<typename T>
-void normalize(T* res, const T&, const T* q, const T*, const void* obj){
-    const size_t& n = *reinterpret_cast<const size_t*>(obj);
-    T N = norm(q+n, n);
-    for (size_t i=0; i<n; i++){
+void normalize(T* res, const T&, const T* q, const T*, size_t nsys){
+    T N = norm(q+nsys, nsys);
+    for (size_t i=0; i<nsys; i++){
         res[i] = q[i];
-        res[i+n] = q[i+n]/N;
+        res[i+nsys] = q[i+nsys]/N;
     }
 }
 
@@ -162,79 +171,6 @@ void normalized(T* q, size_t nsys){
     }
 }
 
-// NormalizationEvent implementations
-template<typename T>
-NormalizationEvent<T>::NormalizationEvent(const std::string& name, size_t Nsys, const T& period, const T& start): Base(Nsys, name, period, start, normalize<T>, true, nullptr), _t_renorm(start), _t_last(start){}
-
-template<typename T>
-void NormalizationEvent<T>::go_back(){
-    PeriodicEvent<T>::go_back();
-    _t_renorm = _t_last;
-    _logksi = _logksi_last;
-    _delta_s = _delta_s_last;
-    _dir = _dir_last;
-}
-
-template<typename T>
-const T& NormalizationEvent<T>::logksi() const{
-    return _logksi;
-}
-
-template<typename T>
-T NormalizationEvent<T>::lyap() const{
-    return _logksi/this->t_lyap();
-}
-
-template<typename T>
-T NormalizationEvent<T>::t_lyap() const{
-    return abs(_t_renorm-this->_start+this->_period*_dir);
-}
-
-template<typename T>
-T NormalizationEvent<T>::delta_s() const{
-    return _delta_s;
-}
-
-template<typename T>
-NormalizationEvent<T>* NormalizationEvent<T>::clone() const{
-    return new NormalizationEvent<T>(*this);
-}
-
-template<typename T>
-void NormalizationEvent<T>::set_start(const T& t){
-    PeriodicEvent<T>::set_start(t);
-    _t_renorm = t;
-}
-
-template<typename T>
-inline size_t NormalizationEvent<T>::Nsys() const{
-    return this->_object;
-}
-
-template<typename T>
-void NormalizationEvent<T>::reset(){
-    PeriodicEvent<T>::reset();
-    _t_renorm = this->_start;
-    _t_last = this->_start;
-    _logksi = 0;
-    _logksi_last = 0;
-    _delta_s = 0;
-    _delta_s_last = 0;
-    _dir = 0;
-    _dir_last = 0;
-}
-
-template<typename T>
-void NormalizationEvent<T>::_register_it(const EventState<T>& res, State<T> before, State<T> after){
-    _t_last = _t_renorm;
-    _logksi_last = _logksi;
-    _dir_last = _dir;
-    _t_renorm = res.t();
-    _delta_s_last = _delta_s;
-    _delta_s = log(norm(res.exposed().vector()+Nsys(), Nsys()));
-    _logksi += _delta_s;
-    _dir = sgn(before.t(), after.t());
-}
 
 // VariationalODE implementations
 template<typename T, size_t N>
@@ -247,7 +183,7 @@ VariationalODE<T, N>::VariationalODE(OdeData<T> ode, T t0, const T* q0_, size_t 
 
     Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
     normalized<T>(tmp.data(), nsys);
-    NormalizationEvent<T> extra_event("Normalization", nsys, period);
+    NormalizationEvent<T> extra_event("Normalization", period);
     events.insert(events.begin(), &extra_event);
     nsys *= 2;
     const T* q0 = tmp.data();
@@ -306,7 +242,7 @@ void VariationalODE<T, N>::_register_event(size_t event){
     ODE<T, N>::_register_event(event);
     if (event == _ind-1){
         const NormalizationEvent<T>& ev = _main_event();
-        _t_lyap.push_back(ev.t_lyap());
+        _t_lyap.push_back(ev.delta_t_abs());
         _lyap_array.push_back(ev.lyap());
         _delta_s_arr.push_back(ev.delta_s());
     }

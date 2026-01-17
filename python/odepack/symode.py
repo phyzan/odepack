@@ -245,10 +245,6 @@ class SymbolicPeriodicEvent(SymbolicEvent):
     period : float
         The time interval between successive event triggers. Must be positive.
         Triggers occur at times t0 + period, t0 + 2*period, t0 + 3*period, ...
-    start : float, optional
-        The time of the first event trigger. If None, the first event occurs at
-        t0 + period (where t0 is the initial integration time). This parameter
-        allows for staggered event times.
     mask : Iterable[Expr], optional
         Symbolic expressions representing the new state vector when the event
         triggers, e.g., mask = [x_new, y_new, ...]. If None, no state
@@ -260,20 +256,12 @@ class SymbolicPeriodicEvent(SymbolicEvent):
 
     Examples
     --------
-    Create an event that triggers every 0.1 time units starting at t=1.0:
-
-    >>> event = SymbolicPeriodicEvent(
-    ...     name="regular_output",
-    ...     period=0.1,
-    ...     start=1.0
-    ... )
 
     Create an event that triggers every 1.0 time units starting from t0+1.0:
 
     >>> event = SymbolicPeriodicEvent(
     ...     name="snapshots",
-    ...     period=1.0,
-    ...     start=None  # First event at t0 + period
+    ...     period=1.0
     ... )
 
     See Also
@@ -282,22 +270,21 @@ class SymbolicPeriodicEvent(SymbolicEvent):
     SymbolicEvent : Abstract base class
     """
 
-    def __init__(self, name: str, period: float, start = None, mask: Iterable[Expr]=None, hide_mask=False):
+    def __init__(self, name: str, period: float, mask: Iterable[Expr]=None, hide_mask=False):
         SymbolicEvent.__init__(self, name, mask, hide_mask)
         self.period = period
-        self.start = start
 
     def __eq__(self, other):
         if isinstance(other, SymbolicPeriodicEvent):
             if other is self:
                 return True
-            elif (self.period, self.start) == (other.period, other.start):
+            elif self.period == other.period:
                 return SymbolicEvent.__eq__(self, other)
         return False
     
     @property
     def kwargs(self):
-        return dict(**SymbolicEvent.kwargs.__get__(self), period=self.period, start=self.start)
+        return dict(**SymbolicEvent.kwargs.__get__(self), period=self.period)
 
     def _toEvent(self, scalar_type, mask=None, **__extra):
         '''
@@ -597,7 +584,7 @@ class OdeSystem:
         res = [None for _ in llc]
         for i in range(len(res)):
             f = llc[i].to_python_callable().lambdify()
-            res[i] = lambda t, q, *args : f(t, q, args)
+            res[i] = lambda t, q, *args, f=f: f(t, q, args)
         return tuple(res)
 
     @cached_property

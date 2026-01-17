@@ -181,7 +181,7 @@ class PyPerEvent : public PyEvent{
 
 public:
 
-    PyPerEvent(std::string name, py::object period, py::object start, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs);
+    PyPerEvent(std::string name, py::object period, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs);
 
     DEFAULT_RULE_OF_FOUR(PyPerEvent);
 
@@ -192,11 +192,8 @@ public:
 
     py::object period() const;
 
-    py::object start() const;
-
 private:
     py::object _period;
-    py::object _start;
 
 };
 
@@ -370,7 +367,7 @@ struct PyVarSolver : public PySolver{
 
     template<typename T>
     inline T t_lyap() const{
-        return this->main_event<T>().t_lyap();
+        return this->main_event<T>().delta_t_abs();
     }
 
     template<typename T>
@@ -733,7 +730,7 @@ void* PyPrecEvent::get_new_event(){
 
 template<typename T>
 void* PyPerEvent::get_new_event(){
-    return new ObjectOwningEvent<PeriodicEvent<T>, PyStruct>(this->data, this->name(), _period.cast<T>(), (_start.is_none() ? inf<T>() : _start.cast<T>()), this->mask<T>(), this->hide_mask());
+    return new ObjectOwningEvent<PeriodicEvent<T>, PyStruct>(this->data, this->name(), _period.cast<T>(), this->mask<T>(), this->hide_mask());
 }
 
 template<typename T>
