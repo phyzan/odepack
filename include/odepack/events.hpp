@@ -817,9 +817,17 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
         return;
     }
 
-    //detect all events and save their indices in order of priority in _event_idx.
+    /*
+     * PHASE 1: Detection and Sorting
+     *
+     * Locate all events that occur between the 'before' and 'after' states.
+     * Store their indices in _event_idx, sorted by priority using insertion sort.
+     * Priority is determined by _is_prioritized(): earlier time wins, ties broken by event index.
+     *
+     * After this phase: _event_idx contains indices of all detected events, sorted by time.
+     */
     const int dir = sgn(before.t(), after.t());
-    _N_detect = 0; //this is how many events have been triggered, and is the next available index in _event_idx_start
+    _N_detect = 0;
     for (size_t i=0; i<this->size(); i++){
         Event<T>* event_obj = _events[i].ptr();
         if (event_obj->locate(before, after, q, obj)){
@@ -833,7 +841,27 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
         }
     }
 
-    //discard "bad" events after the event that determines the main state vector
+    /*
+     * PHASE 2: Resolve Same-Time Conflicts
+     *
+     * When multiple non-pure-temporal events occur at the same time, only one can determine
+     * the state vector. The 'mark' tracks the first non-pure-temporal event at each time.
+     * Since events are sorted by index (for same-time events), the user controls which event
+     * "wins" by ordering them appropriately in the event list.
+     *
+     * For subsequent non-pure-temporal events at the same time as 'mark':
+     *   - discard_event() decides which to discard based on masking rules:
+     *     - If mark is masked (and not hidden): discard any non-pure-temporal event
+     *     - If mark is not masked or hides its mask: discard any masked event
+     *
+     * Note: A masked event does NOT automatically win over a non-masked event at the same time.
+     * The first non-pure-temporal event (by index) becomes the mark and determines the rules.
+     *
+     * Pure-temporal events (no state dependency) are always kept since they don't conflict.
+     * When time changes, mark resets to allow a new "winner" at the new time.
+     *
+     * After this phase: At each time, at most one non-pure-temporal event remains (plus any pure-temporal).
+     */
     size_t mark = this->size();
     size_t i=0;
     while (i<_N_detect){
@@ -856,7 +884,20 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
         i++;
     }
 
-    //split the rest of events in groups of identical detection times and find canon (masked) event
+    /*
+     * PHASE 3: Find Canon Event and Group by Time
+     *
+     * The "canon" event is the first masked event encountered. It determines the true
+     * state vector after all events at its time are processed (the mask transforms the state).
+     *
+     * This phase also builds time groups: _event_idx_start[k] marks where group k begins.
+     * Events are grouped by identical detection times for iteration purposes.
+     *
+     * The loop breaks immediately after finding the first masked event (canon).
+     *
+     * After this phase: _canon_idx points to the canon event (or size() if none),
+     * and time groups are partially built up to and including the canon's time.
+     */
     i=0;
     _canon_idx = this->size();
     _Nt = (_N_detect>0 ? 1 : 0);
@@ -874,7 +915,18 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
         i++;
     }
 
-    //reverse the rest of events after the canon event detection time
+    /*
+     * PHASE 4: Discard Events After Canon Time
+     *
+     * If a canon (masked) event was found, any events occurring AFTER the canon's time
+     * must be discarded. The solver will restart from the canon's time with the transformed
+     * state, so those later events will be re-detected in subsequent steps.
+     *
+     * First, skip any remaining events at the SAME time as canon (they're kept).
+     * Then deactivate all events at LATER times.
+     *
+     * tmp/j tracks where the valid events end; _N_detect is updated to exclude deactivated ones.
+     */
     size_t j=i;
     while (j<_N_detect && (state(_event_idx[j]).t()== state(_event_idx[i-1]).t())){
         j++;
@@ -885,6 +937,15 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
         const_cast<Event<T>&>(event(_event_idx[j])).deactivate();
     }
 
+    /*
+     * PHASE 5: Register Events
+     *
+     * Call register_it() on all events that were successfully located (not deactivated).
+     * This applies masks (copying exposed_vector to true_vector and transforming),
+     * increments event counters, and performs any event-specific registration logic.
+     *
+     * Finally, update _N_detect to reflect only the kept events and reset the iterator.
+     */
     for (i=0; i<size(); i++){
         if (_events[i]->is_located()) {
             _events[i]->register_it();

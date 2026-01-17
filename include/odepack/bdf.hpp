@@ -131,9 +131,9 @@ public:
 
     BDFInterpolator(const Array2D<T, 0, N>& D, size_t order, const T* state1, const T* state2, size_t nsys, int bdr1, int bdr2);
 
-    size_t order() const final;
+    size_t                  order() const final;
 
-    BDFInterpolator<T, N>* clone() const final;
+    BDFInterpolator<T, N>*  clone() const final;
 
 private:
 

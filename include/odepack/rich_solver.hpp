@@ -26,7 +26,7 @@ public:
     const EventCollection<T>&               event_col() const;
     const Interpolator<T, N>*               interpolator() const;
     bool                                    is_interpolating() const;
-    State<T>                          state() const;
+    State<T>                                state() const;
     bool                                    at_event() const;
     void                                    show_state(int prec=8) const;
 
@@ -41,11 +41,10 @@ public:
 
 protected:
 
-    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
-        _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
-    }
+    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events);
     
     DEFAULT_RULE_OF_FOUR(RichSolver)
+    
     ~RichSolver() = default;
 
     void reset_impl();
@@ -53,24 +52,20 @@ protected:
 private:
 
     //================= STATIC OVERRIDES ======================
-    inline const T&                         t_impl() const;
-    inline View1D<T, N>                     vector_impl() const;
-    bool                                    adv_impl();
-    inline void             set_args_impl(const T* new_args);
+    inline const T&     t_impl() const;
+    inline View1D<T, N> vector_impl() const;
+    bool                adv_impl();
+    inline void         set_args_impl(const T* new_args);
     //=========================================================
 
 
-    void                    add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant);
-    inline bool             requires_new_start() const;
-    inline bool             equiv_states() const;
+    void            add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant);
+    inline bool     requires_new_start() const;
+    inline bool     equiv_states() const;
 
-    inline static std::vector<const Event<T>*>& include_tmax_event(std::vector<const Event<T>*>& events){
-        static TmaxEvent<T> ev;
-        events.insert(events.begin(), &ev);
-        return events;
-    }
+    inline static std::vector<const Event<T>*>& include_tmax_event(std::vector<const Event<T>*>& events);
 
-    EventCollection<T>       _events;
+    EventCollection<T>          _events;
     LinkedInterpolator<T, N>    _cli;
     long int                    _event_idx = -1;
     bool                        _interp_data = false;
@@ -151,6 +146,11 @@ void RichSolver<Derived, T, N, SP>::show_state(int prec) const{
 }
 
 // PUBLIC MODIFIERS
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+RichSolver<Derived, T, N, SP>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
+    _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
+}
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 bool RichSolver<Derived, T, N, SP>::adv_impl(){
@@ -321,6 +321,14 @@ inline bool RichSolver<Derived, T, N, SP>::requires_new_start() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline bool RichSolver<Derived, T, N, SP>::equiv_states() const{
     return at_event() ? _events.state(_event_idx).t() == Base::t_impl() : true;
+}
+
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline std::vector<const Event<T>*>& RichSolver<Derived, T, N, SP>::include_tmax_event(std::vector<const Event<T>*>& events){
+    static TmaxEvent<T> ev;
+    events.insert(events.begin(), &ev);
+    return events;
 }
 
 // ============================================================================
