@@ -9,13 +9,6 @@ class AbstractArray : public AbstractMutView<Derived, L, T, DIMS...>{
     using CLS = AbstractArray<Derived, T, L, DIMS...>;
     using Base = AbstractMutView<Derived, L, T, DIMS...>;
 
-public:
-
-    Derived& set(const T& value){
-        std::fill(this->begin(), this->end(), value);
-        return static_cast<Derived&>(*this);
-    }
-
 protected:
 
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
@@ -432,6 +425,11 @@ public:
     template<INT_T... Int>
     INLINE T* ptr(Int... idx){
         return Base::ptr(idx...);
+    }
+
+    INLINE Array& set(const T& value){
+        Base::set(value);
+        return *this;
     }
 
 };

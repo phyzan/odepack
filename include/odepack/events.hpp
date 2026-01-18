@@ -486,6 +486,7 @@ void EventBase<Derived, T>::reset(){
 template<typename Derived, typename T>
 inline bool EventBase<Derived, T>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
     static_assert(false, "static override");
+    return false;
 }
 
 template<typename Derived, typename T>

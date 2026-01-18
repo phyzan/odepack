@@ -111,6 +111,11 @@ public:
         return tensor_call(THIS, i...);
     }
 
+    Derived& set(const T& value){
+        std::fill(this->begin(), this->end(), value);
+        return static_cast<Derived&>(*this);
+    }
+
     using Base::data;
     using Base::operator();
     using Base::operator[];
