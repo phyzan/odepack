@@ -21,7 +21,8 @@ public:
 
     // ODE PROPERTIES
     virtual void                rhs(T* dq_dt, const T& t, const T* q) const = 0;
-    virtual void                jac(T* jm, const T& t, const T* q) const = 0;
+    virtual void                jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const = 0;
+    virtual void                jac_approx(T* j, const T& t, const T* q, const T* dt) const = 0;
 
     // ACCESSORS
     virtual const T&            t() const = 0;

@@ -31,10 +31,9 @@ public:
 
     // ODE PROPERTIES
     inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
-    inline void                 jac(T* jm, const T& t, const T* q) const;
-    inline void                 jac_approx(T* j, const T& t, const T* q) const;
+    inline void                 jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+    inline void                 jac_approx(T* j, const T& t, const T* q, const T* dt) const;
     MutView<T, Layout::F, N, N> jac_view(T* j) const;
-
 
     // ACCESSORS
     inline const T&             t() const;
@@ -96,7 +95,7 @@ protected:
 
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
     inline void                 rhs_impl(T* dq_dt, const T& t, const T* q) const;
-    inline void                 jac_impl(T* jm, const T& t, const T* q) const;
+    inline void                 jac_impl(T* jm, const T& t, const T* q, const T* dt) const;
     inline void                 reset_impl();                                   //call base class's override first
     inline void                 set_args_impl(const T* new_args);               //call base class's override first
     inline void                 re_adjust_impl();                               //call base class's override first
@@ -118,7 +117,6 @@ protected:
     inline void                 set_message(const std::string& text);
     void                        re_adjust();
     void                        remake_new_state(const T* vector);
-    void                        reset_jac_factor();
 
 
     // ================================================================================
@@ -146,16 +144,12 @@ private:
     inline T*                   aux_state_ptr();
     void                        register_states();
     bool                        validate_it(const T* state);
-    void                        update_jac_stepsize() const;
-    void                        update_jac_factor() const;
 
 
     Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
     mutable Array1D<T, 4*N, Allocation::Auto>           _dummy_state;
     Array1D<T, 4, Allocation::Stack>                    _scalar_data;
     Array1D<T>                                          _args;
-    mutable Array1D<T>                                  _jac_factor;
-    mutable Array1D<T>                                  _jac_stepsize;
     OdeData<T>                                          _ode;
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;
@@ -190,50 +184,42 @@ inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q)
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void BaseSolver<Derived, T, N, SP>::jac(T* jm, const T& t, const T* q) const{
-    THIS_C->jac_impl(jm, t, q);
+inline void BaseSolver<Derived, T, N, SP>::jac(T* jm, const T& t, const T* q, const T* dt) const{
+    THIS_C->jac_impl(jm, t, q, dt);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void BaseSolver<Derived, T, N, SP>::jac_approx(T* jm, const T& t, const T* q) const{
-    size_t n = this->Nsys();
-    T* h  = _jac_stepsize.data();
+inline void BaseSolver<Derived, T, N, SP>::jac_approx(T* jm, const T& t, const T* q, const T* dt) const{
+    const size_t n = this->Nsys();
+    const T EPS_SQRT = sqrt(std::numeric_limits<T>::epsilon());
+    const T threshold = this->atol();
+
     T* x1 = _dummy_state.data();
     T* x2 = _dummy_state.data() + n;
     T* f1 = _dummy_state.data() + 2*n;
     T* f2 = _dummy_state.data() + 3*n;
 
-    // We'll store max_diff in x1 and scale in x2 after the loop completes
-    // But first we need to compute all Jacobian columns
+    copy_array(x1, q, n);
+    copy_array(x2, q, n);
 
     for (size_t i = 0; i < n; i++) {
-        // Set up perturbed states - copy fresh each time
-        copy_array(x1, q, n);
-        copy_array(x2, q, n);
-        x1[i] = q[i] - h[i];
-        x2[i] = q[i] + h[i];
+        // Compute step size: use provided dt or compute inline
+        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * std::max(threshold, abs(q[i]));
 
+        x1[i] = q[i] - h_i;
+        x2[i] = q[i] + h_i;
         this->rhs(f1, t, x1);
         this->rhs(f2, t, x2);
+        x1[i] = q[i];
+        x2[i] = q[i];
 
-        // Compute Jacobian column and track max_diff/scale for factor adaptation
-        T col_max_diff = T(0);
-        T col_scale = T(0);
-        T* col = jm + i*n;
+        // Compute Jacobian column using central differences
+        T* col = jm + i * n;
+        T two_h = 2 * h_i;
         for (size_t j = 0; j < n; j++) {
-            T diff = f2[j] - f1[j];
-            T abs_diff = std::abs(diff);
-            if (abs_diff > col_max_diff) {
-                col_max_diff = abs_diff;
-                col_scale = std::max(std::abs(f1[j]), std::abs(f2[j]));
-            }
-            col[j] = diff / (T(2) * h[i]);
+            col[j] = (f2[j] - f1[j]) / two_h;
         }
-        // Store max_diff and scale temporarily in x1, x2 (safe now since we copy fresh each iteration)
-        x1[i] = col_max_diff;
-        x2[i] = col_scale;
     }
-    // After loop: _dummy_state[0:n] = max_diff, _dummy_state[n:2n] = scale
 }
 
 // PUBLIC ACCESSORS
@@ -568,18 +554,17 @@ inline void BaseSolver<Derived, T, N, SP>::rhs_impl(T* dq_dt, const T& t, const 
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void BaseSolver<Derived, T, N, SP>::jac_impl(T* jm, const T& t, const T* q) const{
+inline void BaseSolver<Derived, T, N, SP>::jac_impl(T* jm, const T& t, const T* q, const T* dt) const{
     if (_ode.jacobian != nullptr){
         this->jac_exact(jm, t, q);
-    }else {
-        this->update_jac_stepsize();
-        this->jac_approx(jm, t, q);
-        this->update_jac_factor();
+    }else{
+        this->jac_approx(jm, t, q, dt);
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::jac_exact(T* jm, const T& t, const T* q) const{
+    assert(_ode.jacobian != nullptr && "Jacobian is null");
     _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
 }
 
@@ -596,7 +581,6 @@ inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
     _is_running = true;
     _diverges = false;
     _message = "Running";
-    this->reset_jac_factor();
     for (int i=1; i<5; i++){
         copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }
@@ -732,60 +716,6 @@ void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void BaseSolver<Derived, T, N, SP>::reset_jac_factor(){
-    T eps = std::numeric_limits<T>::epsilon();
-    _jac_factor.set(sqrt(eps));
-    _jac_stepsize.set(0);
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void BaseSolver<Derived, T, N, SP>::update_jac_stepsize() const{
-    const size_t n = this->Nsys();
-    const T* q = this->new_state_ptr() + 2;
-    const T threshold = this->atol();
-    T* h = _jac_stepsize.data();
-    T* factor = _jac_factor.data();
-    
-    for (size_t i = 0; i < n; i++) {
-        T y_scale = std::max(threshold, abs(q[i]));
-        h[i] = factor[i] * y_scale;
-        
-        // Ensure h[i] is not zero
-        while (h[i] == 0) {
-            factor[i] *= 10;
-            h[i] = factor[i] * y_scale;
-        }
-    }
-}
-
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void BaseSolver<Derived, T, N, SP>::update_jac_factor() const{
-    // Adapt jac_factor based on quality of finite differences
-    // Uses max_diff and scale stored in _dummy_state by jac_approx
-    const T EPS = std::numeric_limits<T>::epsilon();
-    const T NUM_JAC_DIFF_SMALL = pow(EPS, T(3)/4);
-    const T NUM_JAC_DIFF_BIG = pow(EPS, T(1)/4);
-    const T NUM_JAC_MIN_FACTOR = 1000 * EPS;
-    const T NUM_JAC_FACTOR_INCREASE = 10;
-    const T NUM_JAC_FACTOR_DECREASE = T(1)/10;
-
-    const size_t n = this->Nsys();
-    T* factor = _jac_factor.data();
-    const T* max_diff = _dummy_state.data();      // stored by jac_approx
-    const T* scale = _dummy_state.data() + n;     // stored by jac_approx
-
-    for (size_t i = 0; i < n; i++) {
-        if (max_diff[i] < NUM_JAC_DIFF_SMALL * scale[i]) {
-            factor[i] *= NUM_JAC_FACTOR_INCREASE;
-        } else if (max_diff[i] > NUM_JAC_DIFF_BIG * scale[i]) {
-            factor[i] *= NUM_JAC_FACTOR_DECREASE;
-        }
-        factor[i] = std::max(factor[i], NUM_JAC_MIN_FACTOR);
-    }
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
 MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
     //returns a high level view of the jacobian matrix, so that its elements
     //can be accessed using matrix(i, j). This function simply simplifies
@@ -801,7 +731,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP>::jac_view(T* j) const{
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _jac_factor(nsys), _jac_stepsize(nsys), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){
@@ -824,7 +754,6 @@ BaseSolver<Derived, T, N, SP>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(5
     }else {
         this->kill("Initial conditions contain nan or inf, or ode(ics) does");
     }
-    this->reset_jac_factor();
 }
 
 
