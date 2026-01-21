@@ -52,6 +52,7 @@ PyEvent::PyEvent(std::string name, py::object mask, bool hide_mask, const std::s
         data.mask = std::move(mask);
         this->_py_mask = true;
     }
+    data.is_lowlevel = data.mask.is_none() && data.event.is_none();
 }
 
 py::str PyEvent::name() const{
@@ -63,7 +64,7 @@ py::bool_ PyEvent::hide_mask() const {
 }
 
 bool PyEvent::is_lowlevel() const{
-    return data.event.is_none() && data.mask.is_none();
+    return data.is_lowlevel;
 }
 
 void PyEvent::check_sizes(size_t Nsys, size_t Nargs) const{
@@ -173,12 +174,12 @@ PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispa
     DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
-PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data) {
+PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data){
     DISPATCH(void, this->s = other.template cast<T>()->clone();)
     DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
-PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)) {
+PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)){
     other.s = nullptr;
     DISPATCH(void, cast<T>()->set_obj(&data);)
 }
@@ -325,7 +326,7 @@ py::object PySolver::py_event_located(const py::str& name) const{
 PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type) : PySolver(scalar_type) {
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_data = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), py_q0, std::move(jac), py_args, py::list());
+        OdeData<T> ode_data = init_ode_data<T>( this->data, args, std::move(f), py_q0, std::move(jac), py_args, py::list());
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
         if ((q0.size() & 1) != 0){
             throw py::value_error("Variational solvers require an even number of system size");
@@ -543,7 +544,7 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, data,args, f, py_q0, jacobian, py_args, events);
+        OdeData<T> ode_rhs = init_ode_data<T>(data,args, f, py_q0, jacobian, py_args, events);
         std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
         std::vector<const Event<T>*> evs(safe_events.size());
         for (size_t i=0; i<evs.size(); i++){
@@ -557,14 +558,14 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
     )
 }
 
-PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data), is_lowlevel(other.is_lowlevel){
-        DISPATCH(void, this->ode = other.template cast<T>()->clone();)
-        DISPATCH(void, cast<T>()->set_obj(&data);)
+PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
+    DISPATCH(void, this->ode = other.template cast<T>()->clone();)
+    DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
-PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)), is_lowlevel(other.is_lowlevel){
+PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)){
     other.ode = nullptr;
-        DISPATCH(void, cast<T>()->set_obj(&data);)
+    DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 PyODE& PyODE::operator=(const PyODE& other){
@@ -574,7 +575,6 @@ PyODE& PyODE::operator=(const PyODE& other){
     DISPATCH(void, delete cast<T>();)
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
     data = other.data;
-    is_lowlevel = other.is_lowlevel;
     DISPATCH(void, cast<T>()->set_obj(&data);)
     return *this;
 }
@@ -584,7 +584,6 @@ PyODE& PyODE::operator=(PyODE&& other) noexcept {
         return *this;
     }
     DISPATCH(void, delete cast<T>();)
-    this->is_lowlevel = other.is_lowlevel;
     this->ode = other.ode;
     other.ode = nullptr;
     data = std::move(other.data);
@@ -723,7 +722,7 @@ void PyODE::clear() {
 PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type):PyODE(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), q0, std::move(jac), py_args, events);
+        OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, std::move(f), q0, std::move(jac), py_args, events);
         Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
         if ((q0_.size() & 1) != 0){
             throw py::value_error("Variational ODEs require an even number of system size");
@@ -801,7 +800,7 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
             auto& pyode = item.cast<PyODE&>();
 
             // Use the scalar_type to determine which array to add to
-            if (!pyode.is_lowlevel) {
+            if (!pyode.data.is_lowlevel) {
                 throw py::value_error("All ODE's in integrate_all must use only compiled functions, and no pure python functions");
             }
             array.push_back(pyode.ode);
@@ -863,9 +862,9 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
         try {
             auto& pysolver = item.cast<PySolver&>();
 
-            // Use the scalar_type to determine which array to add to
-            if (!pysolver.is_lowlevel) {
-                throw py::value_error("All ODE's in advance_all must use only compiled functions, and no pure python functions");
+
+            if (!pysolver.data.is_lowlevel) {
+                throw py::value_error("All solvers in advance_all must use only compiled functions, and no pure python functions");
             }
             array.push_back(pysolver.s);
             types.push_back(pysolver.scalar_type);

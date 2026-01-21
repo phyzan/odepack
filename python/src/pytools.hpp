@@ -150,10 +150,11 @@ struct PyStruct{
     py::function event;
     std::vector<py::ssize_t> shape;
     py::tuple py_args = py::make_tuple();
+    bool is_lowlevel = false;
 };
 
 template<typename T>
-OdeData<T> init_ode_data(bool& is_lowlevel, PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events);
 
 
 template<typename T>
