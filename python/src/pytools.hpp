@@ -8,8 +8,36 @@
 #include "../../include/odepack/variational.hpp"
 #include  "mpreal_caster.hpp"
 
-namespace py = pybind11;
 
+#define DISPATCH(RETURN_TYPE, ...)                                              \
+call_dispatch(this->scalar_type, [&]<typename T>() -> RETURN_TYPE {__VA_ARGS__ });
+
+static const std::string SCALAR_TYPE[4] = {"float", "double", "long double", "mpreal"};
+
+template<typename Callable>
+auto call_dispatch(int scalar_type, Callable&& f){
+    switch (scalar_type) {
+        case 0:
+            return f.template operator()<float>();
+        case 1:
+            return f.template operator()<double>();
+        case 2:
+            return f.template operator()<long double>();
+        default:
+            assert(scalar_type == 3 && "Invalid scalar type");
+            return f.template operator()<mpfr::mpreal>();
+    }
+}
+
+static const std::map<std::string, int> DTYPE_MAP = {
+    {"float", 0},
+    {"double", 1},
+    {"long double", 2},
+    {"mpreal", 3}
+};
+
+
+namespace py = pybind11;
 
 template<typename T, typename Container>
 Container toCPP_Array(const pybind11::iterable &obj) {

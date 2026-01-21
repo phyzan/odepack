@@ -1,8 +1,21 @@
 #include "pyode.hpp"
 
+
+//===========================================================================================
+//                                      DtypeDispatcher
+//===========================================================================================
+
+
+DtypeDispatcher::DtypeDispatcher(const std::string& dtype_){
+    this->scalar_type = DTYPE_MAP.at(dtype_);
+}
+
+DtypeDispatcher::DtypeDispatcher(int dtype_) : scalar_type(dtype_) {}
+
 //===========================================================================================
 //                                      PyFuncWrapper
 //===========================================================================================
+
 
 PyFuncWrapper::PyFuncWrapper(const py::capsule& obj, py::ssize_t Nsys, const py::array_t<py::ssize_t>& output_shape, py::ssize_t Nargs, const std::string& scalar_type) : DtypeDispatcher(scalar_type), rhs(open_capsule<void*>(obj)), Nsys(static_cast<size_t>(Nsys)), output_shape(static_cast<size_t>(output_shape.size())), Nargs(static_cast<size_t>(Nargs)) {
     copy_array(this->output_shape.data(), output_shape.data(), this->output_shape.size());
@@ -14,7 +27,17 @@ PyFuncWrapper::PyFuncWrapper(const py::capsule& obj, py::ssize_t Nsys, const py:
 }
 
 py::object PyFuncWrapper::call(const py::object& t, const py::iterable& py_q, const py::args& py_args) const{
-    EXECUTE(return, this->call_impl, (t, py_q, py_args);, return py::none();)
+
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (static_cast<size_t>(q.size()) != Nsys || py_args.size() != Nargs){
+            throw py::value_error("Invalid array sizes in ode function call");
+        }
+        auto args = toCPP_Array<T, std::vector<T>>(py_args);
+        Array<T> res(output_shape.data(), output_shape.size());
+        reinterpret_cast<Func<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data(), nullptr);
+        return py::cast(res);
+    )
 }
 
 //===========================================================================================
@@ -87,7 +110,10 @@ void* PyPrecEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tupl
     }
     this->data.py_args = args;
     this->data.shape = shape;
-    EXECUTE(return, this->get_new_event, ();, return nullptr;)
+
+    return DISPATCH(void*,
+        return this->get_new_event<T>();
+    )
 }
 
 //===========================================================================================
@@ -107,7 +133,9 @@ void* PyPerEvent::toEvent(const std::vector<py::ssize_t>& shape, const py::tuple
     }
     this->data.py_args = args;
     this->data.shape = shape;
-    EXECUTE(return, this->get_new_event, ();, return nullptr;)
+    return DISPATCH(void*,
+        return this->get_new_event<T>();
+    )
 }
 
 py::object PyPerEvent::period() const{
@@ -134,31 +162,34 @@ inline std::vector<EventOptions> to_Options(const py::iterable& d) {
 //===========================================================================================
 
 PySolver::PySolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
-    EXECUTE(, this->init_solver, (f, jac, t0, py_q0, rtol, atol, min_step, max_step, first_step, dir, py_args, py_events, name);, )
+
+    DISPATCH(void,
+        return this->init_solver<T>(f, jac, t0, py_q0, rtol, atol, min_step, max_step, first_step, dir, py_args, py_events, name);
+    )
 }
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
     this->s = solver;
-    CALL_IT(void, set_obj, &data);
+    DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data) {
-    EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
-    EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
+    DISPATCH(void, this->s = other.template cast<T>()->clone();)
+    DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)) {
     other.s = nullptr;
-    CALL_IT(void, set_obj, &data);
+    DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 
 PySolver& PySolver::operator=(const PySolver& other){
     if (&other != this){
         data = other.data;
-        EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
-        EXECUTE(this->s =, reinterpret_cast<OdeRichSolver, *>(other.s)->clone();, )
-        EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
+        DISPATCH(void, delete cast<T>();)
+        DISPATCH(void, this->s = other.template cast<T>()->clone();)
+        DISPATCH(void, cast<T>()->set_obj(&data);)
     }
     return *this;
 }
@@ -167,9 +198,9 @@ PySolver& PySolver::operator=(const PySolver& other){
 PySolver& PySolver::operator=(PySolver&& other) noexcept{
     if (&other != this){
         data = std::move(other.data);
-        EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
+        DISPATCH(void, delete cast<T>();)
         this->s = other.s;
-        EXECUTE(, reinterpret_cast<OdeRichSolver, *>(this->s)->set_obj(&data);, )
+        DISPATCH(void, cast<T>()->set_obj(&data);)
         other.s = nullptr;
     }
     return *this;
@@ -177,8 +208,162 @@ PySolver& PySolver::operator=(PySolver&& other) noexcept{
 
 
 PySolver::~PySolver(){
-    EXECUTE(delete, reinterpret_cast<OdeRichSolver, *>(this->s);, )
+    DISPATCH(void, delete cast<T>();)
 }
+
+
+py::object PySolver::t() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->t());
+    )
+}
+
+py::object PySolver::t_old() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->t_old());
+    )
+}
+
+py::object PySolver::q() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->vector());
+    )
+}
+
+py::object PySolver::q_old() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->vector_old());
+    )
+}
+
+py::object PySolver::stepsize() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->stepsize());
+    )
+}
+
+py::object PySolver::diverges() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->diverges());
+    )
+}
+
+py::object PySolver::is_dead() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->is_dead());
+    )
+}
+
+py::object PySolver::Nsys() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->Nsys());
+    )
+}
+
+void PySolver::show_state(int digits) const{
+    DISPATCH(void,
+        return cast<T>()->show_state(digits);
+    )
+}
+
+py::object PySolver::advance() {
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->advance());
+    )
+}
+
+py::object PySolver::advance_to_event() {
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->advance_to_event());
+    )
+}
+
+py::object PySolver::advance_until(const py::object& time) {
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->advance_until(time.cast<T>()));
+    )
+}
+
+void PySolver::reset() {
+    DISPATCH(void,
+        return cast<T>()->reset();
+    )
+}
+
+bool PySolver::resume() {
+    return DISPATCH(bool,
+        return cast<T>()->resume();
+    )
+}
+
+py::object PySolver::py_at_event() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->at_event());
+    )
+}
+
+py::object PySolver::py_event_located(const py::str& name) const{
+    return DISPATCH(py::object,
+        EventView<T> events = cast<T>()->current_events();
+        std::string ev = name.cast<std::string>();
+        for (size_t i=0; i<events.size(); i++){
+            if (events[i]->name() == ev){
+                return py::cast(true);
+            }
+        }
+        return py::cast(false);
+    )
+
+}
+
+
+//===========================================================================================
+//                                      PyVarSolver
+//===========================================================================================
+
+
+PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type) : PySolver(scalar_type) {
+    DISPATCH(void,
+        std::vector<T> args;
+        OdeData<T> ode_data = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), py_q0, std::move(jac), py_args, py::list());
+        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        if ((q0.size() & 1) != 0){
+            throw py::value_error("Variational solvers require an even number of system size");
+        }
+        this->s = VariationalSolver<T, 0>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), first_step.cast<T>(), dir, args, method).release();
+    )
+}
+
+PyVarSolver::PyVarSolver(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+
+inline py::object PyVarSolver::py_logksi() const{
+    return DISPATCH(py::object,
+        return py::cast(this->main_event<T>().logksi());
+    )
+}
+
+inline py::object PyVarSolver::py_lyap() const{
+    return DISPATCH(py::object,
+        return py::cast(this->main_event<T>().lyap());
+    )
+}
+
+inline py::object PyVarSolver::py_t_lyap() const{
+    return DISPATCH(py::object,
+        return py::cast(this->main_event<T>().delta_t_abs());
+    )
+}
+
+inline py::object PyVarSolver::py_delta_s() const{
+    return DISPATCH(py::object,
+        return py::cast(this->main_event<T>().delta_s());
+    )
+}
+
+py::object PyVarSolver::copy() const{
+    return py::cast(PyVarSolver(*this));
+}
+
 
 //===========================================================================================
 //                                      PyRK23
@@ -231,7 +416,7 @@ PyOdeResult::PyOdeResult(void* result, const std::vector<py::ssize_t>& q0_shape,
 
 
 PyOdeResult::PyOdeResult(const PyOdeResult& other) : DtypeDispatcher(other.scalar_type), q0_shape(other.q0_shape) {
-    EXECUTE(this->res =, reinterpret_cast<OdeResult, *>(other.res)->clone();,)
+        DISPATCH(void, this->res = other.template cast<T>()->clone();)
 }
 
 
@@ -241,14 +426,14 @@ PyOdeResult::PyOdeResult(PyOdeResult&& other) noexcept : DtypeDispatcher(other.s
 
 
 PyOdeResult::~PyOdeResult(){
-    EXECUTE(delete, reinterpret_cast<OdeResult, *>(this->res);, )
+        DISPATCH(void, delete cast<T>();)
     res = nullptr;
 }
 
 PyOdeResult& PyOdeResult::operator=(const PyOdeResult& other){
     if (&other != this){
-        EXECUTE(delete, reinterpret_cast<OdeResult, *>(this->res);, )
-        EXECUTE(this->res =, reinterpret_cast<OdeResult, *>(other.res)->clone();,)
+        DISPATCH(void, delete cast<T>();)
+        DISPATCH(void, this->res = other.template cast<T>()->clone();)
         q0_shape = other.q0_shape;
     }
     return *this;
@@ -257,13 +442,80 @@ PyOdeResult& PyOdeResult::operator=(const PyOdeResult& other){
 
 PyOdeResult& PyOdeResult::operator=(PyOdeResult&& other) noexcept{
     if (&other != this){
-        EXECUTE(delete, reinterpret_cast<OdeResult, *>(this->res);, )
+        DISPATCH(void, delete cast<T>();)
         this->res = other.res;
         q0_shape = other.q0_shape;
         other.res = nullptr;
     }
     return *this;
 }
+
+
+py::object PyOdeResult::t() const{
+    return DISPATCH(py::object,
+        auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
+        return py::cast(View<T>(r->t().data(), r->t().size()));
+    )
+}
+
+py::object PyOdeResult::q() const{
+    return DISPATCH(py::object,
+        auto *r = reinterpret_cast<OdeResult<T> *>(this->res);
+        auto shape = getShape<size_t>(py::ssize_t(r->t().size()), this->q0_shape);
+        return py::cast(View<T>(r->q().data(), shape.data(), shape.size()));
+    )
+}
+
+py::dict PyOdeResult::event_map() const{
+    return DISPATCH(py::object,
+        EventMap result = reinterpret_cast<const OdeResult<T>*>(this->res)->event_map();
+        return to_PyDict(result);
+    )
+}
+
+py::tuple PyOdeResult::event_data(const py::str& event) const{
+    return DISPATCH(py::object,
+        auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
+        std::vector<T> t_data = r->t_filtered(event.cast<std::string>());
+        Array<T> t_res(t_data.data(), t_data.size());
+        Array2D<T, 0, 0> q_data = r->q_filtered(event.cast<std::string>());
+        auto shape = getShape<size_t>(py::ssize_t(t_res.size()), this->q0_shape);
+        Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
+        return py::make_tuple(py::cast(t_res), py::cast(q_res));
+    )
+}
+
+
+py::bool_ PyOdeResult::diverges() const{
+    return DISPATCH(py::bool_,
+        return py::cast(cast<T>()->diverges());
+    )
+}
+
+py::bool_ PyOdeResult::success() const{
+    return DISPATCH(py::bool_,
+        return py::cast(cast<T>()->success());
+    )
+}
+
+py::float_ PyOdeResult::runtime() const{
+    return DISPATCH(py::float_,
+        return py::cast(cast<T>()->runtime());
+    )
+}
+
+py::str PyOdeResult::message() const{
+    return DISPATCH(py::str,
+        return py::cast(cast<T>()->message());
+    )
+}
+
+void PyOdeResult::examine() const{
+    DISPATCH(void,
+        return cast<T>()->examine();
+    )
+}
+
 
 
 //===========================================================================================
@@ -277,11 +529,10 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
     try {
         // Try to convert t to a numpy array
         py::array arr = py::array::ensure(t);
-        EXECUTE(return, this->_get_array, (arr);, return py::none();)
+        return DISPATCH(py::object, return this->_get_array<T>(arr);)
     } catch (const py::cast_error&) {
         // If conversion fails, treat as a scalar
-        EXECUTE(return, this->_get_frame, (t);, return py::none();)
-    }
+        return DISPATCH(py::object, return this->_get_frame<T>(t);)    }
 }
 
 //===========================================================================================
@@ -290,28 +541,41 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 
 
 PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
-    EXECUTE(, this->_init_ode, (f, t0, py_q0, jacobian, rtol, atol, min_step, max_step, first_step, dir, py_args, events, method);, )
+    DISPATCH(void,
+        std::vector<T> args;
+        OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, data,args, f, py_q0, jacobian, py_args, events);
+        std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
+        std::vector<const Event<T>*> evs(safe_events.size());
+        for (size_t i=0; i<evs.size(); i++){
+            evs[i] = safe_events[i];
+        }
+        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        ode = new ODE<T>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
+        for (size_t i=0; i<evs.size(); i++){
+            delete safe_events[i];
+        }
+    )
 }
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data), is_lowlevel(other.is_lowlevel){
-    EXECUTE(this->ode =, reinterpret_cast<ODE, *>(other.ode)->clone();, )
-    EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
+        DISPATCH(void, this->ode = other.template cast<T>()->clone();)
+        DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)), is_lowlevel(other.is_lowlevel){
     other.ode = nullptr;
-    EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
+        DISPATCH(void, cast<T>()->set_obj(&data);)
 }
 
 PyODE& PyODE::operator=(const PyODE& other){
     if (&other == this){
         return *this;
     }
-    EXECUTE(delete, reinterpret_cast<ODE, *>(this->ode);, )
-    EXECUTE(this->ode =, reinterpret_cast<ODE, *>(other.ode)->clone();, )
+    DISPATCH(void, delete cast<T>();)
+    DISPATCH(void, this->ode = other.template cast<T>()->clone();)
     data = other.data;
     is_lowlevel = other.is_lowlevel;
-    EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
+    DISPATCH(void, cast<T>()->set_obj(&data);)
     return *this;
 }
 
@@ -319,41 +583,66 @@ PyODE& PyODE::operator=(PyODE&& other) noexcept {
     if (&other == this){
         return *this;
     }
-    EXECUTE(delete, reinterpret_cast<ODE, *>(this->ode);, )
+    DISPATCH(void, delete cast<T>();)
     this->is_lowlevel = other.is_lowlevel;
     this->ode = other.ode;
     other.ode = nullptr;
     data = std::move(other.data);
-    EXECUTE(, reinterpret_cast<ODE, *>(this->ode)->set_obj(&data);, )
+    DISPATCH(void, cast<T>()->set_obj(&data);)
     return *this;
 }
 
 PyODE::~PyODE(){
-    EXECUTE(delete, reinterpret_cast<ODE, *>(this->ode);, )
+    DISPATCH(void, delete cast<T>();)
 }
 
 py::object PyODE::py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    PY_GET_TEMPLATE(this->_py_integrate, (interval, t_eval, event_options, max_prints))
+
+    return DISPATCH(py::object,
+        auto* ptr = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
+        return py::cast(PyOdeResult(ptr, this->data.shape, this->scalar_type));
+    )
 }
 
 py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
-    PY_GET_TEMPLATE(this->_py_rich_integrate, (interval, event_options, max_prints))
+    return DISPATCH(py::object,
+        auto* ptr = new OdeSolution<T>(cast<T>()->rich_integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
+        return py::cast(PyOdeSolution(ptr, this->data.shape, this->scalar_type));
+    )
 }
 
 py::object PyODE::py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-    PY_GET_TEMPLATE(this->_py_go_to, (t, t_eval, event_options, max_prints))
+
+    return DISPATCH(py::object,
+        auto* ptr = new OdeResult<T>(cast<T>()->go_to(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
+        return py::cast(PyOdeResult(ptr, this->data.shape, this->scalar_type));
+    )
 }
 
 py::object PyODE::t_array() const{
-    EXECUTE(return, this->_t_array, ();, return py::none();)
+    return DISPATCH(py::object,
+        auto* r = cast<T>();
+        return py::cast(View<T>(r->t().data(), r->t().size()));    
+    )
 }
 
 py::object PyODE::q_array() const{
-    EXECUTE(return, this->_q_array, ();, return py::none();)
+
+    return DISPATCH(py::object,
+        auto* r = cast<T>();
+        auto shape = getShape<size_t>(py::ssize_t(r->t().size()), this->data.shape);
+        return py::cast(View<T>(r->q().data(), shape.data(), shape.size()));
+    )
 }
 
 py::tuple PyODE::event_data(const py::str& event) const{
-    EXECUTE(return, this->_event_data, (event);, return py::none();)
+    return DISPATCH(py::object,
+        std::vector<T> t_data = reinterpret_cast<const ODE<T>*>(ode)->t_filtered(event.cast<std::string>());
+        Array2D<T, 0, 0> q_data = reinterpret_cast<const ODE<T>*>(ode)->q_filtered(event.cast<std::string>());
+        auto shape = getShape<size_t>(py::ssize_t(t_data.size()), data.shape);
+        Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
+        return py::make_tuple(py::cast(Array<T>(t_data.data(), t_data.size())), py::cast(q_res));
+    )
 }
 
 py::object PyODE::copy() const{
@@ -361,8 +650,70 @@ py::object PyODE::copy() const{
 }
 
 py::object PyODE::solver_copy() const{
-    EXECUTE(return, this->_solver_copy, ();, return py::none();)
+    return DISPATCH(py::object,
+        auto* ode_ptr = reinterpret_cast<const ODE<T>*>(ode);
+        auto* solver_clone = ode_ptr->solver()->clone();
+        if (ode_ptr->solver()->method() == "RK45"){
+            return py::cast(PyRK45(solver_clone, data, this->scalar_type));
+        }
+        else if (ode_ptr->solver()->method() == "DOP853"){
+            return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
+        }
+        else if (ode_ptr->solver()->method() == "RK23"){
+            return py::cast(PyRK23(solver_clone, data, this->scalar_type));
+        }
+        else if (ode_ptr->solver()->method() == "BDF"){
+            return py::cast(PyBDF(solver_clone, data, this->scalar_type));
+        }
+        else{
+            throw py::value_error("Unregistered solver!");
+        }
+    )
 }
+
+py::dict PyODE::event_map() const{
+    return DISPATCH(py::dict,
+        EventMap result = cast<T>()->event_map();
+        return to_PyDict(result);
+    )
+}
+
+py::object PyODE::Nsys() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->Nsys());
+    )
+}
+
+py::object PyODE::runtime() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->runtime());
+    )
+}
+
+py::object PyODE::diverges() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->diverges());
+    )
+}
+
+py::object PyODE::is_dead() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->is_dead());
+    )
+}
+
+void PyODE::reset() {
+    DISPATCH(void,
+        return cast<T>()->reset();
+    )
+}
+
+void PyODE::clear() {
+    DISPATCH(void,
+        return cast<T>()->clear();
+    )
+}
+
 
 //===========================================================================================
 //                                      PyVarODE
@@ -370,19 +721,48 @@ py::object PyODE::solver_copy() const{
 
 
 PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type):PyODE(scalar_type){
-    EXECUTE(, this->_init_var_ode, (f, t0, q0, period, jac, rtol, atol, min_step, max_step, first_step, dir, py_args, events, method);, )
+    DISPATCH(void,
+        std::vector<T> args;
+        OdeData<T> ode_rhs = init_ode_data<T>(this->is_lowlevel, this->data, args, std::move(f), q0, std::move(jac), py_args, events);
+        Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
+        if ((q0_.size() & 1) != 0){
+            throw py::value_error("Variational ODEs require an even number of system size");
+        }
+        std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(q0), py_args);
+        std::vector<const Event<T>*> evs(safe_events.size());
+        for (size_t i=0; i<evs.size(); i++){
+            evs[i] = safe_events[i];
+        }
+        this->ode = new VariationalODE<T, 0>(ode_rhs, py::cast<T>(t0), q0_.data(), q0_.size()/2, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method.cast<std::string>());
+        for (size_t i=0; i<evs.size(); i++){
+            delete safe_events[i];
+        }
+    )
 }
 
 py::object PyVarODE::py_t_lyap() const{
-    EXECUTE(return, this->_py_t_lyap, ();, return py::none();)
+    return DISPATCH(py::object,
+        const auto& vode = varode<T>();
+        View<T> res(vode.t_lyap().data(), vode.t_lyap().size());
+        return py::cast(res);
+    )
 }
 
 py::object PyVarODE::py_lyap() const{
-    EXECUTE(return, this->_py_lyap, ();, return py::none();)
+
+    return DISPATCH(py::object,
+        const auto& vode = varode<T>();
+        View<T> res(vode.lyap().data(), vode.t_lyap().size());
+        return py::cast(res);
+    )
 }
 
 py::object PyVarODE::py_kicks() const{
-    EXECUTE(return, this->_py_kicks, ();, return py::none();)
+    return DISPATCH(py::object,
+        const auto& vode = varode<T>();
+        View<T> res(vode.kicks().data(), vode.t_lyap().size());
+        return py::cast(res);
+    )
 }
 
 py::object PyVarODE::copy() const{
@@ -409,10 +789,11 @@ bool all_are_lowlevel(const py::iterable& events){
 
 void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
     // Separate lists for each numeric type
-    std::vector<ODE<double, 0>*> array_double;
-    std::vector<ODE<float, 0>*> array_float;
-    std::vector<ODE<long double, 0>*> array_longdouble;
-    std::vector<ODE<mpfr::mpreal, 0>*> array_mpreal;
+    std::vector<void*> array;
+    std::vector<int> types;
+
+    std::vector<void*> step_seq;
+
 
     // Iterate through the list and identify each PyODE type
     for (const py::handle& item : list) {
@@ -423,21 +804,16 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
             if (!pyode.is_lowlevel) {
                 throw py::value_error("All ODE's in integrate_all must use only compiled functions, and no pure python functions");
             }
-            switch (pyode.scalar_type) {
-                case 0:
-                    array_double.push_back(reinterpret_cast<ODE<double>*>(pyode.ode));
-                    break;
-                case 1:
-                    array_longdouble.push_back(reinterpret_cast<ODE<long double>*>(pyode.ode));
-                    break;
-                case 2:
-                    array_mpreal.push_back(reinterpret_cast<ODE<mpfr::mpreal>*>(pyode.ode));
-                    break;
-                case 3:
-                    array_float.push_back(reinterpret_cast<ODE<float>*>(pyode.ode));
-                    break;
-                default:
-                    throw py::value_error("Unregistered scalar_type in PyODE object.");
+            array.push_back(pyode.ode);
+            types.push_back(pyode.scalar_type);
+            if (size_t(pyode.scalar_type) >= step_seq.size()){
+                step_seq.resize(pyode.scalar_type+1);
+                
+                step_seq[pyode.scalar_type] = call_dispatch(pyode.scalar_type, [&]<typename T>() -> void* {
+                    return new StepSequence<T>(to_step_sequence<T>(t_eval));
+                });
+
+
             }
         } catch (const py::cast_error&) {
             // If cast failed, throw an error
@@ -445,31 +821,42 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
         }
     }
 
-    // Convert event_options once (it's not templated)
     auto options = to_Options(event_options);
 
-    // Call integrate_all for each type group that has elements
-    if (!array_double.empty()) {
-        integrate_all<double, 0>(array_double, interval, to_step_sequence<double>(t_eval), options, threads, display_progress);
-    }
-    if (!array_float.empty()) {
-        integrate_all<float, 0>(array_float, static_cast<float>(interval), to_step_sequence<float>(t_eval), options, threads, display_progress);
-    }
-    if (!array_longdouble.empty()) {
-        integrate_all<long double, 0>(array_longdouble, static_cast<long double>(interval), to_step_sequence<long double>(t_eval), options, threads, display_progress);
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = int(array.size());
+    Clock clock;
+    clock.start();
+
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (size_t i=0; i<array.size(); i++){
+
+        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+            ODE<T>* ode = reinterpret_cast<ODE<T>*>(array[i]);
+            ode->integrate(T(interval), *reinterpret_cast<StepSequence<T>*>(step_seq[types[i]]), options);
+        });
+
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
     }
 
-    if (!array_mpreal.empty()) {
-        integrate_all<mpfr::mpreal, 0>(array_mpreal, mpfr::mpreal(interval), to_step_sequence<mpfr::mpreal>(t_eval), options, threads, display_progress);
+    for (size_t i=0; i<step_seq.size(); i++){
+        call_dispatch(int(i), [&]<typename T>(){
+            delete reinterpret_cast<StepSequence<T>*>(step_seq[i]);
+        });
     }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
 void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress){
     // Separate lists for each numeric type
-    std::vector<OdeSolver<double, 0>*> array_double;
-    std::vector<OdeSolver<float, 0>*> array_float;
-    std::vector<OdeSolver<long double, 0>*> array_longdouble;
-    std::vector<OdeSolver<mpfr::mpreal, 0>*> array_mpreal;
+    std::vector<void*> array;
+    std::vector<int> types;
 
     // Iterate through the list and identify each PySolver type
     for (const py::handle& item : list) {
@@ -480,40 +867,37 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
             if (!pysolver.is_lowlevel) {
                 throw py::value_error("All ODE's in advance_all must use only compiled functions, and no pure python functions");
             }
-            switch (pysolver.scalar_type) {
-                case 0:
-                    array_double.push_back(reinterpret_cast<OdeSolver<double>*>(pysolver.s));
-                    break;
-                case 1:
-                    array_longdouble.push_back(reinterpret_cast<OdeSolver<long double>*>(pysolver.s));
-                    break;
-                case 2:
-                    array_mpreal.push_back(reinterpret_cast<OdeSolver<mpfr::mpreal>*>(pysolver.s));
-                    break;
-                case 3:
-                    array_float.push_back(reinterpret_cast<OdeSolver<float>*>(pysolver.s));
-                    break;
-                default:
-                    throw py::value_error("Unregistered scalar_type in PySolver object.");
-            }
+            array.push_back(pysolver.s);
+            types.push_back(pysolver.scalar_type);
         } catch (const py::cast_error&) {
             // If cast failed, throw an error
             throw py::value_error("List item is not a recognized PySolver object type.");
         }
     }
 
-    // Call integrate_all for each type group that has elements
-    if (!array_double.empty()) {
-        advance_all<double, 0>(array_double, t_goal, threads, display_progress);
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = int(array.size());
+    Clock clock;
+    clock.start();
+
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (size_t i=0; i<array.size(); i++){
+
+        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+            auto* solver = reinterpret_cast<OdeSolver<T>*>(array[i]);
+            solver->advance_until(T(t_goal));
+        });
+
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
     }
-    if (!array_float.empty()) {
-        advance_all<float, 0>(array_float, float(t_goal), threads, display_progress);
-    }
-    if (!array_longdouble.empty()) {
-        advance_all<long double, 0>(array_longdouble, (long double)(t_goal), threads, display_progress);
-    }
-    if (!array_mpreal.empty()) {
-        advance_all<mpfr::mpreal, 0>(array_mpreal, t_goal, threads, display_progress);    }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+
 }
 
 
