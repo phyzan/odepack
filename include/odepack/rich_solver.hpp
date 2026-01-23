@@ -117,7 +117,7 @@ const EventCollection<T>& RichSolver<Derived, T, N, SP>::event_col() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 const Interpolator<T, N>* RichSolver<Derived, T, N, SP>::interpolator() const{
-    return &_cli;
+    return _interp_data ? &_cli : nullptr;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -148,7 +148,7 @@ void RichSolver<Derived, T, N, SP>::show_state(int prec) const{
 // PUBLIC MODIFIERS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-RichSolver<Derived, T, N, SP>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)), _cli(t0, q0, nsys){
+RichSolver<Derived, T, N, SP>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)){
     _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
 }
 

@@ -151,7 +151,7 @@ std::string to_string(const T& value, int prec = 3) {
 
 #ifdef MPREAL
 template<>
-std::string to_string(const mpfr::mpreal& value, int prec){
+inline std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
 #endif
