@@ -393,10 +393,8 @@ T bisect(Callable&& f, const T& a, const T& b, const T& atol){
     T c = a;
     T fm;
 
-    if (f(a)*f(b) > 0){
-        throw std::runtime_error("Root not bracketed");
-    }
-
+    assert((f(a) * f(b) <= 0) && "Root not bracketed" );
+    
     while (err > atol){
         c = (_a+_b)/2;
         if (c == _a || c == _b){

@@ -68,6 +68,9 @@ public:
     // MODIFIERS
     bool                        advance();
     bool                        advance_until(T time);
+
+    template<typename Callable>
+    bool                        advance_until(Callable&& obj_fun, T tol, int dir=0);
     void                        reset();
 
     template<typename Setter>
@@ -111,6 +114,7 @@ protected:
     inline const T*             last_true_state_ptr() const;
 
     const T&                    t_new() const;
+    public:
     const T&                    t_last() const;
     void                        warn_paused() const;
     void                        warn_dead() const;
@@ -144,6 +148,7 @@ private:
     inline T*                   aux_state_ptr();
     void                        register_states();
     bool                        validate_it(const T* state);
+    bool                        settle_on(const T& time, bool success);
 
 
     Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
@@ -425,24 +430,66 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(T time){
         success = this->advance();
     }
 
-    if (success && (time*d < this->t_new()*d)) {
-        T* ptr = this->aux_state_ptr();
-        interp(ptr+2, time);
-        ptr[0] = time;
-        ptr[1] = this->stepsize();
-        if (this->t() != this->t_new()) {
-            _last_true_state_idx = _true_state_idx;
-            _true_state_idx = _aux_state_idx;
-            _aux_state_idx = _aux2_state_idx = _last_true_state_idx;
+    return this->settle_on(time, success);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+template<typename Callable>
+bool BaseSolver<Derived, T, N, SP>::advance_until(Callable&& obj_fun, T tol, int dir){
+
+    /*
+    obj_fun : callable object with signature T obj_fun(const T& t, const T* q, const T* args, const void* obj)
+    tol     : tolerance for root finding
+    dir     : direction of root finding
+    */
+    assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
+
+    int factor = dir == 0 ? 1 : this->direction()*dir;
+
+    auto ObjFun = [&](const T& t, const T* q) LAMBDA_INLINE {
+        return obj_fun(t, q, this->args().data(), this->_ode.obj);
+    };
+
+    auto TrueObjFun = [&](const T& t) LAMBDA_INLINE{
+        this->interp_impl(_dummy_state.data(), t);
+        return ObjFun(t, _dummy_state.data());
+    };
+
+    auto get_sgn = [&]() LAMBDA_INLINE {
+        return factor*sgn(ObjFun(this->t(), this->vector().data()));
+    };
+
+    auto detected = [&](int s1, int s2) LAMBDA_INLINE{
+        if (dir == 0){
+            return s1*s2 <= 0;
         }else {
-            _true_state_idx = _aux_state_idx;
-            _aux_state_idx = _aux2_state_idx;
+            return s1 < s2;
         }
-    }else if (success){
-        _last_true_state_idx = _true_state_idx;
-        _true_state_idx = _new_state_idx;
+    };
+
+    int curr_dir = get_sgn();
+    int old_dir = curr_dir;
+
+    //iterate to the first step where obj_fun != 0
+    //It is a very rare edge case that the code
+    //will enter this loop even once
+    while (curr_dir == 0 && this->advance()){
+        curr_dir = old_dir = get_sgn();
     }
-    return success;
+
+    bool success = this->is_running();
+    while ( !detected(old_dir, curr_dir) && this->is_running()){
+        success = this->advance();
+        old_dir = curr_dir;
+        curr_dir = get_sgn();
+    }
+
+    T time;
+    if (success){
+        time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
+    }
+
+    return settle_on(time, success);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -808,6 +855,28 @@ bool BaseSolver<Derived, T, N, SP>::validate_it(const T* state){
         success = false;
     }
 
+    return success;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+bool BaseSolver<Derived, T, N, SP>::settle_on(const T& time, bool success){
+    if (success && (time*this->direction() < this->t_new()*this->direction())) {
+        T* ptr = this->aux_state_ptr();
+        interp(ptr+2, time);
+        ptr[0] = time;
+        ptr[1] = this->stepsize();
+        if (this->t() != this->t_new()) {
+            _last_true_state_idx = _true_state_idx;
+            _true_state_idx = _aux_state_idx;
+            _aux_state_idx = _aux2_state_idx = _last_true_state_idx;
+        }else {
+            _true_state_idx = _aux_state_idx;
+            _aux_state_idx = _aux2_state_idx;
+        }
+    }else if (success && _true_state_idx != _new_state_idx){
+        _last_true_state_idx = _true_state_idx;
+        _true_state_idx = _new_state_idx;
+    }
     return success;
 }
 
