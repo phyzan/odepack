@@ -772,7 +772,7 @@ LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const T& t, const T* 
 
 
 template<typename T, size_t N, typename INTERPOLATOR>
-LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const LinkedInterpolator& other) : Interpolator<T, N>(other.q_start().size()){
+LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const LinkedInterpolator& other) : Interpolator<T, N>(other.array_size()){
     LinkedInterpolator<T, N, INTERPOLATOR>::operator=(other);
 }
 

@@ -17,75 +17,9 @@ struct LUResult {
     JacMat<T, N> LU;
     Array1D<size_t, N> piv;
 
-    void lu_factor(const JacMat<T, N>& A_input){
-        size_t n = A_input.Nrows();
-        JacMat<T, N>& A = LU;
+    void lu_factor(const JacMat<T, N>& A_input);
 
-        // Copy input to output
-        copy_array(A.data(), A_input.data(), A_input.size());
-
-        // Initialize pivot array as identity
-        for (size_t i = 0; i < n; ++i) {
-            piv[i] = i;
-        }
-
-        for (size_t k = 0; k < n - 1; ++k) {
-            // Find pivot row
-            size_t p = k;
-            T max_val = abs(A(k, k));
-            for (size_t i = k + 1; i < n; ++i) {
-                if (abs(A(i, k)) > max_val) {
-                    max_val = abs(A(i, k));
-                    p = i;
-                }
-            }
-
-            // Check singular
-            if (max_val < 1e-15) {
-                throw std::runtime_error("Matrix is singular or nearly singular");
-            }
-
-            // Record and apply pivot
-            if (p != k) {
-                std::swap(piv[k], piv[p]);  // Record which row k was swapped with
-                for (size_t c = 0; c < n; c++) {
-                    std::swap(A(k, c), A(p, c));
-                }
-            }
-
-            // Eliminate below pivot
-            for (size_t i = k + 1; i < n; ++i) {
-                A(i, k) /= A(k, k);
-                for (size_t j = k + 1; j < n; ++j) {
-                    A(i, j) -= A(i, k) * A(k, j);
-                }
-            }
-        }
-    }
-
-    void lu_solve(T* x, const T* b) const {
-        size_t n = piv.size();
-
-        // Apply permutation: x = P*b
-        for (size_t i = 0; i < n; ++i) {
-            x[i] = b[piv[i]];
-        }
-
-        // Forward substitution: L * y = P*b
-        for (size_t i = 0; i < n; ++i) {
-            for (size_t j = 0; j < i; ++j) {
-                x[i] -= LU(i, j) * x[j];
-            }
-        }
-
-        // Backward substitution: U * x = y
-        for (size_t i = n; i-- > 0; ) {
-            for (size_t j = i + 1; j < n; ++j) {
-                x[i] -= LU(i, j) * x[j];
-            }
-            x[i] /= LU(i, i);
-        }
-    }
+    void lu_solve(T* x, const T* b) const;
 };
 
 template<typename T>
@@ -216,6 +150,78 @@ private:
 
 template<typename T, size_t N>
 LUResult<T, N>::LUResult(size_t Nsys) : LU(Nsys, Nsys), piv(Nsys) {}
+
+template<typename T, size_t N>
+void LUResult<T, N>::lu_factor(const JacMat<T, N>& A_input){
+    size_t n = A_input.Nrows();
+    JacMat<T, N>& A = LU;
+
+    // Copy input to output
+    copy_array(A.data(), A_input.data(), A_input.size());
+
+    // Initialize pivot array as identity
+    for (size_t i = 0; i < n; ++i) {
+        piv[i] = i;
+    }
+
+    for (size_t k = 0; k < n - 1; ++k) {
+        // Find pivot row
+        size_t p = k;
+        T max_val = abs(A(k, k));
+        for (size_t i = k + 1; i < n; ++i) {
+            if (abs(A(i, k)) > max_val) {
+                max_val = abs(A(i, k));
+                p = i;
+            }
+        }
+
+        // Check singular
+        if (max_val < 1e-15) {
+            throw std::runtime_error("Matrix is singular or nearly singular");
+        }
+
+        // Record and apply pivot
+        if (p != k) {
+            std::swap(piv[k], piv[p]);  // Record which row k was swapped with
+            for (size_t c = 0; c < n; c++) {
+                std::swap(A(k, c), A(p, c));
+            }
+        }
+
+        // Eliminate below pivot
+        for (size_t i = k + 1; i < n; ++i) {
+            A(i, k) /= A(k, k);
+            for (size_t j = k + 1; j < n; ++j) {
+                A(i, j) -= A(i, k) * A(k, j);
+            }
+        }
+    }
+}
+
+template<typename T, size_t N>
+void LUResult<T, N>::lu_solve(T* x, const T* b) const{
+    size_t n = piv.size();
+
+    // Apply permutation: x = P*b
+    for (size_t i = 0; i < n; ++i) {
+        x[i] = b[piv[i]];
+    }
+
+    // Forward substitution: L * y = P*b
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < i; ++j) {
+            x[i] -= LU(i, j) * x[j];
+        }
+    }
+
+    // Backward substitution: U * x = y
+    for (size_t i = n; i-- > 0; ) {
+        for (size_t j = i + 1; j < n; ++j) {
+            x[i] -= LU(i, j) * x[j];
+        }
+        x[i] /= LU(i, i);
+    }
+}
 
 template<typename T>
 Array1D<T> arange(size_t a, size_t b){

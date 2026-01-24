@@ -52,9 +52,6 @@ public:
     virtual T                   auto_step(T t, const T* q) const = 0;
     virtual T                   auto_step() const = 0;
     virtual OdeSolver<T, N>*    clone() const = 0;
-    UniqueClone                 safe_clone() const{
-        return std::make_unique<OdeSolver<T, N>>(this->clone());
-    }
 
     // MODIFIERS
     virtual bool                advance() = 0;
@@ -90,9 +87,6 @@ public:
     virtual bool                            is_interpolating() const = 0;
     virtual bool                            at_event() const = 0;
     virtual OdeRichSolver<T, N>*            clone() const = 0;
-    UniqueClone                             safe_clone() const{
-        return std::make_unique<OdeRichSolver<T, N>>(this->clone());
-    }
 
     // MODIFIERS
     virtual bool                            advance_to_event()=0;
