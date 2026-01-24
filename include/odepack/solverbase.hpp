@@ -70,7 +70,7 @@ public:
     bool                        advance_until(T time);
 
     template<typename Callable>
-    bool                        advance_until(Callable&& obj_fun, T tol, int dir=0);
+    bool                        advance_until(Callable&& obj_fun, T tol, int dir=0, T* worker = nullptr);
     void                        reset();
 
     template<typename Setter>
@@ -435,14 +435,20 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(T time){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 template<typename Callable>
-bool BaseSolver<Derived, T, N, SP>::advance_until(Callable&& obj_fun, T tol, int dir){
+bool BaseSolver<Derived, T, N, SP>::advance_until(Callable&& obj_fun, T tol, int dir, T* worker){
 
     /*
     obj_fun : callable object with signature T obj_fun(const T& t, const T* q, const T* args, const void* obj)
     tol     : tolerance for root finding
     dir     : direction of root finding
+    worker: optional pointer to a preallocated array of size N to be used as temporary storage. Use this
+        if obj_fun is calling some of this solver's methods that may overwrite internal dummy arrays.
     */
     assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
+
+    if (worker == nullptr){
+        worker = _dummy_state.data();
+    }
 
     int factor = dir == 0 ? 1 : this->direction()*dir;
 
@@ -451,8 +457,8 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(Callable&& obj_fun, T tol, int
     };
 
     auto TrueObjFun = [&](const T& t) LAMBDA_INLINE{
-        this->interp_impl(_dummy_state.data(), t);
-        return ObjFun(t, _dummy_state.data());
+        this->interp_impl(worker, t);
+        return ObjFun(t, worker);
     };
 
     auto get_sgn = [&]() LAMBDA_INLINE {
