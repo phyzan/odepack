@@ -1,6 +1,7 @@
 #ifndef RICH_SOLVER_HPP
 #define RICH_SOLVER_HPP
 
+
 #include "solverbase.hpp"
 
 #define EVENTS const std::vector<const Event<T>*>&
@@ -65,10 +66,10 @@ private:
 
     inline static std::vector<const Event<T>*>& include_tmax_event(std::vector<const Event<T>*>& events);
 
-    EventCollection<T>          _events;
-    LinkedInterpolator<T, N>    _cli;
-    long int                    _event_idx = -1;
-    bool                        _interp_data = false;
+    EventCollection<T>                      _events;
+    PolyWrapper<LinkedInterpolator<T, N>>   _cli;
+    long int                                _event_idx = -1;
+    bool                                    _interp_data = false;
 
 };
 
@@ -117,7 +118,7 @@ const EventCollection<T>& RichSolver<Derived, T, N, SP>::event_col() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 const Interpolator<T, N>* RichSolver<Derived, T, N, SP>::interpolator() const{
-    return _interp_data ? &_cli : nullptr;
+    return _cli.ptr();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -187,7 +188,7 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
         if (_interp_data && this->requires_new_start()){
             if (!_events.canon_event()->hides_mask()){
                 auto r = std::unique_ptr<Interpolator<T, N>>(new LocalInterpolator<T, N>(this->t(), this->true_vector().data(), this->Nsys()));
-                _cli.adjust_end(this->t());
+                _cli->adjust_end(this->t());
                 this->add_interpolant(std::move(r));
             }
         }
@@ -205,7 +206,7 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
 
     if (_interp_data){
         // _current_linked_interpolator.adjust_end(this->t());
-        _cli.close_end();
+        _cli->close_end();
     }
 
     return true;
@@ -259,22 +260,22 @@ void RichSolver<Derived, T, N, SP>::start_interpolation(){
         _interp_data = true;
 
         if (this->equiv_states()){
-            _cli = LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys());
+            _cli.own(new LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys()));
         }
         else{
             int bdr1 = 1;
             if (at_event() && _events.canon_event() && (_events.state(_event_idx).t() == _events.canon_state()->t()) && _events.canon_event()->hides_mask()){
-                _cli = LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys());
+                _cli.own(new LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys()));
                 bdr1 = -1;
             }
             std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(bdr1, -1);
             r->adjust_start(this->t());
 
             if (bdr1 == 1){
-                _cli = LinkedInterpolator<T, N>(r.get());
+                _cli.own(new LinkedInterpolator<T, N>(r.get()));
             }
             else{
-                _cli.expand_by_owning(std::move(r));
+                _cli->expand_by_owning(std::move(r));
             }
 
         }
@@ -284,7 +285,7 @@ void RichSolver<Derived, T, N, SP>::start_interpolation(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void RichSolver<Derived, T, N, SP>::stop_interpolation(){
-    _cli = LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys());
+    _cli.own(nullptr);
     _interp_data = false;
 }
 
@@ -306,11 +307,10 @@ inline void RichSolver<Derived, T, N, SP>::set_args_impl(const T* new_args){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void RichSolver<Derived, T, N, SP>::add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant){
-    LinkedInterpolator<T, N>& cli = this->_cli;
-    if (cli.last_interpolant().interval().is_point() && interpolant->interval().start_bdr() == 0){
+    if (_cli->last_interpolant().interval().is_point() && interpolant->interval().start_bdr() == 0){
         interpolant->close_start();
     }
-    cli.expand_by_owning(std::move(interpolant));
+    _cli->expand_by_owning(std::move(interpolant));
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -344,7 +344,5 @@ inline void interp_func(T* res, const T& t, const void* obj){
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP>, BaseSolver<Derived, T, N, SP>>;
 
-template<SolverPolicy SP>
-constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
 
 #endif

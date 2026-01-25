@@ -144,4 +144,7 @@ using BaseInterface = typename HelperVirtualSolver<T, N, SP>::type;
 template<typename Solver, typename T, size_t N, SolverPolicy SP>
 using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<T, N>, std::conditional_t<SP==SolverPolicy::RichVirtual, OdeRichSolver<T, N>, Solver>>;
 
+template<SolverPolicy SP>
+constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
+
 #endif

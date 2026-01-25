@@ -73,7 +73,7 @@ public:
 
     virtual ~Interpolator() = default;
 
-    Interpolator() = default;
+    Interpolator() = delete;
 
     //ACCESSORS
 
@@ -258,7 +258,7 @@ class LinkedInterpolator : public Interpolator<T, N>{
 
 public:
 
-    LinkedInterpolator() = default;
+    LinkedInterpolator() = delete;
 
     LinkedInterpolator(const INTERPOLATOR* other);
 
