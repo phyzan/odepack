@@ -5,6 +5,8 @@
 #include "../layouts/standard_layouts.hpp"
 #include "../ndspan.hpp"
 
+namespace ndspan{
+
 template<std::integral INT>
 constexpr INT next_pow_of_2(INT x){
     INT y = 1;
@@ -182,3 +184,5 @@ private:
     std::vector<size_t> _id_at_offset; 
     std::vector<size_t> _offset_at_id;
 };
+
+} // namespace ndspan

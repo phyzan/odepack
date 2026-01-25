@@ -5,6 +5,8 @@
 #include "events.hpp"
 #include <memory>
 
+namespace ode {
+
 template<typename T, size_t N>
 using VirtualInterp = std::unique_ptr<Interpolator<T, N>>;
 
@@ -146,5 +148,7 @@ using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<
 
 template<SolverPolicy SP>
 constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
+
+} // namespace ode
 
 #endif

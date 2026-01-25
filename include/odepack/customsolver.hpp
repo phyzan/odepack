@@ -3,8 +3,7 @@
 
 #include "solverbase.hpp"
 
-
-
+namespace ode {
 
 template<template<typename, size_t, SolverPolicy> typename Custom, template<typename, size_t, SolverPolicy, typename> typename Solver, typename T, size_t N, SolverPolicy SP>
 class CustomSolver : public Solver<T, N, SP, Custom<T, N, SP>>{
@@ -55,6 +54,6 @@ public:
 
 */
 
-
+} // namespace ode
 
 #endif

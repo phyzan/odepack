@@ -2,6 +2,7 @@
 
 #include "layoutmap.hpp"
 
+namespace ndspan{
 
 
 template<typename Derived, Layout L, typename T, size_t... DIMS>
@@ -206,3 +207,5 @@ template<typename Derived, INT_T... Int>
 inline const Derived::value_type& tensor_call(const Derived& x, Int... idx){
     return x(idx...);
 }
+
+} // namespace ndspan

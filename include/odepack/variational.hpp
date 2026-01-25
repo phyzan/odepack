@@ -8,6 +8,7 @@
 #include <memory>
 #include <stdexcept>
 
+namespace ode {
 
 // ============================================================================
 // DECLARATIONS
@@ -287,5 +288,6 @@ void VariationalODE<T, N>::_register_event(size_t event){
     }
 }
 
+} // namespace ode
 
 #endif

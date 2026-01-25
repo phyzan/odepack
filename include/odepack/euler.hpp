@@ -3,9 +3,7 @@
 
 #include "rich_solver.hpp"
 
-
-// OdeData<T> ode, const T& t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
-
+namespace ode{
 
 template<typename T, size_t N, SolverPolicy SP, typename Derived=void>
 class Euler : public BaseDispatcher<GetDerived<Euler<T, N, SP, Derived>, Derived>, T, N, SP>{
@@ -71,5 +69,7 @@ template<typename T, size_t N, SolverPolicy SP, typename Derived>
 inline std::unique_ptr<Interpolator<T, N>> Euler<T, N, SP, Derived>::state_interpolator(int bdr1, int bdr2) const{
     return std::make_unique<LocalInterpolator<T, N>>(this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2);
 }
+
+} // namespace ode
 
 #endif

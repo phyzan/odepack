@@ -12,6 +12,9 @@
 #include "mpreal.h"
 #endif
 
+namespace ode {
+
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string;
 
 template<typename Type>
 class PolyWrapper{
@@ -626,5 +629,6 @@ inline T choose_step(const T& habs, const T& hmin, const T& hmax){
     return std::max(std::min(habs, hmax), hmin);
 }
 
+} // namespace ode
 
 #endif

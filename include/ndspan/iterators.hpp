@@ -3,6 +3,8 @@
 
 #include "ndtools.hpp"
 
+namespace ndspan{
+
 template<typename Derived, size_t ND>
 class IndexIterator{
 
@@ -188,6 +190,6 @@ inline constexpr size_t multiset_coef(size_t n, size_t k){
     return comb(n+k-1, k);
 }
 
-
+} // namespace ndspan
 
 #endif

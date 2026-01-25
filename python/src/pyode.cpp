@@ -1,5 +1,6 @@
 #include "pyode.hpp"
 
+namespace ode{
 
 //===========================================================================================
 //                                      DtypeDispatcher
@@ -1173,4 +1174,6 @@ PYBIND11_MODULE(odesolvers, m) {
       py::arg("bits"),
       "Set the default MPFR precision (in bits) for mpfr::mpreal.")
     .def("mpreal_prec", &mpfr::mpreal::get_default_prec);
+}
+
 }

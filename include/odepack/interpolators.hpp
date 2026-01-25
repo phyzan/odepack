@@ -3,6 +3,7 @@
 
 #include "tools.hpp"
 
+namespace ode {
 
 template<typename T>
 class Interval{
@@ -1126,5 +1127,6 @@ void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y
     }
 }
 
+} // namespace ode
 
 #endif

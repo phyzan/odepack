@@ -3,6 +3,7 @@
 
 #include "rich_solver.hpp"
 
+namespace ode{
 
 constexpr size_t MAX_ORDER = 5;
 
@@ -708,5 +709,6 @@ bool BDF<T, N, SP, Derived>::_resize_step(T& factor, const T& min_step, const T&
     return res;
 }
 
+} // namespace ode
 
 #endif

@@ -31,6 +31,7 @@
 
 #define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args
 
+namespace ode{
 /**
  * @brief Base class for adaptive-step ODE solvers using CRTP.
  *
@@ -52,6 +53,8 @@
  *       enable static polymorphism. The derived class passes itself as the
  *       first template parameter.
  */
+
+
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 class BaseSolver : public BaseInterface<T, N, SP>{
 
@@ -1187,5 +1190,8 @@ bool BaseSolver<Derived, T, N, SP>::settle_on(const T& time, bool success){
     }
     return success;
 }
+
+
+} // namespace ode
 
 #endif

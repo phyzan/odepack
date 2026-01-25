@@ -4,6 +4,8 @@
 #include "arrays.hpp"
 #include "iterators.hpp"
 
+namespace ndspan{
+
 template<typename T, size_t N, size_t M>
 constexpr bool same_elements(const std::array<T, N>& a, const std::array<T, M>& b){
     if constexpr (N!=M){
@@ -396,7 +398,7 @@ struct VirtualTensor{
 
     template<char label>
     static constexpr bool contains(Index<label>){
-        return ::contains(label, idx_labels());
+        return ndspan::contains(label, idx_labels());
     }
 
     constexpr size_t shape(size_t i) const{
@@ -580,7 +582,7 @@ public:
         std::array<char, Ncontr> res{};
         size_t k=0;
         for (char name : unique_idx_labels()){
-            if (!::contains(name, free_idx)){
+            if (!ndspan::contains(name, free_idx)){
                 res[k++] = name;
             }
         }
@@ -839,5 +841,7 @@ contract closed networks first
 find optimal contraction ordering
 add vectorization
 */
+
+} // namespace ndspan
 
 #endif

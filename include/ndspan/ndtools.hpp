@@ -26,7 +26,9 @@
     CLASSNAME& operator=(const CLASSNAME& other) = default; \
     CLASSNAME& operator=(CLASSNAME&& other) = default;
 
+namespace ndspan{
 
+    
 template<typename... Arg>
 void print(Arg... y){
     ((std::cout << y << ' '), ...);
@@ -231,3 +233,5 @@ constexpr size_t comb(size_t n, size_t k) {
     }
     return res;
 }
+
+} // namespace ndspan

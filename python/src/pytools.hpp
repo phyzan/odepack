@@ -12,6 +12,8 @@
 #define DISPATCH(RETURN_TYPE, ...)                                              \
 call_dispatch(this->scalar_type, [&]<typename T>() -> RETURN_TYPE {__VA_ARGS__ });
 
+namespace ode{
+
 static const std::string SCALAR_TYPE[4] = {"float", "double", "long double", "mpreal"};
 
 template<typename Callable>
@@ -235,5 +237,7 @@ mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mpreal* q
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args).template cast<mpfr::mpreal>();
 }
+
+} // namespace ode
 
 #endif

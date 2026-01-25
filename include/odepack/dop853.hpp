@@ -3,6 +3,7 @@
 
 #include "rk_adaptive.hpp"
 
+namespace ode{
 
 // ============================================================================
 // DECLARATIONS
@@ -637,5 +638,6 @@ T DOP853<T, N, SP, Derived>::estimate_error_norm(const T* K, const T* scale, T h
     return abs(h) * err5_norm_2 / sqrt(denom * Nsys);
 }
 
+} // namespace ode
 
 #endif

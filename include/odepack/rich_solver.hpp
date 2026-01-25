@@ -6,7 +6,7 @@
 
 #define EVENTS const std::vector<const Event<T>*>&
 
-
+namespace ode{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void interp_func(T* res, const T& t, const void* obj);
@@ -344,5 +344,5 @@ inline void interp_func(T* res, const T& t, const void* obj){
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP>, BaseSolver<Derived, T, N, SP>>;
 
-
+}
 #endif

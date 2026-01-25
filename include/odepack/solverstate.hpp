@@ -4,6 +4,8 @@
 #include "events.hpp"
 #include "../ndspan/arrays.hpp"
 
+namespace ode {
+
 template<typename T, size_t N>
 struct SolverState{
     
@@ -62,5 +64,7 @@ struct SolverRichState : public SolverState<T, N>{
     }
 
 };
+
+} // namespace ode
 
 #endif

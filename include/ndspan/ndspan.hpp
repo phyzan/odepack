@@ -2,6 +2,8 @@
 
 #include "ndtools.hpp"
 
+namespace ndspan{
+
 template<typename Derived, size_t... DIMS>
 class AbstractNdSpan{
 
@@ -578,3 +580,5 @@ private:
 // Derived Layouts inherit from this
 template<typename Derived, size_t... DIMS>
 using DerivedNdSpan = std::conditional_t<(sizeof...(DIMS) > 0 && (DIMS*...*1)>0), StaticNdSpan<Derived, DIMS...>, std::conditional_t<(sizeof...(DIMS)>0), SemiStaticNdSpan<Derived, DIMS...>, DynamicNdSpan<Derived>>>;
+
+} // namespace ndspan

@@ -5,6 +5,8 @@
 #include "bdf.hpp"
 #include "euler.hpp"
 
+namespace ode {
+
 template<typename T, size_t N>
 std::unique_ptr<OdeRichSolver<T, N>> get_solver(const std::string& name, MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) {
     if (name == "Euler"){
@@ -26,5 +28,7 @@ std::unique_ptr<OdeRichSolver<T, N>> get_solver(const std::string& name, MAIN_DE
         throw std::runtime_error("Unknown solver name: " + name);
     }
 }
+
+} // namespace ode
 
 #endif

@@ -2,6 +2,8 @@
 
 #include "../ndspan.hpp"
 
+namespace ndspan{
+
 template<typename Derived, size_t... DIMS>
 class StridedDerivedNdSpan : public DerivedNdSpan<Derived, DIMS...>{
 
@@ -445,5 +447,6 @@ public:
         }
     }
 
-    
 };
+
+} // namespace ndspan

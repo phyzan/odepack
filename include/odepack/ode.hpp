@@ -5,6 +5,7 @@
 #include <omp.h>
 #include "solvers.hpp"
 
+namespace ode {
 
 // ============================================================================
 // DECLARATIONS
@@ -653,5 +654,6 @@ void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const
     std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
+} // namespace ode
 
 #endif

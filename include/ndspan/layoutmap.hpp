@@ -4,6 +4,7 @@
 #include "layouts/morton.hpp"
 
 
+namespace ndspan{
 /*
 All classes in the LayoutMap (e.g. AbstractRowMajorSpan) must have this private method:
 
@@ -102,3 +103,6 @@ public:
         Base::resize(shape, ndim);
     }
 };
+
+
+} // namespace ndspan

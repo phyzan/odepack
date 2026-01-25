@@ -5,6 +5,8 @@
 
 #include "rich_solver.hpp"
 
+namespace ode {
+
 // Forward declarations
 template<typename T, size_t Nstages>
 T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size);
@@ -512,5 +514,7 @@ inline constexpr typename RK23<T, N, SP, Derived>::RKbase::Ptype RK23<T, N, SP, 
     typename RKbase::Ptype P(q, Nstages+1, static_cast<size_t>(3));
     return P;
 }
+
+} // namespace ode
 
 #endif

@@ -23,6 +23,8 @@
 
 #include "tools.hpp"
 
+namespace ode {
+
 // ============================================================================
 // DECLARATIONS
 // ============================================================================
@@ -1291,5 +1293,7 @@ bool EventCollection<T>::_is_prioritized(size_t i, size_t j, int dir){
     }
     return false;
 }
+
+} // namespace ode
 
 #endif

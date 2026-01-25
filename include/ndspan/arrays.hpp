@@ -2,6 +2,8 @@
 
 #include "ndview.hpp"
 
+namespace ndspan{
+
 
 template<typename Derived, typename T, Layout L, size_t... DIMS>
 class AbstractArray : public AbstractMutView<Derived, L, T, DIMS...>{
@@ -486,3 +488,5 @@ public:
 
 template <typename T, size_t M=0, size_t N=0, size_t K=0, Allocation Alloc = Allocation::Heap>
 using Array3D = Array<T, Alloc, Layout::C, M, N, K>;
+
+} // namespace ndspan

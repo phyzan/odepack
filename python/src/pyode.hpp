@@ -5,7 +5,7 @@
 #include "../../include/odepack/virtualsolver.hpp"
 
 
-
+namespace ode{
 
 struct DtypeDispatcher{
 
@@ -659,5 +659,7 @@ std::string get_scalar_type(){
         static_assert(false, "Unsupported scalar type T");
     }
 }
+
+} // namespace ode
 
 #endif
