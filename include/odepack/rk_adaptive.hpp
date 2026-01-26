@@ -101,7 +101,7 @@ protected:
 
 
 
-template<typename T, size_t N, SolverPolicy SP, typename Derived=void>
+template<typename T, size_t N=0, SolverPolicy SP=SolverPolicy::Static, typename Derived=void>
 class RK45 : public StandardRungeKutta<GetDerived<RK45<T, N, SP, Derived>, Derived>, T, N, 6, 5, SP>{
 
     static const size_t Norder = 5;
@@ -308,45 +308,52 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::step_impl(T* result, const T& h){
     this->_mat_is_set = false;
     const T* state = this->new_state_ptr();
-    size_t Nsys = this->Nsys();
-    T* q = result+2;
+    const size_t n = this->Nsys();
+    T* q_new = result + 2;
     T* K_ = _K_true.data();
-    const T* vector = state+2;
-    // const T* A_ = A.data();
+    const T* q = state + 2;
     const T* B_ = B.data();
     const T* C_ = C.data();
+    const T* A_ = A.data();
     T* r = _df_tmp.data();
     const T& t = state[0];
 
-    this->rhs(K_, t, vector);
+    // Stage 1: K1 = f(t, q)
+    this->rhs(K_, t, q);
 
+    // Initialize q_new = q + h*B[0]*K1
+    const T hB0 = B_[0] * h;
     #pragma omp simd
-    for (size_t j=0; j<Nsys; j++){
-        q[j] = vector[j]+B_[0]*K_[j]*h;
+    for (size_t j = 0; j < n; j++) {
+        q_new[j] = q[j] + hB0 * K_[j];
     }
 
-    for (size_t s=1; s<Nstages; s++){
+    // Stages 2 through Nstages: fused single-pass computation
+    for (size_t s = 1; s < Nstages; s++) {
+        // Compute r = q + h * sum(A[s][i]*K[i]) in a single pass
         #pragma omp simd
-        for (size_t j=0; j<Nsys; j++) {
-            r[j] = vector[j];
-        }
-        for (size_t i=0; i<s; i++){
-            T p = A(s, i) * h;
-            #pragma omp simd
-            for (size_t j=0; j<Nsys; j++){
-                r[j] += p * _K_true(i, j);
+        for (size_t j = 0; j < n; j++) {
+            T sum = 0;
+            for (size_t i = 0; i < s; i++) {
+                sum += A_[s*Nstages+i] * K_[i*n + j];
             }
+            r[j] = q[j] + h * sum;
         }
-        this->rhs(K_+s*Nsys, t+C_[s]*h, r);
-        T p = B(s) * h;
+
+        // K[s] = f(t + c[s]*h, r)
+        this->rhs(K_ + s*n, t + C_[s]*h, r);
+
+        // Accumulate into q_new
+        const T hBs = B_[s] * h;
         #pragma omp simd
-        for (size_t j=0; j<Nsys; j++){
-            q[j] += p * _K_true(s, j);
+        for (size_t j = 0; j < n; j++) {
+            q_new[j] += hBs * K_[s*n + j];
         }
     }
 
-    this->rhs(K_+Nstages*Nsys, t+h, q);
-    result[0] = t+h;
+    // Final: K[Nstages] = f(t + h, q_new) for error estimation
+    this->rhs(K_ + Nstages*n, t + h, q_new);
+    result[0] = t + h;
 }
 
 

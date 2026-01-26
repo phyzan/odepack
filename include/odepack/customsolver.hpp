@@ -12,7 +12,9 @@ class CustomSolver : public Solver<T, N, SP, Custom<T, N, SP>>{
 
 public:
 
-    CustomSolver(T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}) : Base(OdeData<T>{.rhs=nullptr, .jacobian=nullptr, .obj=nullptr}, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args){}
+    CustomSolver(T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}) requires (!is_rich<SP>) : Base(OdeData<T>{.rhs=nullptr, .jacobian=nullptr, .obj=nullptr}, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args){}
+
+    CustomSolver(T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events={}) requires (is_rich<SP>) : Base(OdeData<T>{.rhs=nullptr, .jacobian=nullptr, .obj=nullptr}, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events){}
 
     inline void rhs_impl(T* dq_dt, const T& t, const T* q) const{
         static_assert(false, "rhs_impl must be overriden in a derived class");
@@ -23,7 +25,7 @@ public:
     }
 
     inline void set_obj(const void* obj){
-        static_assert(false, "set_obj does not do anything in CustomSolver");
+        assert(false && "set_obj does not do anything in CustomSolver");
     }
 
 };

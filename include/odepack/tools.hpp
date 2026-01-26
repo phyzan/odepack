@@ -247,6 +247,11 @@ inline double as_duration(const TimePoint& t1, const TimePoint& t2){
     return duration.count();
 }
 
+template<typename A, typename B>
+inline auto max(A a, B b) {
+    return (a > b) ? a : b;
+}
+
 template <typename T>
 T inf() {
     // When using -ffast-math, infinity() may cause issues or segfaults

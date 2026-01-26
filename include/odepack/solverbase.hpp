@@ -509,7 +509,7 @@ inline void BaseSolver<Derived, T, N, SP>::jac_approx(T* jm, const T& t, const T
 
     for (size_t i = 0; i < n; i++) {
         // Compute step size: use provided dt or compute inline
-        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * std::max(threshold, abs(q[i]));
+        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * max(threshold, abs(q[i]));
 
         x1[i] = q[i] - h_i;
         x2[i] = q[i] + h_i;
