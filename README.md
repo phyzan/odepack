@@ -75,7 +75,7 @@ Simply include the headers in your project:
 ```
 
 **Requirements:**
-- C++20 compatible compiler (GCC 10+, Clang 10+, MSVC 19.29+)
+- C++20 compatible compiler
 - OpenMP (optional, for parallel integration)
 - MPFR/GMP (optional, for arbitrary precision)
 
