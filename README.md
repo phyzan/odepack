@@ -179,9 +179,11 @@ print("Expected state:", "[..., 1]")
 
 ---
 
-## API Reference
+# API Reference
 
-### Solver Methods
+## ODE Solver
+
+### Solver classes only update their internal state at each step: no reallocation
 
 | Method | Description |
 |--------|-------------|
@@ -193,7 +195,7 @@ print("Expected state:", "[..., 1]")
 | `interp(t)` | Interpolate solution at arbitrary time within last step |
 | `clone()` | Create a dynamic copy of the solver |
 
-### Solver Properties
+### Common Properties
 
 | Property | Description |
 |----------|-------------|
@@ -202,9 +204,9 @@ print("Expected state:", "[..., 1]")
 | `stepsize()` | Current step size |
 | `at_event()` | If the solver state is currently at a detected event |
 
-### ODE Class (High-Level Interface)
+## ODE Class
 
-For automatic solution storage:
+### ODE classes use an internal solver to store integration history
 
 ```cpp
 #include <odepack/ode.hpp>
@@ -279,7 +281,7 @@ int main() {
 
 ## Event System
 
-ODEPACK features a powerful event detection system for handling discontinuities and special conditions during integration.
+ODEPACK features an event detection system that handles integration events, with special processing for multiple or simultaneous event detections, with or without discontinuities, at each time step.
 
 ### Zero-Crossing Events
 
