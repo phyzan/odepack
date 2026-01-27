@@ -170,7 +170,11 @@ struct PySolver : DtypeDispatcher {
 
     void                reset();
 
+    bool                set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt);
+
     bool                resume();
+
+    py::str             message() const;       
 
     py::object          py_at_event() const;
 

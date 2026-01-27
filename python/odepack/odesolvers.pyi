@@ -394,6 +394,18 @@ class OdeSolver:
         """
         ...
 
+    @property
+    def status(self)->str:
+        """
+        The current status message of the solver.
+
+        Returns
+        -------
+        str
+            A descriptive message indicating the solver's current state.
+        """
+        ...
+
     def event_located(self, event: str)->bool:
         """
         Check if a specific event is located at the current step.
@@ -478,8 +490,8 @@ class OdeSolver:
         -------
         bool
             True if the solver successfully advanced to t.
-            False if advancement failed before reaching t. When False, a
-            diagnostic message is returned in self.message explaining the reason.
+            False if advancement failed before reaching t. When False, a diagnostic
+                message is printed explaining the reason. Alternatively, check self.status.
         """
 
     def reset(self)->None:
@@ -503,6 +515,31 @@ class OdeSolver:
             True if the solver was successfully resumed.
             False if the solver is not in a stoppable state (e.g., dead).
             If False, call message to see the reason.
+        """
+
+    def set_ics(self, t0: float, q0: np.ndarray, dt: float = 0.)->bool:
+        """
+        Set new initial conditions for the solver.
+
+        This method allows re-initializing the solver with a new starting time
+        and state vector. Optionally, an initial step size can be provided.
+
+        Parameters
+        ----------
+        t0 : float
+            New initial time.
+
+        q0 : np.ndarray
+            New initial state vector.
+
+        dt : float, optional
+            Initial step size estimate. If 0 (default), automatically determined.
+
+        Returns
+        -------
+        bool
+            True if the initial conditions were successfully set.
+            False if there was an error (e.g., nan/inf values).
         """
 
     def copy(self)->OdeSolver:

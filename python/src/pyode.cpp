@@ -292,9 +292,25 @@ void PySolver::reset() {
     )
 }
 
+bool PySolver::set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt) {
+    return DISPATCH(bool,
+        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        if (size_t(q0.size()) != cast<T>()->Nsys()){
+            throw py::value_error("Invalid size of initial condition array");
+        }
+        return cast<T>()->set_ics(t0.cast<T>(), q0.data(), dt.cast<T>());
+    )
+}
+
 bool PySolver::resume() {
     return DISPATCH(bool,
         return cast<T>()->resume();
+    )
+}
+
+py::str PySolver::message() const{
+    return DISPATCH(py::str,
+        return py::cast(cast<T>()->message());
     )
 }
 
@@ -968,6 +984,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("diverges", &PySolver::diverges)
         .def_property_readonly("is_dead", &PySolver::is_dead)
         .def_property_readonly("Nsys", &PySolver::Nsys)
+        .def_property_readonly("status", &PySolver::message)
         .def_property_readonly("at_event", &PySolver::py_at_event)
         .def("event_located", &PySolver::py_event_located, py::arg("event"))
         .def("show_state", &PySolver::show_state,
@@ -976,7 +993,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def("advance", &PySolver::advance)
         .def("advance_to_event", &PySolver::advance_to_event)
         .def("advance_until", &PySolver::advance_until, py::arg("t"))
-        .def("reset", &PySolver::reset)
+        .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("dt")=0)
         .def("resume", &PySolver::resume)
         .def("copy", &PySolver::copy)
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});

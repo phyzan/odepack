@@ -64,6 +64,7 @@ public:
     virtual void                kill(const std::string& text = "") = 0;
     virtual void                set_obj(const void* obj) = 0;
     virtual void                set_args(const T* new_args) = 0;
+    virtual bool                set_ics(T t0, const T* y0, T stepsize = 0) = 0;
 
 protected:
 
@@ -93,7 +94,7 @@ public:
     // MODIFIERS
     virtual bool                            advance_to_event()=0;
 
-    virtual void                            set_tmax(T tmax) = 0;
+    virtual bool                            set_tmax(T tmax) = 0;
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
 

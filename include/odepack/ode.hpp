@@ -348,19 +348,19 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
 
 template<typename T, size_t N>
 OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
+    if (!_solver->set_tmax(t)){
+        return OdeResult<T, N>(); //cannot integrate in opposite direction
+    }
+    _solver->resume();
     TimePoint t1 = now();
     const T t0 = _solver->t();
     const int d = _solver->direction();
     const bool save_all = t_array.size() < 0;
     const bool save_some = t_array.data() != nullptr && t_array.size() > 0;
-    if (t*d < t0*d){
-        throw std::runtime_error("Integration can only advance along the initial direction");
-    }
     const size_t Nt = _t_arr.size();
     long int frame_counter = 0;
     int prints = 0;
     size_t Nnew = 0;
-    _solver->set_tmax(t);
     T t_last = _solver->t();
     T t_curr = t_last;
     bool include_first = false;

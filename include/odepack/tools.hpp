@@ -576,6 +576,8 @@ public:
 
     OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message) : _t(t), _q(q), _event_map(std::move(event_map)), _diverges(diverges), _success(success), _runtime(runtime), _message(std::move(message)) {}
 
+    OdeResult() = default;
+
     DEFAULT_RULE_OF_FOUR(OdeResult);
 
     virtual ~OdeResult() = default;
@@ -632,10 +634,10 @@ private:
     std::vector<T> _t;
     Array2D<T, 0, N> _q;
     EventMap _event_map;
-    bool _diverges;
-    bool _success;// true if the OdeSolver didnt die during the integration
-    double _runtime;
-    std::string _message;
+    bool _diverges = false;
+    bool _success = true;// true if the OdeSolver didnt die during the integration
+    double _runtime = 0;
+    std::string _message = "No integration performed";
 };
 
 template<typename T>

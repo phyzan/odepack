@@ -267,7 +267,7 @@ public:
      * @param t0      New initial time.
      * @param y0      New initial state vector (size Nsys).
      * @param stepsize Initial step size (0 = auto-compute).
-     * @return True if ICs were valid and set successfully.
+     * @return True if ICs were valid and set successfully. Otherwise returns false and stops the solver. Simply call resume() to continue.
      * @throws std::runtime_error If stepsize is negative.
      */
     bool                        set_ics(T t0, const T* y0, T stepsize = 0);
@@ -723,6 +723,14 @@ bool BaseSolver<Derived, T, N, SP>::advance_until(T time){
     
     assert(!is_rich<SP> && "Do not cast a RichSolver to BaseSolver and call advance_until. This method may conflict with Event encounters in RichSolver");
 
+    if (this->is_dead()){
+        this->warn_dead();
+        return false;
+    }else if (!this->is_running()) {
+        this->warn_paused();
+        return false;
+    }
+
     int d = this->direction();
     if (time*d <= this->t()*d) {
         return false;
@@ -741,6 +749,14 @@ template<typename Callable>
 bool BaseSolver<Derived, T, N, SP>::advance_until(Callable&& obj_fun, T tol, int dir, T* worker){
 
     assert(!is_rich<SP> && "Do not cast a RichSolver to BaseSolver and call advance_until. This method may conflict with Event encounters in RichSolver");
+
+    if (this->is_dead()){
+        this->warn_dead();
+        return false;
+    }else if (!this->is_running()) {
+        this->warn_paused();
+        return false;
+    }
 
     /*
     obj_fun : callable object with signature T obj_fun(const T& t, const T* q, const T* args, const void* obj)
@@ -816,7 +832,7 @@ void BaseSolver<Derived, T, N, SP>::apply_ics_setter(T t0, Setter&& func, T step
     func(ics+2);
     assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
     if (stepsize < 0) {
-        throw std::runtime_error("Cannot set negative stepsize in solver initialization");
+        std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
     } else if (stepsize == 0) {
         stepsize = this->auto_step(t0, ics+2);
     }
@@ -829,7 +845,8 @@ bool BaseSolver<Derived, T, N, SP>::set_ics(T t0, const T* y0, T stepsize){
 
     if (this->validate_ics(t0, y0)){
         if (stepsize < 0) {
-            throw std::runtime_error("Cannot set negative stepsize in solver initialization");
+            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+            return false;
         } else if (stepsize == 0) {
             stepsize = this->auto_step(t0, y0);
         }
@@ -841,6 +858,7 @@ bool BaseSolver<Derived, T, N, SP>::set_ics(T t0, const T* y0, T stepsize){
         this->reset();
         return true;
     }else {
+        std::cerr << "Tried to set invalid initial conditions" << std::endl;
         return false;
     }
 }

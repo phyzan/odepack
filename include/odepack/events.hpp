@@ -211,7 +211,7 @@ protected:
      * @param obj       Optional user object pointer for callbacks.
      */
     EventBase(std::string name, Func<T> mask, bool hide_mask, const void* obj = nullptr);
-    EventBase() = default;
+
     DEFAULT_RULE_OF_FOUR(EventBase);
 
     // ================ STATIC OVERRIDE (REQUIRED) ======================
@@ -396,7 +396,7 @@ class TmaxEvent : public EventBase<GetDerived<TmaxEvent<T, Derived>, Derived>, T
 
 public:
 
-    TmaxEvent() = default;
+    TmaxEvent() : Base("t-goal", nullptr, false, nullptr) {};
 
     /// @brief Set the target time to stop at.
     inline void set_goal(T tmax);

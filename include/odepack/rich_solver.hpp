@@ -34,7 +34,7 @@ public:
     // MODIFIERS
     bool                                    advance_until(T time);
     bool                                    advance_to_event();
-    void                                    set_tmax(T tmax);
+    bool                                    set_tmax(T tmax);
     void                                    start_interpolation();
     void                                    stop_interpolation();
 
@@ -214,7 +214,12 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 bool RichSolver<Derived, T, N, SP>::advance_until(T time){
-    this->set_tmax(time);
+    if (!this->set_tmax(time)){
+        return false;
+    } else if (!this->is_running()){
+        this->warn_paused();
+        return false;
+    }
     while (this->is_running()) {
         this->advance();
     }
@@ -243,15 +248,20 @@ bool RichSolver<Derived, T, N, SP>::advance_to_event(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::set_tmax(T tmax){
-    _events.set_tmax(tmax);
-    if (tmax*this->direction() > this->t()*this->direction()){
-        this->resume();
-    } else if (tmax == this->t()){
+bool RichSolver<Derived, T, N, SP>::set_tmax(T tmax){
+    if (this->is_dead()){
+        this->warn_dead();
+        return false;
+    } else if ( (tmax - this->t())*this->direction() < 0 ){
+        std::cerr << "Error: cannot set tmax to " << tmax << " from current time " << this->t() << " due to direction mismatch." << std::endl;
+        return false;
+    } else if (tmax == this->t() && this->is_running()){
         this->stop("t-goal");
-    } else{
-        throw std::runtime_error("Cannot integrate to given tmax, as it requires integration to the opposite direction");
     }
+    _events.set_tmax(tmax);
+
+    assert(this->t()*this->direction() <= tmax*this->direction() && "Internal solver bug");
+    return true;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>

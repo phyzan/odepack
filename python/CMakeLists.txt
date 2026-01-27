@@ -37,6 +37,7 @@ set(COMMON_COMPILE_OPTIONS
     -fopenmp
     -march=x86-64
     -DMPREAL
+    -DPYBIND11_DETAILED_ERROR_MESSAGES
 )
 
 # Add optimization and debug flags based on DETAILED_BACKTRACE option
