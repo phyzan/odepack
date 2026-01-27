@@ -152,7 +152,29 @@ struct PyStruct{
     py::function event;
     std::vector<py::ssize_t> shape;
     py::tuple py_args = py::make_tuple();
+    py::array_t<float> array_f;
+    py::array_t<double> array_d;
+    py::array_t<long double> array_ld;
     bool is_lowlevel = false;
+
+    template<typename T>
+    INLINE const py::array_t<T>& get_array() const {
+        if constexpr (std::is_same_v<T, float>) {
+            return array_f;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return array_d;
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return array_ld;
+        } else {
+            static_assert(false, "Unsupported type for PyStruct array.");
+            return array_d; // This line will never be reached
+        }
+    }
+
+    template<typename T>
+    INLINE py::array_t<T>& get_array() {
+        return const_cast<py::array_t<T>&>(static_cast<const PyStruct&>(*this).get_array<T>());
+    }
 };
 
 template<typename T>
@@ -174,9 +196,10 @@ void arrcpy(T* dst, const void* src, size_t size){
 
 template<typename T>
 void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
-    //args should always be the same as p.py_args
-    const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::array_t<T> pyres = p.rhs(t, py::array_t<T>(p.shape, q), *p.py_args);
+    PyStruct& p = *const_cast<PyStruct*>(reinterpret_cast<const PyStruct*>(obj));
+    py::array_t<T>& arr = p.get_array<T>();
+    std::memcpy(arr.mutable_data(), q, arr.size() * sizeof(T));
+    py::array_t<T> pyres = p.rhs(t, arr, *p.py_args);
     arrcpy(res, pyres.data(), pyres.size());
 }
 

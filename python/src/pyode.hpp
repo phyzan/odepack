@@ -638,7 +638,12 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, con
             throw py::value_error("All event objects in 'events' must have scalar type " + scalar_type + ".");
         }
         _ev.check_sizes(_size, args.size());
+    }
 
+    // allocate dummy array in PyStruct data
+    if constexpr (std::is_floating_point_v<T>) {
+        py::array_t<T>& array = data.template get_array<T>();
+        array.resize({static_cast<py::ssize_t>(_size)});
     }
 
     data.is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);

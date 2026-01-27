@@ -166,7 +166,7 @@ inline std::vector<EventOptions> to_Options(const py::iterable& d) {
 PySolver::PySolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
 
     DISPATCH(void,
-        return this->init_solver<T>(f, jac, t0, py_q0, rtol, atol, min_step, max_step, first_step, dir, py_args, py_events, name);
+        this->init_solver<T>(f, jac, t0, py_q0, rtol, atol, min_step, max_step, first_step, dir, py_args, py_events, name);
     )
 }
 
