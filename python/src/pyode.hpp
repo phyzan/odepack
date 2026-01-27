@@ -158,6 +158,8 @@ struct PySolver : DtypeDispatcher {
 
     py::object          Nsys() const;
 
+    py::object          n_evals_rhs() const;
+
     void                show_state(int digits) const;
 
     py::object          advance();

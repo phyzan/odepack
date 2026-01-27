@@ -380,7 +380,19 @@ class OdeSolver:
         int
             Number of equations in the system (length of state vector).
         """
-        pass
+        ...
+
+    @property
+    def n_evals_rhs(self)->int:
+        """
+        Get the number of RHS function evaluations performed so far.
+
+        Returns
+        -------
+        int
+            Total count of RHS evaluations.
+        """
+        ...
 
     @property
     def at_event(self)->bool:

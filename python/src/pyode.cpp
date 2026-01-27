@@ -262,6 +262,12 @@ py::object PySolver::Nsys() const{
     )
 }
 
+py::object PySolver::n_evals_rhs() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->n_evals_rhs());
+    )
+}
+
 void PySolver::show_state(int digits) const{
     DISPATCH(void,
         return cast<T>()->show_state(digits);
@@ -984,6 +990,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("diverges", &PySolver::diverges)
         .def_property_readonly("is_dead", &PySolver::is_dead)
         .def_property_readonly("Nsys", &PySolver::Nsys)
+        .def_property_readonly("n_evals_rhs", &PySolver::n_evals_rhs)
         .def_property_readonly("status", &PySolver::message)
         .def_property_readonly("at_event", &PySolver::py_at_event)
         .def("event_located", &PySolver::py_event_located, py::arg("event"))

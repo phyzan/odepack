@@ -203,6 +203,12 @@ public:
     inline void                 interp(T* result, const T& t) const;
 
     /**
+        * @brief Get the number of RHS function evaluations performed so far.
+        * @return Total count of RHS evaluations. User calls to rhs() increment this counter.
+    */
+    inline size_t               n_evals_rhs() const;
+
+    /**
      * @brief Compute an appropriate initial step size.
      * @param t Initial time.
      * @param q Initial state vector.
@@ -458,6 +464,7 @@ private:
     OdeData<T>                                          _ode;
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;
+    mutable size_t                                      _n_evals_rhs = 0;
     std::string                                         _message = "Running";
     std::string                                         _name = name;
     int                                                 _direction = 1;
@@ -485,6 +492,7 @@ private:
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::rhs(T* dq_dt, const T& t, const T* q) const{
+    this->_n_evals_rhs++;
     THIS_C->rhs_impl(dq_dt, t, q);
 }
 
@@ -646,6 +654,11 @@ inline void BaseSolver<Derived, T, N, SP>::interp(T* result, const T& t) const{
         throw std::runtime_error("Cannot perform local interpolation at t = " + to_string(t) + " between the states t_1 = " + to_string(this->t_old()) + " and t_2 = " + to_string(this->t_new()));
     }
     return interp_impl(result, t);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+inline size_t BaseSolver<Derived, T, N, SP>::n_evals_rhs() const{
+    return _n_evals_rhs;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
@@ -957,6 +970,7 @@ inline void BaseSolver<Derived, T, N, SP>::reset_impl(){
     _is_running = true;
     _diverges = false;
     _message = "Running";
+    _n_evals_rhs = 0;
     for (int i=1; i<5; i++){
         copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }

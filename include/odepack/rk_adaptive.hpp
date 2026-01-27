@@ -235,17 +235,26 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 // RungeKuttaBase implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows)
-    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
+    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    // Compute K[0] = f(t0, q0) for FSAL
+    this->rhs(_K_true.data(), t0, q0);
+}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows)
-    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {}
+    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    // Compute K[0] = f(t0, q0) for FSAL
+    this->rhs(_K_true.data(), t0, q0);
+}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
 void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::reset_impl(){
     Base::reset_impl();
     _K_true.set(0);
     _mat_is_set = false;
+    // Compute K[0] = f(t0, q0) for FSAL
+    const T* state = this->new_state_ptr();
+    this->rhs(_K_true.data(), state[0], state+2);
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
@@ -273,6 +282,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::adapt_impl(T* res){
     const T& atol = this->atol();
     const T& rtol = this->rtol();
     const T* state = this->new_state_ptr();
+    const size_t n = this->Nsys();
 
     T& habs = res[1];
     habs = state[1];
@@ -285,7 +295,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::adapt_impl(T* res){
     while (!step_accepted){
         h = habs * this->direction();
         step_impl(res, h); //res and K are altered
-        adapt_scale(_scale_tmp.data(), q, q_new, atol, rtol, this->Nsys());
+        adapt_scale(_scale_tmp.data(), q, q_new, atol, rtol, n);
         err_norm = this->estimate_error_norm(_K_true.data(), _scale_tmp.data(), h);
         _factor = this->SAFETY*pow(err_norm, ERR_EXP);
         if (err_norm < 1){
@@ -303,6 +313,9 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::adapt_impl(T* res){
             break;
         }
     }
+    // FSAL: K[0] for next step = K[Nstages] from this step
+    T* K_ = _K_true.data();
+    copy_array(K_, K_ + Nstages*n, n);
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
@@ -319,8 +332,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::step_impl(T* result, co
     T* r = _df_tmp.data();
     const T& t = state[0];
 
-    // Stage 1: K1 = f(t, q)
-    this->rhs(K_, t, q);
+    // Stage 1: K[0] = f(t, q) is already computed (FSAL)
 
     // Initialize q_new = q + h*B[0]*K1
     const T hB0 = B_[0] * h;
