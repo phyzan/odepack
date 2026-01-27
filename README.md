@@ -421,22 +421,59 @@ odepack/
 ODEPACK supports arbitrary precision arithmetic via MPFR:
 
 ```cpp
+// #include 
+#include "<odepack/solvers.hpp>"
 #include <mpreal.h>
-#include <odepack/solvers.hpp>
 
+template<typename T>
+void df_dt(T* dy_dt, const T& t, const T* y, const T* args, const void* obj) {
+    //2D oscillator: y'' + y = 0
+    dy_dt[0] = y[1];
+    dy_dt[1] = -y[0];
+}
+
+template<typename T>
+T crossing(const T& t, const T* y, const T* args, const void* obj) {
+    return y[1] - 1;
+}
+
+using ode::PreciseEvent, ode::RK45, ode::SolverPolicy;
 using mpfr::mpreal;
 
-// Set precision to 256 bits
-mpreal::set_default_prec(256);
+int main() {
 
-RK45<mpreal, 2> solver(
-    {ode}, t0, y0,
-    mpreal("1e-50"),  // rtol
-    mpreal("1e-60")   // atol
-);
+    // Initial conditions
+    mpreal t0 = 0;
+    std::array<mpreal, 2> y0 = {3, 0};
+
+    // y' = 1 crossing
+    PreciseEvent<mpreal> event(
+        "event",
+        crossing<mpreal>
+    );
+
+    // Create solver
+    RK45<mpreal, 2, SolverPolicy::RichStatic> solver(
+        {.rhs=df_dt<mpreal>},   // ODE function
+        t0,                 // Initial time
+        y0.data(),
+        2,             // ODE system size
+        mpreal("1e-6"),          // Relative tolerance
+        mpreal("1e-9"),          // Absolute tolerance
+        mpreal("0.0"),       // Minimum step size (0 = auto)
+        mpreal("1.0"),       // Maximum step size
+        mpreal("0.01"),    // First step size
+        1,              // Integration direction
+        {},            // Additional args
+        {&event} // Events
+
+    );
+
+    return 0;
+}
 ```
 
-Compile with `-DMPREAL` flag and link against MPFR/GMP.
+Compile with `-DMPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`.
 
 ---
 
