@@ -333,6 +333,15 @@ T rms_norm(const T* x, const T* scale, size_t size){
 }
 
 template<typename T>
+T inf_norm(const T* x, size_t size){
+    T max_val = 0;
+    for (size_t i = 0; i < size; i++){
+        max_val = std::max(max_val, std::abs(x[i]));
+    }
+    return max_val;
+}
+
+template<typename T>
 T norm(const T* x, size_t size){
     return sqrt(norm_squared(x, size));
 }

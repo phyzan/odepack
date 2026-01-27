@@ -194,41 +194,42 @@ inline void adapt_scale(T* scale, const T* q1, const T* q2, T atol, T rtol, size
     }
 }
 
-// template<typename T, size_t Nstages>
-// T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
-
-//     for (size_t j=0; j<size; j++){
-//         T sum = 0;
-//         for (size_t i=0; i<Nstages+1; i++){
-//             sum += K[i*size+j] * E[i]*h;
-//         }
-//         tmp[j] = sum/scale[j];
-//     }
-//     return rms_norm(tmp, size);
-// }
-
 template<typename T, size_t Nstages>
 T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
 
-    // for (size_t j=0; j<size; j++){
-    //     T sum = 0;
-    //     for (size_t i=0; i<Nstages+1; i++){
-    //         sum += K[i*size+j] * E[i]*h;
+    // std::fill(tmp, tmp+size, 0);
+    // for (size_t i=0; i<Nstages+1; i++){
+    //     T p = E[i]*h;
+    //     #pragma omp simd
+    //     for (size_t j=0; j<size; j++){
+    //         tmp[j] += (K[i*size+j] * p)/scale[j];
     //     }
-    //     tmp[j] = sum/scale[j];
     // }
-    // The implementation below can be vectorized
 
-    std::fill(tmp, tmp+size, 0);
-    for (size_t i=0; i<Nstages+1; i++){
-        T p = E[i]*h;
-        #pragma omp simd
-        for (size_t j=0; j<size; j++){
-            tmp[j] += (K[i*size+j] * p)/scale[j];
+    for (size_t j=0; j<size; j++){
+        T sum = 0;
+        for (size_t i=0; i<Nstages+1; i++){
+            sum += K[i*size+j] * E[i]*h;
         }
+        tmp[j] = sum/scale[j];
     }
     return rms_norm(tmp, size);
 }
+
+// template<typename T, size_t Nstages>
+// T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
+//     // Single-pass: compute error and max simultaneously
+//     T max_err = 0;
+//     for (size_t j = 0; j < size; j++) {
+//         T sum = 0;
+//         for (size_t i = 0; i < Nstages + 1; i++) {
+//             sum += E[i] * K[i * size + j];
+//         }
+//         T err = abs(h * sum / scale[j]);
+//         max_err = max(max_err, err);
+//     }
+//     return max_err;
+// }
 
 
 // RungeKuttaBase implementations
