@@ -14,7 +14,7 @@
 
 namespace ode {
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
 template<typename Type>
 class PolyWrapper{
