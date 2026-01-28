@@ -24,6 +24,8 @@ protected:
 
     void reset_impl();
 
+    void re_adjust_impl();
+
     // =========================================================
 
     using Base = BaseDispatcher<Derived, T, N, SP>;
@@ -253,6 +255,14 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::reset_impl(){
     _K_true.set(0);
     _mat_is_set = false;
     // Compute K[0] = f(t0, q0) for FSAL
+    const T* state = this->new_state_ptr();
+    this->rhs(_K_true.data(), state[0], state+2);
+}
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP>
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP>::re_adjust_impl(){
+    // Re-compute K[0] = f(t, q) after restarting at intermediate time (e.g. because of discontinuity due to masked event)
+    Base::re_adjust_impl();
     const T* state = this->new_state_ptr();
     this->rhs(_K_true.data(), state[0], state+2);
 }
