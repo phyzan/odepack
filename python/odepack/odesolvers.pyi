@@ -1855,6 +1855,66 @@ class LowLevelFunction:
         ...
 
 
+class SampledVectorField2D:
+
+    '''
+    Class representing a 2D vector field
+    '''
+
+    def __init__(self, x: np.ndarray, y: np.ndarray, vx: np.ndarray, vy: np.ndarray):
+        '''
+        Initialize a 2D vector field.
+        Parameters
+        ----------
+        x : np.ndarray
+            X-coordinates of the grid points.
+        y : np.ndarray
+            Y-coordinates of the grid points.
+        vx : np.ndarray
+            X-components of the vector field at the grid points.
+        vy : np.ndarray
+            Y-components of the vector field at the grid points.
+
+        Notes
+        -----
+        The shape of vx and vy must be (len(x), len(y))
+        and vx[i, j], vy[i, j] correspond to the vector at (x[i], y[j]).
+
+        '''
+        ...
+
+    def streamline(self, x0: float, y0: float, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
+        '''
+        Compute a streamline starting from (x0, y0).
+
+        Parameters
+        ----------
+        x0 : float
+            Initial x-coordinate.
+        y0 : float
+            Initial y-coordinate.
+        length : float
+            Length of the streamline to compute.
+        rtol, atol : float, optional
+            Relative and absolute tolerances for the ODE solver.
+        min_step, max_step, first_step : float, optional
+            Step size control parameters.
+        direction : {-1, 1}, optional
+            Direction of integration. 1 for forward, -1 for backward.
+        t_eval : array-like, optional
+            Times at which to store solution values.
+        method : str, optional
+            Integration method. Default is "RK45".
+
+
+        Returns
+        -------
+        OdeResult
+            Result containing the computed streamline points.
+        '''
+        ...
+
+
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:
     """
     Integrate multiple independent ODE systems in parallel.

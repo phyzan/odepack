@@ -348,8 +348,10 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
 
 template<typename T, size_t N>
 OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
-    if (!_solver->set_tmax(t)){
-        return OdeResult<T, N>(); //cannot integrate in opposite direction
+    if (_solver->is_dead()){
+        return OdeResult<T, N>({}, {}, {}, _solver->diverges(), false, 0, _solver->message());
+    }else if (!_solver->set_tmax(t)){
+        return OdeResult<T, N>({}, {}, {}, false, false, 0, "Cannot integrate in opposite direction"); //cannot integrate in opposite direction
     }
     _solver->resume();
     TimePoint t1 = now();
@@ -361,6 +363,7 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
     long int frame_counter = 0;
     int prints = 0;
     size_t Nnew = 0;
+
     T t_last = _solver->t();
     T t_curr = t_last;
     bool include_first = false;

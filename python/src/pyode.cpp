@@ -793,6 +793,38 @@ py::object PyVarODE::copy() const{
 
 
 //===========================================================================================
+//                                  PyVecField2D
+//===========================================================================================
+
+PyVecField2D::PyVecField2D(const py::array_t<double>& x_grid, const py::array_t<double>& y_grid, const py::array_t<double>& vx_data, const py::array_t<double>& vy_data) : Base(x_grid.data(), y_grid.data(), vx_data.data(), vy_data.data(), x_grid.size(), y_grid.size()) {
+    if (x_grid.ndim() != 1 || y_grid.ndim() != 1){
+        throw py::value_error("x_grid and y_grid must be 1D arrays");
+    }
+    if (vx_data.ndim() != 2 || vy_data.ndim() != 2){
+        throw py::value_error("vx_data and vy_data must be 2D arrays");
+    }
+    if (vx_data.shape(0) != x_grid.size() || vx_data.shape(1) != y_grid.size()){
+        throw py::value_error("vx_data shape does not match grid sizes");
+    }
+    if (vy_data.shape(0) != x_grid.size() || vy_data.shape(1) != y_grid.size()){
+        throw py::value_error("vy_data shape does not match grid sizes");
+    }
+}
+
+py::object PyVecField2D::py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double first_step, int direction, const py::object& t_eval, const py::str& method) const {
+    StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
+    try{
+        double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
+        auto* result = new OdeResult<double>(this->streamline(x0, y0, length, rtol, atol, min_step, max_step_val, first_step, direction, t_seq, method.cast<std::string>()));
+        PyOdeResult py_res(result, {2}, DTYPE_MAP.at("double"));
+        return py::cast(py_res);
+    } catch (const std::runtime_error& e){
+        throw py::value_error(e.what());
+    }
+}
+
+
+//===========================================================================================
 //                                      Additional functions
 //===========================================================================================
 
@@ -1000,6 +1032,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def("advance", &PySolver::advance)
         .def("advance_to_event", &PySolver::advance_to_event)
         .def("advance_until", &PySolver::advance_until, py::arg("t"))
+        .def("reset", &PySolver::reset)
         .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("dt")=0)
         .def("resume", &PySolver::resume)
         .def("copy", &PySolver::copy)
@@ -1187,7 +1220,25 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("kicks", &PyVarODE::py_kicks)
         .def("copy", &PyVarODE::copy);
 
-
+    py::class_<PyVecField2D>(m, "SampledVectorField2D")
+        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
+            py::arg("x"),
+            py::arg("y"),
+            py::arg("vx"),
+            py::arg("vy"))
+        .def("streamline", &PyVecField2D::py_streamline,
+            py::arg("x0"),
+            py::arg("y0"),
+            py::arg("length"),
+            py::arg("rtol")=1e-12,
+            py::arg("atol")=1e-12,
+            py::arg("min_step")=0.,
+            py::arg("max_step")=py::none(),
+            py::arg("first_step")=0.,
+            py::arg("direction")=1,
+            py::arg("t_eval")=py::none(),
+            py::arg("method")="RK45"
+        );
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 

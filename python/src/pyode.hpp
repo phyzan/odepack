@@ -3,6 +3,7 @@
 
 #include "pytools.hpp"
 #include "../../include/odepack/virtualsolver.hpp"
+#include "../../include/odepack/grid_interp.hpp"
 
 
 namespace ode{
@@ -413,6 +414,19 @@ public:
 
     py::object copy() const override;
     
+};
+
+
+class PyVecField2D : public SampledVectorField2D<double> {
+
+    using Base = SampledVectorField2D<double>;
+
+public:
+    PyVecField2D(const py::array_t<double>& x_grid, const py::array_t<double>& y_grid, const py::array_t<double>& vx_data, const py::array_t<double>& vy_data);
+
+    DEFAULT_RULE_OF_FOUR(PyVecField2D)
+
+    py::object py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double first_step, int direction, const py::object& t_eval, const py::str& method) const;
 };
 
 

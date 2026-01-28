@@ -437,6 +437,24 @@ public:
 };
 
 
+
+
+template <typename T, size_t NDIM, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
+struct HelperNdArray
+{
+private:
+    template <std::size_t... Is>
+    static Array<T, Alloc, L, (static_cast<void>(Is), 0)...> make(std::index_sequence<Is...>);
+
+public:
+
+    using type = decltype(make(std::make_index_sequence<NDIM>{}));
+};
+
+template <typename T, size_t NDIM, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
+using NdArray = HelperNdArray<T, NDIM, Alloc, L>::type;
+
+
 template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Heap>
 using Array1D = Array<T, Alloc, Layout::C, SIZE>;
 

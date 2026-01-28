@@ -35,6 +35,10 @@ void print(Arg... y){
     std::cout << "\n";
 }
 
+#define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
+#define CONCAT(a,b) CONCAT_IMPL(a,b)
+#define CONCAT_IMPL(a,b) a##b
+
 #define INTS(IntType, I) std::integer_sequence<IntType, I...>
 
 #define MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
@@ -43,11 +47,14 @@ void print(Arg... y){
     __VA_ARGS__ \
 }(MAKE_INTS(IntType, N))
 
-#define FOR_LOOP(IntType, I, N, ...) [&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline)) { \
-    ([&]<IntType I>(){\
-        __VA_ARGS__ \
-    }.template operator()<IDUMMY>(), ...);\
+#define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, BODY) \
+[&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline)) { \
+    ([&]<IntType I>() { BODY }.template operator()<IDUMMY>(), ...); \
 }(MAKE_INTS(IntType, N))
+
+#define FOR_LOOP(IntType, I, N, ...) \
+    FOR_LOOP_IMPL(IntType, I, N, CONCAT(IDUMMY,__COUNTER__), __VA_ARGS__)
+
 
 template<std::size_t I, typename FirstType, typename... ArgType>
 INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {

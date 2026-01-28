@@ -597,7 +597,7 @@ public:
 
     double runtime() const {return _runtime;}
 
-    std::string message() const {return _message;}
+    const std::string& message() const {return _message;}
 
     void examine() const{
         std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n" <<
@@ -635,7 +635,7 @@ private:
     Array2D<T, 0, N> _q;
     EventMap _event_map;
     bool _diverges = false;
-    bool _success = true;// true if the OdeSolver didnt die during the integration
+    bool _success = false;
     double _runtime = 0;
     std::string _message = "No integration performed";
 };
