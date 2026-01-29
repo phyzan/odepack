@@ -649,9 +649,9 @@ inline const std::string& BaseSolver<Derived, T, N, SP>::method() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 inline void BaseSolver<Derived, T, N, SP>::interp(T* result, const T& t) const{
-    int d = this->direction();
-    if (t*d < this->t_old()*d || this->t_new()*d < t*d ){
-        throw std::runtime_error("Cannot perform local interpolation at t = " + to_string(t) + " between the states t_1 = " + to_string(this->t_old()) + " and t_2 = " + to_string(this->t_new()));
+    assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->t_new()*this->direction()) && "Out of bounds interpolation requested");
+    if (this->t_old() == this->t_new()){
+        copy_array(result, this->new_state_ptr(), this->Nsys());
     }
     return interp_impl(result, t);
 }
@@ -1098,6 +1098,7 @@ bool BaseSolver<Derived, T, N, SP>::validate_ics_impl(T t0, const T* q0) const {
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP>
 void BaseSolver<Derived, T, N, SP>::remake_new_state(const T* vector){
+    // interpolation will not be working properly after this call, until the solver is advanced.
     T* state = const_cast<T*>(this->new_state_ptr());
     state[0] = this->t();
     state[1] = this->stepsize();
