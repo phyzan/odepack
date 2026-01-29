@@ -8,16 +8,16 @@
 
 namespace ode{
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void interp_func(T* res, const T& t, const void* obj);
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-class RichSolver : public BaseSolver<Derived, T, N, SP>{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+class RichSolver : public BaseSolver<Derived, T, N, SP, RhsType, JacType>{
 
-    using Base = BaseSolver<Derived, T, N, SP>;
+    using Base = BaseSolver<Derived, T, N, SP, RhsType, JacType>;
 
     friend Base; // So that Base can access specific private methods for static override
-    friend void interp_func<Derived, T, N, SP>(T*, const T&, const void*);
+    friend void interp_func<Derived, T, N, SP, RhsType, JacType>(T*, const T&, const void*);
 
 public:
 
@@ -79,13 +79,13 @@ private:
 
 // PUBLIC ACCESSORS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline const T& RichSolver<Derived, T, N, SP>::t_impl() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline const T& RichSolver<Derived, T, N, SP, RhsType, JacType>::t_impl() const{
     return (_event_idx == -1) ? Base::t_impl() : _events.state(_event_idx).t();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<T, N> RichSolver<Derived, T, N, SP>::vector_impl() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
     switch (_event_idx) {
         case -1:
             return Base::vector_impl();
@@ -95,8 +95,8 @@ inline View1D<T, N> RichSolver<Derived, T, N, SP>::vector_impl() const{
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline View1D<T, N> RichSolver<Derived, T, N, SP>::true_vector() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector() const{
     switch (_event_idx) {
         case -1:
             return Base::vector_impl();
@@ -106,28 +106,28 @@ inline View1D<T, N> RichSolver<Derived, T, N, SP>::true_vector() const{
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-EventView<T> RichSolver<Derived, T, N, SP>::current_events() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+EventView<T> RichSolver<Derived, T, N, SP, RhsType, JacType>::current_events() const{
     return _events.event_view();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-const EventCollection<T>& RichSolver<Derived, T, N, SP>::event_col() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+const EventCollection<T>& RichSolver<Derived, T, N, SP, RhsType, JacType>::event_col() const{
     return _events;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-const Interpolator<T, N>* RichSolver<Derived, T, N, SP>::interpolator() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+const Interpolator<T, N>* RichSolver<Derived, T, N, SP, RhsType, JacType>::interpolator() const{
     return _cli.ptr();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::is_interpolating() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::is_interpolating() const{
     return _interp_data;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-State<T> RichSolver<Derived, T, N, SP>::state() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+State<T> RichSolver<Derived, T, N, SP, RhsType, JacType>::state() const{
     switch (_event_idx) {
         case -1:
             return Base::state();
@@ -136,25 +136,25 @@ State<T> RichSolver<Derived, T, N, SP>::state() const{
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::at_event() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event() const{
     return _event_idx != -1;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::show_state(int prec) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::show_state(int prec) const{
     SolverRichState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->message(), this->current_events()).show(prec);
 }
 
 // PUBLIC MODIFIERS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-RichSolver<Derived, T, N, SP>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+RichSolver<Derived, T, N, SP, RhsType, JacType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)){
     _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::adv_impl(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
 
     if (this->requires_new_start()){
         this->remake_new_state(this->true_vector().data());
@@ -165,7 +165,7 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
         if (Base::adv_impl()){
             State<T> last_state = {this->last_true_state_ptr(), this->Nsys()};
             State<T> true_state = {this->true_state_ptr(), this->Nsys()};
-            _events.detect_all_between(last_state, true_state, interp_func<Derived, T, N, SP>, this);
+            _events.detect_all_between(last_state, true_state, interp_func<Derived, T, N, SP, RhsType, JacType>, this);
             if (_interp_data){
                 std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);
                 if (const EventState<T>* ev = _events.canon_state()){
@@ -212,8 +212,8 @@ bool RichSolver<Derived, T, N, SP>::adv_impl(){
     return true;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::advance_until(T time){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
     if (!this->set_tmax(time)){
         return false;
     } else if (!this->is_running()){
@@ -233,8 +233,8 @@ bool RichSolver<Derived, T, N, SP>::advance_until(T time){
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::advance_to_event(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(){
     if (_events.size() == 0){
         return false;
     }
@@ -247,8 +247,8 @@ bool RichSolver<Derived, T, N, SP>::advance_to_event(){
     return true;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-bool RichSolver<Derived, T, N, SP>::set_tmax(T tmax){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::set_tmax(T tmax){
     if (this->is_dead()){
         this->warn_dead();
         return false;
@@ -264,8 +264,8 @@ bool RichSolver<Derived, T, N, SP>::set_tmax(T tmax){
     return true;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::start_interpolation(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
     if (!_interp_data){
         _interp_data = true;
 
@@ -293,14 +293,14 @@ void RichSolver<Derived, T, N, SP>::start_interpolation(){
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::stop_interpolation(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::stop_interpolation(){
     _cli.own(nullptr);
     _interp_data = false;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::reset_impl(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
     Base::reset_impl();
     _events.reset();
     _event_idx = -1;
@@ -309,33 +309,33 @@ void RichSolver<Derived, T, N, SP>::reset_impl(){
 
 // PRIVATE METHODS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline void RichSolver<Derived, T, N, SP>::set_args_impl(const T* new_args){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline void RichSolver<Derived, T, N, SP, RhsType, JacType>::set_args_impl(const T* new_args){
     Base::set_args_impl(new_args);
     _events.set_args(new_args, this->args().size());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-void RichSolver<Derived, T, N, SP>::add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant){
     if (_cli->last_interpolant().interval().is_point() && interpolant->interval().start_bdr() == 0){
         interpolant->close_start();
     }
     _cli->expand_by_owning(std::move(interpolant));
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline bool RichSolver<Derived, T, N, SP>::requires_new_start() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline bool RichSolver<Derived, T, N, SP, RhsType, JacType>::requires_new_start() const{
     return _events.canon_event() && (_events.canon_state()->t() == this->t());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline bool RichSolver<Derived, T, N, SP>::equiv_states() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
     return at_event() ? _events.state(_event_idx).t() == Base::t_impl() : true;
 }
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-inline std::vector<const Event<T>*>& RichSolver<Derived, T, N, SP>::include_tmax_event(std::vector<const Event<T>*>& events){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline std::vector<const Event<T>*>& RichSolver<Derived, T, N, SP, RhsType, JacType>::include_tmax_event(std::vector<const Event<T>*>& events){
     static TmaxEvent<T> ev;
     events.insert(events.begin(), &ev);
     return events;
@@ -343,16 +343,16 @@ inline std::vector<const Event<T>*>& RichSolver<Derived, T, N, SP>::include_tmax
 
 // ============================================================================
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void interp_func(T* res, const T& t, const void* obj){
-    const auto* solver = reinterpret_cast<const RichSolver<Derived, T, N, SP>*>(obj);
+    const auto* solver = reinterpret_cast<const RichSolver<Derived, T, N, SP, RhsType, JacType>*>(obj);
     solver->interp_impl(res, t);
 }
 
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP>
-using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP>, BaseSolver<Derived, T, N, SP>>;
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP, RhsType, JacType>, BaseSolver<Derived, T, N, SP, RhsType, JacType>>;
 
 }
 #endif

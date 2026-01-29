@@ -349,12 +349,12 @@ py::object PySolver::py_event_located(const py::str& name) const{
 PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type) : PySolver(scalar_type) {
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_data = init_ode_data<T>( this->data, args, f, py_q0, jac, py_args, py::list());
+        OdeData<Func<T>, Func<T>> ode_data = init_ode_data<T>( this->data, args, f, py_q0, jac, py_args, py::list());
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
         if ((q0.size() & 1) != 0){
             throw py::value_error("Variational solvers require an even number of system size");
         }
-        this->s = VariationalSolver<T, 0>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), first_step.cast<T>(), dir, args, method).release();
+        this->s = VariationalSolver<T, 0, Func<T>, Func<T>>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), first_step.cast<T>(), dir, args, method).release();
     )
 }
 
@@ -567,14 +567,14 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_rhs = init_ode_data<T>(data,args, f, py_q0, jacobian, py_args, events);
+        OdeData<Func<T>, Func<T>> ode_rhs = init_ode_data<T>(data,args, f, py_q0, jacobian, py_args, events);
         std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
         std::vector<const Event<T>*> evs(safe_events.size());
         for (size_t i=0; i<evs.size(); i++){
             evs[i] = safe_events[i];
         }
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-        ode = new ODE<T>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
+        ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method);
         for (size_t i=0; i<evs.size(); i++){
             delete safe_events[i];
         }
@@ -745,7 +745,7 @@ void PyODE::clear() {
 PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type):PyODE(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, f, q0, jac, py_args, events);
+        OdeData<Func<T>, Func<T>> ode_rhs = init_ode_data<T>(this->data, args, f, q0, jac, py_args, events);
         Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
         if ((q0_.size() & 1) != 0){
             throw py::value_error("Variational ODEs require an even number of system size");
@@ -755,7 +755,7 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable
         for (size_t i=0; i<evs.size(); i++){
             evs[i] = safe_events[i];
         }
-        this->ode = new VariationalODE<T, 0>(ode_rhs, py::cast<T>(t0), q0_.data(), q0_.size()/2, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method.cast<std::string>());
+        this->ode = new VariationalODE<T, 0, Func<T>, Func<T>>(ode_rhs, py::cast<T>(t0), q0_.data(), q0_.size()/2, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs, method.cast<std::string>());
         for (size_t i=0; i<evs.size(); i++){
             delete safe_events[i];
         }

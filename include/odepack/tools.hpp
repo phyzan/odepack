@@ -537,12 +537,11 @@ inline void show_progress(const int& n, const int& target, const Clock& clock){
 }
 
 
-template<typename T>
-struct OdeData{
-
-    Func<T> rhs=nullptr;
-    Func<T> jacobian=nullptr;
-    const void* obj = nullptr; //It will be passed inside rhs and jacobian
+template<typename RHS, typename JAC>
+struct OdeData {
+    RHS rhs;
+    JAC jacobian;
+    const void* obj = nullptr;
 
     /*
     IMPORTANT

@@ -189,10 +189,6 @@ struct PyStruct{
 };
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
-
-
-template<typename T>
 void arrcpy(T* dst, const T* src, size_t size){
     for (size_t i=0; i<size; i++){
         dst[i] = src[i];

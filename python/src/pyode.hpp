@@ -401,10 +401,10 @@ public:
     DEFAULT_RULE_OF_FOUR(PyVarODE);
 
     template<typename T>
-    VariationalODE<T, 0>& varode();
+    VariationalODE<T, 0, Func<T>, Func<T>>& varode();
 
     template<typename T>
-    const VariationalODE<T, 0>& varode() const;
+    const VariationalODE<T, 0, Func<T>, Func<T>>& varode() const;
 
     py::object py_t_lyap() const;
 
@@ -440,7 +440,7 @@ template<typename T>
 std::string get_scalar_type();
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 /*
 IMPLEMENTATIONS
@@ -544,14 +544,14 @@ inline const ODE<T>* PyODE::cast() const {
 template<typename T>
 void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
-    OdeData<T> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
+    OdeData<Func<T>, Func<T>> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
     std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
     std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
         evs[i] = safe_events[i];
     }
     auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_solver<T, 0>(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs).release();
+    this->s = get_virtual_solver<T, 0>(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(first_step), dir, args, evs).release();
     for (size_t i=0; i<evs.size(); i++){
         delete safe_events[i];
     }
@@ -581,13 +581,13 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
 
 
 template<typename T>
-VariationalODE<T, 0>& PyVarODE::varode(){
-    return *static_cast<VariationalODE<T, 0>*>(this->ode);
+VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode(){
+    return *static_cast<VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
 }
 
 template<typename T>
-const VariationalODE<T, 0>& PyVarODE::varode() const {
-    return *static_cast<const VariationalODE<T, 0>*>(this->ode);
+const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode() const {
+    return *static_cast<const VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
 }
 
 
@@ -596,7 +596,7 @@ const VariationalODE<T, 0>& PyVarODE::varode() const {
 //===========================================================================================
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
+OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
     std::string scalar_type = get_scalar_type<T>();
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
@@ -605,7 +605,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object&
     bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
     bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
     args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<T> ode_rhs = {nullptr, nullptr, &data};
+    OdeData<Func<T>, Func<T>> ode_rhs = {nullptr, nullptr, &data};
     if (f_is_compiled){
         if (py::isinstance<PyFuncWrapper>(f)){
             //safe approach
