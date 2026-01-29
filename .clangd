@@ -10,6 +10,7 @@ CompileFlags:
     - "-Wshadow"
     - "-fopenmp"
     - "-fno-math-errno"
+    - "-DMPREAL"
     - "-Wno-sign-conversion"
     - "-I/home/senpy/Documents/repos/odepack"
     - "-I/usr/include/python3.12"

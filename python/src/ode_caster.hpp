@@ -1,7 +1,9 @@
 #pragma once
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#ifdef MPREAL
 #include <mpreal.h>
+#endif
 #include <vector>
 #include <type_traits>
 
@@ -154,6 +156,7 @@ namespace py = pybind11;
 
 namespace pybind11::detail {
 
+#ifdef MPREAL
 // ====================== mpreal <-> double caster ======================
 template <>
 struct type_caster<mpfr::mpreal> {
@@ -179,6 +182,7 @@ public:
         return py::cast(val).release();
     }
 };
+#endif // MPREAL
 
 // ====================== ArrayType<T> caster ======================
 // Assumes ArrayType<T> has:
@@ -216,14 +220,17 @@ struct type_caster<ArrayType, std::enable_if_t<
                        handle /* parent */)
     {
         using T = typename ArrayType::value_type;
+
+#ifdef MPREAL
         constexpr bool is_mpreal = std::is_same_v<T, mpfr::mpreal>;
+#endif
         const size_t ndim = src.ndim();
         // Build shape vector
         std::vector<ssize_t> shape(ndim);
         for (size_t i = 0; i < ndim; ++i) {
             shape[i] = static_cast<ssize_t>(src.shape(i));
         }
-
+#ifdef MPREAL
         if constexpr (is_mpreal) {
             // For mpreal: numpy array of doubles
             size_t total_size = 1;
@@ -260,10 +267,13 @@ struct type_caster<ArrayType, std::enable_if_t<
             }
 
             return result.release();
-        } else {
-            // For POD types like double/int: numpy array of T
+        }else{
             return py::array_t<T>(shape, src.data()).release();
         }
+#else
+        // Default: For POD types like double/int: numpy array of T
+        return py::array_t<T>(shape, src.data()).release();
+#endif
     }
 };
 

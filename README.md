@@ -88,6 +88,16 @@ pip install ./python
 **Requirements:**
 - Python 3.12+
 
+In order to build with arbitrary precision support, use the MPREAL flag:
+```bash
+CMAKE_ARGS="-DMPREAL=ON" pip install ./python
+``` 
+
+For a debug build, use the DEBUG flag:
+```bash
+CMAKE_ARGS="-DDEBUG=ON" pip install ./python
+```
+
 ---
 
 ## Quick Start

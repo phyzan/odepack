@@ -6,15 +6,18 @@
 #include <pybind11/numpy.h>
 #include "../../include/ndspan/arrays.hpp"
 #include "../../include/odepack/variational.hpp"
-#include  "mpreal_caster.hpp"
-
+#include  "ode_caster.hpp"
 
 #define DISPATCH(RETURN_TYPE, ...)                                              \
 call_dispatch(this->scalar_type, [&]<typename T>() -> RETURN_TYPE {__VA_ARGS__ });
 
 namespace ode{
 
+#ifdef MPREAL
 static const std::string SCALAR_TYPE[4] = {"float", "double", "long double", "mpreal"};
+#else
+static const std::string SCALAR_TYPE[3] = {"float", "double", "long double"};
+#endif
 
 template<typename Callable>
 auto call_dispatch(int scalar_type, Callable&& f){
@@ -23,11 +26,17 @@ auto call_dispatch(int scalar_type, Callable&& f){
             return f.template operator()<float>();
         case 1:
             return f.template operator()<double>();
+#ifdef MPREAL
         case 2:
             return f.template operator()<long double>();
         default:
             assert(scalar_type == 3 && "Invalid scalar type");
             return f.template operator()<mpfr::mpreal>();
+#else
+        default:
+            assert(scalar_type == 2 && "Invalid scalar type");
+            return f.template operator()<long double>();
+#endif
     }
 }
 
@@ -35,7 +44,9 @@ static const std::map<std::string, int> DTYPE_MAP = {
     {"float", 0},
     {"double", 1},
     {"long double", 2},
+#ifdef MPREAL
     {"mpreal", 3}
+#endif
 };
 
 
@@ -178,7 +189,7 @@ struct PyStruct{
 };
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 
 template<typename T>
@@ -226,6 +237,8 @@ T py_event(const T& t, const T* q, const T*, const void* obj){
     return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();
 }
 
+
+#ifdef MPREAL
 // Specializations for mpfr::mpreal
 
 template<>
@@ -260,6 +273,8 @@ mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mpreal* q
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args).template cast<mpfr::mpreal>();
 }
+
+#endif // MPREAL
 
 } // namespace ode
 

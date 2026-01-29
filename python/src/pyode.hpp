@@ -440,7 +440,7 @@ template<typename T>
 std::string get_scalar_type();
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 /*
 IMPLEMENTATIONS
@@ -544,7 +544,7 @@ inline const ODE<T>* PyODE::cast() const {
 template<typename T>
 void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
-    OdeData<T> ode_data = init_ode_data<T>(this->data, args, std::move(f), py_q0, std::move(jac), py_args, py_events);
+    OdeData<T> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
     std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
     std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
@@ -596,7 +596,7 @@ const VariationalODE<T, 0>& PyVarODE::varode() const {
 //===========================================================================================
 
 template<typename T>
-OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, const py::iterable& q0, py::object jacobian, const py::iterable& py_args, const py::iterable& events){
+OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
     std::string scalar_type = get_scalar_type<T>();
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
@@ -623,7 +623,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, con
         }
     }
     else{
-        data.rhs = std::move(f);
+        data.rhs = f;
         ode_rhs.rhs = py_rhs;
     }
     if (jac_is_compiled){
@@ -642,7 +642,7 @@ OdeData<T> init_ode_data(PyStruct& data, std::vector<T>& args, py::object f, con
             ode_rhs.jacobian = open_capsule<Func<T>>(jacobian.cast<py::capsule>());
         }
     }else if (!jacobian.is_none()){
-        data.jac = std::move(jacobian);
+        data.jac = jacobian;
         ode_rhs.jacobian = py_jac;
     }
     for (py::handle ev : events){
@@ -677,9 +677,11 @@ std::string get_scalar_type(){
     else if constexpr (std::is_same_v<T, long double>){
         return "long double";
     }
+#ifdef MPREAL
     else if constexpr (std::is_same_v<T, mpfr::mpreal>){
         return "mpreal";
     }
+#endif
     else{
         static_assert(false, "Unsupported scalar type T");
     }

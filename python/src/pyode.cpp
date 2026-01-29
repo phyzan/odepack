@@ -349,7 +349,7 @@ py::object PySolver::py_event_located(const py::str& name) const{
 PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type) : PySolver(scalar_type) {
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_data = init_ode_data<T>( this->data, args, std::move(f), py_q0, std::move(jac), py_args, py::list());
+        OdeData<T> ode_data = init_ode_data<T>( this->data, args, f, py_q0, jac, py_args, py::list());
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
         if ((q0.size() & 1) != 0){
             throw py::value_error("Variational solvers require an even number of system size");
@@ -745,7 +745,7 @@ void PyODE::clear() {
 PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type):PyODE(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, std::move(f), q0, std::move(jac), py_args, events);
+        OdeData<T> ode_rhs = init_ode_data<T>(this->data, args, f, q0, jac, py_args, events);
         Array1D<T> q0_ = toCPP_Array<T, Array1D<T>>(q0);
         if ((q0_.size() & 1) != 0){
             throw py::value_error("Variational ODEs require an even number of system size");
@@ -1244,11 +1244,23 @@ PYBIND11_MODULE(odesolvers, m) {
 
     m.def("advance_all", &py_advance_all, py::arg("solvers"), py::arg("t_goal"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
+#ifdef MPREAL
     m.def("set_mpreal_prec",
       &mpfr::mpreal::set_default_prec,
       py::arg("bits"),
       "Set the default MPFR precision (in bits) for mpfr::mpreal.")
     .def("mpreal_prec", &mpfr::mpreal::get_default_prec);
+#else
+    m.def("set_mpreal_prec",
+      [](size_t){
+        throw py::value_error("Current installtion does not support mpreal for arbitrary precision");
+      },
+      py::arg("bits"),
+      "Set the default MPFR precision (in bits) for mpfr::mpreal.")
+    .def("mpreal_prec", []() {
+        throw py::value_error("Current installtion does not support mpreal for arbitrary precision");
+      });
+#endif
 }
 
 }
