@@ -540,7 +540,7 @@ inline void show_progress(const int& n, const int& target, const Clock& clock){
 template<typename RHS, typename JAC>
 struct OdeData {
     RHS rhs;
-    JAC jacobian;
+    JAC jacobian = nullptr;
     const void* obj = nullptr;
 
     /*
