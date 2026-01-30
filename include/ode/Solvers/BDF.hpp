@@ -1,7 +1,7 @@
 #ifndef BDF_HPP
 #define BDF_HPP
 
-#include "rich_solver.hpp"
+#include "../Core/RichBase.hpp"
 
 namespace ode{
 

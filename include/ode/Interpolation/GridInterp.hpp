@@ -2,7 +2,7 @@
 #define GRID_INTERP_HPP
 
 
-#include "ode.hpp"
+#include "../OdeInt.hpp"
 
 
 

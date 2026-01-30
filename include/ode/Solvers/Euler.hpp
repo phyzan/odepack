@@ -1,7 +1,7 @@
 #ifndef EULER_HPP
 #define EULER_HPP
 
-#include "rich_solver.hpp"
+#include "../Core/RichBase.hpp"
 
 namespace ode{
 

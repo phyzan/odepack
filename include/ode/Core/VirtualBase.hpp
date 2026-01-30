@@ -1,9 +1,8 @@
 #ifndef VIRTUALSOLVER_HPP
 #define VIRTUALSOLVER_HPP
 
-#include "interpolators.hpp"
-#include "events.hpp"
-#include <memory>
+#include "../Interpolation/Interpolators.hpp"
+#include "Events.hpp"
 
 namespace ode {
 

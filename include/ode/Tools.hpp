@@ -14,7 +14,7 @@
 
 namespace ode {
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs, ndspan::print;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
 template<typename Type>
 class PolyWrapper{
@@ -235,6 +235,12 @@ using JacMat = Array2D<T, N, N, Allocation::Heap, Layout::F>;
 using EventMap = std::map<std::string, std::vector<size_t>>;
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::complex;
+
+template<typename... Arg>
+void print(Arg... x){
+    ((std::cout << x << ' '), ...);
+    std::cout << "\n";
+}
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 

@@ -28,13 +28,6 @@
 
 namespace ndspan{
 
-    
-template<typename... Arg>
-void print(Arg... y){
-    ((std::cout << y << ' '), ...);
-    std::cout << "\n";
-}
-
 #define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
 #define CONCAT(a,b) CONCAT_IMPL(a,b)
 #define CONCAT_IMPL(a,b) a##b

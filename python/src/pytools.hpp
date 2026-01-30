@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "../../include/ndspan/arrays.hpp"
-#include "../../include/odepack/variational.hpp"
+#include "../../include/odepack.hpp"
 #include  "ode_caster.hpp"
 
 #define DISPATCH(RETURN_TYPE, ...)                                              \

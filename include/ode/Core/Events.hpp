@@ -21,7 +21,7 @@
  * - EventView<T>: View into detected events at a time point
  */
 
-#include "tools.hpp"
+#include "../Tools.hpp"
 
 namespace ode {
 

@@ -68,10 +68,25 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 ### C++ (Header-Only)
 
-Simply include the headers in your project:
+```bash
+git clone https://github.com/phyzan/odepack.git
+cd odepack
+sudo make install
+```
 
+This installs headers to `/usr/local/include`. To use a custom location:
+```bash
+sudo make install PREFIX=/path/to/install
+```
+
+To uninstall:
+```bash
+sudo make uninstall
+```
+
+Then include in your code:
 ```cpp
-#include <odepack/solvers.hpp>
+#include <odepack/odepack.hpp>
 ```
 
 **Requirements:**
@@ -105,7 +120,7 @@ CMAKE_ARGS="-DDEBUG=ON" pip install ./python
 ### C++ Example
 
 ```cpp
-#include <odepack/solvers.hpp>
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 
@@ -228,7 +243,7 @@ print("Expected state:", "[..., 1]")
 ### ODE classes use an internal solver to store integration history
 
 ```cpp
-#include <odepack/ode.hpp>
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 
@@ -305,7 +320,7 @@ ODEPACK features an event detection system that handles integration events, with
 ### Zero-Crossing Events
 
 ```cpp
-#include <odepack/events.hpp>
+#include <odepack/Core/Events.hpp>
 
 // Detect when y[0] crosses zero
 PreciseEvent<double> event(
@@ -325,7 +340,7 @@ PreciseEvent<double> event(
 
 ## Architecture
 
-ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphism:
+ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphism via CRTP (Curiously Recurring Template Pattern):
 
 ### Class Hierarchy
 
@@ -348,16 +363,16 @@ ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphi
 │        ┌────────────────────┐       ┌───────────────────────┐               │
 │        │ BaseSolver<T,N,SP> │──────▶│  RichSolver<T,N,SP>   │               │
 │        └────────────────────┘       └───────────────────────┘               │
-│              (CRTP base) │             (+ events/interpolation)             |
-│                   │                             │                           |
-│                   │                             │                           |
-|                   ───────────────────────────────                           |
-│                                  │                                          |
-│         ┌────────────────────────┼──────────────────────────┐               |
-│         │            │           │          │               │               |
-│         ┌────▼───┐  ┌─────▼────┐ ┌────▼────┐ ┌───▼───┐ ┌───▼───┐            |
-│         │ Euler  │  │   RK23   │ │  RK45   │ │DOP853 │ │  BDF  │            |
-│         └────────┘  └──────────┘ └─────────┘ └───────┘ └───────┘            |
+│              (CRTP base) │             (+ events/interpolation)             │
+│                   │                             │                           │
+│                   │                             │                           │
+│                   ───────────────────────────────                           │
+│                                  │                                          │
+│         ┌────────────────────────┼──────────────────────────┐               │
+│         │            │           │          │               │               │
+│      ┌──▼───┐   ┌────▼───┐  ┌────▼───┐ ┌────▼──┐  ┌────▼──┐                 │
+│      │Euler │   │  RK23  │  │  RK45  │ │DOP853 │  │  BDF  │                 │
+│      └──────┘   └────────┘  └────────┘ └───────┘  └───────┘                 │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -401,6 +416,15 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 | `Virtual` | Yes | No | No | Runtime solver selection, no events |
 | `RichVirtual` | Yes | Yes | Yes | Full flexibility at runtime |
 
+### Design Patterns
+
+| Pattern | Usage |
+|---------|-------|
+| **CRTP** | `BaseSolver<Derived, ...>` enables static dispatch without virtual overhead |
+| **Policy Pattern** | `SolverPolicy` enum for compile-time feature selection |
+| **Factory Pattern** | `getSolver()` and `get_virtual_solver()` for solver instantiation |
+| **Polymorphic Wrapper** | `PolyWrapper<T>` for type-erased ownership of interpolators & events |
+
 ---
 
 ## Directory Structure
@@ -409,30 +433,57 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 odepack/
 ├── include/
 │   ├── odepack/
-│   │   ├── solverbase.hpp      # CRTP base class
-│   │   ├── virtualsolver.hpp   # Virtual interfaces
-│   │   ├── rich_solver.hpp     # Event-aware solver
-│   │   ├── rk_adaptive.hpp     # Runge-Kutta base
-│   │   ├── dop853.hpp          # 8th order RK
-│   │   ├── bdf.hpp             # Implicit BDF method
-│   │   ├── euler.hpp           # Euler method
-│   │   ├── events.hpp          # Event detection system
-│   │   ├── ode.hpp             # High-level ODE wrapper
-│   │   ├── solvers.hpp         # Solver factory
-│   │   ├── interpolators.hpp   # Dense output
-│   │   └── variational.hpp     # Lyapunov exponents
-│   │   ├── ...
-│   └── ndspan/                 # Multi-dimensional array library
+│   │   ├── Core/                    # Foundation & base classes
+│   │   │   ├── VirtualBase.hpp      # Virtual interfaces & solver policies
+│   │   │   ├── SolverBase.hpp       # CRTP base solver
+│   │   │   ├── RichBase.hpp         # Event-aware solver extension
+│   │   │   └── Events.hpp           # Event detection system
+│   │   │
+│   │   ├── Solvers/                 # Concrete solver implementations
+│   │   │   ├── Euler.hpp            # Simple Euler method (1st order)
+│   │   │   ├── DOPRI.hpp            # Runge-Kutta RK23, RK45 (adaptive)
+│   │   │   ├── DOP853.hpp           # High-order explicit RK (8th order)
+│   │   │   └── BDF.hpp              # Implicit solver for stiff systems
+│   │   │
+│   │   ├── Interpolation/           # Dense output & interpolation
+│   │   │   ├── Interpolators.hpp    # Base interpolator interface
+│   │   │   └── GridInterp.hpp       # Grid & vector field interpolation
+│   │   │
+│   │   ├── Chaos/                   # Dynamical systems analysis
+│   │   │   └── VariationalSolvers.hpp  # Lyapunov exponent computation
+│   │   │
+│   │   ├── odepack.hpp              # Main include (all headers)
+│   │   ├── OdeInt.hpp               # High-level ODE wrapper
+│   │   ├── SolverDispatcher.hpp     # Factory for solver instantiation
+│   │   ├── SolverState.hpp          # Solver state & status reporting
+│   │   └── Tools.hpp                # Utilities (PolyWrapper, etc.)
+│   │
+│   └── ndspan/                      # Multi-dimensional array library
 │       ├── ndspan.hpp
 │       ├── arrays.hpp
 │       └── ...
+│
 ├── python/
-│   ├── src/                    # Python bindings (pybind11)
-│   ├── odepack/                # Python package
-│   └── tests/                  # Python tests
+│   ├── src/                         # Python bindings (pybind11)
+│   ├── odepack/                     # Python package
+│   └── tests/                       # Python tests
+│
+├── tests/                           # C++ tests
 ├── LICENSE
 └── README.md
 ```
+
+### Component Overview
+
+| Component | Description |
+|-----------|-------------|
+| **Core/** | Base classes, virtual interfaces, event system, and solver policies |
+| **Solvers/** | Concrete integrator implementations (Euler, RK23, RK45, DOP853, BDF) |
+| **Interpolation/** | Dense output providers and grid interpolation utilities |
+| **Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
+| **OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
+| **SolverDispatcher.hpp** | Factory functions for solver instantiation |
+| **Tools.hpp** | Utilities including `PolyWrapper` for polymorphic type ownership |
 
 ---
 
@@ -441,8 +492,7 @@ odepack/
 ODEPACK supports arbitrary precision arithmetic via MPFR:
 
 ```cpp
-#include <odepack/solvers.hpp>
-
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 

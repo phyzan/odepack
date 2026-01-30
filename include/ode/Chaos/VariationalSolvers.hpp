@@ -1,12 +1,9 @@
 #ifndef VARIATIONAL_HPP
 #define VARIATIONAL_HPP
 
-
-#include "events.hpp"
-#include "ode.hpp"
-#include "virtualsolver.hpp"
-#include <memory>
-#include <stdexcept>
+#include "../Core/Events.hpp"
+#include "../OdeInt.hpp"
+#include "../Core/VirtualBase.hpp"
 
 namespace ode {
 

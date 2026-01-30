@@ -17,9 +17,9 @@
  * output interpolation, and event detection.
  */
 
-#include "tools.hpp"
-#include "virtualsolver.hpp"
-#include "solverstate.hpp"
+#include "../Tools.hpp"
+#include "VirtualBase.hpp"
+#include "../SolverState.hpp"
 
 #define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
 
@@ -488,9 +488,17 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
-    if constexpr (HAS_JAC || RUNTIME_JAC_TYPE) {
+    if constexpr (HAS_JAC) {
         this->jac_exact(jm, t, q);
-    } else {
+    } else if constexpr (RUNTIME_JAC_TYPE) {
+        if (_ode.jacobian != nullptr){
+            auto jac = reinterpret_cast<Func<T>>(_ode.jacobian);
+            jac(jm, t, q, _args.data(), _ode.obj);
+        }else{
+            this->jac_approx(jm, t, q, dt);
+        }
+    }    
+    else {
         this->jac_approx(jm, t, q, dt);
     }
 }
@@ -937,6 +945,9 @@ INLINE void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_exact(T* jm, co
         assert(jac != nullptr && "Jacobian function pointer is null");
         jac(jm, t, q, _args.data(), _ode.obj);
     } else if constexpr (HAS_JAC) {
+        if constexpr (std::is_pointer_v<JacType>) {
+            assert(_ode.jacobian != nullptr && "Jacobian function pointer is null");
+        }
         _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
     } else {
         throw std::runtime_error("Jacobian function not provided for this solver.");

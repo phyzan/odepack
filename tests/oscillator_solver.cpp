@@ -1,5 +1,6 @@
-#include "../include/odepack/solvers.hpp"
+// #include "../include/odepack.hpp"
 
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 

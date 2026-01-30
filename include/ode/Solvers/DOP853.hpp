@@ -1,7 +1,7 @@
 #ifndef DOP853_HPP
 #define DOP853_HPP
 
-#include "rk_adaptive.hpp"
+#include "DOPRI.hpp"
 
 namespace ode{
 

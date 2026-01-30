@@ -1,9 +1,7 @@
 #ifndef ODE_HPP
 #define ODE_HPP
 
-
-#include <omp.h>
-#include "solvers.hpp"
+#include "SolverDispatcher.hpp"
 
 namespace ode {
 

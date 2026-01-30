@@ -2,7 +2,7 @@
 #define RICH_SOLVER_HPP
 
 
-#include "solverbase.hpp"
+#include "SolverBase.hpp"
 
 #define EVENTS const std::vector<const Event<T>*>&
 
@@ -355,4 +355,6 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP, RhsType, JacType>, BaseSolver<Derived, T, N, SP, RhsType, JacType>>;
 
 }
+
+
 #endif

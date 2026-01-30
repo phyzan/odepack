@@ -3,7 +3,7 @@
 
 //https://en.wikipedia.org/wiki/Dormand%E2%80%93Prince_method
 
-#include "rich_solver.hpp"
+#include "../Core/RichBase.hpp"
 
 namespace ode {
 

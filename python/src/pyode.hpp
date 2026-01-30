@@ -2,8 +2,6 @@
 #define PYODE_HPP
 
 #include "pytools.hpp"
-#include "../../include/odepack/virtualsolver.hpp"
-#include "../../include/odepack/grid_interp.hpp"
 
 
 namespace ode{

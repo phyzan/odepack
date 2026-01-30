@@ -1,7 +1,7 @@
 #ifndef INTERPOLATORS_HPP
 #define INTERPOLATORS_HPP
 
-#include "tools.hpp"
+#include "../Tools.hpp"
 
 namespace ode {
 

@@ -1,7 +1,7 @@
 #ifndef SOLVERSTATE_HPP
 #define SOLVERSTATE_HPP
 
-#include "events.hpp"
+#include "Core/Events.hpp"
 #include "../ndspan/arrays.hpp"
 
 namespace ode {
