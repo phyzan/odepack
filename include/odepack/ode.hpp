@@ -82,11 +82,9 @@ private:
 template<typename T, size_t N=0>
 class ODE{
 
-    using RhsType = Func<T>;
-    using JacType = Func<T>;
-
 public:
 
+    template<typename RhsType, typename JacType>
     ODE(ODE_CONSTRUCTOR(T));
 
     ODE(const ODE<T, N>& other);
@@ -154,6 +152,7 @@ protected:
 
     virtual void                                _register_event(size_t i);
 
+    template<typename RhsType, typename JacType>
     void                                        _init(ODE_CONSTRUCTOR(T));
 
 private:
@@ -277,6 +276,7 @@ inline size_t EventCounter<T, N>::total()const{
 
 // ODE implementations
 template<typename T, size_t N>
+template<typename RhsType, typename JacType>
 ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
     _init(ARGS, events, method);
 }
@@ -562,6 +562,7 @@ void ODE<T, N>::_register_event(size_t i){
 }
 
 template<typename T, size_t N>
+template<typename RhsType, typename JacType>
 void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
     _Nevents = std::vector<std::vector<size_t>>(events.size());
     _solver = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events).release();

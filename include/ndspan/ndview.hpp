@@ -132,8 +132,6 @@ class View : public AbstractView<View<T, L, DIMS...>, L, T, DIMS...>{
 
 public:
 
-    using Base::Base;
-
     explicit View(const T* data) requires (Base::N > 0) : Base(), _data(data) {}
 
     template<INT_T... Args>

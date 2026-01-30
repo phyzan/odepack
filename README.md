@@ -107,43 +107,52 @@ CMAKE_ARGS="-DDEBUG=ON" pip install ./python
 ```cpp
 #include <odepack/solvers.hpp>
 
-void df_dt(double* dy_dt, const double& t, const double* y, const double* args, const void* obj) {
-    //2D oscillator: y'' + y = 0
-    dy_dt[0] = y[1];
-    dy_dt[1] = -y[0];
-}
+using namespace ode;
 
 int main() {
 
     // Initial conditions
-    double t0 = 0.0;
+    double t = 0.0;
     std::array<double, 2> y0 = {3.0, 0.0};
 
-    // y' = 1 crossing
-    ode::PreciseEvent<double> event(
+    // Define the y' = 1 crossing
+    PreciseEvent<double> event(
         "event",
-        [](const double& t, const double* y, const double* args, const void*){
-            return y[1]-1;
+        [](const double& t, const double* y, const double* args, const void* ptr){
+            return y[1] - 1.0;
         });
 
+
+    // General signature for ODE function
+    auto df_dt = [&](double* dy_dt, const double& t, const double* y, const double* args, const void* ptr) {
+        //2D oscillator: y'' + y = 0  => y1' = y2, y2' = -y1
+        dy_dt[0] = y[1];
+        dy_dt[1] = -y[0];
+    };
+
+    // Solver policy determines the capabilities of the solver,
+    // by slightly sacrificing performance. Here we use RichStatic
+    // which allows event detection.
+    constexpr SolverPolicy SP = SolverPolicy::RichStatic;
+
     // Create solver
-    ode::RK45<double, 2, ode::SolverPolicy::RichStatic> solver(
-        {.rhs=df_dt},   // ODE function
-        t0,                 // Initial time
+    auto solver = getSolver<RK45, double, 2, SP>(
+        OdeData{.rhs=df_dt},   // ODE function
+        t,                 // Initial time
         y0.data(),
         2,             // ODE system size
         1e-6,          // Relative tolerance
         1e-9,          // Absolute tolerance
-        0.0,       // Minimum step size (0 = auto)
+        0.0,       // Minimum step size
         1.0,       // Maximum step size
-        0.01,    // First step size
+        0.0,    // First step size (0 = auto)
         1,              // Integration direction
-        {},            // Additional args
+        {},            // Additional args to be passed to ODE function
         {&event} // Events
 
     );
 
-    // Integrate to t = 5
+    // Advance until event is detected
     while (!solver.at_event()) {
         solver.advance();
     }
@@ -221,7 +230,7 @@ print("Expected state:", "[..., 1]")
 ```cpp
 #include <odepack/ode.hpp>
 
-using ode::RK45, ode::ODE, ode::OdeResult, ode::StepSequence, ode::PreciseEvent, ode::EventOptions, ode::EventMap;
+using namespace ode;
 
 void df_dt(double* dy_dt, const double& t, const double* y, const double* args, const void* obj) {
     //2D oscillator: y'' + y = 0
@@ -244,7 +253,7 @@ int main() {
 
     // Create ode
     ODE<double, 2> ode(
-        {.rhs=df_dt},   // ODE function
+        OdeData{.rhs=df_dt},   // ODE function
         t0,                 // Initial time
         y0.data(),
         2,             // ODE system size
@@ -412,6 +421,7 @@ odepack/
 │   │   ├── solvers.hpp         # Solver factory
 │   │   ├── interpolators.hpp   # Dense output
 │   │   └── variational.hpp     # Lyapunov exponents
+│   │   ├── ...
 │   └── ndspan/                 # Multi-dimensional array library
 │       ├── ndspan.hpp
 │       ├── arrays.hpp
@@ -431,53 +441,72 @@ odepack/
 ODEPACK supports arbitrary precision arithmetic via MPFR:
 
 ```cpp
-// #include 
-#include "<odepack/solvers.hpp>"
-#include <mpreal.h>
+#include <odepack/solvers.hpp>
+
+
+using namespace ode;
+
+using mpfr::mpreal;
 
 template<typename T>
-void df_dt(T* dy_dt, const T& t, const T* y, const T* args, const void* obj) {
+void df_dt(T* dy_dt, const T& t, const T* y, const T* args, const void* ptr) {
     //2D oscillator: y'' + y = 0
     dy_dt[0] = y[1];
     dy_dt[1] = -y[0];
 }
 
 template<typename T>
-T crossing(const T& t, const T* y, const T* args, const void* obj) {
+T crossing(const T& t, const T* y, const T* args, const void* ptr) {
     return y[1] - 1;
 }
-
-using ode::PreciseEvent, ode::RK45, ode::SolverPolicy;
-using mpfr::mpreal;
 
 int main() {
 
     // Initial conditions
-    mpreal t0 = 0;
     std::array<mpreal, 2> y0 = {3, 0};
 
-    // y' = 1 crossing
-    PreciseEvent<mpreal> event(
-        "event",
-        crossing<mpreal>
-    );
+    // Define the y' = 1 crossing
+    PreciseEvent<mpreal> event("event", crossing<mpreal>);
+
+    constexpr SolverPolicy SP = SolverPolicy::RichStatic;
 
     // Create solver
-    RK45<mpreal, 2, SolverPolicy::RichStatic> solver(
-        {.rhs=df_dt<mpreal>},   // ODE function
-        t0,                 // Initial time
+    mpreal t = 0;
+    mpreal rtol = "1e-6";
+    mpreal atol = "1e-9";
+    mpreal min_step = 0;
+    mpreal max_step = 1;
+    mpreal first_step = 0;
+    constexpr size_t nsys = 2;
+    int dir = 1;
+    auto solver = getSolver<RK45, mpreal, nsys, SP>(
+        OdeData{.rhs=df_dt<mpreal>},
+        t,
         y0.data(),
-        2,             // ODE system size
-        mpreal("1e-6"),          // Relative tolerance
-        mpreal("1e-9"),          // Absolute tolerance
-        mpreal("0.0"),       // Minimum step size (0 = auto)
-        mpreal("1.0"),       // Maximum step size
-        mpreal("0.01"),    // First step size
-        1,              // Integration direction
-        {},            // Additional args
-        {&event} // Events
-
+        nsys,
+        rtol,
+        atol,
+        min_step,
+        max_step,
+        first_step,
+        dir,
+        {},
+        {&event}
     );
+
+    // Advance until event is detected
+    while (!solver.at_event()) {
+        solver.advance();
+    }
+
+    std::cout << "Event detected at t = " << solver.t() << "\n";
+    std::cout << "State at event: ";
+    auto v = solver.vector();
+    for (size_t i = 0; i < 2; ++i) {
+        std::cout << v[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "Expected state: {..., 1}" << std::endl;
 
     return 0;
 }

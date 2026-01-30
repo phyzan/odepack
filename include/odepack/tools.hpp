@@ -537,7 +537,7 @@ inline void show_progress(const int& n, const int& target, const Clock& clock){
 }
 
 
-template<typename RHS, typename JAC>
+template<typename RHS, typename JAC = std::nullptr_t>
 struct OdeData {
     RHS rhs;
     JAC jacobian = nullptr;
@@ -563,6 +563,13 @@ struct OdeData {
     and NOT
     m[0] = a, m[1] = b, m[2] = c, m[3] = d;
     */
+};
+
+template<typename RHS>
+struct OdeData<RHS, void> {
+    RHS rhs;
+    const void* jacobian = nullptr; //will be cast to Func<T> and will be checked for nullptr at runtime
+    const void* obj = nullptr;
 };
 
 

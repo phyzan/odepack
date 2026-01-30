@@ -440,7 +440,7 @@ template<typename T>
 std::string get_scalar_type();
 
 template<typename T>
-OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
+OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 /*
 IMPLEMENTATIONS
@@ -544,7 +544,7 @@ inline const ODE<T>* PyODE::cast() const {
 template<typename T>
 void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
-    OdeData<Func<T>, Func<T>> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
+    OdeData<Func<T>, void> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
     std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
     std::vector<const Event<T>*> evs(safe_events.size());
     for (size_t i=0; i<evs.size(); i++){
@@ -596,7 +596,7 @@ const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode() const {
 //===========================================================================================
 
 template<typename T>
-OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
+OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
     std::string scalar_type = get_scalar_type<T>();
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
@@ -605,7 +605,7 @@ OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, co
     bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
     bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
     args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<Func<T>, Func<T>> ode_rhs = {nullptr, nullptr, &data};
+    OdeData<Func<T>, void> ode_rhs = {nullptr, nullptr, &data};
     if (f_is_compiled){
         if (py::isinstance<PyFuncWrapper>(f)){
             //safe approach
@@ -630,7 +630,7 @@ OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, co
         if (py::isinstance<PyFuncWrapper>(jacobian)){
             //safe approach
             auto& _j = jacobian.cast<PyFuncWrapper&>();
-            ode_rhs.jacobian = reinterpret_cast<Func<T>>(_j.rhs);
+            ode_rhs.jacobian = (const void*)_j.rhs;
             if (_j.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
             }
@@ -639,11 +639,11 @@ OdeData<Func<T>, Func<T>> init_ode_data(PyStruct& data, std::vector<T>& args, co
             }
         }
         else{
-            ode_rhs.jacobian = open_capsule<Func<T>>(jacobian.cast<py::capsule>());
+            ode_rhs.jacobian = (const void*)open_capsule<Func<T>>(jacobian.cast<py::capsule>());
         }
     }else if (!jacobian.is_none()){
         data.jac = jacobian;
-        ode_rhs.jacobian = py_jac;
+        ode_rhs.jacobian = (const void*)py_jac<T>;
     }
     for (py::handle ev : events){
         if (!py::isinstance<PyEvent>(ev)) {

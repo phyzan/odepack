@@ -149,6 +149,7 @@ public:
         direction: +1 forward, -1 backward
         */
         auto ode_func = [](T* out, const T& t, const T* q, const T* args, const void* ptr){
+            assert(ptr != nullptr && "Vector field pointer is null");
             const auto* vec_field = reinterpret_cast<const SampledVectorField2D<T>*>(ptr);
             if (!vec_field->in_bounds(q[0], 0) || !vec_field->in_bounds(q[1], 1)){
                 out[0] = out[1] = 0;
@@ -159,7 +160,7 @@ public:
 
 
         std::array<T, 2> y0_vec = {x0, y0};
-        ODE<T> ode({.rhs=ode_func, .obj=this}, 0, y0_vec.data(), 2, rtol, atol, min_step, max_step, first_step, direction, {}, {}, method);
+        ODE<T> ode(OdeData{.rhs=ode_func, .obj=this}, 0, y0_vec.data(), 2, rtol, atol, min_step, max_step, first_step, direction, {}, {}, method);
 
         return ode.integrate(length, t_eval);
     }

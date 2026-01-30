@@ -61,7 +61,8 @@ class BaseSolver : public BaseInterface<T, N, SP>{
     using Base = BaseInterface<T, N, SP>;
     using Clone = SolverCloneType<Derived, T, N, SP>;
 
-    static constexpr bool HAS_JAC = !std::is_same_v<JacType, std::nullptr_t>;
+    static constexpr bool RUNTIME_JAC_TYPE = std::is_same_v<JacType, void>;
+    static constexpr bool HAS_JAC = !RUNTIME_JAC_TYPE && !std::is_same_v<JacType, std::nullptr_t>;
     static_assert( !std::is_same_v<RhsType, std::nullptr_t> , "RHS function type cannot be nullptr");
 
 public:
@@ -487,9 +488,9 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
-    if constexpr (HAS_JAC) {
+    if constexpr (HAS_JAC || RUNTIME_JAC_TYPE) {
         this->jac_exact(jm, t, q);
-    }else{
+    } else {
         this->jac_approx(jm, t, q, dt);
     }
 }
@@ -930,13 +931,16 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_impl(T* resu
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_exact(T* jm, const T& t, const T* q) const{
-    if constexpr (!HAS_JAC){
-        throw std::runtime_error("Jacobian function not provided for this solver.");
-    }else{
+INLINE void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_exact(T* jm, const T& t, const T* q) const{
+    if constexpr (RUNTIME_JAC_TYPE) {
+        auto jac = reinterpret_cast<Func<T>>(_ode.jacobian);
+        assert(jac != nullptr && "Jacobian function pointer is null");
+        jac(jm, t, q, _args.data(), _ode.obj);
+    } else if constexpr (HAS_JAC) {
         _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
+    } else {
+        throw std::runtime_error("Jacobian function not provided for this solver.");
     }
-    
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

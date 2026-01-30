@@ -203,6 +203,7 @@ void arrcpy(T* dst, const void* src, size_t size){
 
 template<typename T>
 void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
+    assert(obj != nullptr && "RHS function pointer is null");
     PyStruct& p = *const_cast<PyStruct*>(reinterpret_cast<const PyStruct*>(obj));
     py::array_t<T>& arr = p.get_array<T>();
     std::memcpy(arr.mutable_data(), q, arr.size() * sizeof(T));
@@ -212,6 +213,7 @@ void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
 
 template<typename T>
 void py_jac(T* res, const T& t, const T* q, const T*, const void* obj){
+    assert(obj != nullptr && "Jacobian function pointer is null");
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::array_t<T> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
@@ -221,6 +223,7 @@ void py_jac(T* res, const T& t, const T* q, const T*, const void* obj){
 template<typename T>
 void py_mask(T* res, const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
+    assert(obj != nullptr && "Mask function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::array_t<T> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
     arrcpy(res, pyres.data(), pyres.size());
@@ -229,6 +232,7 @@ void py_mask(T* res, const T& t, const T* q, const T*, const void* obj){
 template<typename T>
 T py_event(const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
+    assert(obj != nullptr && "Event function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();
 }
@@ -239,6 +243,7 @@ T py_event(const T& t, const T* q, const T*, const void* obj){
 
 template<>
 void py_rhs<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    assert(obj != nullptr && "RHS function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
@@ -248,6 +253,7 @@ void py_rhs<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::
 
 template<>
 void py_jac<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    assert(obj != nullptr && "Jacobian function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
@@ -257,6 +263,7 @@ void py_jac<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::
 
 template<>
 void py_mask<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    assert(obj != nullptr && "Mask function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     py::iterable pyres = p.rhs(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args);
     // Convert py::object back to Array<mpfr::mpreal>
@@ -266,6 +273,7 @@ void py_mask<mpfr::mpreal>(mpfr::mpreal* res, const mpfr::mpreal& t, const mpfr:
 
 template<>
 mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mpreal* q, const mpfr::mpreal*, const void* obj){
+    assert(obj != nullptr && "Event function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args).template cast<mpfr::mpreal>();
 }
