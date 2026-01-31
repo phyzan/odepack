@@ -173,12 +173,10 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
                 }
                 this->add_interpolant(std::move(r));
             }
-        }
-        else{
+        }else{
             return false;
         }
-    }
-    else{
+    }else{
         _events.next_result();
     }
 
@@ -198,14 +196,12 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
     for (size_t idx : _events){
         if (_events.event(idx).is_lethal()){
             this->kill(_events.event(idx).name());
-        }
-        else if (_events.event(idx).is_stop_event()){
+        }else if (_events.event(idx).is_stop_event()){
             this->stop(_events.event(idx).name());
         }
     }
 
     if (_interp_data){
-        // _current_linked_interpolator.adjust_end(this->t());
         _cli->close_end();
     }
 

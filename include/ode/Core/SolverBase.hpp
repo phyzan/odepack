@@ -379,28 +379,37 @@ protected:
 
     /// @brief Get pointer to the initial conditions state data.
     inline const T*             ics_ptr() const;
+
     /// @brief Get pointer to the most recently computed state.
     inline const T*             new_state_ptr() const;
+
     /// @brief Get pointer to the previous accepted state.
     inline const T*             old_state_ptr() const;
+
     /// @brief Get pointer to the current "true" state.
     inline const T*             true_state_ptr() const;
+
     /// @brief Get pointer to the previous "true" state.
     inline const T*             last_true_state_ptr() const;
 
     /// @brief Get the time value of the newest computed step.
     const T&                    t_new() const;
-    public:
+
     /// @brief Get the time value of the last "true" state.
     const T&                    t_last() const;
+
     /// @brief Print a warning that the solver is paused.
     void                        warn_paused() const;
+
     /// @brief Print a warning that the solver is dead.
     void                        warn_dead() const;
+
     /// @brief Set the solver status message.
     inline void                 set_message(const std::string& text);
+
     /// @brief Trigger re-adjustment after state changes.
     void                        re_adjust();
+
     /**
      * @brief Rebuild the new state from a modified vector.
      * @param vector New state vector values (size Nsys).
@@ -413,8 +422,10 @@ protected:
     // ============================ OVERRIDEN IN RICH SOLVER ==========================
     /// @brief Time accessor implementation (overridden in RichSolver).
     inline const T&             t_impl() const;
+
     /// @brief Vector accessor implementation (overridden in RichSolver).
     inline View1D<T, N>         vector_impl() const;
+
     /// @brief Advance implementation (overridden in RichSolver).
     inline bool                 adv_impl();
     // ================================================================================
@@ -430,10 +441,13 @@ protected:
 
     /// @brief Maximum step size increase factor per step.
     T                                   MAX_FACTOR = 10;
+
     /// @brief Safety factor for step size control (typically 0.8-0.95).
     T                                   SAFETY = T(9)/10;
+
     /// @brief Minimum step size decrease factor per step.
     T                                   MIN_FACTOR = T(2)/10;
+    
     /// @brief Absolute minimum step size before solver terminates.
     T                                   MIN_STEP = 100*std::numeric_limits<T>::epsilon();
 
@@ -1207,6 +1221,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(const T* state
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::settle_on(const T& time, bool success){
+    assert( (time*this->direction() >= this->true_state_ptr()[0]*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in settle_on");
     if (success && (time*this->direction() < this->t_new()*this->direction())) {
         T* ptr = this->aux_state_ptr();
         interp(ptr+2, time);
@@ -1221,6 +1236,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::settle_on(const T& time, b
             _aux_state_idx = _aux2_state_idx;
         }
     }else if (success && _true_state_idx != _new_state_idx){
+        // update the true state to the new state, because time is exactly at t_new
         _last_true_state_idx = _true_state_idx;
         _true_state_idx = _new_state_idx;
     }
