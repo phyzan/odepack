@@ -313,7 +313,7 @@ public:
     inline void                 set_args(const T* new_args);
 
 
-protected:
+// protected:
 
     using MainSolverType = BaseSolver;
     // =================== STATIC OVERRIDES (NECESSARY) ===============================
@@ -416,6 +416,8 @@ protected:
      */
     void                        remake_new_state(const T* vector);
 
+    /// @brief Check if the current true state matches the new state.
+    inline bool                 is_at_new_state() const;
 
     // ================================================================================
 
@@ -451,21 +453,23 @@ protected:
     /// @brief Absolute minimum step size before solver terminates.
     T                                   MIN_STEP = 100*std::numeric_limits<T>::epsilon();
 
-private:
+// private:
 
     inline void                 jac_exact(T* j, const T& t, const T* q) const;
     inline const T*             aux_state_ptr() const;
     inline T*                   aux_state_ptr();
     void                        register_states();
     bool                        validate_it(const T* state);
-    bool                        settle_on(const T& time, bool success);
+    void                        update_state(const T& time);
+    void                        move_state(const T& time);
+    void                        set_state(const T& time, T* state);
 
 
     Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
     mutable Array1D<T, 4*N, Allocation::Auto>           _dummy_state;
     Array1D<T, 4, Allocation::Stack>                    _scalar_data;
     Array1D<T>                                          _args;
-    OdeData<RhsType, JacType>                        _ode;
+    OdeData<RhsType, JacType>                           _ode;
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;
     mutable size_t                                      _n_evals_rhs = 0;
@@ -749,8 +753,6 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
-    
-    assert(!is_rich<SP> && "Do not cast a RichSolver to BaseSolver and call advance_until. This method may conflict with Event encounters in RichSolver");
 
     if (this->is_dead()){
         this->warn_dead();
@@ -766,18 +768,21 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
     }
 
     bool success = this->is_running();
-    while (time*d > this->t_new()*d && this->is_running()){
+    while (time*d > this->t()*d && this->is_running()){
         success = this->advance();
     }
 
-    return this->settle_on(time, success);
+    if (success){
+        this->move_state(time);
+        return true;
+    }else{
+        return false;
+    }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename Callable>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& obj_fun, T tol, int dir, T* worker){
-
-    assert(!is_rich<SP> && "Do not cast a RichSolver to BaseSolver and call advance_until. This method may conflict with Event encounters in RichSolver");
 
     if (this->is_dead()){
         this->warn_dead();
@@ -840,12 +845,13 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& o
         curr_dir = get_sgn();
     }
 
-    T time;
     if (success){
-        time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
+        T time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
+        this->move_state(time);
+        return true;
+    }else{
+        return false;
     }
-
-    return settle_on(time, success);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1118,6 +1124,11 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::remake_new_state(const T* 
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::is_at_new_state() const{
+    return _true_state_idx == _new_state_idx;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_view(T* j) const{
     //returns a high level view of the jacobian matrix, so that its elements
     //can be accessed using matrix(i, j). This function simply simplifies
@@ -1220,14 +1231,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(const T* state
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::settle_on(const T& time, bool success){
-    assert( (time*this->direction() >= this->true_state_ptr()[0]*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in settle_on");
-    if (success && (time*this->direction() < this->t_new()*this->direction())) {
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::update_state(const T& time){
+    assert( (time*this->direction() > this->t_last()*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in update_state");
+    if ((time*this->direction() < this->t_new()*this->direction())) {
         T* ptr = this->aux_state_ptr();
-        interp(ptr+2, time);
-        ptr[0] = time;
-        ptr[1] = this->stepsize();
-        if (this->t() != this->t_new()) {
+        set_state(time, ptr);
+        if (this->t_impl() != this->t_new()) {
             _last_true_state_idx = _true_state_idx;
             _true_state_idx = _aux_state_idx;
             _aux_state_idx = _aux2_state_idx = _last_true_state_idx;
@@ -1235,12 +1244,42 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::settle_on(const T& time, b
             _true_state_idx = _aux_state_idx;
             _aux_state_idx = _aux2_state_idx;
         }
-    }else if (success && _true_state_idx != _new_state_idx){
+    }else if (_true_state_idx != _new_state_idx){
         // update the true state to the new state, because time is exactly at t_new
         _last_true_state_idx = _true_state_idx;
         _true_state_idx = _new_state_idx;
     }
-    return success;
+
+}
+
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::move_state(const T& time){
+    assert( (time*this->direction() > this->t_last()*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in move_state");
+
+
+    if ((time*this->direction() < this->t_new()*this->direction())) {
+        if (this->t_impl() == this->t_new()) {
+            int idx = _last_true_state_idx == _aux_state_idx ? _aux2_state_idx : _aux_state_idx;
+            T* ptr = _state_data.ptr(idx, 0);
+            set_state(time, ptr);
+            _true_state_idx = idx;
+        }else{
+            T* ptr = const_cast<T*>(this->true_state_ptr());
+            set_state(time, ptr);
+        }
+    }else if (_true_state_idx != _new_state_idx){
+        // update the true state to the new state, because time is exactly at t_new
+        _aux_state_idx = _true_state_idx;
+        _true_state_idx = _new_state_idx;
+    }
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_state(const T& time, T* state){
+    state[0] = time;
+    state[1] = this->stepsize();
+    interp(state+2, time);
 }
 
 

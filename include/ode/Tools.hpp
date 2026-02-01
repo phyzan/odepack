@@ -91,7 +91,7 @@ public:
         return dynamic_cast<Base*>(this->_ptr);
     }
 
-    inline void own(Type* ptr){
+    inline void take_ownership(Type* ptr){
         delete _ptr;
         _ptr = ptr;
     }

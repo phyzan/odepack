@@ -533,20 +533,31 @@ public:
 
     /// @brief Get event by index.
     inline const Event<T>&      event(size_t i) const;
+
     /// @brief Get event state by index.
     inline const EventState<T>& state(size_t i) const;
+
     /// @brief Get total number of events.
     inline size_t               size() const;
+
     /// @brief Get number of events detected in last pass.
     inline size_t               detection_size() const;
+
     /// @brief Get number of distinct trigger times in last pass.
     inline size_t               detection_times() const;
+
+    /// @brief Get the pointer to the first detected event in the next time group
+    const Event<T>*             get_next_event() const;
+
     /// @brief Set the target time for the internal TmaxEvent (if present).
     void                        set_tmax(T tmax);
+
     /// @brief Initialize all events for use with solver.
     void                        setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
+
     /// @brief Update arguments for all events.
     void                        set_args(const T* args, size_t size);
+
     /**
      * @brief Detect all events between two states.
      *
@@ -1025,7 +1036,7 @@ EventCollection<T>::EventCollection(const Event<T>*const* events, size_t size) :
     }
 
     for (size_t i=0; i<size; i++){
-        _events[i].own(events[i]->clone());
+        _events[i].take_ownership(events[i]->clone());
     }
 }
 
@@ -1052,6 +1063,16 @@ inline size_t EventCollection<T>::detection_size() const{
 template<typename T>
 inline size_t EventCollection<T>::detection_times() const{
     return _Nt;
+}
+
+template<typename T>
+const Event<T>* EventCollection<T>::get_next_event() const {
+    if (_iter+1 < _Nt){
+        size_t next_idx = *(_event_idx.data() + _event_idx_start[_iter+1]);
+        return _events[next_idx].ptr();
+    }else{
+        return nullptr;
+    }
 }
 
 template<typename T>
