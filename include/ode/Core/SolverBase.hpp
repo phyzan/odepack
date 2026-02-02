@@ -313,7 +313,7 @@ public:
     inline void                 set_args(const T* new_args);
 
 
-// protected:
+protected:
 
     using MainSolverType = BaseSolver;
     // =================== STATIC OVERRIDES (NECESSARY) ===============================
@@ -453,7 +453,7 @@ public:
     /// @brief Absolute minimum step size before solver terminates.
     T                                   MIN_STEP = 100*std::numeric_limits<T>::epsilon();
 
-// private:
+private:
 
     inline void                 jac_exact(T* j, const T& t, const T* q) const;
     inline const T*             aux_state_ptr() const;
@@ -1121,6 +1121,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::remake_new_state(const T* 
     state[1] = this->stepsize();
     copy_array(state+2, vector, this->Nsys());
     this->re_adjust();
+    _true_state_idx = _new_state_idx;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

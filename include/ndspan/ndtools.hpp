@@ -40,9 +40,9 @@ namespace ndspan{
     __VA_ARGS__ \
 }(MAKE_INTS(IntType, N))
 
-#define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, BODY) \
+#define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, ...) \
 [&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline)) { \
-    ([&]<IntType I>() { BODY }.template operator()<IDUMMY>(), ...); \
+    ([&]<IntType I>() { __VA_ARGS__ }.template operator()<IDUMMY>(), ...); \
 }(MAKE_INTS(IntType, N))
 
 #define FOR_LOOP(IntType, I, N, ...) \
