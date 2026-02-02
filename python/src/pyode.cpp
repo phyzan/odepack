@@ -426,7 +426,7 @@ py::object PyDOP853::copy() const{
 //                                      PyBDF
 //===========================================================================================
 
-PyBDF::PyBDF(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(f, jac, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "BDF", scalar_type){}
+PyBDF::PyBDF(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(f, jac, t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "BDF", scalar_type){}
 
 py::object PyBDF::copy() const{
     return py::cast(PyBDF(*this));
@@ -583,6 +583,13 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
             delete safe_events[i];
         }
     )
+}
+
+template<typename T, typename RhsType, typename JacType>
+PyODE::PyODE(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, const std::string& method) : DtypeDispatcher(get_scalar_type<T>()){
+    data.is_lowlevel = true;
+    data.shape = {py::ssize_t(nsys)};
+    this->ode = new ODE<T, 0>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events, method);
 }
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
@@ -825,6 +832,18 @@ py::object PyVecField2D::py_streamline(double x0, double y0, double length, doub
         return py::cast(py_res);
     } catch (const std::runtime_error& e){
         throw py::value_error(e.what());
+    }
+}
+
+py::object PyVecField2D::py_streamline_ode(double x0, double y0, double rtol, double atol, double min_step, const py::object& max_step, double first_step, int direction, const py::str& method, bool normalized) const{
+    if (direction != 1 && direction != -1){
+        throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
+    }
+    std::array<double, 2> q0 = {x0, y0};
+    if (normalized){
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}));
+    }else{
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}));
     }
 }
 
@@ -1096,12 +1115,12 @@ PYBIND11_MODULE(odesolvers, m) {
 
     py::class_<PyBDF, PySolver>(m, "BDF")
         .def(py::init<PyBDF>(), py::arg("solver"))
-        .def(py::init<py::object, py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
+        .def(py::init<py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
             py::arg("f"),
-            py::arg("jac"),
             py::arg("t0"),
             py::arg("q0"),
             py::kw_only(),
+            py::arg("jac")=py::none(),
             py::arg("rtol")=1e-12,
             py::arg("atol")=1e-12,
             py::arg("min_step")=0.,
@@ -1170,7 +1189,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("method")="RK45",
             py::arg("scalar_type")="double")
         .def(py::init<PyODE>(), py::arg("ode"))
-        .def("solver", &PyODE::solver_copy)
+        .def("solver", &PyODE::solver_copy, py::keep_alive<0, 1>())
         .def("integrate", &PyODE::py_integrate,
             py::arg("interval"),
             py::kw_only(),
@@ -1243,6 +1262,18 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("direction")=1,
             py::arg("t_eval")=py::none(),
             py::arg("method")="RK45"
+        )
+        .def("get_ode", &PyVecField2D::py_streamline_ode,
+            py::arg("x0"),
+            py::arg("y0"),
+            py::arg("rtol")=1e-12,
+            py::arg("atol")=1e-12,
+            py::arg("min_step")=0.,
+            py::arg("max_step")=py::none(),
+            py::arg("first_step")=0.,
+            py::arg("direction")=1,
+            py::arg("method")="RK45",
+            py::arg("normalized")=false, py::keep_alive<0, 1>()
         );
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);

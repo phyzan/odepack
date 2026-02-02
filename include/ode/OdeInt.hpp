@@ -599,7 +599,7 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
 
     for (size_t i=0; i<Nevs-1; i++){ //the iteration skips the main TmaxEvent
         found = false;
-        for (const auto & option : options){
+        for (const auto& option : options){
             if (option.name == _solver->event_col().event(i+1).name()){
                 found = true;
                 res[i] = option;

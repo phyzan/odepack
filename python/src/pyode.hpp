@@ -251,7 +251,7 @@ struct PyDOP853 : public PySolver{
 
 struct PyBDF : public PySolver{
 
-    PyBDF(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
+    PyBDF(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
     PyBDF(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
 
@@ -331,6 +331,9 @@ class PyODE : public DtypeDispatcher{
 public:
 
     PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type);
+
+    template<typename T, typename RhsType, typename JacType>
+    PyODE(ODE_CONSTRUCTOR(T));
 
 protected:
 
@@ -425,6 +428,9 @@ public:
     DEFAULT_RULE_OF_FOUR(PyVecField2D)
 
     py::object py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double first_step, int direction, const py::object& t_eval, const py::str& method) const;
+
+    py::object py_streamline_ode(double x0, double y0, double rtol, double atol, double min_step, const py::object& max_step, double first_step, int direction, const py::str& method, bool normalized) const;
+
 };
 
 

@@ -798,15 +798,17 @@ class BDF(OdeSolver):
         Right-hand side of the ODE: f(t, q, *args) -> array.
         Must return an array of the same shape as q.
 
-    jac : callable
-        Jacobian of f: jac(t, q, *args) -> matrix.
-        Must return a matrix of shape (len(q), len(q)) where jac[i, j] = df_i/dq_j.
-
     t0 : float
         Initial time.
 
     q0 : np.ndarray
         Initial state vector.
+
+    jac : callable, optional
+        Jacobian of f: jac(t, q, *args) -> matrix.
+        Must return a matrix of shape (len(q), len(q)) where jac[i, j] = df_i/dq_j.
+        If None, central finite differences will be used to approximate the Jacobian,
+            using adaptive step sizes.
 
     rtol : float, optional
         Relative tolerance for adaptive step control. Default is 1e-12.
@@ -848,13 +850,13 @@ class BDF(OdeSolver):
     ...     return np.array([-1000*q[0], q[0] - q[1]])
     >>> def jac(t, q):
     ...     return np.array([[-1000, 0], [1, -1]])
-    >>> solver = BDF(f, jac, 0, np.array([1.0, 0.0]), rtol=1e-6, atol=1e-9)
+    >>> solver = BDF(f, 0, np.array([1.0, 0.0]), jac=jac, rtol=1e-6, atol=1e-9)
     >>> # Integrate to t=1.0
     >>> while solver.t < 1.0 and not solver.is_dead:
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         pass
 
 
@@ -1136,7 +1138,7 @@ class LowLevelODE:
 
     @overload
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
-        pass
+        ...
 
     def solver(self)->OdeSolver:
         """
@@ -1914,6 +1916,29 @@ class SampledVectorField2D:
         '''
         ...
 
+    def get_ode(self, x0: float, y0: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
+        '''
+        Create a LowLevelODE object for streamlining from (x0, y0).
+
+        Parameters
+        ----------
+        x0 : float
+            Initial x-coordinate.
+        y0 : float
+            Initial y-coordinate.
+        rtol, atol : float, optional
+            Relative and absolute tolerances for the ODE solver.
+        min_step, max_step, first_step : float, optional
+            Step size control parameters.
+        direction : {-1, 1}, optional
+            Direction of integration. 1 for forward, -1 for backward.
+        method : str, optional
+            Integration method. Default is "RK45".
+        normalized : bool, optional
+            If True, the vector field is normalized to unit length at each point, using the magnitude = sqrt(vx**2 + vy**2).
+                Then, the integration parameter corresponds to arc length along the streamline.
+        '''
+        ...
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:
     """
