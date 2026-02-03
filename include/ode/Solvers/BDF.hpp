@@ -101,7 +101,7 @@ public:
     void                                        adapt_impl(T* res);
     inline void                                 interp_impl(T* result, const T& t) const;
     inline void                                 reset_impl();
-    void                                        re_adjust_impl();
+    void                                        re_adjust_impl(const T* new_vector);
     bool                                        validate_ics_impl(T t0, const T* q0) const;
     // ===========================================
 
@@ -130,7 +130,7 @@ private:
 
     JacMat<T, N> _J;
     mutable JacMat<T, N> _B;
-    std::array<Dlike, 2> _D;
+    std::array<Dlike, 3> _D;
     LUResult<T, N> _LU;
     T _newton_tol;
     size_t _order = 1;
@@ -141,6 +141,7 @@ private:
     mutable Array1D<T, N> _f, _dy, _b, _scale, _ypred, _psi, _d, _error, _error_m, _error_p;
     mutable std::array<T, 3> _error_norms;
     BDFCONSTS<T> BDF_COEFS;
+    int interp_idx = 0;
 
 };
 
@@ -294,7 +295,7 @@ template<typename T, size_t N>
 BDFInterpolator<T, N>::BDFInterpolator(const Array2D<T, 0, N>& D, size_t order, const T* state1, const T* state2, size_t nsys, int bdr1, int bdr2) : LocalInterpolator<T, N>(state1[0], state2[0], state1+2, state2+2, nsys, bdr1, bdr2), _order(order), _D(order+1, D.Ncols()) {
     int dir = sgn(state1[0], state2[0]);
     _t2 = state2[0];
-    _h = state2[1]*dir;    
+    _h = state2[1]*dir;
     copy_array(_D.data(), D.data(), _D.size()); //keeping the first (order+1) rows
 }
 
@@ -333,18 +334,20 @@ BDF<T, N, SP, RhsType, JacType>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BDF<T, N, SP, RhsType, JacType>::re_adjust_impl() {
-    Base::re_adjust_impl();
-    copy_array(_D[0].data(), this->new_state_ptr()+2, this->Nsys());
-    this->rhs(_D[0].data()+this->Nsys(), this->t(), this->new_state_ptr()+2);
+void BDF<T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector) {
+    Base::re_adjust_impl(new_vector);
+    copy_array(_D[2].data(), _D[_idx_D].data(), this->Nsys());
+    copy_array(_D[0].data(), new_vector, this->Nsys());
+    this->rhs(_D[0].data()+this->Nsys(), this->t(), new_vector);
     for (size_t i=0; i<this->Nsys(); i++){
         _D[0][i+this->Nsys()] *= this->stepsize() * this->direction();
     }
-    this->jac(_J.data(), this->t(), this->new_state_ptr()+2);
+    this->jac(_J.data(), this->t(), new_vector);
     _order = 1;
     _n_eq_steps = 0;
     _valid_LU = false;
     _idx_D = 0;
+    interp_idx = 2;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -386,6 +389,7 @@ void BDF<T, N, SP, RhsType, JacType>::_reset_impl_alone(){
     _n_eq_steps = 0;
     _valid_LU = false;
     _idx_D = 0;
+    interp_idx = 0;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -434,6 +438,7 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
         else if (habs > max_step){
             _change_D(max_step/habs);
             habs = max_step;
+            interp_idx = _idx_D;
             return;
         }
 
@@ -517,6 +522,7 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     }
 
     if (_n_eq_steps < _order + 1){
+        interp_idx = _idx_D;
         return;
     }
 
@@ -556,19 +562,18 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     factor = std::min(this->MAX_FACTOR, safety * max_factor);
     habs *= factor;
     _change_D(factor);
-
-
     _valid_LU = false;
+    interp_idx = _idx_D;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline std::unique_ptr<Interpolator<T, N>> BDF<T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
-    return std::unique_ptr<Interpolator<T, N>>(new BDFInterpolator<T, N>(_D[_idx_D], _order, this->old_state_ptr(), this->new_state_ptr(), this->Nsys(), bdr1, bdr2));
+    return std::unique_ptr<Interpolator<T, N>>(new BDFInterpolator<T, N>(_D[interp_idx], _order, this->old_state_ptr(), this->interp_new_state_ptr(), this->Nsys(), bdr1, bdr2));
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void BDF<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
-    bdf_interp(result, t, this->t(), this->stepsize()*this->direction(), _D[_idx_D].data(), _order, this->Nsys());
+    bdf_interp(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->Nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

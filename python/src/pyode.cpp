@@ -433,6 +433,16 @@ py::object PyBDF::copy() const{
 }
 
 //===========================================================================================
+//                                      PyRK4
+//===========================================================================================
+
+PyRK4::PyRK4(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, first_step, dir, args, events, "RK4", scalar_type){}
+
+py::object PyRK4::copy() const{
+    return py::cast(PyRK4(*this));
+}
+
+//===========================================================================================
 //                                      PyOdeResult
 //===========================================================================================
 
@@ -1121,6 +1131,24 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("q0"),
             py::kw_only(),
             py::arg("jac")=py::none(),
+            py::arg("rtol")=1e-12,
+            py::arg("atol")=1e-12,
+            py::arg("min_step")=0.,
+            py::arg("max_step")=py::none(),
+            py::arg("first_step")=0.,
+            py::arg("direction")=1,
+            py::arg("args")=py::tuple(),
+            py::arg("events")=py::tuple(),
+            py::arg("scalar_type")="double");
+
+
+    py::class_<PyRK4, PySolver>(m, "RK4")
+        .def(py::init<PyRK4>(), py::arg("solver"))
+        .def(py::init<py::object, py::object, py::iterable, py::object, py::object, py::object, py::object, py::object, int, py::iterable, py::iterable, std::string>(),
+            py::arg("f"),
+            py::arg("t0"),
+            py::arg("q0"),
+            py::kw_only(),
             py::arg("rtol")=1e-12,
             py::arg("atol")=1e-12,
             py::arg("min_step")=0.,

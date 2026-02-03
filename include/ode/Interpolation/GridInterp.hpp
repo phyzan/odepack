@@ -127,6 +127,7 @@ class SampledVectorField2D{
 public:
 
     SampledVectorField2D(const T* x, const T* y, const T* u, const T* v, size_t Nx, size_t Ny) : u_interp_(u, View1D<T>(x, Nx), View1D<T>(y, Ny)), v_interp_(v, View1D<T>(x, Nx), View1D<T>(y, Ny)) {}
+    
     inline bool in_bounds(const T& x, size_t axis) const{
         return u_interp_.in_bounds(x, axis);
     }

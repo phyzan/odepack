@@ -187,7 +187,7 @@ class PreciseEvent(Event):
     """
 
     def __init__(self, name: str, when: ObjFunc, direction=0, mask: Func=None, hide_mask=False, event_tol=1e-12, scalar_type: str = "double", __Nsys: int = 0, __Nargs: int = 0):
-        pass
+        ...
 
     @property
     def event_tol(self)->float:
@@ -287,6 +287,7 @@ class OdeSolver:
     RK45 : Explicit Runge-Kutta 4(5) method
     DOP853 : Explicit Runge-Kutta 8(5,3) method
     BDF : Implicit backward differentiation formula method
+    RK4 : Fixed-step classic Runge-Kutta 4th order method
     """
 
     @property
@@ -299,7 +300,7 @@ class OdeSolver:
         float
             Current value of the integration variable at the latest step.
         """
-        pass
+        ...
 
     @property
     def q(self)->np.ndarray:
@@ -311,7 +312,7 @@ class OdeSolver:
         np.ndarray
             State vector q(t) at the current time, with the same shape as initial condition.
         """
-        pass
+        ...
 
     @property
     def t_old(self)->float:
@@ -324,14 +325,14 @@ class OdeSolver:
         float
             Value of the integration variable at the step before the current one.
         """
-        pass
+        ...
 
     @property
     def q_old(self)->np.ndarray:
         """
         The previous state vector before the current step, corresponding to t_old.
         """
-        pass
+        ...
 
     @property
     def stepsize(self)->float:
@@ -343,7 +344,7 @@ class OdeSolver:
         float
             Step size that will be used for the next step.
         """
-        pass
+        ...
 
     @property
     def is_dead(self)->bool:
@@ -642,7 +643,7 @@ class RK23(OdeSolver):
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
-        pass
+        ...
 
 
 class RK45(OdeSolver):
@@ -709,7 +710,7 @@ class RK45(OdeSolver):
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
-        pass
+        ...
 
 
 class DOP853(OdeSolver):
@@ -775,7 +776,7 @@ class DOP853(OdeSolver):
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
-        pass
+        ...
 
 
 class BDF(OdeSolver):
@@ -857,7 +858,60 @@ class BDF(OdeSolver):
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
-        pass
+        ...
+
+
+class RK4(OdeSolver):
+    """
+    Explicit Runge-Kutta method of order 4(5). This is the standard Runge-Kutta 4 method.
+
+    The core algorithm consists of 4 stages:
+
+    k1 = f(t, q)
+    k2 = f(t + h/2, q + h/2 * k1)
+    k3 = f(t + h/2, q + h/2 * k2)
+    k4 = f(t + h, q + h * k3)
+
+    And the state is updated as:
+    q_new = q + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    while keeping the stepsize fixed.
+
+    Parameters
+    ----------
+    f : callable
+        Right-hand side of the ODE: f(t, q, *args) -> array.
+        Must return an array of the same shape as q.
+
+    t0 : float
+        Initial time.
+
+    q0 : np.ndarray
+        Initial state vector.
+
+    rtol, atol : float, optional
+        Not used to adapt the stepsize, but is used to estimate the first step size, if that is set to 0.
+
+    min_step, max_step : They are not used, as the stepsize is fixed. They are only present for API consistency.
+
+    first_step : float, optional
+        The fixed step size to use for integration. Default is 0., which means a step size is estimated.
+
+    direction : {-1, 1}, optional
+        Integration direction. 1 for forward (default), -1 for backward in time.
+
+    args : tuple, optional
+        Extra arguments passed to f and events. Default is ().
+
+    events : iterable, optional
+        Sequence of Event objects to detect. Default is ().
+
+    scalar_type : str, optional
+        Numerical precision. One of "double" (default), "float", "long double", "mpreal".
+    """
+
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+        ...
 
 
 class VariationalSolver(OdeSolver):
@@ -925,7 +979,7 @@ class VariationalSolver(OdeSolver):
         Extra arguments passed to f and jac. Default is ().
 
     method : str, optional
-        Integration method: "RK23", "RK45" (default), "DOP853", or "BDF".
+        Integration method: "RK23", "RK45" (default), "DOP853", "BDF" or "RK4"
 
     scalar_type : str, optional
         Numerical precision: "double" (default), "float", "long double", or "mpreal".
@@ -1113,6 +1167,7 @@ class LowLevelODE:
         - "RK45" (recommended default)
         - "DOP853" (highest accuracy)
         - "BDF" (for stiff problems, requires jac)
+        - "RK4" (fixed step size Runge-Kutta 4)
         Default is "RK45".
 
     scalar_type : str, optional
@@ -1136,7 +1191,6 @@ class LowLevelODE:
     >>> print(ode.event_map)
     """
 
-    @overload
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
         ...
 
@@ -1150,7 +1204,7 @@ class LowLevelODE:
             A copy of the internal solver in its current state. Modifications to the
             returned solver do not affect this LowLevelODE object.
         """
-        pass
+        ...
 
     def integrate(self, interval, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:
         """
@@ -1188,7 +1242,7 @@ class LowLevelODE:
             Result containing the newly computed solution segment. The internal
             history of this LowLevelODE is updated with these results.
         """
-        pass
+        ...
 
     def go_to(self, t, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:
         """
@@ -1244,7 +1298,7 @@ class LowLevelODE:
             Callable result object supporting interpolation via __call__(t).
             Solution values can be evaluated at any time in the integrated interval.
         """
-        pass
+        ...
 
     @property
     def t(self)->np.ndarray:
@@ -1494,9 +1548,8 @@ class VariationalLowLevelODE(LowLevelODE):
     >>> lyap_exp = ode.lyap[-1]  # Final Lyapunov exponent estimate
     """
 
-    @overload
     def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
-        pass
+        ...
 
     @property
     def t_lyap(self)->np.ndarray:
@@ -1588,7 +1641,7 @@ class OdeResult:
             Array of time values at which solutions were stored. Monotonically
             increasing if direction=1, decreasing if direction=-1.
         """
-        pass
+        ...
 
     @property
     def q(self)->np.ndarray:
@@ -1601,7 +1654,7 @@ class OdeResult:
             Array of shape (n_steps, n_states) where q[i] is the state at t[i].
             q[i].shape equals the initial condition q0 shape.
         """
-        pass
+        ...
 
     @property
     def event_map(self)->dict[str, np.ndarray[int]]:
@@ -1639,7 +1692,7 @@ class OdeResult:
             True if the segment completed without divergence or other errors.
             False if integration was aborted or encountered problems.
         """
-        pass
+        ...
 
     @property
     def runtime(self)->float:
@@ -1651,7 +1704,7 @@ class OdeResult:
         float
             Time in seconds for this segment's integration.
         """
-        pass
+        ...
 
     @property
     def message(self)->str:
@@ -1664,7 +1717,7 @@ class OdeResult:
             Descriptive message explaining why integration stopped (e.g., "reached
             target time", "divergence detected", "event triggered termination").
         """
-        pass
+        ...
 
     @property
     def scalar_type(self)->str:
@@ -1735,7 +1788,6 @@ class OdeSolution(OdeResult):
 
     def __init__(self, result: OdeSolution):...
 
-    @overload
     def __call__(self, t: float)->np.ndarray:
         """
         Evaluate the interpolated solution at a single time.
@@ -1752,7 +1804,6 @@ class OdeSolution(OdeResult):
         """
         ...
 
-    @overload
     def __call__(self, t: np.ndarray)->np.ndarray:
         """
         Evaluate the interpolated solution at multiple times.
@@ -2019,7 +2070,11 @@ def advance_all(solvers: Iterable[OdeSolver], t_goal: float, threads=-1, display
     solvers : iterable of OdeSolver
         Collection of OdeSolver objects to advance. Each solver will be advanced from
         its current time to t_goal. All solvers must use compiled functions (not pure
-        Python functions). Can include RK23, RK45, DOP853, BDF, or VariationalSolver.
+        Python functions). Can include any OdeSolver subclass, as long as they inherit from
+        the provided OdeSolver subclasses (e.g. RK45, BDF, etc.), and they have been constructed
+        using fully compiled functions. If a custom OdeSolver subclass is passed that overrides
+        the advance() method, that will NOT be called while integrating the solver to the requested
+        t_goal. Instead, the compiled advance() method is used internally.
 
     t_goal : float
         Target time. Each solver advances from its current time (solver.t) to this

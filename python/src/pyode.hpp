@@ -261,6 +261,17 @@ struct PyBDF : public PySolver{
 
 };
 
+struct PyRK4 : public PySolver{
+
+    PyRK4(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& first_step, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
+
+    PyRK4(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+    DEFAULT_RULE_OF_FOUR(PyRK4)
+
+    py::object copy() const override;
+
+};
+
 
 struct PyOdeResult : DtypeDispatcher{
 

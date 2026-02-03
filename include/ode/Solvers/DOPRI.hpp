@@ -24,7 +24,7 @@ protected:
 
     void reset_impl();
 
-    void re_adjust_impl();
+    void re_adjust_impl(const T* new_vector);
 
     // =========================================================
 
@@ -253,13 +253,16 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::reset
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::re_adjust_impl(){
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){
     // Re-compute K[Nstages] = f(t, q) after restarting at intermediate time (e.g. because of discontinuity due to masked event)
-    Base::re_adjust_impl();
-    const T* state = this->new_state_ptr();
+    Base::re_adjust_impl(new_vector);
 
+    //prepate the coef matrix for interpolation
+    //before altering K, so that interpolation is valid
+    //from t_old to t
+    this->set_coef_matrix();
     //copy the new state vector into the last stage of K
-    this->rhs(_K_true.data() + Nstages*this->Nsys(), state[0], state+2);
+    this->rhs(_K_true.data() + Nstages*this->Nsys(), this->t(), new_vector);
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
@@ -282,6 +285,7 @@ inline void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt_impl(T* res){
+    this->_mat_is_set = false;
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
@@ -324,7 +328,6 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::step_impl(T* result, const T& h){
-    this->_mat_is_set = false;
     const T* state = this->new_state_ptr();
     const size_t n = this->Nsys();
     T* q_new = result + 2;
@@ -386,13 +389,15 @@ StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::Standa
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 inline std::unique_ptr<Interpolator<T, N>> StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
     this->set_coef_matrix();
-    return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2));
+    const T* d = this->interp_new_state_ptr();
+    return std::unique_ptr<Interpolator<T, N>>(new StandardLocalInterpolator<T, N>(this->_coef_mat, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->Nsys(), bdr1, bdr2));
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 inline void StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
-    return coef_mat_interp(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
+    const T* d = this->interp_new_state_ptr();
+    return coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>

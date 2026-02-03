@@ -361,8 +361,14 @@ protected:
     /// @brief Args update implementation hook. Derived should call base first.
     inline void                 set_args_impl(const T* new_args);
 
-    /// @brief Re-adjustment hook after state modification. Derived should call base first.
-    inline void                 re_adjust_impl();
+    /**
+    @brief Re-adjustment hook right before new_state modification. Derived should call base first.
+    @param new_vector New state vector values (size Nsys).
+
+    @note Nothing has changed yet when this is called; it's a chance to update any internal data before the state is modified. The new state will be set to (t(), stepsize(), new_vector),
+    where t() is the true current time, which might lie between old_state and new_state (e.g. if an event occurred).
+    */
+    inline void                 re_adjust_impl(const T* new_vector);
 
     /**
      * @brief Validate initial conditions implementation.
@@ -392,6 +398,9 @@ protected:
     /// @brief Get pointer to the previous "true" state.
     inline const T*             last_true_state_ptr() const;
 
+    /// @brief Get pointer to the correct new state for interpolation
+    inline const T*             interp_new_state_ptr() const;
+
     /// @brief Get the time value of the newest computed step.
     const T&                    t_new() const;
 
@@ -407,14 +416,14 @@ protected:
     /// @brief Set the solver status message.
     inline void                 set_message(const std::string& text);
 
-    /// @brief Trigger re-adjustment after state changes.
-    void                        re_adjust();
-
     /**
-     * @brief Rebuild the new state from a modified vector.
-     * @param vector New state vector values (size Nsys).
-     */
-    void                        remake_new_state(const T* vector);
+    @brief Trigger re-adjustment right before state changes.
+    @param new_vector New state vector values (size Nsys).
+
+    @note The current state will be set to (t(), stepsize(), new_vector),
+    where t() is the true current time, which might lie between old_state and new_state (e.g. if an event occurred). After that, any interpolation algorithms can only be valid in the interval [t_old, t), and the dense state vector output will reflect that with a discontinuity at t().
+    */
+    void                        re_adjust(const T* new_vector);
 
     /// @brief Check if the current true state matches the new state.
     inline bool                 is_at_new_state() const;
@@ -465,7 +474,7 @@ private:
     void                        set_state(const T& time, T* state);
 
 
-    Array2D<T, 5, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
+    Array2D<T, 6, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
     mutable Array1D<T, 4*N, Allocation::Auto>           _dummy_state;
     Array1D<T, 4, Allocation::Stack>                    _scalar_data;
     Array1D<T>                                          _args;
@@ -485,6 +494,7 @@ private:
     bool                                                _is_dead = false;
     bool                                                _diverges = false;
     bool                                                _is_running = true;
+    bool                                                _use_new_state = true; //for interpolation purposes
 
     static constexpr int rtol_idx = 0;
     static constexpr int atol_idx = 1;
@@ -669,7 +679,7 @@ inline const std::string& BaseSolver<Derived, T, N, SP, RhsType, JacType>::metho
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp(T* result, const T& t) const{
-    assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->t_new()*this->direction()) && "Out of bounds interpolation requested");
+    assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->interp_new_state_ptr()[0]*this->direction()) && "Out of bounds interpolation requested");
     if (this->t_old() == this->t_new()){
         copy_array(result, this->new_state_ptr(), this->Nsys());
     }
@@ -988,7 +998,8 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
     _diverges = false;
     _message = "Running";
     _n_evals_rhs = 0;
-    for (int i=1; i<5; i++){
+    _use_new_state = true;
+    for (int i=1; i<6; i++){
         copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }
 }
@@ -999,7 +1010,7 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_args_impl(const
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust_impl(){}
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){}
 
 //=============================================================================
 
@@ -1063,6 +1074,15 @@ inline const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_new_state_ptr() const{
+    if (this->_use_new_state){
+        return this->new_state_ptr();
+    }else{
+        return this->_state_data.ptr(5, 0); // 5th index reserved for interpolation purposes
+    }
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_new() const{
     return this->_state_data(this->_new_state_idx, 0);
 }
@@ -1093,8 +1113,15 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::warn_dead() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust(){
-    THIS->re_adjust_impl();
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust(const T* new_vector){
+    THIS->re_adjust_impl(new_vector);
+    copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->Nsys()+2); //store the re-adjusted new state for interpolation
+    T* state = const_cast<T*>(this->new_state_ptr());
+    state[0] = this->t();
+    state[1] = this->stepsize();
+    copy_array(state+2, new_vector, this->Nsys());
+    _true_state_idx = _new_state_idx;
+    _use_new_state = false;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1111,17 +1138,6 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics_impl(T t0, co
 
     this->rhs(_dummy_state.data(), t0, q0);
     return all_are_finite(_dummy_state.data(), this->Nsys());
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::remake_new_state(const T* vector){
-    // interpolation will not be working properly after this call, until the solver is advanced.
-    T* state = const_cast<T*>(this->new_state_ptr());
-    state[0] = this->t();
-    state[1] = this->stepsize();
-    copy_array(state+2, vector, this->Nsys());
-    this->re_adjust();
-    _true_state_idx = _new_state_idx;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1145,7 +1161,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(5, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     if constexpr (std::is_pointer_v<RhsType>){
         assert(ode.rhs != nullptr && "RHS function pointer cannot be nullptr");
     }
@@ -1155,7 +1171,7 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (first_step < 0){
-        throw std::runtime_error("The first_step argument must not be negative");
+        throw std::runtime_error("The first_step argument cannot be negative");
     }
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
@@ -1205,6 +1221,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::register_states(){
         _true_state_idx = _new_state_idx;
         _old_state_idx = _last_true_state_idx;
     }
+    _use_new_state = true;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1226,6 +1243,15 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(const T* state
     else if (state[0] == this->t_new()){
         this->kill("The next time step is identical to the previous one, possibly due to machine rounding error");
         success = false;
+    }
+
+    if (!success){
+        //close the interpolation interval as most integration algorithms
+        //alter their interpolation polynomials when calling adapt_impl,
+        //but since the step failed, the current interpolation interval is no longer valid.
+        _use_new_state = false;
+        T* d = _state_data.ptr(5, 0);
+        copy_array(d, this->old_state_ptr(), this->Nsys()+2);
     }
 
     return success;

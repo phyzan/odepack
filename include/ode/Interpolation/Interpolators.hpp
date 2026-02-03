@@ -667,7 +667,11 @@ void LocalInterpolator<T, N>::adjust_start(const T& t_start){
 template<typename T, size_t N>
 void LocalInterpolator<T, N>::adjust_end(const T& t_end){
     int d = _interval.dir();
-    if (_interval.start()*d < t_end*d && t_end*d <= _tmax*d){
+    if (this->interval().is_point()){
+        if (t_end != _interval.start()){
+            throw std::runtime_error("Cannot adjust point-interval");
+        }
+    }else if (_interval.start()*d < t_end*d && t_end*d <= _tmax*d){
         _interval.adjust_end(t_end);
     }
     else{
@@ -1096,6 +1100,14 @@ inline void LinkedInterpolator<T, N, INTERPOLATOR>::_throw_invalid_interpolant(c
 
 template<typename T>
 void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size){
+    if (t == t1){
+        copy_array(result, y1, size);
+        return;
+    }
+    else if (t == t2){
+        copy_array(result, y2, size);
+        return;
+    }
     #pragma omp simd
     for (size_t i=0; i<size; i++){
         result[i] = y1[i] + (y2[i]-y1[i])/(t2-t1) * (t-t1);

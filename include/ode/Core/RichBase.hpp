@@ -47,7 +47,9 @@ protected:
     
     ~RichSolver() = default;
 
-    void reset_impl();
+    INLINE void reset_impl();
+
+    INLINE void re_adjust_impl(const T* new_vector);
 
 private:
 
@@ -188,7 +190,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
 
     if (this->requires_new_start()){
-        this->remake_new_state(this->true_vector().data());
+        this->re_adjust(this->true_vector().data());
     }
 
     if (this->equiv_states()){
@@ -331,6 +333,14 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
     Base::reset_impl();
     _events.reset();
     stop_interpolation();
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){
+    Base::re_adjust_impl(new_vector);
+    if (_interp_data){
+        _cli->adjust_end(this->t());
+    }
 }
 
 // PRIVATE METHODS

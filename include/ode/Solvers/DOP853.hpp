@@ -84,7 +84,7 @@ public:
     static constexpr size_t N_STAGES = 12;
     static constexpr size_t N_ORDER = 8;
     static constexpr size_t N_STAGES_EXTRA = 3;
-    static constexpr int ERR_EST_ORDER = 7;
+    static constexpr int    ERR_EST_ORDER = 7;
     static constexpr size_t N_STAGES_EXT = DOP_COEFS<T>::N_STAGES_EXT;
     static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
 
@@ -492,13 +492,15 @@ DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) r
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline void DOP853<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
-    return coef_mat_interp_dop853(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
+    const T* d = this->interp_new_state_ptr();
+    return coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline std::unique_ptr<Interpolator<T, N>> DOP853<T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
     this->set_coef_matrix();
-    return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->t_old(), this->t_new(),this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2));
+    const T* d = this->interp_new_state_ptr();
+    return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->t_old(), d[0],this->old_state_ptr()+2, d+2, this->Nsys(), bdr1, bdr2));
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -546,7 +548,7 @@ typename DOP853<T, N, SP, RhsType, JacType>::C_EXTRA_TYPE DOP853<T, N, SP, RhsTy
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void DOP853<T, N, SP, RhsType, JacType>::set_coef_matrix_impl() const{
 
-    const T& h = this->stepsize() * this->direction();
+    T h = this->stepsize() * this->direction();
     const T* y_old = this->old_state_ptr()+2;
     const T& t_old = this->t_old();
     size_t Nsys = this->Nsys();

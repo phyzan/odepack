@@ -4,6 +4,7 @@
 #include "Solvers/DOP853.hpp"
 #include "Solvers/BDF.hpp"
 #include "Solvers/Euler.hpp"
+#include "Solvers/RungeKutta.hpp"
 
 namespace ode {
 
@@ -38,7 +39,10 @@ std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(const std::string& name,
         return std::make_unique<DOP853<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
     }
     else if (name == "BDF"){
-        return std::make_unique<BDF<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);;
+        return std::make_unique<BDF<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
+    }
+    else if (name == "RK4"){
+        return std::make_unique<RK4<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, events);
     }
     else{
         throw std::runtime_error("Unknown solver name: " + name);
