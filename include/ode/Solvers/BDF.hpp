@@ -320,7 +320,9 @@ BDF<T, N, SP, RhsType, JacType>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();
+#ifndef NO_ODE_WARN
         std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
+#endif
     }
     _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
 

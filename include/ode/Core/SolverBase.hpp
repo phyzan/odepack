@@ -65,6 +65,8 @@ class BaseSolver : public BaseInterface<T, N, SP>{
     static constexpr bool HAS_JAC = !RUNTIME_JAC_TYPE && !std::is_same_v<JacType, std::nullptr_t>;
     static_assert( !std::is_same_v<RhsType, std::nullptr_t> , "RHS function type cannot be nullptr");
 
+    static constexpr auto VoidFunc = [](const T&, const T*)LAMBDA_INLINE{};
+
 public:
 
     using Scalar = T;
@@ -237,12 +239,16 @@ public:
      */
     bool                        advance();
 
+    bool                        advance_until(T time);
+
     /**
      * @brief Integrate until the specified time is reached.
      * @param time Target time to integrate to.
+     * @param observer Callable function(T t, const T* q) that is called at each successfull step until "time" is reached.
      * @return True if integration succeeded, false if solver stopped early.
      */
-    bool                        advance_until(T time);
+    template<typename Callable>
+    bool                        advance_until(T time, Callable&& observer);
 
     /**
      * @brief Integrate until an objective function crosses zero (event detection).
@@ -251,12 +257,13 @@ public:
      * @param obj_fun  Objective function to monitor for zero crossing.
      * @param tol      Tolerance for root finding (bisection).
      * @param dir      Direction of crossing: +1 (increasing), -1 (decreasing), 0 (any).
+     * @param observer Callable function(T t, const T* q) that is called at each successfull step until the requested zero crossing of the objective function is reached
      * @param worker   Optional preallocated array (size Nsys) for temporary storage.
      *                 Use if obj_fun calls solver methods that may overwrite internal arrays.
      * @return True if event was detected and solver positioned at crossing.
      */
-    template<typename Callable>
-    bool                        advance_until(Callable&& obj_fun, T tol, int dir=0, T* worker = nullptr);
+    template<typename ObjFun, typename Callable>
+    bool                        advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc), T* worker = nullptr);
 
     /// @brief Reset the solver to its initial conditions.
     void                        reset();
@@ -435,7 +442,7 @@ protected:
     inline const T&             t_impl() const;
 
     /// @brief Vector accessor implementation (overridden in RichSolver).
-    inline View1D<T, N>         vector_impl() const;
+    inline const T*             vector_impl() const;
 
     /// @brief Advance implementation (overridden in RichSolver).
     inline bool                 adv_impl();
@@ -574,7 +581,7 @@ inline const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector() const{
-    return THIS_C->vector_impl();
+    return View1D<T, N>(THIS_C->vector_impl(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -763,6 +770,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
+    return this->advance_until(time, VoidFunc);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Callable>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Callable&& observer){
 
     if (this->is_dead()){
         this->warn_dead();
@@ -778,12 +791,19 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
     }
 
     bool success = this->is_running();
-    while (time*d > this->t()*d && this->is_running()){
-        success = this->advance();
+    bool condition = success;
+    while (true){
+        if ((success = this->advance()) && (condition = (time*d > this->t()*d))){
+            observer(this->t(), THIS_C->vector_impl());
+        }else{
+            break;
+        }
+
     }
 
     if (success){
         this->move_state(time);
+        observer(this->t(), THIS_C->vector_impl());
         return true;
     }else{
         return false;
@@ -791,8 +811,8 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-template<typename Callable>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& obj_fun, T tol, int dir, T* worker){
+template<typename ObjFun, typename Callable>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer, T* worker){
 
     if (this->is_dead()){
         this->warn_dead();
@@ -806,8 +826,10 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& o
     obj_fun : callable object with signature T obj_fun(const T& t, const T* q, const T* args, const void* obj)
     tol     : tolerance for root finding
     dir     : direction of root finding
+    observer: called at every advance call
     worker: optional pointer to a preallocated array of size N to be used as temporary storage. Use this
         if obj_fun is calling some of this solver's methods that may overwrite internal dummy arrays.
+        
     */
     assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
 
@@ -817,17 +839,17 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& o
 
     int factor = dir == 0 ? 1 : this->direction()*dir;
 
-    auto ObjFun = [&](const T& t, const T* q) LAMBDA_INLINE {
+    auto ObjFunLike = [&](const T& t, const T* q) LAMBDA_INLINE {
         return obj_fun(t, q, this->args().data(), this->_ode.obj);
     };
 
     auto TrueObjFun = [&](const T& t) LAMBDA_INLINE{
         this->interp_impl(worker, t);
-        return ObjFun(t, worker);
+        return ObjFunLike(t, worker);
     };
 
     auto get_sgn = [&]() LAMBDA_INLINE {
-        return factor*sgn(ObjFun(this->t(), this->vector().data()));
+        return factor*sgn(ObjFunLike(this->t(), this->vector().data()));
     };
 
     auto detected = [&](int s1, int s2) LAMBDA_INLINE{
@@ -846,18 +868,29 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(Callable&& o
     //will enter this loop even once
     while (curr_dir == 0 && this->advance()){
         curr_dir = old_dir = get_sgn();
+        observer(this->t(), THIS_C->vector_impl());
+        if (curr_dir == 0 && dir == 0){
+            // If a root is found while trying to find a step
+            // where the objective function is non zero (required for bisection)
+            // then if the sign direction does not matter, this is success
+            return true;
+        }
     }
 
     bool success = this->is_running();
-    while ( !detected(old_dir, curr_dir) && this->is_running()){
-        success = this->advance();
-        old_dir = curr_dir;
-        curr_dir = get_sgn();
+    bool condition = success;
+    while (true){
+        if ((success = this->advance()) && (old_dir = curr_dir, curr_dir = get_sgn(), condition = (!detected(old_dir, curr_dir)))){
+            observer(this->t(), THIS_C->vector_impl());
+        }else{
+            break;
+        }
     }
 
     if (success){
         T time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
         this->move_state(time);
+        observer(this->t(), THIS_C->vector_impl());
         return true;
     }else{
         return false;
@@ -1022,8 +1055,8 @@ inline const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_impl() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
-    return View1D<T, N>{this->true_state_ptr()+2, this->Nsys()};
+inline const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
+    return this->true_state_ptr()+2;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1034,8 +1067,7 @@ inline bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
             register_states();
             this->_Nupdates++;
             return true;
-        }
-        else{
+        }else{
             return false;
         }
     }
@@ -1104,12 +1136,16 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_message(const std::str
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::warn_paused() const{
-    std::cout << "\n" << "Solver has paused integrating. Resume before advancing." << std::endl;
+#ifndef NO_ODE_WARN
+    std::cerr << "\n" << "Solver has paused integrating. Resume before advancing." << std::endl;
+#endif
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::warn_dead() const{
-    std::cout << "\n" << "Solver has permanently stop integrating. Termination cause:\n\t" << _message << std::endl;
+#ifndef NO_ODE_WARN
+    std::cerr << "\n" << "Solver has permanently stop integrating. Termination cause:\n\t" << _message << std::endl;
+#endif
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

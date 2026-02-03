@@ -55,7 +55,7 @@ private:
 
     //================= STATIC OVERRIDES ======================
     inline const T&     t_impl() const;
-    inline View1D<T, N> vector_impl() const;
+    inline const T*     vector_impl() const;
     bool                adv_impl();
     inline void         set_args_impl(const T* new_args);
     //=========================================================
@@ -94,13 +94,13 @@ inline const T& RichSolver<Derived, T, N, SP, RhsType, JacType>::t_impl() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
+inline const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
         if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
             return Base::vector_impl();
         }else{
-            return View1D<T, N>(_events.state(*ev_idx).exposed().vector(), this->Nsys());
+            return _events.state(*ev_idx).exposed().vector();
         }
     }else{
         return Base::vector_impl();
@@ -112,12 +112,12 @@ inline View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
         if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
-            return Base::vector_impl();
+            return View1D<T, N>(Base::vector_impl(), this->Nsys());
         }else{
             return View1D<T, N>(_events.state(*ev_idx).True().vector(), this->Nsys());
         }
     }else{
-        return Base::vector_impl();
+        return View1D<T, N>(Base::vector_impl(), this->Nsys());
     }
 }
 
@@ -239,13 +239,6 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
                 _cli->adjust_end(this->t());
                 this->add_interpolant(std::move(r));
             }
-        }
-    }
-    for (size_t idx : _events){
-        if (_events.event(idx).is_lethal()){
-            this->kill(_events.event(idx).name());
-        }else if (_events.event(idx).is_stop_event()){
-            this->stop(_events.event(idx).name());
         }
     }
 

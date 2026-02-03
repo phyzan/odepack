@@ -79,12 +79,6 @@ public:
     /// @brief Check if this is a temporal (time-based) event.
     virtual bool                    is_temporal() const = 0;
 
-    /// @brief Check if this event pauses the solver when triggered.
-    virtual bool                    is_stop_event() const = 0;
-
-    /// @brief Check if this event permanently kills the solver when triggered.
-    virtual bool                    is_lethal() const = 0;
-
     /// @brief Get the integration direction (+1 forward, -1 backward).
     virtual int                     direction() const = 0;
 
@@ -171,10 +165,6 @@ public:
     Event<T>*                       clone() const;
     /// @brief Check if this is a temporal event.
     inline bool                     is_temporal() const;
-    /// @brief Check if this event stops the solver.
-    bool                            is_stop_event() const;
-    /// @brief Check if this event kills the solver.
-    bool                            is_lethal() const;
     /// @brief Get the integration direction.
     inline int                      direction() const;
     /// @brief Check if event was located in last detection pass.
@@ -658,16 +648,6 @@ Event<T>* EventBase<Derived, T>::clone() const{
 template<typename Derived, typename T>
 inline bool EventBase<Derived, T>::is_temporal() const{
     return THIS_C->is_temporal_impl();
-}
-
-template<typename Derived, typename T>
-bool EventBase<Derived, T>::is_stop_event() const{
-    return THIS_C->stop_impl();
-}
-
-template<typename Derived, typename T>
-bool EventBase<Derived, T>::is_lethal() const{
-    return THIS_C->kill_impl();
 }
 
 template<typename Derived, typename T>
