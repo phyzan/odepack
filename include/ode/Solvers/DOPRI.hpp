@@ -14,7 +14,7 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 class RungeKuttaBase : public BaseDispatcher<Derived, T, N, SP, RhsType, JacType>{
 
-    
+    using Base = BaseDispatcher<Derived, T, N, SP, RhsType, JacType>;
 protected:
 
     // ================ STATIC OVERRIDES ========================
@@ -28,7 +28,7 @@ protected:
 
     // =========================================================
 
-    using Base = BaseDispatcher<Derived, T, N, SP, RhsType, JacType>;
+    using RKBase = RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
 
     using Atype = Array2D<T, Nstages, Nstages>;
     using Btype = Array1D<T, Nstages>;
@@ -106,16 +106,7 @@ protected:
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
 class RK45 : public StandardRungeKutta<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>{
 
-    static const size_t Norder = 5;
-    static const size_t Nstages = 6;
-
-    using RKbase = StandardRungeKutta<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>;
-
 public:
-
-    static constexpr const char*    name = "RK45";
-    static constexpr size_t         ERR_EST_ORDER = 4;
-    static constexpr size_t         INTERP_ORDER = 4;
 
     RK45(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
@@ -123,15 +114,29 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RK45);
 
-    inline static constexpr typename RKbase::Atype Amatrix();
+private:
 
-    inline static constexpr typename RKbase::Btype Bmatrix();
+    using Base = StandardRungeKutta<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>;
+    friend Base;
+    friend Base::RKBase;
+    friend Base::MainSolverType;
 
-    inline static constexpr typename RKbase::Ctype Cmatrix();
+    static const size_t Norder = 5;
+    static const size_t Nstages = 6;
 
-    inline static constexpr typename RKbase::Etype Ematrix();
+    static constexpr const char*    name = "RK45";
+    static constexpr size_t         ERR_EST_ORDER = 4;
+    static constexpr size_t         INTERP_ORDER = 4;
 
-    inline static constexpr typename RKbase::Ptype Pmatrix();
+    inline static constexpr typename Base::Atype Amatrix();
+
+    inline static constexpr typename Base::Btype Bmatrix();
+
+    inline static constexpr typename Base::Ctype Cmatrix();
+
+    inline static constexpr typename Base::Etype Ematrix();
+
+    inline static constexpr typename Base::Ptype Pmatrix();
 
 };
 
@@ -142,16 +147,7 @@ public:
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
 class RK23 : public StandardRungeKutta<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType> {
 
-    static const size_t Norder = 3;
-    static const size_t Nstages = 3;
-
-    using RKbase = StandardRungeKutta<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType>;
-
 public:
-
-    static constexpr const char*    name = "RK23";
-    static constexpr size_t         ERR_EST_ORDER = 2;
-    static constexpr size_t         INTERP_ORDER = 3;
 
     RK23(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
@@ -159,15 +155,29 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RK23);
 
-    inline static constexpr typename RKbase::Atype Amatrix();
+private:
 
-    inline static constexpr typename RKbase::Btype Bmatrix();
+    using Base = StandardRungeKutta<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType>;
+    friend Base;
+    friend Base::RKBase;
+    friend Base::MainSolverType;
 
-    inline static constexpr typename RKbase::Ctype Cmatrix();
+    static const size_t Norder = 3;
+    static const size_t Nstages = 3;
 
-    inline static constexpr typename RKbase::Etype Ematrix();
+    static constexpr const char*    name = "RK23";
+    static constexpr size_t         ERR_EST_ORDER = 2;
+    static constexpr size_t         INTERP_ORDER = 3;
 
-    inline static constexpr typename RKbase::Ptype Pmatrix();
+    inline static constexpr typename Base::Atype Amatrix();
+
+    inline static constexpr typename Base::Btype Bmatrix();
+
+    inline static constexpr typename Base::Ctype Cmatrix();
+
+    inline static constexpr typename Base::Etype Ematrix();
+
+    inline static constexpr typename Base::Ptype Pmatrix();
 
 };
 
@@ -232,14 +242,18 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows)
     requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
-    this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
+    if (q0 != nullptr){
+        this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
+    }
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows)
     requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
-    this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
+    if (q0 != nullptr){
+        this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
+    }
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
@@ -421,13 +435,13 @@ inline T StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType
 
 // RK45 implementations
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RK45<T, N, SP, RhsType, JacType>::RK45(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): RKbase(ARGS){}
+RK45<T, N, SP, RhsType, JacType>::RK45(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RK45<T, N, SP, RhsType, JacType>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
+RK45<T, N, SP, RhsType, JacType>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events){}
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Atype RK45<T, N, SP, RhsType, JacType>::Amatrix() {
+inline constexpr typename RK45<T, N, SP, RhsType, JacType>::Base::Atype RK45<T, N, SP, RhsType, JacType>::Amatrix() {
     return {   T(0),        T(0),        T(0),        T(0),        T(0), T(0),
             T(1)/T(5),  T(0),        T(0),        T(0),        T(0), T(0),
             T(3)/T(40), T(9)/T(40), T(0),        T(0),        T(0), T(0),
@@ -437,19 +451,19 @@ inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Atype RK45<T
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Btype RK45<T, N, SP, RhsType, JacType>::Bmatrix(){
+inline constexpr typename RK45<T, N, SP, RhsType, JacType>::Base::Btype RK45<T, N, SP, RhsType, JacType>::Bmatrix(){
     T q[] = { T(35)/T(384),
             T(0),
             T(500)/T(1113),
             T(125)/T(192),
             T(-2187)/T(6784),
             T(11)/T(84)};
-    typename RKbase::Btype B(q);
+    typename Base::Btype B(q);
     return B;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Ctype RK45<T, N, SP, RhsType, JacType>::Cmatrix(){
+inline constexpr typename RK45<T, N, SP, RhsType, JacType>::Base::Ctype RK45<T, N, SP, RhsType, JacType>::Cmatrix(){
 
     T q[] = { T(0),
             T(1)/T(5),
@@ -457,12 +471,12 @@ inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Ctype RK45<T
             T(4)/T(5),
             T(8)/T(9),
             T(1)};
-    typename RKbase::Ctype C(q);
+    typename Base::Ctype C(q);
     return C;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Etype RK45<T, N, SP, RhsType, JacType>::Ematrix() {
+inline constexpr typename RK45<T, N, SP, RhsType, JacType>::Base::Etype RK45<T, N, SP, RhsType, JacType>::Ematrix() {
 
     T q[] = { T(-71)/T(57600),
             T(0),
@@ -471,12 +485,12 @@ inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Etype RK45<T
             T(17253)/T(339200),
             T(-22)/T(525),
             T(1)/T(40)};
-    typename RKbase::Etype E(q);
+    typename Base::Etype E(q);
     return E;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Ptype RK45<T, N, SP, RhsType, JacType>::Pmatrix() {
+inline constexpr typename RK45<T, N, SP, RhsType, JacType>::Base::Ptype RK45<T, N, SP, RhsType, JacType>::Pmatrix() {
 
     T q[] = {    T(1),   -T(8048581381)/T(2820520608),   T(8663915743)/T(2820520608),   -T(12715105075)/T(11282082432),
             T(0),    T(0),                          T(0),                          T(0),
@@ -485,60 +499,60 @@ inline constexpr typename RK45<T, N, SP, RhsType, JacType>::RKbase::Ptype RK45<T
             T(0),    T(127303824393)/T(49829197408), -T(318862633887)/T(49829197408), T(701980252875)/T(199316789632),
             T(0),   -T(282668133)/T(205662961),       T(2019193451)/T(616988883),   -T(1453857185)/T(822651844),
             T(0),    T(40617522)/T(29380423),        -T(110615467)/T(29380423),     T(69997945)/T(29380423)};
-    typename RKbase::Ptype P(q, Nstages+1, static_cast<size_t>(4));
+    typename Base::Ptype P(q, Nstages+1, static_cast<size_t>(4));
     return P;
 }
 
 
 // RK23 implementations
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RK23<T, N, SP, RhsType, JacType>::RK23(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): RKbase(ARGS){}
+RK23<T, N, SP, RhsType, JacType>::RK23(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RK23<T, N, SP, RhsType, JacType>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): RKbase(ARGS, events){}
+RK23<T, N, SP, RhsType, JacType>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events){}
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK23<T, N, SP, RhsType, JacType>::RKbase::Atype RK23<T, N, SP, RhsType, JacType>::Amatrix() {
+inline constexpr typename RK23<T, N, SP, RhsType, JacType>::Base::Atype RK23<T, N, SP, RhsType, JacType>::Amatrix() {
     return { T(0),    T(0),    T(0),
             T(1)/T(2), T(0),    T(0),
             T(0),    T(3)/T(4), T(0)};
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK23<T, N, SP, RhsType, JacType>::RKbase::Btype RK23<T, N, SP, RhsType, JacType>::Bmatrix(){
+inline constexpr typename RK23<T, N, SP, RhsType, JacType>::Base::Btype RK23<T, N, SP, RhsType, JacType>::Bmatrix(){
     T q[] = { T(2)/T(9),
             T(1)/T(3),
             T(4)/T(9)};
-    typename RKbase::Btype B(q);
+    typename Base::Btype B(q);
     return B;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK23<T, N, SP, RhsType, JacType>::RKbase::Ctype RK23<T, N, SP, RhsType, JacType>::Cmatrix(){
+inline constexpr typename RK23<T, N, SP, RhsType, JacType>::Base::Ctype RK23<T, N, SP, RhsType, JacType>::Cmatrix(){
 
     T q[] = { T(0),
             T(1)/T(2),
             T(3)/T(4)};
-    typename RKbase::Ctype C(q);
+    typename Base::Ctype C(q);
     return C;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK23<T, N, SP, RhsType, JacType>::RKbase::Etype RK23<T, N, SP, RhsType, JacType>::Ematrix() {
+inline constexpr typename RK23<T, N, SP, RhsType, JacType>::Base::Etype RK23<T, N, SP, RhsType, JacType>::Ematrix() {
     T q[] = { T(5)/T(72),
             T(-1)/T(12),
             T(-1)/T(9),
             T(1)/T(8)};
-    typename RKbase::Etype E(q);
+    typename Base::Etype E(q);
     return E;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline constexpr typename RK23<T, N, SP, RhsType, JacType>::RKbase::Ptype RK23<T, N, SP, RhsType, JacType>::Pmatrix() {
+inline constexpr typename RK23<T, N, SP, RhsType, JacType>::Base::Ptype RK23<T, N, SP, RhsType, JacType>::Pmatrix() {
     T q[] = { T(1),   -T(4)/T(3),  T(5)/T(9),
         T(0),    T(1),      -T(2)/T(3),
         T(0),    T(4)/T(3), -T(8)/T(9),
         T(0),   -T(1),       T(1)};
-    typename RKbase::Ptype P(q, Nstages+1, static_cast<size_t>(3));
+    typename Base::Ptype P(q, Nstages+1, static_cast<size_t>(3));
     return P;
 }
 

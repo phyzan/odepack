@@ -51,7 +51,7 @@ public:
 
     template<INT_T... Idx>
     INLINE constexpr size_t offset(Idx... idx) const noexcept {
-        //dimension and range check in debug mode. They will not be compiled when -DNDBUG is enabled
+        //dimension and range check in debug mode. They will not be compiled when -DNDEBUG is enabled
         _dim_check(idx...);
         _bounds_check(idx...);
         return offset_impl(idx...);

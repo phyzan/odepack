@@ -81,15 +81,29 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, type
 class DOP853 : public RungeKuttaBase<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, SP, RhsType, JacType>{
 
 public:
+
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
+
+    inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
+
+private:
+
+    using Base = RungeKuttaBase<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, SP, RhsType, JacType>;
+    friend Base::MainSolverType;
+
+    static constexpr const char* name = "DOP853";
+    
     static constexpr size_t N_STAGES = 12;
     static constexpr size_t N_ORDER = 8;
     static constexpr size_t N_STAGES_EXTRA = 3;
     static constexpr int    ERR_EST_ORDER = 7;
     static constexpr size_t N_STAGES_EXT = DOP_COEFS<T>::N_STAGES_EXT;
     static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
+    
 
-private:
-    using Base = RungeKuttaBase<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, SP, RhsType, JacType>;
+    
 
     using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
 
@@ -98,17 +112,7 @@ private:
     friend Base;
     friend Base::MainSolverType; // So that Base can access specific private methods for static override
 
-    static constexpr const char* name = "DOP853";
-
-public:
-
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
-
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
-
     inline void interp_impl(T* result, const T& t) const;
-
-    inline std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
 
     static typename Base::Atype Amatrix();
 
@@ -129,8 +133,6 @@ public:
     typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
 
     typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
-
-private:
 
     void set_coef_matrix_impl() const;
 

@@ -229,10 +229,6 @@ protected:
     inline bool is_masked_impl() const;
     /// @brief Check if temporal. Override to mark as temporal event.
     inline bool is_temporal_impl() const;
-    /// @brief Check if stops solver. Override to make stop event.
-    inline bool stop_impl() const;
-    /// @brief Check if kills solver. Override to make lethal event.
-    inline bool kill_impl() const;
     //==========================================================
 
 private:
@@ -404,9 +400,6 @@ protected:
 
     /// @brief Reset to no goal set.
     inline void reset_impl();
-
-    /// @brief Returns true (this is a stop event).
-    inline bool stop_impl() const;
 
     /// @brief Returns true (this is a temporal event).
     inline bool is_temporal_impl() const;
@@ -773,16 +766,6 @@ inline bool EventBase<Derived, T>::is_temporal_impl() const{
     return false;
 }
 
-template<typename Derived, typename T>
-inline bool EventBase<Derived, T>::stop_impl() const{
-    return false;
-}
-
-template<typename Derived, typename T>
-inline bool EventBase<Derived, T>::kill_impl() const{
-    return false;
-}
-
 // PreciseEvent implementations
 
 template<typename T, typename Derived>
@@ -917,11 +900,6 @@ template<typename T, typename Derived>
 inline void TmaxEvent<T, Derived>::reset_impl(){
     Base::reset_impl();
     _t_goal = inf<T>();
-}
-
-template<typename T, typename Derived>
-inline bool TmaxEvent<T, Derived>::stop_impl() const{
-    return true;
 }
 
 template<typename T, typename Derived>

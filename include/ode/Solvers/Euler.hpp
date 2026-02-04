@@ -8,8 +8,6 @@ namespace ode{
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 class Euler : public BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>{
 
-    using Base = BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
-
 public:
 
     DEFAULT_RULE_OF_FOUR(Euler)
@@ -19,6 +17,11 @@ public:
     Euler(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T stepsize, int dir=1, const std::vector<T>& args = {}, EVENTS events = {}) requires (is_rich<SP>);
 
     inline std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
+
+private:
+
+    using Base = BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
+    friend Base::MainSolverType;
 
     void                                        adapt_impl(T* res);
 

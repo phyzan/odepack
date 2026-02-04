@@ -49,8 +49,7 @@ namespace ode{
  * @tparam N       System size at compile time. Use 0 for runtime-sized systems.
  * @tparam SP      Solver policy controlling behavior (see SolverPolicy enum).
  *
- * @note This class uses the Curiously Recurring Template Pattern (CRTP) to
- *       enable static polymorphism. The derived class passes itself as the
+ * @note This class uses static polymorphism (CRTP). The derived class passes itself as the
  *       first template parameter.
  */
 
@@ -83,7 +82,7 @@ public:
      * @param[in]  t     Current time.
      * @param[in]  q     Current state vector (size Nsys).
      */
-    inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
+    inline void                 Rhs(T* dq_dt, const T& t, const T* q) const;
 
     /**
      * @brief Compute the Jacobian matrix of the ODE system.
@@ -210,7 +209,7 @@ public:
 
     /**
         * @brief Get the number of RHS function evaluations performed so far.
-        * @return Total count of RHS evaluations. User calls to rhs() increment this counter.
+        * @return Total count of RHS evaluations. User calls to Rhs() do NOT increment this counter.
     */
     inline size_t               n_evals_rhs() const;
 
@@ -390,6 +389,9 @@ protected:
 
     // =========================== HELPER METHODS =====================================
 
+    /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
+    inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
+
     /// @brief Get pointer to the initial conditions state data.
     inline const T*             ics_ptr() const;
 
@@ -516,8 +518,13 @@ private:
 // ODE PROPERTIES
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Rhs(T* dq_dt, const T& t, const T* q) const{
     _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
+    this->Rhs(dq_dt, t, q);
     this->_n_evals_rhs++;
 }
 

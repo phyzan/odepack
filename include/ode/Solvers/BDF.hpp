@@ -85,33 +85,33 @@ private:
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
 class BDF : public BaseDispatcher<BDF<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>{
 
-    using Base = BaseDispatcher<BDF<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
-    using Dlike = Array2D<T, 0, N>;
-    struct None{};
-
 public:
-
-    static constexpr size_t NEWTON_MAXITER = 4;
-    // =============== OVERRIDEN =================
-    static constexpr const char* name = "BDF";
-    static constexpr bool IS_IMPLICIT = true;
-    static constexpr int ERR_EST_ORDER = 1;
-
-    inline std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
-    void                                        adapt_impl(T* res);
-    inline void                                 interp_impl(T* result, const T& t) const;
-    inline void                                 reset_impl();
-    void                                        re_adjust_impl(const T* new_vector);
-    bool                                        validate_ics_impl(T t0, const T* q0) const;
-    // ===========================================
-
-    DEFAULT_RULE_OF_FOUR(BDF)
 
     BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>) : BDF(ARGS, None()) {}
 
     BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>) : BDF(ARGS, None(), events) {}
 
+    inline std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
+
+    DEFAULT_RULE_OF_FOUR(BDF)
+
 private:
+
+    using Base = BaseDispatcher<BDF<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
+    using Dlike = Array2D<T, 0, N>;
+    struct None{};
+    friend Base::MainSolverType;
+    static constexpr size_t NEWTON_MAXITER = 4;
+
+    static constexpr const char* name = "BDF";
+    static constexpr bool IS_IMPLICIT = true;
+    static constexpr int ERR_EST_ORDER = 1;
+
+    void                                        adapt_impl(T* res);
+    inline void                                 interp_impl(T* result, const T& t) const;
+    inline void                                 reset_impl();
+    void                                        re_adjust_impl(const T* new_vector);
+    bool                                        validate_ics_impl(T t0, const T* q0) const;
 
     template<typename... Type>
     BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras);

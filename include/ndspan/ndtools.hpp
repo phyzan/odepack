@@ -10,6 +10,7 @@
 #include <cinttypes>
 #include <iostream>
 #include <numeric>
+#include <concepts>
 #ifdef MPREAL
 #include "mpreal.h"
 #endif

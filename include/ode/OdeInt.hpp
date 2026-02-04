@@ -396,6 +396,7 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
                     }
                     else if (ev == 0){
                         tmax_event = true;
+                        _solver->stop("t-goal");
                     }
                 }
                 if (_solver->is_running() && !event_counter.is_running()){
