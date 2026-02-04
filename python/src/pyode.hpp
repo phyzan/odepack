@@ -645,7 +645,7 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
         if (py::isinstance<PyFuncWrapper>(jacobian)){
             //safe approach
             auto& _j = jacobian.cast<PyFuncWrapper&>();
-            ode_rhs.jacobian = (const void*)_j.rhs;
+            ode_rhs.jacobian = (VoidType)_j.rhs;
             if (_j.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
             }
@@ -654,11 +654,11 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
             }
         }
         else{
-            ode_rhs.jacobian = (const void*)open_capsule<Func<T>>(jacobian.cast<py::capsule>());
+            ode_rhs.jacobian = (VoidType)open_capsule<Func<T>>(jacobian.cast<py::capsule>());
         }
     }else if (!jacobian.is_none()){
         data.jac = jacobian;
-        ode_rhs.jacobian = (const void*)py_jac<T>;
+        ode_rhs.jacobian = (VoidType)py_jac<T>;
     }
     for (py::handle ev : events){
         if (!py::isinstance<PyEvent>(ev)) {

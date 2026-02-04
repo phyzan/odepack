@@ -571,10 +571,13 @@ struct OdeData {
     */
 };
 
+using VoidType = void(*)();
+
 template<typename RHS>
 struct OdeData<RHS, void> {
+
     RHS rhs;
-    const void* jacobian = nullptr; //will be cast to Func<T> and will be checked for nullptr at runtime
+    VoidType jacobian = [](){}; //will be cast to Func<T> and will be checked for nullptr at runtime
     const void* obj = nullptr;
 };
 
