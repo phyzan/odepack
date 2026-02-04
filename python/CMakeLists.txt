@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.15...3.26)
 
-# optional flags: -DMPREAL=ON -DDEBUG=ON
+# optional flags: -DMPREAL=ON -DDEBUG=ON, -DRK4_DENSE=ON
 option(MPREAL "Enable MPFR multi-precision support" OFF)
 option(DEBUG "Enable debug build" OFF)
+option(RK4_DENSE "Enable accurate RK4 dense output" OFF) #by default Hermite interpolation is used
 
 set(CMAKE_CXX_COMPILER "g++")
 
@@ -42,6 +43,9 @@ set(COMMON_COMPILE_OPTIONS
 
 if(MPREAL)
     list(APPEND COMMON_COMPILE_OPTIONS -DMPREAL)
+endif()
+if(RK4_DENSE)
+    list(APPEND COMMON_COMPILE_OPTIONS -DRK4_DENSE)
 endif()
 
 # Add optimization and debug flags based on debug mode

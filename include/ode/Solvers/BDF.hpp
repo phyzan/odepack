@@ -316,7 +316,7 @@ void BDFInterpolator<T, N>::_call_impl(T* result, const T& t) const {
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename... Type>
-BDF<T, N, SP, RhsType, JacType>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, extras...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
+BDF<T, N, SP, RhsType, JacType>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, std::forward<Type>(extras)...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((MAX_ORDER+1)*(MAX_ORDER+1)), _U((MAX_ORDER+1)*(MAX_ORDER+1)), _RU((MAX_ORDER+1)*(MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();

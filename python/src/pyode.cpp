@@ -698,17 +698,15 @@ py::object PyODE::solver_copy() const{
         auto* solver_clone = ode_ptr->solver()->clone();
         if (ode_ptr->solver()->method() == "RK45"){
             return py::cast(PyRK45(solver_clone, data, this->scalar_type));
-        }
-        else if (ode_ptr->solver()->method() == "DOP853"){
+        }else if (ode_ptr->solver()->method() == "DOP853"){
             return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
-        }
-        else if (ode_ptr->solver()->method() == "RK23"){
+        }else if (ode_ptr->solver()->method() == "RK23"){
             return py::cast(PyRK23(solver_clone, data, this->scalar_type));
-        }
-        else if (ode_ptr->solver()->method() == "BDF"){
+        }else if (ode_ptr->solver()->method() == "BDF"){
             return py::cast(PyBDF(solver_clone, data, this->scalar_type));
-        }
-        else{
+        }else if (ode_ptr->solver()->method() == "RK4"){
+            return py::cast(PyRK4(solver_clone, data, this->scalar_type));
+        }else{
             throw py::value_error("Unregistered solver!");
         }
     )

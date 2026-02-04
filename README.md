@@ -103,14 +103,16 @@ pip install ./python
 **Requirements:**
 - Python 3.12+
 
-In order to build with arbitrary precision support, use the MPREAL flag:
-```bash
-CMAKE_ARGS="-DMPREAL=ON" pip install ./python
-``` 
+There are optional build flags for the Python bindings:
 
-For a debug build, use the DEBUG flag:
+- MPREAL: Enable arbitrary precision support
+- DEBUG: Enable debug build
+- RK4_DENSE: Enable accurate RK4 dense output for the RK4 solver, with the cost of additional memory usage and slightly slower performance.
+
+Use any of them by setting the `CMAKE_ARGS` environment variable before installation, and adding the `-D` character before the flag, for example:
+
 ```bash
-CMAKE_ARGS="-DDEBUG=ON" pip install ./python
+CMAKE_ARGS="-DDEBUG=ON -DRK4_DENSE=ON" pip install ./python
 ```
 
 ---
