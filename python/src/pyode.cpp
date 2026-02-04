@@ -849,9 +849,9 @@ py::object PyVecField2D::py_streamline_ode(double x0, double y0, double rtol, do
     }
     std::array<double, 2> q0 = {x0, y0};
     if (normalized){
-        return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}));
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}, method.cast<std::string>()));
     }else{
-        return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}));
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), first_step, direction, {}, {}, method.cast<std::string>()));
     }
 }
 
