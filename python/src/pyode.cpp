@@ -654,10 +654,10 @@ py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterab
     )
 }
 
-py::object PyODE::py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
+py::object PyODE::py_integrate_until(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
-        auto* ptr = new OdeResult<T>(cast<T>()->go_to(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
+        auto* ptr = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
         return py::cast(PyOdeResult(ptr, this->data.shape, this->scalar_type));
     )
 }
@@ -1222,7 +1222,7 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("t_eval")=py::none(),
             py::arg("event_options")=py::tuple(),
             py::arg("max_prints")=0)
-        .def("go_to", &PyODE::py_go_to,
+        .def("integrate_until", &PyODE::py_integrate_until,
             py::arg("t"),
             py::kw_only(),
             py::arg("t_eval")=py::none(),

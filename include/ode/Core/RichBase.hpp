@@ -148,17 +148,6 @@ public:
     bool                                    advance_to_event();
 
     /**
-     * @brief Set the maximum integration time.
-     *
-     * The solver will stop (trigger a tmax event) when reaching this time.
-     * The tmax must be in the integration direction from the current time.
-     *
-     * @param tmax Maximum time to integrate to.
-     * @return True if tmax was set successfully, false on error.
-     */
-    bool                                    set_tmax(T tmax);
-
-    /**
      * @brief Begin collecting dense output interpolation data.
      *
      * After calling this method, the solver builds a chain of interpolators
@@ -222,9 +211,6 @@ private:
 
     /// @brief Check if the current state equals the new computed state.
     inline bool     equiv_states() const;
-
-    /// @brief Insert the tmax event at the beginning of the event list.
-    inline static std::vector<const Event<T>*>& include_tmax_event(std::vector<const Event<T>*>& events);
 
     /// @brief Collection of events being monitored.
     EventCollection<T>                      _events;
@@ -346,7 +332,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::show_state(int prec) const
 // PUBLIC MODIFIERS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RichSolver<Derived, T, N, SP, RhsType, JacType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(include_tmax_event(events)){
+RichSolver<Derived, T, N, SP, RhsType, JacType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(events){
     _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
 }
 
@@ -429,23 +415,6 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool RichSolver<Derived, T, N, SP, RhsType, JacType>::set_tmax(T tmax){
-    if (this->is_dead()){
-        this->warn_dead();
-        return false;
-    } else if ( (tmax - this->t())*this->direction() < 0 ){
-        std::cerr << "Error: cannot set tmax to " << tmax << " from current time " << this->t() << " due to direction mismatch." << std::endl;
-        return false;
-    } else if (tmax == this->t() && this->is_running()){
-        this->stop("t-goal");
-    }
-    _events.set_tmax(tmax);
-
-    assert(this->t()*this->direction() <= tmax*this->direction() && "Internal solver bug");
-    return true;
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
     if (!_interp_data){
         _interp_data = true;
@@ -524,14 +493,6 @@ inline bool RichSolver<Derived, T, N, SP, RhsType, JacType>::requires_new_start(
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 inline bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
     return this->t_impl() == Base::t_new();
-}
-
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline std::vector<const Event<T>*>& RichSolver<Derived, T, N, SP, RhsType, JacType>::include_tmax_event(std::vector<const Event<T>*>& events){
-    static TmaxEvent<T> ev;
-    events.insert(events.begin(), &ev);
-    return events;
 }
 
 // ============================================================================

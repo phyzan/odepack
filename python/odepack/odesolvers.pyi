@@ -1117,7 +1117,7 @@ class LowLevelODE:
     and automatically stores all results.
 
     The object grows dynamically as integration methods are called. Each call to
-    integrate(), go_to(), or rich_integrate() appends new results to the internal
+    integrate(), integrate_until(), or rich_integrate() appends new results to the internal
     history.
 
     Parameters
@@ -1244,7 +1244,7 @@ class LowLevelODE:
         """
         ...
 
-    def go_to(self, t, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:
+    def integrate_until(self, t, *, t_eval : Iterable[float] = None, event_options: Iterable[EventOpt] = (), max_prints=0)->OdeResult:
         """
         Integrate the ODE to a specific time target.
 
@@ -1344,7 +1344,7 @@ class LowLevelODE:
         Returns
         -------
         float
-            Wall-clock time in seconds for all integrate/go_to/rich_integrate calls.
+            Wall-clock time in seconds for all integrate/integrate_until/rich_integrate calls.
         """
         ...
 
@@ -1608,7 +1608,7 @@ class OdeResult:
     Encapsulation of a single ODE integration result segment.
 
     OdeResult represents the solution data from a single integration call (e.g.,
-    ode.integrate(), ode.go_to(), or ode.rich_integrate()). Unlike LowLevelODE
+    ode.integrate(), ode.integrate_until(), or ode.rich_integrate()). Unlike LowLevelODE
     which accumulates all history, OdeResult contains only the newly computed segment.
 
     OdeResult instances are returned by integration methods and provide the same

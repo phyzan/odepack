@@ -829,7 +829,7 @@ class OdeSystem:
         Returns
         -------
         LowLevelODE
-            A solver instance ready for integration. Call integrate(), go_to(),
+            A solver instance ready for integration. Call integrate(), integrate_until(),
             or rich_integrate() to perform integration.
 
         Raises

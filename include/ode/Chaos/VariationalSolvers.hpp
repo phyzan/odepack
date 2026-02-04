@@ -97,7 +97,7 @@ private:
 
     void _register_event(size_t event) override;
 
-    size_t _ind = 1;
+    size_t _ind = 0;
     std::vector<T> _t_lyap = {};
     std::vector<T> _lyap_array = {};
     std::vector<T> _delta_s_arr = {};
@@ -186,7 +186,7 @@ VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, Ja
 
 template<typename T, size_t N, typename RhsType, typename JacType>
 inline const NormalizationEvent<T>& VariationalSolver<T, N, RhsType, JacType>::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(this->ptr->event_col().event(1));
+    return static_cast<const NormalizationEvent<T>&>(this->ptr->event_col().event(0));
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
@@ -277,7 +277,7 @@ inline const NormalizationEvent<T>& VariationalODE<T, N, RhsType, JacType>::_mai
 template<typename T, size_t N, typename RhsType, typename JacType>
 void VariationalODE<T, N, RhsType, JacType>::_register_event(size_t event){
     ODE<T, N>::_register_event(event);
-    if (event == _ind-1){
+    if (event == _ind){
         const NormalizationEvent<T>& ev = _main_event();
         _t_lyap.push_back(ev.delta_t_abs());
         _lyap_array.push_back(ev.lyap());

@@ -372,7 +372,7 @@ public:
 
     py::object py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints);
 
-    py::object py_go_to(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints);
+    py::object py_integrate_until(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints);
 
     py::object t_array() const;
 
@@ -482,7 +482,7 @@ const OdeRichSolver<T>* PySolver::cast()const{
 
 template<typename T>
 inline const NormalizationEvent<T>& PyVarSolver::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(1));
+    return static_cast<const NormalizationEvent<T>&>(reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(0));
 }
 
 template<typename T>

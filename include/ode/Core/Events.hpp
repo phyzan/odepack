@@ -15,7 +15,6 @@
  * - EventBase<Derived, T>: CRTP base with common implementation
  *   - PreciseEvent<T>: Zero-crossing detection with bisection
  *   - PeriodicEvent<T>: Fixed-interval temporal events
- *   - TmaxEvent<T>: Integration endpoint event
  * - ObjectOwningEvent<EventType, ObjType>: Wrapper owning user data
  * - EventCollection<T>: Container managing multiple events
  * - EventView<T>: View into detected events at a time point
@@ -364,52 +363,6 @@ private:
 
 };
 
-/**
- * @brief Event triggered when integration reaches a target time.
- *
- * Used internally to implement advance_until(tmax). This is a stop event
- * that pauses the solver when the target time is reached. The goal can
- * be set dynamically and is cleared after triggering.
- *
- * @tparam T       Scalar type for computations.
- * @tparam Derived Optional derived class for further CRTP extension.
- */
-template<typename T, typename Derived = void>
-class TmaxEvent : public EventBase<GetDerived<TmaxEvent<T, Derived>, Derived>, T>{
-
-    using Base = EventBase<GetDerived<TmaxEvent<T, Derived>, Derived>, T>;
-    friend Base;
-
-public:
-
-    TmaxEvent() : Base("t-goal", nullptr, false, nullptr) {};
-
-    /// @brief Set the target time to stop at.
-    inline void set_goal(T tmax);
-
-    /// @brief Check if a target time has been set.
-    inline bool goal_is_set() const;
-
-protected:
-
-    /// @brief Locate if target time falls within interval.
-    inline bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
-
-    /// @brief Clear the goal after triggering.
-    inline void register_impl();
-
-    /// @brief Reset to no goal set.
-    inline void reset_impl();
-
-    /// @brief Returns true (this is a temporal event).
-    inline bool is_temporal_impl() const;
-
-private:
-
-    T _t_goal = inf<T>();  ///< Target time (infinity = no goal).
-
-};
-
 
 /**
  * @brief Wrapper that owns the user object passed to event callbacks.
@@ -531,9 +484,6 @@ public:
 
     /// @brief Get the pointer to the first detected event in the next time group
     const Event<T>*             get_next_event() const;
-
-    /// @brief Set the target time for the internal TmaxEvent (if present).
-    void                        set_tmax(T tmax);
 
     /// @brief Initialize all events for use with solver.
     void                        setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
@@ -864,49 +814,6 @@ inline void PeriodicEvent<T, Derived>::reset_impl(){
     _n = _n_aux = 0;
 }
 
-// TmaxEvent implementations
-
-template<typename T, typename Derived>
-inline void TmaxEvent<T, Derived>::set_goal(T tmax){
-    _t_goal = tmax;
-}
-
-template<typename T, typename Derived>
-inline bool TmaxEvent<T, Derived>::goal_is_set() const{
-    return is_finite(_t_goal);
-}
-
-template<typename T, typename Derived>
-inline bool TmaxEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
-    if (!goal_is_set()) {return false;}
-
-    int d = this->direction();
-
-    if ((before.t()*d < _t_goal*d) && (_t_goal*d <= after.t()*d )){
-        t = _t_goal;
-        return true;
-    }else {
-        return false;
-    }
-}
-
-template<typename T, typename Derived>
-inline void TmaxEvent<T, Derived>::register_impl(){
-    Base::register_impl();
-    _t_goal = inf<T>();
-}
-
-template<typename T, typename Derived>
-inline void TmaxEvent<T, Derived>::reset_impl(){
-    Base::reset_impl();
-    _t_goal = inf<T>();
-}
-
-template<typename T, typename Derived>
-inline bool TmaxEvent<T, Derived>::is_temporal_impl() const{
-    return true;
-}
-
 // ObjectOwningEvent implementations
 
 template<typename EventType, typename ObjType>
@@ -1030,15 +937,6 @@ const Event<T>* EventCollection<T>::get_next_event() const {
         return _events[next_idx].ptr();
     }else{
         return nullptr;
-    }
-}
-
-template<typename T>
-void EventCollection<T>::set_tmax(T tmax){
-    if (this->size() > 0){
-        if (TmaxEvent<T>* p = _events[0].template cast<TmaxEvent<T>>()){
-            p->set_goal(tmax);
-        }
     }
 }
 

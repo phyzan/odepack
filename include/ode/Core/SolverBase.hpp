@@ -243,7 +243,7 @@ public:
     /**
      * @brief Integrate until the specified time is reached.
      * @param time Target time to integrate to.
-     * @param observer Callable function(T t, const T* q) that is called at each successfull step until "time" is reached.
+     * @param observer Callable function(t, q_ptr) that is called at each successfull step until "time" is reached.
      * @return True if integration succeeded, false if solver stopped early.
      */
     template<typename Callable>
@@ -256,13 +256,15 @@ public:
      * @param obj_fun  Objective function to monitor for zero crossing.
      * @param tol      Tolerance for root finding (bisection).
      * @param dir      Direction of crossing: +1 (increasing), -1 (decreasing), 0 (any).
-     * @param observer Callable function(T t, const T* q) that is called at each successfull step until the requested zero crossing of the objective function is reached
+     * @param observer Callable function(t, q_ptr) that is called at each successfull step until the requested zero crossing of the objective function is reached
      * @param worker   Optional preallocated array (size Nsys) for temporary storage.
      *                 Use if obj_fun calls solver methods that may overwrite internal arrays.
      * @return True if event was detected and solver positioned at crossing.
      */
     template<typename ObjFun, typename Callable>
     bool                        advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc), T* worker = nullptr);
+
+    bool                        observe_until(T time, std::function<void(const T&, const T*)> observer);
 
     /// @brief Reset the solver to its initial conditions.
     void                        reset();
@@ -902,6 +904,11 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     }else{
         return false;
     }
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+INLINE bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(T time, std::function<void(const T&, const T*)> observer){
+    return this->advance_until(time, observer);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

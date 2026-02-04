@@ -146,6 +146,9 @@ int main() {
     oscillator_test<double, DOP853>();
     lambda_test<double, DOP853>();
 
+    oscillator_test<double, RK4>();
+    lambda_test<double, RK4>();
+
     // Test with arbitrary precision
     std::cout << "\nTesting with arbitrary precision (mpreal):\n";
     mpreal::set_default_prec(256); // Set precision to 256 bits
@@ -161,6 +164,9 @@ int main() {
 
     oscillator_test<mpreal, DOP853>();
     lambda_test<mpreal, DOP853>();
+    
+    oscillator_test<mpreal, RK4>();
+    lambda_test<mpreal, RK4>();
 
     std::cout << "Expected event at t = 3.48143\n";
     std::cout << "Even state expected: {-2.82843, 1}\n";

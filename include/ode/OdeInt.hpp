@@ -105,7 +105,7 @@ public:
 
     OdeResult<T, N>                             integrate(const T& interval, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
-    OdeResult<T, N>                             go_to(const T& t, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
+    OdeResult<T, N>                             integrate_until(const T& t_max, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
     std::map<std::string, std::vector<size_t>>  event_map(size_t start_point=0) const;
 
@@ -335,7 +335,7 @@ OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const StepSequence<T>& t
     if (interval < 0){
         throw std::runtime_error("Integration interval must be positive");
     }
-    return this->go_to(_solver->t()+interval*_solver->direction(), t_array, event_options, max_prints);
+    return this->integrate_until(_solver->t()+interval*_solver->direction(), t_array, event_options, max_prints);
 }
 
 template<typename T, size_t N>
@@ -348,10 +348,10 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
 }
 
 template<typename T, size_t N>
-OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
+OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
     if (_solver->is_dead()){
         return OdeResult<T, N>({}, {}, {}, _solver->diverges(), false, 0, _solver->message());
-    }else if (!_solver->set_tmax(t)){
+    }else if (t_max*_solver->direction() < _solver->t()*_solver->direction()){
         return OdeResult<T, N>({}, {}, {}, false, false, 0, "Cannot integrate in opposite direction"); //cannot integrate in opposite direction
     }
     _solver->resume();
@@ -378,51 +378,54 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
     const std::vector<EventOptions> options = this->_validate_events(event_options);
 
     EventCounter<T, N> event_counter(options);
-    while (_solver->is_running()){
-        if (_solver->advance()){
-            t_last = t_curr;
-            t_curr = _solver->t();
-            if (_solver->at_event()){
-                //the .count_it(ev) in the line above might have stopped the solver.
-                //if the solver stopped for any other reason, that takes priority.
-                //only if it is still running but max events have been reached, the solver will display "max events reached".
-                while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
-                bool any_event = false;
-                bool tmax_event = false;
-                for (const size_t& ev : _solver->event_col()){
-                    if (ev > 0 && event_counter.count_it(ev-1)){
-                        any_event = true;
-                        _register_event(ev-1);
-                    }
-                    else if (ev == 0){
-                        tmax_event = true;
-                        _solver->stop("t-goal");
-                    }
-                }
-                if (_solver->is_running() && !event_counter.is_running()){
-                    _solver->stop("Max events reached");
-                }
-                if (any_event){
-                    _register_state();
-                    Nnew++;
-                }
-                else if (tmax_event && (frame_counter < t_array.size())){
-                    _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
-                }
-                else if (tmax_event && save_all){
-                    Nnew++;
+
+    auto observer = [&](const T& t, const T* q) -> void {
+        t_last = t_curr;
+        t_curr = _solver->t();
+        if (_solver->at_event()){
+            //the .count_it(ev) in the line above might have stopped the solver.
+            //if the solver stopped for any other reason, that takes priority.
+            //only if it is still running but max events have been reached, the solver will display "max events reached".
+            while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
+            bool any_event = false;
+            bool tmax_event = (t == t_max);
+            if (tmax_event){
+                _solver->stop("t-goal");
+            }
+
+            // Manage events
+            for (const size_t& ev : _solver->event_col()){
+                if (event_counter.count_it(ev)){
+                    any_event = true;
+                    _register_event(ev);
                 }
             }
-            else if (save_all){
+            if (_solver->is_running() && !event_counter.is_running()){
+                _solver->stop("Max events reached");
+            }
+            if (any_event || tmax_event){
                 _register_state();
                 Nnew++;
             }
-            else if (save_some){
-                while (frame_counter < t_array.size() && _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
+            else if (tmax_event && (frame_counter < t_array.size())){
+                _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
+            }
+            else if (tmax_event && save_all){
+                Nnew++;
             }
         }
+        else if (save_all){
+            _register_state();
+            Nnew++;
+        }
+        else if (save_some){
+            while (frame_counter < t_array.size() && _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
+        }
+        
+
+        // =========================== Manage console output ==========================
         if (max_prints > 0){
-            T percentage = (_solver->t() - t0)/(t-t0);
+            T percentage = (_solver->t() - t0)/(t_max-t0);
             if (percentage*max_prints >= prints){
                 #pragma omp critical
                 {
@@ -433,7 +436,11 @@ OdeResult<T, N> ODE<T, N>::go_to(const T& t, const StepSequence<T>& t_array, con
             }
 
         }
-    }
+
+    };
+
+    _solver->observe_until(t_max, observer);
+
     if (max_prints > 0){
         std::cout << std::endl;
     }
@@ -450,12 +457,12 @@ template<typename T, size_t N>
 std::map<std::string, std::vector<size_t>> ODE<T, N>::event_map(size_t start_point) const{
     std::map<std::string, std::vector<size_t>> res;
     size_t index;
-    for (size_t i=1; i<_solver->event_col().size(); i++){
+    for (size_t i=0; i<_solver->event_col().size(); i++){
         const Event<T>& ev = _solver->event_col().event(i);
         res[ev.name()] = {};
         std::vector<size_t>& list = res[ev.name()];
-        for (size_t j=0; j<_Nevents[i-1].size(); j++){
-            index = _Nevents[i-1][j];
+        for (size_t j=0; j<_Nevents[i].size(); j++){
+            index = _Nevents[i][j];
             if (index >= start_point){
                 list.push_back(index-start_point);
             }
@@ -581,13 +588,13 @@ void ODE<T, N>::_copy_data(const ODE<T, N>& other){
 template<typename T, size_t N>
 std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOptions>& options)const{
 
-    //the check skips the first internal event which is about the tmax
+
     size_t Nevs = _solver->event_col().size();
-    std::vector<EventOptions> res(Nevs-1);
+    std::vector<EventOptions> res(Nevs);
     bool found;
     for (size_t i=0; i<options.size(); i++) {
         found = false;
-        for (size_t j=1; j<Nevs; j++){
+        for (size_t j=0; j<Nevs; j++){
             if (_solver->event_col().event(j).name() == options[i].name){
                 found = true;
                 break;
@@ -598,10 +605,10 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
         }
     }
 
-    for (size_t i=0; i<Nevs-1; i++){ //the iteration skips the main TmaxEvent
+    for (size_t i=0; i<Nevs; i++){
         found = false;
         for (const auto& option : options){
-            if (option.name == _solver->event_col().event(i+1).name()){
+            if (option.name == _solver->event_col().event(i).name()){
                 found = true;
                 res[i] = option;
                 res[i].max_events = std::max(option.max_events, -1);
@@ -609,7 +616,7 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
             }
         }
         if (!found){
-            res[i] = {_solver->event_col().event(i+1).name()};
+            res[i] = {_solver->event_col().event(i).name()};
         }
     }
     return res;

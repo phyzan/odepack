@@ -1,6 +1,7 @@
 #ifndef VIRTUALSOLVER_HPP
 #define VIRTUALSOLVER_HPP
 
+#include <functional>
 #include "../Interpolation/Interpolators.hpp"
 #include "Events.hpp"
 
@@ -58,6 +59,7 @@ public:
     // MODIFIERS
     virtual bool                advance() = 0;
     virtual bool                advance_until(T time) = 0;
+    virtual bool                observe_until(T time, std::function<void(const T&, const T*)> observer) = 0;
     virtual void                reset() = 0;
     virtual bool                resume() = 0;
     virtual void                stop(const std::string& text = "") = 0;
@@ -93,8 +95,6 @@ public:
 
     // MODIFIERS
     virtual bool                            advance_to_event()=0;
-
-    virtual bool                            set_tmax(T tmax) = 0;
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
 
