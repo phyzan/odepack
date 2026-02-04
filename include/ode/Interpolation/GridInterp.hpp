@@ -165,13 +165,13 @@ public:
         };
     }
 
-    OdeResult<T> streamline(T x0, T y0, T length, T rtol, T atol, T min_step, T max_step, T first_step, int direction, const StepSequence<T>& t_eval, const std::string& method) const{
+    OdeResult<T> streamline(T x0, T y0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, const std::string& method) const{
         /*
         direction: +1 forward, -1 backward
         */
 
         std::array<T, 2> y0_vec = {x0, y0};
-        ODE<T> ode(OdeData{.rhs=this->ode_func(), .obj=this}, 0, y0_vec.data(), 2, rtol, atol, min_step, max_step, first_step, direction, {}, {}, method);
+        ODE<T> ode(OdeData{.rhs=this->ode_func(), .obj=this}, 0, y0_vec.data(), 2, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
 
         return ode.integrate(length, t_eval);
     }

@@ -616,7 +616,7 @@ class RK23(OdeSolver):
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -642,7 +642,7 @@ class RK23(OdeSolver):
     ...         print(f"t={solver.t:.3f}, q={solver.q}")
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -684,7 +684,7 @@ class RK45(OdeSolver):
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -709,7 +709,7 @@ class RK45(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -750,7 +750,7 @@ class DOP853(OdeSolver):
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -775,7 +775,7 @@ class DOP853(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -823,7 +823,7 @@ class BDF(OdeSolver):
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -857,7 +857,7 @@ class BDF(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -894,8 +894,8 @@ class RK4(OdeSolver):
 
     min_step, max_step : They are not used, as the stepsize is fixed. They are only present for API consistency.
 
-    first_step : float, optional
-        The fixed step size to use for integration. Default is 0., which means a step size is estimated.
+    stepsize : float, optional
+        The fixed step size to use for integration. Default is 0., which means a step size is estimated initially based on rtol and atol.
 
     direction : {-1, 1}, optional
         Integration direction. 1 for forward (default), -1 for backward in time.
@@ -910,7 +910,7 @@ class RK4(OdeSolver):
         Numerical precision. One of "double" (default), "float", "long double", "mpreal".
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -969,7 +969,7 @@ class VariationalSolver(OdeSolver):
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -1048,7 +1048,7 @@ class VariationalSolver(OdeSolver):
     OdeSolver : Base class for step-by-step ODE integration
     """
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
         ...
 
     @property
@@ -1149,7 +1149,7 @@ class LowLevelODE:
     max_step : float, optional
         Maximum allowed step size. Default is None (no limit).
 
-    first_step : float, optional
+    stepsize : float, optional
         Initial step size estimate. If 0 (default), automatically determined.
 
     direction : {-1, 1}, optional
@@ -1191,7 +1191,7 @@ class LowLevelODE:
     >>> print(ode.event_map)
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
         ...
 
     def solver(self)->OdeSolver:
@@ -1505,7 +1505,7 @@ class VariationalLowLevelODE(LowLevelODE):
     rtol, atol : float, optional
         Relative and absolute tolerances. Default is 1e-12.
 
-    min_step, max_step, first_step : float, optional
+    min_step, max_step, stepsize : float, optional
         Step size control. See LowLevelODE.
 
     direction : {-1, 1}, optional
@@ -1548,7 +1548,7 @@ class VariationalLowLevelODE(LowLevelODE):
     >>> lyap_exp = ode.lyap[-1]  # Final Lyapunov exponent estimate
     """
 
-    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, first_step=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
         ...
 
     @property
@@ -1936,7 +1936,7 @@ class SampledVectorField2D:
         '''
         ...
 
-    def streamline(self, x0: float, y0: float, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
+    def streamline(self, x0: float, y0: float, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
         '''
         Compute a streamline starting from (x0, y0).
 
@@ -1950,7 +1950,7 @@ class SampledVectorField2D:
             Length of the streamline to compute.
         rtol, atol : float, optional
             Relative and absolute tolerances for the ODE solver.
-        min_step, max_step, first_step : float, optional
+        min_step, max_step, stepsize : float, optional
             Step size control parameters.
         direction : {-1, 1}, optional
             Direction of integration. 1 for forward, -1 for backward.
@@ -1967,7 +1967,7 @@ class SampledVectorField2D:
         '''
         ...
 
-    def get_ode(self, x0: float, y0: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, first_step = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
+    def get_ode(self, x0: float, y0: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
         '''
         Create a LowLevelODE object for streamlining from (x0, y0).
 
@@ -1979,7 +1979,7 @@ class SampledVectorField2D:
             Initial y-coordinate.
         rtol, atol : float, optional
             Relative and absolute tolerances for the ODE solver.
-        min_step, max_step, first_step : float, optional
+        min_step, max_step, stepsize : float, optional
             Step size control parameters.
         direction : {-1, 1}, optional
             Direction of integration. 1 for forward, -1 for backward.

@@ -791,7 +791,7 @@ class OdeSystem:
             self._pointers(scalar_type=scalar_type, variational=True, first=ptrs)
         return
     
-    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->LowLevelODE:
+    def get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->LowLevelODE:
         """Create a solver instance for integrating the ODE system.
 
         Parameters
@@ -808,7 +808,7 @@ class OdeSystem:
             Minimum allowed step size (0. means no limit)
         max_step : float, default np.inf
             Maximum allowed step size
-        first_step : float, default 0.
+        stepsize : float, default 0.
             Suggested first step size (0. means automatic)
         direction : {-1, 1}, default 1
             Integration direction: 1 for forward, -1 for backward in time
@@ -842,9 +842,9 @@ class OdeSystem:
         LowLevelODE : Returned solver object with integration methods
         get_variational : Create solver for variational equations with Lyapunov tracking
         """
-        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=None, compiled=compiled, scalar_type=scalar_type)
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, method=method, period=None, compiled=compiled, scalar_type=scalar_type)
 
-    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->VariationalLowLevelODE:
+    def get_variational(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double')->VariationalLowLevelODE:
         """Create a solver for the variational equations of the ODE system.
 
         This method creates a solver that tracks both the solution and its
@@ -878,7 +878,7 @@ class OdeSystem:
             Minimum allowed step size
         max_step : float, default np.inf
             Maximum allowed step size
-        first_step : float, default 0.
+        stepsize : float, default 0.
             Suggested first step size
         direction : {-1, 1}, default 1
             Integration direction: 1 for forward, -1 for backward
@@ -913,9 +913,9 @@ class OdeSystem:
         VariationalLowLevelODE : Returned solver object
         VariationalOdeSystem : Helper to create systems with explicit variational equations
         """
-        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, period=period, compiled=compiled, scalar_type=scalar_type)
+        return self._get(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, method=method, period=period, compiled=compiled, scalar_type=scalar_type)
     
-    def get_var_solver(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double'):
+    def get_var_solver(self, t0: float, q0: np.ndarray, period: float, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", compiled=True, scalar_type='double'):
         """Create a low-level VariationalSolver for step-by-step integration.
 
         This method creates a VariationalSolver (low-level iterator) for variational
@@ -953,7 +953,7 @@ class OdeSystem:
             Minimum allowed step size
         max_step : float, default np.inf
             Maximum allowed step size
-        first_step : float, default 0.
+        stepsize : float, default 0.
             Suggested first step size
         direction : {-1, 1}, default 1
             Integration direction: 1 for forward, -1 for backward
@@ -1030,7 +1030,7 @@ class OdeSystem:
         if len(args) != len(self.args):
             raise ValueError(f"The provided number of args must be {len(self.args), not {len(args)}}")
 
-        return VariationalSolver(f=f, jac=jac, t0=t0, q0=q0, period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, method=method, scalar_type=scalar_type)
+        return VariationalSolver(f=f, jac=jac, t0=t0, q0=q0, period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, method=method, scalar_type=scalar_type)
 
     def lowlevel_odefunc(self, scalar_type='double'):
         """Get the compiled ODE right-hand side function.
@@ -1286,7 +1286,7 @@ class OdeSystem:
             res.append(event._toEvent(scalar_type=scalar_type, **extra_kwargs))
         return res
 
-    def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, first_step=0., direction=1, args=(), method="RK45", period=None, compiled=True, scalar_type='double'):
+    def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", period=None, compiled=True, scalar_type='double'):
         """Internal method to create a solver instance.
 
         Parameters
@@ -1303,7 +1303,7 @@ class OdeSystem:
             Minimum step size
         max_step : float
             Maximum step size
-        first_step : float
+        stepsize : float
             Suggested first step size
         direction : {-1, 1}
             Integration direction
@@ -1339,7 +1339,7 @@ class OdeSystem:
             events = self.true_py_events if not variational else self.true_py_events_var
             f = self._odefunc if not variational else self._var_odefunc
             jac = self._jac if not variational else self._var_jac
-        kwargs = dict(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, first_step=first_step, direction=direction, args=args, events=events, method=method)
+        kwargs = dict(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, events=events, method=method)
         if not variational:
             getter = LowLevelODE
         else:

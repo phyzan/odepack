@@ -199,7 +199,7 @@ event = SymbolicPreciseEvent("event", y-1)
 dq_dt = [y, -x]
 odesys = OdeSystem(dq_dt, t, [x, y], events=[event])
 
-ode = odesys.get(t0=0, q0=[3.0, 0.0], rtol=1e-6, atol=1e-9, first_step=0.01, compiled=True, scalar_type="double") #use False for pure python version
+ode = odesys.get(t0=0, q0=[3.0, 0.0], rtol=1e-6, atol=1e-9, stepsize=0.01, compiled=True, scalar_type="double") #use False for pure python version
 
 solver = ode.solver()   # get a copy of the internal solver
 print(ode.__class__)    #LowLevelODE
@@ -528,7 +528,7 @@ int main() {
     mpreal atol = "1e-9";
     mpreal min_step = 0;
     mpreal max_step = 1;
-    mpreal first_step = 0;
+    mpreal stepsize = 0;
     constexpr size_t nsys = 2;
     int dir = 1;
     auto solver = getSolver<RK45, mpreal, nsys, SP>(
@@ -540,7 +540,7 @@ int main() {
         atol,
         min_step,
         max_step,
-        first_step,
+        stepsize,
         dir,
         {},
         {&event}

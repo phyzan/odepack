@@ -169,7 +169,7 @@ INLINE void RK4Interpolator<T, N>::_call_impl(T* result, const T& t) const{
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename... Type>
-RK4<T, N, SP, RhsType, JacType>::RK4(MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, nsys, rtol, atol, 0, inf<T>(), first_step, dir, args, std::forward<Type>(extras)...),
+RK4<T, N, SP, RhsType, JacType>::RK4(MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, nsys, rtol, atol, 0, inf<T>(), stepsize, dir, args, std::forward<Type>(extras)...),
 #ifdef RK4_DENSE
 K(9, nsys)
 #else

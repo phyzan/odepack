@@ -56,7 +56,7 @@ class VariationalSolver : public PolyWrapper<OdeRichSolver<T, N>>{
 
 public:
 
-    VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, const std::string& method = "RK45");
+    VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, const std::string& method = "RK45");
 
     inline const NormalizationEvent<T>& main_event() const;
 
@@ -75,7 +75,7 @@ class VariationalODE : public ODE<T, N>{
 
 public:
 
-    VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> = {}, const std::string& method = "RK45");
+    VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> = {}, const std::string& method = "RK45");
 
     DEFAULT_RULE_OF_FOUR(VariationalODE);
 
@@ -175,13 +175,13 @@ inline bool NormalizationEvent<T, Derived>::is_masked_impl() const{
 
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, const std::string& method) : Base() {
+VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::string& method) : Base() {
     Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
     normalized<T>(tmp.data(), nsys);
     NormalizationEvent<T> event("Normalization", period);
     nsys *= 2;
     const T* q0 = tmp.data();
-    this->_ptr = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args, {&event}).release();
+    this->_ptr = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, {&event}).release();
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
@@ -211,7 +211,7 @@ inline T VariationalSolver<T, N, RhsType, JacType>::delta_s() const{
 
 // VariationalODE implementations
 template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, const std::string& method) : ODE<T, N>(){
+VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, const std::string& method) : ODE<T, N>(){
     for (size_t i=0; i<events.size(); i++){
         if (dynamic_cast<const NormalizationEvent<T>*>(events[i])){
             throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");

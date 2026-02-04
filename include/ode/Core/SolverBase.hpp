@@ -21,15 +21,15 @@
 #include "VirtualBase.hpp"
 #include "../SolverState.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T first_step=0, int dir=1, const std::vector<T>& args={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}
 
-#define MAIN_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define MAIN_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
-#define SOLVER_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T first_step, int dir, const std::vector<T>& args
+#define SOLVER_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
 #define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, const std::string& method="RK45"
 
-#define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, first_step, dir, args
+#define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args
 
 namespace ode{
 /**
@@ -1220,8 +1220,8 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
     }
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
-    if (first_step < 0){
-        throw std::runtime_error("The first_step argument cannot be negative");
+    if (stepsize < 0){
+        throw std::runtime_error("The stepsize argument cannot be negative");
     }
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
@@ -1229,7 +1229,7 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
     if (q0 == nullptr){
         this->kill("Initial conditions not set (nullptr provided)");
     }else if (this->validate_ics_impl(t0, q0)){
-        T habs = (first_step == 0 ? this->auto_step(t0, q0) : abs(first_step));
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs(stepsize));
 
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;

@@ -34,7 +34,7 @@ void oscillator_test(){
     Scalar atol = 1e-9;
     Scalar min_step = 0;
     Scalar max_step = 1;
-    Scalar first_step = 0;
+    Scalar stepsize = 0;
     constexpr size_t nsys = 2;
     int dir = 1;
     auto solver = getSolver<Solver, Scalar, nsys, SP>(
@@ -46,7 +46,7 @@ void oscillator_test(){
         atol,
         min_step,
         max_step,
-        first_step,
+        stepsize,
         dir,
         {},
         {&event}
@@ -83,7 +83,7 @@ void lambda_test(){
     Scalar atol = 1e-9;
     Scalar min_step = 0;
     Scalar max_step = 1;
-    Scalar first_step = 0;
+    Scalar stepsize = 0;
     constexpr size_t nsys = 2;
     int dir = 1;
 
@@ -103,7 +103,7 @@ void lambda_test(){
         atol,
         min_step,
         max_step,
-        first_step,
+        stepsize,
         dir,
         {},
         {&event}
