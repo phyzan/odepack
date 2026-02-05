@@ -51,13 +51,18 @@ namespace ndspan{
 
 
 template<std::size_t I, typename FirstType, typename... ArgType>
-INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
+INLINE constexpr decltype(auto) helper_pack_elem(FirstType&& x0, ArgType&&... x) {
     if constexpr (I == 0) {
         return std::forward<FirstType>(x0);
     } else {
         static_assert(sizeof...(x) > 0, "Index out of bounds");
-        return pack_elem<I - 1>(std::forward<ArgType>(x)...);
+        return helper_pack_elem<I - 1>(std::forward<ArgType>(x)...);
     }
+}
+
+template<std::size_t I, typename... Args>
+INLINE constexpr decltype(auto) pack_elem(Args&&... args) {
+    return helper_pack_elem<I>(std::forward<Args>(args)...);
 }
 
 #define BOUNDS_ASSERT(i, n) assert((i>=0 && size_t(i)<size_t(n)) && "Index out of bounds")

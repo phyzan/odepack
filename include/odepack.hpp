@@ -4,7 +4,7 @@
 #include "ode/SolverDispatcher.hpp"
 #include "ode/OdeInt.hpp"
 #include "ode/Chaos/VariationalSolvers.hpp"
-#include "ode/Interpolation/GridInterp.hpp"
+#include "ode/Interpolation/SampledVectorfields.hpp"
 
 /**
  * @file odepack.h

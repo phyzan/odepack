@@ -7,8 +7,7 @@
  *
  * This file defines the event detection infrastructure used during ODE solving.
  * Events can trigger at specific times, periodic intervals, or when a user-defined
- * function crosses zero. Events support masking (state transformation at trigger),
- * and can optionally stop or terminate the solver.
+ * function crosses zero. Events also support masking (state transformation at trigger).
  *
  * Class hierarchy:
  * - Event<T>: Abstract interface for all events

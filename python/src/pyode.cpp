@@ -298,13 +298,19 @@ void PySolver::reset() {
     )
 }
 
-bool PySolver::set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt) {
+bool PySolver::set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt, int direction) {
+    if (direction != 1 && direction != -1 && direction != 0){
+        throw py::value_error("Direction must be either +1 or -1 or 0 (default)");
+    }
     return DISPATCH(bool,
+        if (dt.cast<T>() < 0){
+            throw py::value_error("Stepsize cannot be negative");
+        }
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
         if (size_t(q0.size()) != cast<T>()->Nsys()){
             throw py::value_error("Invalid size of initial condition array");
         }
-        return cast<T>()->set_ics(t0.cast<T>(), q0.data(), dt.cast<T>());
+        return cast<T>()->set_ics(t0.cast<T>(), q0.data(), dt.cast<T>(), direction);
     )
 }
 
@@ -639,6 +645,39 @@ PyODE::~PyODE(){
     DISPATCH(void, delete cast<T>();)
 }
 
+py::object PyODE::call_Rhs(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (size_t(q.size()) != cast<T>()->Nsys()){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        const ODE<T>* ode_ptr = this->cast<T>();
+        Array1D<T> qdot(ode_ptr->Nsys());
+        ode_ptr->Rhs(qdot.data(), py::cast<T>(t), q.data());
+        return py::cast(qdot);
+    )
+}
+
+py::object PyODE::call_Jac(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (size_t(q.size()) != cast<T>()->Nsys()){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        const ODE<T>* ode_ptr = this->cast<T>();
+        Array2D<T, 0, 0, ndspan::Allocation::Heap, ndspan::Layout::F> jac(ode_ptr->Nsys(), ode_ptr->Nsys());
+        ode_ptr->Jac(jac.data(), py::cast<T>(t), q.data(), nullptr);
+        for (size_t i=0; i<ode_ptr->Nsys(); i++){
+            for (size_t j=i+1; j<ode_ptr->Nsys(); j++){
+                T tmp = jac(i, j);
+                jac(i, j) = jac(j, i);
+                jac(j, i) = tmp;
+            }
+        }
+        return py::cast(View<T, ndspan::Layout::C, 0, 0>(jac.data(), ode_ptr->Nsys(), ode_ptr->Nsys()));
+    )
+}
+
 py::object PyODE::py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
@@ -809,85 +848,6 @@ py::object PyVarODE::py_kicks() const{
 
 py::object PyVarODE::copy() const{
     return py::cast(PyVarODE(*this));
-}
-
-
-//===========================================================================================
-//                                  PyVecField2D
-//===========================================================================================
-
-PyVecField2D::PyVecField2D(const py::array_t<double>& x_grid, const py::array_t<double>& y_grid, const py::array_t<double>& vx_data, const py::array_t<double>& vy_data) : Base(x_grid.data(), y_grid.data(), vx_data.data(), vy_data.data(), x_grid.size(), y_grid.size()) {
-    if (x_grid.ndim() != 1 || y_grid.ndim() != 1){
-        throw py::value_error("x_grid and y_grid must be 1D arrays");
-    }
-    if (vx_data.ndim() != 2 || vy_data.ndim() != 2){
-        throw py::value_error("vx_data and vy_data must be 2D arrays");
-    }
-    if (vx_data.shape(0) != x_grid.size() || vx_data.shape(1) != y_grid.size()){
-        throw py::value_error("vx_data shape does not match grid sizes");
-    }
-    if (vy_data.shape(0) != x_grid.size() || vy_data.shape(1) != y_grid.size()){
-        throw py::value_error("vy_data shape does not match grid sizes");
-    }
-}
-
-py::object PyVecField2D::get_x_grid() const{
-    return py::cast(this->x());
-}
-
-py::object PyVecField2D::get_y_grid() const{
-    return py::cast(this->y());
-}
-
-py::object PyVecField2D::get_vx_data() const{
-    return py::cast(this->u_field());
-}
-
-py::object PyVecField2D::get_vy_data() const{
-    return py::cast(this->v_field());
-}
-
-py::object PyVecField2D::py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const {
-    StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
-    try{
-        double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
-        auto* result = new OdeResult<double>(this->streamline(x0, y0, length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>()));
-        PyOdeResult py_res(result, {2}, DTYPE_MAP.at("double"));
-        return py::cast(py_res);
-    } catch (const std::runtime_error& e){
-        throw py::value_error(e.what());
-    }
-}
-
-py::object PyVecField2D::py_streamline_ode(double x0, double y0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
-    if (direction != 1 && direction != -1){
-        throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
-    }
-    std::array<double, 2> q0 = {x0, y0};
-    if (normalized){
-        return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
-    }else{
-        return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), 2, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
-    }
-}
-
-py::object PyVecField2D::py_streamplot_data(double max_length, double ds, int density) const {
-    if (density <= 0){
-        throw py::value_error("Density must be a positive integer");
-    }
-    if (max_length <= 0){
-        throw py::value_error("Max length must be a positive number");
-    }
-    if (ds <= 0){
-        throw py::value_error("ds must be a positive number");
-    }
-
-    std::vector<Array2D<double, 2, 0>> streamlines = this->streamplot_data(max_length, ds, size_t(density));
-    py::list result;
-    for (const Array2D<double, 2, 0>& line : streamlines){
-        result.append(py::cast(line));
-    }
-    return result;
 }
 
 //===========================================================================================
@@ -1099,7 +1059,7 @@ PYBIND11_MODULE(odesolvers, m) {
         .def("advance_to_event", &PySolver::advance_to_event)
         .def("advance_until", &PySolver::advance_until, py::arg("t"))
         .def("reset", &PySolver::reset)
-        .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("dt")=0)
+        .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("stepsize")=0, py::arg("direction")=0)
         .def("resume", &PySolver::resume)
         .def("copy", &PySolver::copy)
         .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
@@ -1249,6 +1209,8 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("method")="RK45",
             py::arg("scalar_type")="double")
         .def(py::init<PyODE>(), py::arg("ode"))
+        .def("rhs", &PyODE::call_Rhs, py::arg("t"), py::arg("q"))
+        .def("jac", &PyODE::call_Jac, py::arg("t"), py::arg("q"))
         .def("solver", &PyODE::solver_copy, py::keep_alive<0, 1>())
         .def("integrate", &PyODE::py_integrate,
             py::arg("interval"),
@@ -1304,19 +1266,9 @@ PYBIND11_MODULE(odesolvers, m) {
         .def_property_readonly("kicks", &PyVarODE::py_kicks)
         .def("copy", &PyVarODE::copy);
 
-    py::class_<PyVecField2D>(m, "SampledVectorField2D")
-        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
-            py::arg("x"),
-            py::arg("y"),
-            py::arg("vx"),
-            py::arg("vy"))
-        .def_property_readonly("x", &PyVecField2D::get_x_grid)
-        .def_property_readonly("y", &PyVecField2D::get_y_grid)
-        .def_property_readonly("vx", &PyVecField2D::get_vx_data)
-        .def_property_readonly("vy", &PyVecField2D::get_vy_data)
-        .def("streamline", &PyVecField2D::py_streamline,
-            py::arg("x0"),
-            py::arg("y0"),
+    py::class_<PyVecFieldBase>(m, "SampledVectorField")
+        .def("streamline", &PyVecFieldBase::py_streamline,
+            py::arg("q0"),
             py::arg("length"),
             py::arg("rtol")=1e-12,
             py::arg("atol")=1e-12,
@@ -1327,9 +1279,8 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("t_eval")=py::none(),
             py::arg("method")="RK45"
         )
-        .def("get_ode", &PyVecField2D::py_streamline_ode,
-            py::arg("x0"),
-            py::arg("y0"),
+        .def("get_ode", &PyVecFieldBase::py_streamline_ode,
+            py::arg("q0"),
             py::arg("rtol")=1e-12,
             py::arg("atol")=1e-12,
             py::arg("min_step")=0.,
@@ -1339,11 +1290,45 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("method")="RK45",
             py::arg("normalized")=false, py::keep_alive<0, 1>()
         )
-        .def("streamplot_data", &PyVecField2D::py_streamplot_data,
+        .def("streamplot_data", &PyVecFieldBase::py_streamplot_data,
             py::arg("max_length"),
             py::arg("ds"),
             py::arg("density")=30
         );
+
+    py::class_<PyVecField2D, PyVecFieldBase>(m, "SampledVectorField2D")
+        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
+            py::arg("x"),
+            py::arg("y"),
+            py::arg("vx"),
+            py::arg("vy"))
+        .def_property_readonly("x", &PyVecField2D::py_x<0>)
+        .def_property_readonly("y", &PyVecField2D::py_x<1>)
+        .def_property_readonly("vx", &PyVecField2D::py_vx<0>)
+        .def_property_readonly("vy", &PyVecField2D::py_vx<1>)
+        .def("get_vx", &PyVecField2D::py_vx_at<0, double, double>, py::arg("x"), py::arg("y"))
+        .def("get_vy", &PyVecField2D::py_vx_at<1, double, double>, py::arg("x"), py::arg("y"))
+        .def("__call__", &PyVecField2D::py_vector<double, double>, py::arg("x"), py::arg("y"))
+        .def("in_bounds", &PyVecField2D::py_in_bounds<double, double>, py::arg("x"), py::arg("y"));
+
+    py::class_<PyVecField3D, PyVecFieldBase>(m, "SampledVectorField3D")
+        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
+            py::arg("x"),
+            py::arg("y"),
+            py::arg("z"),
+            py::arg("vx"),
+            py::arg("vy"),
+            py::arg("vz"))
+        .def_property_readonly("x", &PyVecField3D::py_x<0>)
+        .def_property_readonly("y", &PyVecField3D::py_x<1>)
+        .def_property_readonly("z", &PyVecField3D::py_x<2>)
+        .def_property_readonly("vx", &PyVecField3D::py_vx<0>)
+        .def_property_readonly("vy", &PyVecField3D::py_vx<1>)
+        .def_property_readonly("vz", &PyVecField3D::py_vx<2>)
+        .def("get_vx", &PyVecField3D::py_vx_at<0, double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
+        .def("get_vy", &PyVecField3D::py_vx_at<1, double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
+        .def("__call__", &PyVecField3D::py_vector<double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
+        .def("in_bounds", &PyVecField3D::py_in_bounds<double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"));
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 
@@ -1358,12 +1343,12 @@ PYBIND11_MODULE(odesolvers, m) {
 #else
     m.def("set_mpreal_prec",
       [](size_t){
-        throw py::value_error("Current installtion does not support mpreal for arbitrary precision");
+        throw py::value_error("Current installation does not support mpreal for arbitrary precision");
       },
       py::arg("bits"),
       "Set the default MPFR precision (in bits) for mpfr::mpreal.")
     .def("mpreal_prec", []() {
-        throw py::value_error("Current installtion does not support mpreal for arbitrary precision");
+        throw py::value_error("Current installation does not support mpreal for arbitrary precision");
       });
 #endif
 }

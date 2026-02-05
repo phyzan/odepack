@@ -96,7 +96,7 @@ public:
      * @param[in]  dt Optional step sizes for finite difference (size Nsys). If nullptr,
      *                step sizes are computed automatically.
      */
-    inline void                 jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+    inline void                 Jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
     /**
      * @brief Approximate the Jacobian using central finite differences.
@@ -395,6 +395,9 @@ protected:
     /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
     inline void                 rhs(T* dq_dt, const T& t, const T* q) const;
 
+    /// @brief Same as this->Jac, but increments the Jacobian evaluation counter.
+    inline void                 jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+
     /// @brief Get pointer to the initial conditions state data.
     inline const T*             ics_ptr() const;
 
@@ -494,6 +497,7 @@ private:
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;
     mutable size_t                                      _n_evals_rhs = 0;
+    mutable size_t                                      _n_evals_jac = 0;
     std::string                                         _message = "Running";
     std::string                                         _name = name;
     int                                                 _direction = 1;
@@ -532,7 +536,7 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Jac(T* jm, const T& t, const T* q, const T* dt) const{
     if constexpr (HAS_JAC) {
         this->jac_exact(jm, t, q);
     } else if constexpr (RUNTIME_JAC_TYPE) {
@@ -546,6 +550,12 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T&
     else {
         this->jac_approx(jm, t, q, dt);
     }
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
+    this->Jac(jm, t, q, dt);
+    this->_n_evals_jac++;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -1051,6 +1061,7 @@ inline void BaseSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
     _diverges = false;
     _message = "Running";
     _n_evals_rhs = 0;
+    _n_evals_jac = 0;
     _use_new_state = true;
     for (int i=1; i<6; i++){
         copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others

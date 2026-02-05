@@ -171,7 +171,7 @@ struct PySolver : DtypeDispatcher {
 
     void                reset();
 
-    bool                set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt);
+    bool                set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt, int direction);
 
     bool                resume();
 
@@ -368,6 +368,10 @@ public:
     template<typename T>
     inline const ODE<T>* cast() const;
 
+    py::object call_Rhs(const py::object& t, const py::iterable& py_q) const;
+
+    py::object call_Jac(const py::object& t, const py::iterable& py_q) const;
+
     py::object py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints);
 
     py::object py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints);
@@ -429,33 +433,215 @@ public:
 };
 
 
-class PyVecField2D : public SampledVectorField2D<double> {
+template<size_t NDIM>
+class PyVecField : public SampledVectorField<double, NDIM> {
 
-    using Base = SampledVectorField2D<double>;
+    using Base = SampledVectorField<double, NDIM>;
+
+private:
+
+    template<size_t... I, typename... PyArray>
+    PyVecField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args) : Base(pack_elem<I>(args...)..., pack_elem<I+NDIM>(args...).data()...) {}
 
 public:
-    PyVecField2D(const py::array_t<double>& x_grid, const py::array_t<double>& y_grid, const py::array_t<double>& vx_data, const py::array_t<double>& vy_data);
 
-    DEFAULT_RULE_OF_FOUR(PyVecField2D)
+    template<typename... PyArray>
+    PyVecField(const PyArray&... args) : PyVecField(parse_args(args...), std::make_index_sequence<NDIM>(), args...) {}
 
-    bool in_bounds(double x, double y) const;
+    template<size_t Axis>
+    inline py::object py_x() const{
+        return py::cast(this->x(Axis));
+    }
 
-    py::object get_x_grid() const;
+    template<size_t FieldIdx>
+    inline py::object py_vx() const{
+        return py::cast(this->field(FieldIdx));
+    }
 
-    py::object get_y_grid() const;
+    template<size_t FieldIdx, typename... Scalar>
+    inline py::object py_vx_at(Scalar... x) const{
+        static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
+        this->check_coords(x...);
+        std::array<double, NDIM> coords = {double(x)...};
+        return py::cast(this->template get_single<FieldIdx>(coords.data()));
+    }
 
-    py::object get_vx_data() const;
+    template<typename... Scalar>
+    inline py::object py_vector(Scalar... x) const{
+        static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
+        this->check_coords(x...);
+        Array1D<double, NDIM> res;
+        this->fill(res.data(), x...);
+        return py::cast(res);
+    }
 
-    py::object get_vy_data() const;
+    template<typename... Scalar>
+    inline bool py_in_bounds(Scalar... x) const{
+        return this->coords_in_bounds(x...);
+    }
 
-    py::object py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const;
+    // ==========================================
 
-    py::object py_streamline_ode(double x0, double y0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const;
+    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const{
 
-    py::object py_streamplot_data(double max_length, double ds, int density) const;
+        if (q0.ndim() != 1 || q0.shape(0) != NDIM){
+            throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+        }
+
+        EXPAND(size_t, NDIM, I,
+            check_coords(q0.at(I)...);
+        );
+    
+        StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
+        try{
+            double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
+            auto* result = new OdeResult<double>(this->streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>()));
+            PyOdeResult py_res(result, {NDIM}, DTYPE_MAP.at("double"));
+            return py::cast(py_res);
+        } catch (const std::runtime_error& e){
+            throw py::value_error(e.what());
+        }
+    }
+
+    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
+        if (direction != 1 && direction != -1){
+            throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
+        }else if (q0.ndim() != 1 || q0.shape(0) != NDIM){
+            throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+        }
+
+        EXPAND(size_t, NDIM, I,
+            check_coords(q0.at(I)...);
+        );
+
+        if (normalized){
+            return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+        }else{
+            return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+        }
+    }
+
+    py::object py_streamplot_data(double max_length, double ds, int density) const{
+        if (density <= 1){
+            throw py::value_error("Density must be greater than 1");
+        }
+        if (max_length <= 0){
+            throw py::value_error("Max length must be a positive number");
+        }
+        if (ds <= 0){
+            throw py::value_error("ds must be a positive number");
+        }
+
+        std::vector<Array2D<double, NDIM, 0>> streamlines = this->streamplot_data(max_length, ds, size_t(density));
+        py::list result;
+        for (const Array2D<double, NDIM, 0>& line : streamlines){
+            result.append(py::cast(line));
+        }
+        return result;
+    }
+
+private:
+
+    template<typename... Scalar>
+    inline void check_coords(Scalar... x) const{
+        static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
+        if (!this->coords_in_bounds(x...)){
+            py::array_t<double> py_coords = py::cast(Array1D<double, NDIM>{double(x)...});
+            throw py::value_error("Coordinates " + py::repr(py_coords).cast<std::string>() + " are out of bounds");
+        }
+    }
+
+    template<typename... PyArray>
+    static std::nullptr_t parse_args(const PyArray&... args){
+        EXPAND(size_t, NDIM, I,
+            if (((pack_elem<I>(args...).ndim() != 1) || ...)){
+                throw py::value_error("All grid dimensions must be 1D arrays");
+            }else if (((pack_elem<I+NDIM>(args...).ndim() != NDIM) || ...)){
+                throw py::value_error("All vector component arrays must be " + std::to_string(NDIM) + "D");
+            }else if (((!is_sorted(pack_elem<I>(args...))) || ...)){
+                throw py::value_error("All grid dimensions must be 1D arrays");
+            }
+            FOR_LOOP(size_t, J, NDIM,
+                const py::array_t<double>& field = pack_elem<J+NDIM>(args...);
+                if (((field.shape(I) != pack_elem<I>(args...).size()) || ...)){
+                    throw py::value_error("Grid size does not match vector component array size");
+                }
+            );
+        );
+        return nullptr;
+    }
+
+    static bool is_sorted(const py::array_t<double>& arr){
+        const double* ptr = arr.data();
+        for (ssize_t i = 1; i < arr.size(); ++i){
+            if (ptr[i] <= ptr[i-1]){
+                return false;
+            }
+        }
+        return true;
+    }
 
 };
 
+
+class PyVecFieldBase {
+
+public:
+
+    virtual ~PyVecFieldBase() = default;
+
+    virtual py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const = 0;
+
+    virtual py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const = 0;
+
+    virtual py::object py_streamplot_data(double max_length, double ds, int density) const = 0;
+
+};
+
+
+class PyVecField2D : public PyVecFieldBase, public PyVecField<2> {
+    
+    using Base = PyVecField<2>;
+
+public:
+
+    PyVecField2D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& vx, const py::array_t<double>& vy) : Base(x, y, vx, vy) {}
+
+    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const override{
+        return Base::py_streamline(q0, length, rtol, atol, min_step, max_step, stepsize, direction, t_eval, method);
+    }
+
+    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const override{
+        return Base::py_streamline_ode(q0, rtol, atol, min_step, max_step, stepsize, direction, method, normalized);
+    }
+
+    py::object py_streamplot_data(double max_length, double ds, int density) const override{
+        return Base::py_streamplot_data(max_length, ds, density);
+    }
+
+};
+
+class PyVecField3D : public PyVecFieldBase, public PyVecField<3> {
+    
+    using Base = PyVecField<3>;
+
+public:
+
+    PyVecField3D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& z, const py::array_t<double>& vx, const py::array_t<double>& vy, const py::array_t<double>& vz) : Base(x, y, z, vx, vy, vz) {}
+
+    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const override{
+        return Base::py_streamline(q0, length, rtol, atol, min_step, max_step, stepsize, direction, t_eval, method);
+    }
+
+    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const override{
+        return Base::py_streamline_ode(q0, rtol, atol, min_step, max_step, stepsize, direction, method, normalized);
+    }
+
+    py::object py_streamplot_data(double max_length, double ds, int density) const override{
+        return Base::py_streamplot_data(max_length, ds, density);
+    }
+    
+};
 
 void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress);
 

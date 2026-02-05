@@ -95,6 +95,10 @@ public:
 
     virtual ~ODE();
 
+    void                                        Rhs(T* out, const T& t, const T* q) const;
+
+    void                                        Jac(T* out, const T& t, const T* q, const T* dt = nullptr) const;        
+
     virtual ODE<T, N>*                          clone() const;
 
     std::unique_ptr<ODE<T, N>>                  safe_clone() const;
@@ -313,6 +317,16 @@ ODE<T, N>& ODE<T, N>::operator=(ODE<T, N>&& other) noexcept{
 template<typename T, size_t N>
 ODE<T, N>::~ODE(){
     delete _solver;
+}
+
+template<typename T, size_t N>
+void ODE<T, N>::Rhs(T* out, const T& t, const T* q) const{
+    _solver->Rhs(out, t, q);
+}
+
+template<typename T, size_t N>
+void ODE<T, N>::Jac(T* out, const T& t, const T* q, const T* dt) const{
+    _solver->Jac(out, t, q, dt);
 }
 
 template<typename T, size_t N>

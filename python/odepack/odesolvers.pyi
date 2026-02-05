@@ -530,7 +530,7 @@ class OdeSolver:
             If False, call message to see the reason.
         """
 
-    def set_ics(self, t0: float, q0: np.ndarray, dt: float = 0.)->bool:
+    def set_ics(self, t0: float, q0: np.ndarray, stepsize: float = 0., direction: int = 0)->bool:
         """
         Set new initial conditions for the solver.
 
@@ -545,8 +545,12 @@ class OdeSolver:
         q0 : np.ndarray
             New initial state vector.
 
-        dt : float, optional
+        stepsize : float, optional
             Initial step size estimate. If 0 (default), automatically determined.
+
+        direction : int, optional
+            Integration direction. 1 for forward, -1 for backward, 0 for unchanged.
+            Default is 0 (keep current direction).
 
         Returns
         -------
@@ -603,11 +607,8 @@ class RK23(OdeSolver):
     q0 : np.ndarray
         Initial state vector.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
         Error estimate: atol + rtol * |q|
 
     min_step : float, optional
@@ -671,11 +672,8 @@ class RK45(OdeSolver):
     q0 : np.ndarray
         Initial state vector.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
         Error estimate: atol + rtol * |q|
 
     min_step : float, optional
@@ -738,11 +736,9 @@ class DOP853(OdeSolver):
     q0 : np.ndarray
         Initial state vector.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
+        Error estimate: atol + rtol * |q|
 
     min_step : float, optional
         Minimum allowed step size. Default is 0 (no minimum).
@@ -811,11 +807,9 @@ class BDF(OdeSolver):
         If None, central finite differences will be used to approximate the Jacobian,
             using adaptive step sizes.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
+        Error estimate: atol + rtol * |q|
 
     min_step : float, optional
         Minimum allowed step size. Default is 0 (no minimum).
@@ -957,11 +951,10 @@ class VariationalSolver(OdeSolver):
         renormalized to unit length every 'period' time units. The growth rate at each
         renormalization contributes to the Lyapunov exponent calculation.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
+        Error estimate: atol + rtol * |q|. Used only when the method is adaptive (e.g., RK45, BDF). Ignored for fixed-step RK4,
+            except for estimating the initial step size if stepsize=0.
 
     min_step : float, optional
         Minimum allowed step size. Default is 0 (no minimum).
@@ -1136,11 +1129,8 @@ class LowLevelODE:
         Jacobian matrix function: jac(t, q, *args) -> matrix.
         Required for BDF method. Matrix elements should be jac[i, j] = df_i/dq_j.
 
-    rtol : float, optional
-        Relative tolerance for adaptive step control. Default is 1e-12.
-
-    atol : float, optional
-        Absolute tolerance for adaptive step control. Default is 1e-12.
+    rtol, atol : float, optional
+        Relative and absolute tolerance for adaptive step control.
         Error estimate: atol + rtol * |q|
 
     min_step : float, optional
@@ -1192,6 +1182,47 @@ class LowLevelODE:
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
+        ...
+
+    def rhs(self, t: float, q: np.ndarray)->np.ndarray:
+        """
+        Evaluate the right-hand side function f(t, q) at a given time and state, using the extra args
+            provided at initialization.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the RHS.
+
+        q : np.ndarray
+            State vector at which to evaluate the RHS.
+
+        Returns
+        -------
+        np.ndarray
+            The result of f(t, q), an array of the same shape as q.
+        """
+        ...
+
+    def jac(self, t: float, q: np.ndarray)->np.ndarray:
+        """
+        Evaluate the Jacobian matrix at a given time and state, using the extra args
+            provided at initialization.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the Jacobian.
+
+        q : np.ndarray
+            State vector at which to evaluate the Jacobian.
+
+        Returns
+        -------
+        np.ndarray
+            The Jacobian matrix evaluated at (t, q). Shape should be (len(q), len(q)).
+            If no Jacobian was provided at initialization, finite difference approximation is used.
+        """
         ...
 
     def solver(self)->OdeSolver:
@@ -1503,7 +1534,8 @@ class VariationalLowLevelODE(LowLevelODE):
         based on the primary state portion.
 
     rtol, atol : float, optional
-        Relative and absolute tolerances. Default is 1e-12.
+        Relative and absolute tolerance for adaptive step control.
+        Error estimate: atol + rtol * |q|. Used for adaptive methods. Ignored for fixed-step RK4 except for initial step size estimation.
 
     min_step, max_step, stepsize : float, optional
         Step size control. See LowLevelODE.
@@ -1908,6 +1940,82 @@ class LowLevelFunction:
         ...
 
 
+class SampleVectorField:
+
+
+    def streamline(self, q0: np.ndarray, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
+        '''
+        Compute a streamline starting from (x0, y0).
+
+        Parameters
+        ----------
+        q0 : np.ndarray
+            Initial coordinates
+        length : float
+            Length of the streamline to compute.
+        rtol, atol : float, optional
+            Relative and absolute tolerances for the ODE solver.
+        min_step, max_step, stepsize : float, optional
+            Step size control parameters.
+        direction : {-1, 1}, optional
+            Direction of integration. 1 for forward, -1 for backward.
+        t_eval : array-like, optional
+            Times at which to store solution values.
+        method : str, optional
+            Integration method. Default is "RK45".
+
+
+        Returns
+        -------
+        OdeResult
+            Result containing the computed streamline points.
+        '''
+        ...
+
+    def get_ode(self, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
+        '''
+        Create a LowLevelODE object for streamlining from (x0, y0).
+
+        Parameters
+        ----------
+        q0 : np.ndarray
+            Initial coordinates.
+        rtol, atol : float, optional
+            Relative and absolute tolerances for the ODE solver.
+        min_step, max_step, stepsize : float, optional
+            Step size control parameters.
+        direction : {-1, 1}, optional
+            Direction of integration. 1 for forward, -1 for backward.
+        method : str, optional
+            Integration method. Default is "RK45".
+        normalized : bool, optional
+            If True, the vector field is normalized to unit length at each point, using the magnitude = sqrt(vx**2 + vy**2 + ...).
+                Then, the integration parameter corresponds to arc length along the streamline.
+        '''
+        ...
+
+    def streamplot_data(self, max_length: float, ds: float, density: int = 30)->list[np.ndarray]:
+        '''
+        Compute streamplot data for visualization.
+
+        Parameters
+        ----------
+        max_length : float
+            Maximum length of streamlines to compute.
+        ds: float
+            Step size for the RK4 integrator.
+        density : int, optional
+            Density of streamlines. The number of streamlines per axis will be approximately equal to the density. Default is 30.
+        
+        Returns
+        -------
+        list of np.ndarray
+            List of arrays containing streamline points for visualization.
+            x_line, y_line = result[i]
+        '''
+        ...
+
+
 class SampledVectorField2D:
 
     '''
@@ -1964,79 +2072,134 @@ class SampledVectorField2D:
         '''
         ...
 
-    def streamline(self, x0: float, y0: float, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
+    def __call__(self, x: float, y: float)->np.ndarray:
         '''
-        Compute a streamline starting from (x0, y0).
-
-        Parameters
-        ----------
-        x0 : float
-            Initial x-coordinate.
-        y0 : float
-            Initial y-coordinate.
-        length : float
-            Length of the streamline to compute.
-        rtol, atol : float, optional
-            Relative and absolute tolerances for the ODE solver.
-        min_step, max_step, stepsize : float, optional
-            Step size control parameters.
-        direction : {-1, 1}, optional
-            Direction of integration. 1 for forward, -1 for backward.
-        t_eval : array-like, optional
-            Times at which to store solution values.
-        method : str, optional
-            Integration method. Default is "RK45".
-
-
-        Returns
-        -------
-        OdeResult
-            Result containing the computed streamline points.
+        Get the vector field components (vx, vy) at a specific point (x, y) using interpolation.
+        This is equivalent to np.array([self.get_vx(x, y), self.get_vy(x, y)])
         '''
         ...
 
-    def get_ode(self, x0: float, y0: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
+    def get_vx(self, x: float, y: float)->float:
         '''
-        Create a LowLevelODE object for streamlining from (x0, y0).
-
-        Parameters
-        ----------
-        x0 : float
-            Initial x-coordinate.
-        y0 : float
-            Initial y-coordinate.
-        rtol, atol : float, optional
-            Relative and absolute tolerances for the ODE solver.
-        min_step, max_step, stepsize : float, optional
-            Step size control parameters.
-        direction : {-1, 1}, optional
-            Direction of integration. 1 for forward, -1 for backward.
-        method : str, optional
-            Integration method. Default is "RK45".
-        normalized : bool, optional
-            If True, the vector field is normalized to unit length at each point, using the magnitude = sqrt(vx**2 + vy**2).
-                Then, the integration parameter corresponds to arc length along the streamline.
+        Get the x-component of the vector field at a specific point (x, y) using interpolation.
         '''
         ...
 
-    def streamplot_data(self, max_length: float, ds: float, density: int = 30)->list[np.ndarray]:
+    def get_vy(self, x: float, y: float)->float:
         '''
-        Compute streamplot data for visualization.
+        Get the y-component of the vector field at a specific point (x, y) using interpolation.
+        '''
+        ...
 
+    def in_bounds(self, x: float, y: float)->bool:
+        '''
+        Check if the point (x, y) is within the bounds of the grid.
+        '''
+        ...
+
+
+class SampledVectorField3D:
+
+    '''
+    Class representing a 3D vector field
+    '''
+
+    def __init__(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, vx: np.ndarray, vy: np.ndarray, vz: np.ndarray):
+        '''
+        Initialize a 3D vector field.
         Parameters
         ----------
-        max_length : float
-            Maximum length of streamlines to compute.
-        ds: float
-            Step size for the RK4 integrator.
-        density : int, optional
-            Density of streamlines. The number of streamlines per axis will be approximately equal to the density. Default is 30.
-        
-        Returns
-        -------
-        list of np.ndarray
-            List of arrays containing streamline points for visualization.
-            x_line, y_line = result[i]
+        x : np.ndarray
+            X-coordinates of the grid points.
+        y : np.ndarray
+            Y-coordinates of the grid points.
+        z : np.ndarray
+            Z-coordinates of the grid points.
+        vx : np.ndarray
+            X-components of the vector field at the grid points.
+        vy : np.ndarray
+            Y-components of the vector field at the grid points.
+        vz : np.ndarray
+            Z-components of the vector field at the grid points.
+
+        Notes
+        -----
+        The shape of vx, vy, and vz must be (len(x), len(y), len(z))
+        and vx[i, j, k], vy[i, j, k], vz[i, j, k] correspond to the vector at (x[i], y[j], z[k]).
+
+        '''
+        ...
+
+    @property
+    def x(self)->np.ndarray:
+        '''
+        X-coordinates of the grid points.
+        '''
+        ...
+
+    @property
+    def y(self)->np.ndarray:
+        '''
+        Y-coordinates of the grid points.
+        '''
+        ...
+
+    @property
+    def z(self)->np.ndarray:
+        '''
+        Z-coordinates of the grid points.
+        '''
+        ...
+
+    @property
+    def vx(self)->np.ndarray:
+        '''
+        X-components of the vector field at the grid points.
+        '''
+        ...
+
+    @property
+    def vy(self)->np.ndarray:
+        '''
+        Y-components of the vector field at the grid points.
+        '''
+        ...
+
+    @property
+    def vz(self)->np.ndarray:
+        '''
+        Z-components of the vector field at the grid points.
+        '''
+        ...
+
+    def __call__(self, x: float, y: float, z: float)->np.ndarray:
+        '''
+        Get the vector field components (vx, vy, vz) at a specific point (x, y, z) using interpolation.
+        This is equivalent to np.array([self.get_vx(x, y, z), self.get_vy(x, y, z), self.get_vz(x, y, z)])
+        '''
+        ...
+
+    def get_vx(self, x: float, y: float, z: float)->float:
+        '''
+        Get the x-component of the vector field at a specific point (x, y, z) using interpolation.
+        '''
+        ...
+
+    def get_vy(self, x: float, y: float, z: float)->float:
+        '''
+        Get the y-component of the vector field at a specific point (x, y, z) using interpolation.
+        '''
+        ...
+
+    def get_vz(self, x: float, y: float, z: float)->float:
+        '''
+        Get the z-component of the vector field at a specific point (x, y, z) using interpolation.
+        '''
+        ...
+
+    def in_bounds(self, x: float, y: float, z: float)->bool:
+        '''
+        Check if the point (x, y, z) is within the bounds of the grid.
         '''
         ...
         
