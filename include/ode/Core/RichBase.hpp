@@ -457,7 +457,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::stop_interpolation(){
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void RichSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
     Base::reset_impl();
-    _events.reset();
+    _events.reset(this->direction());
     stop_interpolation();
 }
 

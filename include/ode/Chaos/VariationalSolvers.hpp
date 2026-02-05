@@ -36,7 +36,7 @@ protected:
 
     inline void register_impl();
 
-    inline void reset_impl();
+    inline void reset_impl(int direction);
 
     inline void mask_impl(T* out, const T& t, const T* q) const;
 
@@ -151,9 +151,9 @@ void NormalizationEvent<T, Derived>::register_impl(){
 }
 
 template<typename T, typename Derived>
-void NormalizationEvent<T, Derived>::reset_impl(){
+void NormalizationEvent<T, Derived>::reset_impl(int direction){
     //call Base::reset_impl() first
-    Base::reset_impl();
+    Base::reset_impl(direction);
     _logksi = 0;
     _delta_s = 0;
 }

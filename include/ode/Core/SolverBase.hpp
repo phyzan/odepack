@@ -285,10 +285,11 @@ public:
      * @param t0      New initial time.
      * @param y0      New initial state vector (size Nsys).
      * @param stepsize Initial step size (0 = auto-compute).
+     * @param direction Integration direction for the new ICs (+1 forward, -1 backward, 0 default).
      * @return True if ICs were valid and set successfully. Otherwise returns false and stops the solver. Simply call resume() to continue.
      * @throws std::runtime_error If stepsize is negative.
      */
-    bool                        set_ics(T t0, const T* y0, T stepsize = 0);
+    bool                        set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0);
 
     /**
      * @brief Pause the solver (can be resumed later).
@@ -933,14 +934,19 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::apply_ics_setter(T t0, Set
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0, T stepsize){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0, T stepsize, int direction){
 
+    assert((direction == 1 || direction == -1 || direction == 0) && "Direction must be 1, -1, or 0");
+    direction = (direction == 0) ? _direction : direction; // if 0, keep existing direction;
     if (this->validate_ics(t0, y0)){
         if (stepsize < 0) {
             std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
             return false;
         } else if (stepsize == 0) {
+            _direction = direction;
             stepsize = this->auto_step(t0, y0);
+        }else{
+            _direction = direction;
         }
 
         T* ics = const_cast<T*>(this->ics_ptr());

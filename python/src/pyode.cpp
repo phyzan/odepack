@@ -831,6 +831,22 @@ PyVecField2D::PyVecField2D(const py::array_t<double>& x_grid, const py::array_t<
     }
 }
 
+py::object PyVecField2D::get_x_grid() const{
+    return py::cast(this->x());
+}
+
+py::object PyVecField2D::get_y_grid() const{
+    return py::cast(this->y());
+}
+
+py::object PyVecField2D::get_vx_data() const{
+    return py::cast(this->u_field());
+}
+
+py::object PyVecField2D::get_vy_data() const{
+    return py::cast(this->v_field());
+}
+
 py::object PyVecField2D::py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const {
     StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
     try{
@@ -855,6 +871,24 @@ py::object PyVecField2D::py_streamline_ode(double x0, double y0, double rtol, do
     }
 }
 
+py::object PyVecField2D::py_streamplot_data(double max_length, double ds, int density) const {
+    if (density <= 0){
+        throw py::value_error("Density must be a positive integer");
+    }
+    if (max_length <= 0){
+        throw py::value_error("Max length must be a positive number");
+    }
+    if (ds <= 0){
+        throw py::value_error("ds must be a positive number");
+    }
+
+    std::vector<Array2D<double, 2, 0>> streamlines = this->streamplot_data(max_length, ds, size_t(density));
+    py::list result;
+    for (const Array2D<double, 2, 0>& line : streamlines){
+        result.append(py::cast(line));
+    }
+    return result;
+}
 
 //===========================================================================================
 //                                      Additional functions
@@ -1276,6 +1310,10 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("y"),
             py::arg("vx"),
             py::arg("vy"))
+        .def_property_readonly("x", &PyVecField2D::get_x_grid)
+        .def_property_readonly("y", &PyVecField2D::get_y_grid)
+        .def_property_readonly("vx", &PyVecField2D::get_vx_data)
+        .def_property_readonly("vy", &PyVecField2D::get_vy_data)
         .def("streamline", &PyVecField2D::py_streamline,
             py::arg("x0"),
             py::arg("y0"),
@@ -1300,6 +1338,11 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("direction")=1,
             py::arg("method")="RK45",
             py::arg("normalized")=false, py::keep_alive<0, 1>()
+        )
+        .def("streamplot_data", &PyVecField2D::py_streamplot_data,
+            py::arg("max_length"),
+            py::arg("ds"),
+            py::arg("density")=30
         );
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);

@@ -1,7 +1,7 @@
 #ifndef GRID_INTERP_HPP
 #define GRID_INTERP_HPP
 
-
+#include <cmath>
 #include "../OdeInt.hpp"
 
 
@@ -40,6 +40,11 @@ public:
 
     inline constexpr size_t ndim() const{
         return N;
+    }
+
+    inline T length(size_t axis) const{
+        const Array1D<T>& x_grid = x_[axis];
+        return x_grid[x_grid.size()-1] - x_grid[0];
     }
 
     inline const T& x(size_t axis, size_t index) const{
@@ -104,6 +109,15 @@ public:
         return result;
     }
 
+    inline const Array1D<T>& x(size_t axis) const{
+        assert(axis < N && "Axis out of bounds");
+        return x_[axis];
+    }
+
+    inline const ndspan::NdArray<T, N>& field() const{
+        return field_;
+    }
+
     template<typename... Scalar>
     T operator()(const Scalar&... x) const{
         static_assert(sizeof...(x) == N && "Number of arguments must match number of dimensions");
@@ -130,6 +144,30 @@ public:
     
     inline bool in_bounds(const T& x, size_t axis) const{
         return u_interp_.in_bounds(x, axis);
+    }
+
+    inline const Array1D<T>& x() const{
+        return u_interp_.x(0);
+    }
+
+    inline const Array1D<T>& y() const{
+        return u_interp_.x(1);
+    }
+
+    inline const ndspan::NdArray<T, 2>& u_field() const{
+        return u_interp_.field();
+    }
+
+    inline const ndspan::NdArray<T, 2>& v_field() const{
+        return v_interp_.field();
+    }
+
+    inline T Lx() const{
+        return u_interp_.length(0);
+    }
+
+    inline T Ly() const{
+        return u_interp_.length(1);
     }
 
     void get(T* out, const T& x, const T& y) const{
@@ -174,6 +212,151 @@ public:
         ODE<T> ode(OdeData{.rhs=this->ode_func(), .obj=this}, 0, y0_vec.data(), 2, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
 
         return ode.integrate(length, t_eval);
+    }
+
+
+    std::vector<Array2D<T, 2, 0>> streamplot_data(const T max_length, const T ds, size_t density) const{
+
+        assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
+
+        auto ode = this->ode_func_norm();
+
+        using Solver = RK4<T, 2, SolverPolicy::Static, decltype(ode), std::nullptr_t>;
+
+        size_t  Nx = density;
+        size_t  Ny = density;
+        T       Lx = this->Lx();
+        T       Ly = this->Ly();
+        T       Dx = Lx / (Nx - 1);
+        T       Dy = Ly / (Ny - 1);
+        const T* X = this->x().data();
+        const T* Y = this->y().data();
+
+        size_t max_pts = size_t(max_length / ds) + 1; //per integration direction
+
+        Array2D<bool> is_full(Nx, Ny);
+        std::vector<int> altered_x;
+        std::vector<int> altered_y;
+        is_full.set(false);
+
+        T min_length = 0.2 * std::min(Lx, Ly);        
+
+        auto GetIdx = [&](size_t& i, size_t& j, const T& x, const T& y) LAMBDA_INLINE{
+            i = size_t(std::round((x - X[0]) / Dx));
+            j = size_t(std::round((y - Y[0]) / Dy));
+        };
+
+        auto in_bounds = [&](int i, int j) LAMBDA_INLINE{
+            return (i >= 0 && i < int(Nx) && j >= 0 && j < int(Ny));
+        };
+
+        auto IntegrateDirection = [&](Solver& solver, T& s_total, T* x, T* y, size_t& n_steps_tot, const int dir){
+            // x and y are preallocated arrays of size max_pts + 1. x[0] = x0, y[0] = y0, so at each step, we write to x[step], y[step], starting from x[1], y[1]
+            const T& x0 = x[0];
+            const T& y0 = y[0];
+            assert(this->in_bounds(x0, 0) && this->in_bounds(y0, 1) && "Initial point out of bounds");
+            assert(dir == 1 || dir == -1 && "Direction must be either +1 or -1");
+            size_t n_steps = 0;
+            std::array<T, 2> ics = {x0, y0};
+            solver.set_ics(0, ics.data(), ds, dir);
+            const T* q_new;
+            const T* q_old;
+            size_t i_start, j_start;
+            GetIdx(i_start, j_start, x0, y0);
+            size_t i, j;
+            while ((n_steps < max_pts) && solver.advance()){
+                q_new = solver.vector().data();
+                q_old = solver.vector_old().data();
+                GetIdx(i, j, q_new[0], q_new[1]);
+                s_total += sqrt((q_new[0] - q_old[0])*(q_new[0] - q_old[0]) + (q_new[1] - q_old[1])*(q_new[1] - q_old[1]));
+                n_steps++;
+                n_steps_tot++;
+                x[n_steps*dir] = q_new[0];
+                y[n_steps*dir] = q_new[1];
+                if ((i != i_start || j != j_start) && in_bounds(i, j)){
+                    if(!is_full(i, j)){
+                        is_full(i, j) = true;
+                        altered_x.push_back(i);
+                        altered_y.push_back(j);
+                        i_start = i;
+                        j_start = j;
+                    }else {
+                        break;
+                    }
+                }
+            }
+            return n_steps;
+        };
+
+
+        auto GetStreamline = [&](bool& success, Array2D<T, 2, 0>& worker_line, T x0, T y0) {
+            assert(worker_line.shape(0) == 2 && worker_line.shape(1) == 2*max_pts + 1 && "Line array must have shape (2, 2*max_pts + 1)");
+            worker_line(0, max_pts) = x0;
+            worker_line(1, max_pts) = y0;
+
+            size_t n_steps_tot = 0;
+            Solver solver({.rhs=ode}, 0, nullptr, 2, 1e-5, 1e-5, 0, inf<T>(), ds, +1);
+
+            T s_total = 0;
+            altered_x.clear();
+            altered_y.clear();
+            
+            IntegrateDirection(solver, s_total, worker_line.ptr(0, max_pts), worker_line.ptr(1, max_pts), n_steps_tot, +1);
+            size_t n_steps_bwd = IntegrateDirection(solver, s_total, worker_line.ptr(0, max_pts), worker_line.ptr(1, max_pts), n_steps_tot, -1);
+
+            // if the streamline is long enough and n_steps_tot  > 1, we keep it:
+            const T* x_line = worker_line.ptr(0, max_pts - n_steps_bwd);
+            const T* y_line = worker_line.ptr(1, max_pts - n_steps_bwd);
+            Array2D<T, 2, 0> true_line(2, n_steps_tot);
+            if (s_total > min_length && n_steps_tot > 1){
+                copy_array(true_line.data(), worker_line.ptr(0, max_pts - n_steps_bwd), n_steps_tot);
+                copy_array(true_line.data() + n_steps_tot, worker_line.ptr(1, max_pts - n_steps_bwd), n_steps_tot);
+                
+                //mark the initial point
+                size_t i_start, j_start;
+                GetIdx(i_start, j_start, x0, y0);
+                if (in_bounds(i_start, j_start)){
+                    is_full(i_start, j_start) = true;
+                }
+                success = true;
+            }else{
+                // unmark the points we marked during this integration attempt
+                for (size_t k = 0; k < altered_x.size(); k++){
+                    is_full(altered_x[k], altered_y[k]) = false;
+                }
+                success = false;
+            }
+            return true_line;
+        };
+
+        std::vector<Array2D<T, 2, 0>> streamlines;
+        auto TryTrajectory = [&](Array2D<T, 2, 0>& worker_line, int i, int j) LAMBDA_INLINE{
+            if (i < 0 || i >= Nx || j < 0 || j >= Ny){
+                return;
+            }
+            T x0 = X[0] + i * Dx;
+            T y0 = Y[0] + j * Dy;
+            assert(this->in_bounds(x0, 0) && this->in_bounds(y0, 1) && "Initial point out of bounds");
+            if (!is_full(i, j)){
+                bool success;
+                auto new_line = GetStreamline(success, worker_line, x0, y0);
+                if (success) {
+                    streamlines.push_back(std::move(new_line));
+                }
+            }
+        };
+
+        // Seeding streamlines from edges working inwards in a spiral pattern:
+        Array2D<T, 2, 0> line(2, 2*max_pts + 1);
+        for (size_t indent = 0; indent < std::max(Nx, Ny) / 2; indent++){
+            for (size_t i = 0; i < std::max(Nx, Ny) - 2*indent; i++){
+                TryTrajectory(line, indent + i, indent);
+                TryTrajectory(line, indent + i, Ny - 1 - indent);
+                TryTrajectory(line, indent, indent + i);
+                TryTrajectory(line, Nx - 1 - indent, indent + i);
+            }
+        }
+        return streamlines;
     }
 
 private:

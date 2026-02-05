@@ -227,7 +227,7 @@ print("Expected state:", "[..., 1]")
 | `advance_until(time)` | Integrate until the specified time |
 | `advance_until(func, tol, dir)` | Integrate until an event condition is met |
 | `reset()` | Return to initial conditions |
-| `set_ics(t0, y0, stepsize)` | Set new initial conditions |
+| `set_ics(t0, y0, stepsize, direction)` | Set new initial conditions |
 | `interp(t)` | Interpolate solution at arbitrary time within last step |
 | `clone()` | Create a dynamic copy of the solver |
 

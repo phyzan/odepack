@@ -1936,6 +1936,34 @@ class SampledVectorField2D:
         '''
         ...
 
+    @property
+    def x(self)->np.ndarray:
+        '''
+        X-coordinates of the grid points.
+        '''
+        ...
+
+    @property
+    def y(self)->np.ndarray:
+        '''
+        Y-coordinates of the grid points.
+        '''
+        ...
+
+    @property
+    def vx(self)->np.ndarray:
+        '''
+        X-components of the vector field at the grid points.
+        '''
+        ...
+
+    @property
+    def vy(self)->np.ndarray:
+        '''
+        Y-components of the vector field at the grid points.
+        '''
+        ...
+
     def streamline(self, x0: float, y0: float, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
         '''
         Compute a streamline starting from (x0, y0).
@@ -1990,6 +2018,27 @@ class SampledVectorField2D:
                 Then, the integration parameter corresponds to arc length along the streamline.
         '''
         ...
+
+    def streamplot_data(self, max_length: float, ds: float, density: int = 30)->list[np.ndarray]:
+        '''
+        Compute streamplot data for visualization.
+
+        Parameters
+        ----------
+        max_length : float
+            Maximum length of streamlines to compute.
+        ds: float
+            Step size for the RK4 integrator.
+        density : int, optional
+            Density of streamlines. The number of streamlines per axis will be approximately equal to the density. Default is 30.
+        
+        Returns
+        -------
+        list of np.ndarray
+            List of arrays containing streamline points for visualization.
+            x_line, y_line = result[i]
+        '''
+        
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:
     """

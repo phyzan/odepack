@@ -123,7 +123,7 @@ public:
     virtual bool register_it() = 0;
 
     /// @brief Reset the event to its initial state.
-    virtual void reset() = 0;
+    virtual void reset(int direction = 0) = 0;
 };
 
 
@@ -186,7 +186,7 @@ public:
     /// @brief Register the event after location.
     bool                            register_it();
     /// @brief Reset to initial state.
-    void                            reset();
+    void                            reset(int direction = 0);
 
 protected:
 
@@ -221,7 +221,7 @@ protected:
     /// @brief Called when event is registered. Override to add custom logic.
     inline void register_impl();
     /// @brief Called on reset. Override to reset derived state.
-    inline void reset_impl();
+    inline void reset_impl(int direction);
     /// @brief Apply mask to state. Override for custom mask behavior.
     inline void mask_impl(T* out, const T& t, const T* q) const;
     /// @brief Check if masked. Override to customize mask detection.
@@ -353,7 +353,7 @@ protected:
     inline void     register_impl();
 
     /// @brief Reset period counter.
-    inline void     reset_impl();
+    inline void     reset_impl(int direction);
 
 private:
 
@@ -513,7 +513,7 @@ public:
     /// @brief Get the state of the first masked event, if any.
     const EventState<T>*        canon_state() const;
     /// @brief Reset all events to initial state.
-    void                        reset();
+    void                        reset(int direction = 0);
 
 private:
 
@@ -678,8 +678,8 @@ bool EventBase<Derived, T>::register_it(){
 }
 
 template<typename Derived, typename T>
-void EventBase<Derived, T>::reset(){
-    THIS->reset_impl();
+void EventBase<Derived, T>::reset(int direction){
+    THIS->reset_impl(direction);
 }
 
 template<typename Derived, typename T>
@@ -694,10 +694,11 @@ inline void EventBase<Derived, T>::register_impl(){
 }
 
 template<typename Derived, typename T>
-inline void EventBase<Derived, T>::reset_impl(){
+inline void EventBase<Derived, T>::reset_impl(int direction){
     _counter = 0;
     _state.choose_true = true;
     _state.triggered = false;
+    _direction = (direction == 0) ? _direction : direction;
 }
 
 template<typename Derived, typename T>
@@ -809,8 +810,8 @@ inline void PeriodicEvent<T, Derived>::register_impl(){
 }
 
 template<typename T, typename Derived>
-inline void PeriodicEvent<T, Derived>::reset_impl(){
-    Base::reset_impl();
+inline void PeriodicEvent<T, Derived>::reset_impl(int direction){
+    Base::reset_impl(direction);
     _n = _n_aux = 0;
 }
 
@@ -1145,10 +1146,10 @@ const EventState<T>* EventCollection<T>::canon_state() const{
 }
 
 template<typename T>
-void EventCollection<T>::reset(){
+void EventCollection<T>::reset(int direction){
 
     for (size_t i=0; i<this->size(); i++){
-        _events[i]->reset();
+        _events[i]->reset(direction);
         _event_idx[i] = 0;
         _event_idx_start[i] = 0;
     }

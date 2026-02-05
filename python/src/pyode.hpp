@@ -438,9 +438,21 @@ public:
 
     DEFAULT_RULE_OF_FOUR(PyVecField2D)
 
+    bool in_bounds(double x, double y) const;
+
+    py::object get_x_grid() const;
+
+    py::object get_y_grid() const;
+
+    py::object get_vx_data() const;
+
+    py::object get_vy_data() const;
+
     py::object py_streamline(double x0, double y0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const;
 
     py::object py_streamline_ode(double x0, double y0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const;
+
+    py::object py_streamplot_data(double max_length, double ds, int density) const;
 
 };
 
