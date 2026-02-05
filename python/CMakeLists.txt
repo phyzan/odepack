@@ -9,6 +9,17 @@ set(CMAKE_CXX_COMPILER "g++")
 
 project(odepack)
 
+# Check for g++ compiler and minimum version 13.3.0
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(FATAL_ERROR "This project requires g++ (GNU C++ compiler). Found: ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
+if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "13.3.0")
+    message(FATAL_ERROR "g++ version 13.3.0 or higher is required. Found: ${CMAKE_CXX_COMPILER_VERSION}")
+endif()
+
+message(STATUS "Using g++ version: ${CMAKE_CXX_COMPILER_VERSION}")
+
 # Set C++ standard (using C++20 as per .clangd)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
