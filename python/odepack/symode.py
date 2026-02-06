@@ -428,6 +428,7 @@ class OdeSystem:
     SymbolicPeriodicEvent : Event triggered at time intervals
     """
 
+    _cached_fields: list = []
     _cls_instances: list[OdeSystem] = []
 
     def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
@@ -683,7 +684,7 @@ class OdeSystem:
           The binary is named 'module_name_<scalar_type>' for each scalar type.
         """
         result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational))
-        return result
+        return result # (pointers, ...), set_field
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
         """Get the ODE right-hand side ready for compilation.
@@ -1248,7 +1249,20 @@ class OdeSystem:
             try:
                 default_ptrs = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational)).pointers()
             except ImportError:
-                default_ptrs = self.compile(scalar_type=scalar_type, variational=variational)
+                default_ptrs, setter = self.compile(scalar_type=scalar_type, variational=variational)
+                fields = self._get_evaluated_fields(variational=variational)
+                new_sampled_fields = []
+                for f in fields:
+                    if f.ndim == 1:
+                        new_sampled_fields.append(SampledScalarField1D(f._ndarray, *f.grid.x))
+                    elif f.ndim == 2:
+                        new_sampled_fields.append(SampledScalarField2D(f._ndarray, *f.grid.x))
+                    elif f.ndim == 3:
+                        new_sampled_fields.append(SampledScalarField3D(f._ndarray, *f.grid.x))
+                    else:
+                        raise ValueError(f"Unsupported field dimension: {f.ndim}")
+                setter(*new_sampled_fields)
+                self._cached_fields += new_sampled_fields
             cache[scalar_type] = tuple(first) + default_ptrs[len(first):]
         else:
             cache[scalar_type] = tuple(first) + cache[scalar_type][len(first):]
@@ -1284,6 +1298,22 @@ class OdeSystem:
                 extra_kwargs[param_name] = items[i+2]
                 i+=1
             res.append(event._toEvent(scalar_type=scalar_type, **extra_kwargs))
+        return res
+    
+    def _get_evaluated_fields(self, variational: bool)->list[EvaluatedScalarField]:
+        res = []
+        expressions = [*self.ode_sys]
+        for row in self.jacmat:
+            expressions += row
+        if variational:
+            expressions += [*self.ode_sys_augmented]
+            for row in self.jacmat_augmented:
+                expressions += row
+
+        for expr in expressions:
+            for item in expr.deepsearch(EvaluatedScalarField):
+                if item not in res:
+                    res.append(item)
         return res
 
     def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", period=None, compiled=True, scalar_type='double'):
@@ -1371,7 +1401,7 @@ class OdeSystem:
             shape = [self.Nsys*factor]
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')])[0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')])[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')

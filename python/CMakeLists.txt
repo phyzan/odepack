@@ -76,7 +76,7 @@ endif()
 find_package(OpenMP)
 
 # Create the main odesolvers module
-pybind11_add_module(odesolvers src/pyode.cpp)
+pybind11_add_module(odesolvers ../include/pyode/pyode.cpp)
 target_include_directories(odesolvers PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_compile_options(odesolvers PRIVATE ${COMMON_COMPILE_OPTIONS})
 target_link_libraries(odesolvers PRIVATE OpenMP::OpenMP_CXX)

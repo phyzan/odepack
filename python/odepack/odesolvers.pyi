@@ -2202,6 +2202,69 @@ class SampledVectorField3D:
         Check if the point (x, y, z) is within the bounds of the grid.
         '''
         ...
+
+
+class SampledScalarField1D:
+
+    def __init__(self, f: np.ndarray, x: np.ndarray):
+        '''
+        Initialize a 1D scalar field.
+        Parameters
+        ----------
+        f : np.ndarray
+            Scalar field values at the grid points.
+        x : np.ndarray
+            Coordinates of the grid points.
+        '''
+        ...
+        
+
+class SampledScalarField2D:
+
+    def __init__(self, f: np.ndarray, x: np.ndarray, y: np.ndarray):
+        '''
+        Initialize a 2D scalar field.
+        Parameters
+        ----------
+        f : np.ndarray
+            Scalar field values at the grid points.
+        x : np.ndarray
+            X-coordinates of the grid points.
+        y : np.ndarray
+            Y-coordinates of the grid points.
+
+        Notes
+        -----
+        The shape of f must be (len(x), len(y))
+        and f[i, j] corresponds to the scalar value at (x[i], y[j]).
+
+        '''
+        ...
+
+
+class SampledScalarField3D:
+
+    def __init__(self, f: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray):
+        '''
+        Initialize a 3D scalar field.
+        Parameters
+        ----------
+        f : np.ndarray
+            Scalar field values at the grid points.
+        x : np.ndarray
+            X-coordinates of the grid points.
+        y : np.ndarray
+            Y-coordinates of the grid points.
+        z : np.ndarray
+            Z-coordinates of the grid points.
+
+        Notes
+        -----
+        The shape of f must be (len(x), len(y), len(z))
+        and f[i, j, k] corresponds to the scalar value at (x[i], y[j], z[k]).
+
+        '''
+        ...
         
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:

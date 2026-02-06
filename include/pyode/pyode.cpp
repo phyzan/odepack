@@ -1334,6 +1334,24 @@ PYBIND11_MODULE(odesolvers, m) {
 
     m.def("advance_all", &py_advance_all, py::arg("solvers"), py::arg("t_goal"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
+    py::class_<PyScalarField<1>>(m, "SampledScalarField1D")
+        .def(py::init<py::array_t<double>, py::array_t<double>>(),
+            py::arg("f"),
+            py::arg("x"));
+    
+    py::class_<PyScalarField<2>>(m, "SampledScalarField2D")
+        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
+            py::arg("f"),
+            py::arg("x"),
+            py::arg("y"));
+
+    py::class_<PyScalarField<3>>(m, "SampledScalarField3D")
+        .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
+            py::arg("f"),
+            py::arg("x"),
+            py::arg("y"),
+            py::arg("z"));
+
 #ifdef MPREAL
     m.def("set_mpreal_prec",
       &mpfr::mpreal::set_default_prec,

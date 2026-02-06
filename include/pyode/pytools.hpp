@@ -4,8 +4,8 @@
 #include <cstddef>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include "../../include/ndspan/arrays.hpp"
-#include "../../include/odepack.hpp"
+#include "../ndspan/arrays.hpp"
+#include "../odepack.hpp"
 #include  "ode_caster.hpp"
 
 #define DISPATCH(RETURN_TYPE, ...)                                              \

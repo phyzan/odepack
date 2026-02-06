@@ -433,6 +433,69 @@ public:
 };
 
 
+
+
+
+static bool is_sorted(const py::array_t<double>& arr){
+    const double* ptr = arr.data();
+    for (ssize_t i = 1; i < arr.size(); ++i){
+        if (ptr[i] <= ptr[i-1]){
+            return false;
+        }
+    }
+    return true;
+}
+
+
+template<size_t NDIM>
+class PyScalarField : public RegularGridInterpolator<double, NDIM> {
+
+    using Base = RegularGridInterpolator<double, NDIM>;
+
+private:
+
+    template<size_t... I, typename... PyArray>
+    PyScalarField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args) : Base(pack_elem<I+1>(args...)..., pack_elem<0>(args...).data()) {}
+
+public:
+
+    template<typename... PyArray>
+    PyScalarField(const PyArray&... args) : PyScalarField(parse_args(args...), std::make_index_sequence<NDIM>(), args...) {}
+
+    template<typename... Scalar>
+    inline double operator()(Scalar... x) const{
+        static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
+        if (!this->coords_in_bounds(x...)){
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        std::array<double, NDIM> coords = {double(x)...};
+        return this->template get_single<0>(coords.data());
+    }
+
+
+private:
+
+    template<typename... PyArray>
+    static std::nullptr_t parse_args(const PyArray&... args){
+        if (((pack_elem<0>(args...).ndim() != NDIM))){
+            throw py::value_error("The SampledScarField"+std::to_string(NDIM) + "D requires an array with " + std::to_string(NDIM) + " dimensions for the field values");
+        }
+        EXPAND(size_t, NDIM, I,
+            if (((pack_elem<I+1>(args...).ndim() != 1) || ...)){
+                throw py::value_error("All grid dimensions must be 1D arrays");
+            }else if (((!is_sorted(pack_elem<I+1>(args...))) || ...)){
+                throw py::value_error("All grid dimensions must be 1D arrays");
+            }
+            const py::array_t<double>& field = pack_elem<0>(args...);
+            if (((field.shape(I) != pack_elem<I+1>(args...).size()) || ...)){
+                throw py::value_error("Scalar field shape does not match grid size");
+            }
+        );
+        return nullptr;
+    }
+};
+
+
 template<size_t NDIM>
 class PyVecField : public SampledVectorField<double, NDIM> {
 
@@ -571,15 +634,7 @@ private:
         return nullptr;
     }
 
-    static bool is_sorted(const py::array_t<double>& arr){
-        const double* ptr = arr.data();
-        for (ssize_t i = 1; i < arr.size(); ++i){
-            if (ptr[i] <= ptr[i-1]){
-                return false;
-            }
-        }
-        return true;
-    }
+
 
 };
 
