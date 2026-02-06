@@ -18,5 +18,7 @@ dev = [
 
 [tool.scikit-build]
 # Scikit-build-core settings
+cmake.source-dir = ".."
 cmake.build-type = "Debug"
 wheel.packages = ["odepack"]
+install.components = ["python"]

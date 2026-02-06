@@ -2,6 +2,15 @@ from __future__ import annotations
 from typing import Iterable, Callable
 from .odesolvers import * #type: ignore
 from numiphy.lowlevelsupport import *
+from pathlib import Path
+import sys
+
+
+_LIB_PATH = Path(__file__).resolve().parent
+_LIB_DIR = os.path.join(_LIB_PATH, "lib")
+_LIB_NAME = "odepack"
+
+_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "PyMain.hpp")
 
 
 class SymbolicEvent:
@@ -645,7 +654,37 @@ class OdeSystem:
         The generated code includes function pointers that can be called from
         Python after compilation.
         """
-        return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational))
+        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
+
+        return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+    
+    def get_fields(self, scalar_type: str, variational: bool):
+        evaluated_fields: list[EvaluatedScalarField] = []
+        for func in self.lowlevel_callables(scalar_type=scalar_type, variational=variational):
+            for field in func.evaluated_fields():
+                if field not in evaluated_fields:
+                    evaluated_fields.append(field)
+        return evaluated_fields
+    
+    def extra_code(self, scalar_type: str, variational: bool)->tuple[str, tuple[str, str]]:
+        fields = self.get_fields(scalar_type, variational)
+        field_block = '\n'.join([f'const ode::PyScalarField<{f.ndim}>* {f.name} = nullptr;' for f in fields])
+
+        if fields:
+            set_fields_params = ', '.join([f'const ode::PyScalarField<{f.ndim}>& {f.name}_tmp' for f in fields])
+            set_fields_body = '\n'.join([f'\t{f.name} = &{f.name}_tmp;' for f in fields])
+            set_fields_func = f'void set_fields({set_fields_params}){{\n{set_fields_body}\n}}'
+        else:
+            set_fields_func = 'void set_fields(){}'
+        main_block = '\n\n'.join([field_block, set_fields_func])
+
+        extra_func = ('set_fields', "&set_fields")
+        return main_block, extra_func
+    
+    @property
+    def header(self):
+        return f'#include "{_HEADER_PATH}"'
+
 
     def compile(self, scalar_type='double', variational=False, start_from=0)->tuple:
         """Compile the ODE system to a C++ module.
@@ -683,7 +722,8 @@ class OdeSystem:
           directory specified (or current working directory if directory was None).
           The binary is named 'module_name_<scalar_type>' for each scalar type.
         """
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational))
+        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational, links=[(_LIB_DIR, _LIB_NAME)]), extra_code_block=extra_code_block, extra_funcs=[extra_func_code], links=[(_LIB_DIR, _LIB_NAME)], extra_header_block=self.header)
         return result # (pointers, ...), set_field
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
@@ -1395,13 +1435,16 @@ class OdeSystem:
         LowLevelFunction
             A callable wrapper around compiled function pointers
         """
+
+        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
+
         factor = 1 if not variational else 2
         if func == 'rhs':
             idx = 0
             shape = [self.Nsys*factor]
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')])[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header, links=[(_LIB_DIR, _LIB_NAME)])[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')
