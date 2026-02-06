@@ -36,7 +36,6 @@ private:
 // IMPLEMENTATIONS
 // ============================================================================
 
-#ifndef NO_ODE_TEMPLATE
 
 // ----------------------------------------------------------------------------
 // SampledVectorField
@@ -48,7 +47,6 @@ SampledVectorField<T, NDIM>::SampledVectorField(const Args&... args) : Base(args
     static_assert(sizeof...(args) == 2*NDIM, "SampledVectorField constructor requires NDIM grid arrays and NDIM field arrays");
 }
 
-#endif // NO_ODE_TEMPLATE
 
 template<typename T, size_t NDIM>
 auto SampledVectorField<T, NDIM>::ode_func_norm() const {

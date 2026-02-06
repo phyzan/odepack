@@ -1,4 +1,4 @@
-#include "../../include/pyode/pyode.hpp"
+#include "../../include/pyode/PYODE.hpp"
 
 namespace ode{
 
@@ -401,6 +401,8 @@ py::object PyVarSolver::copy() const{
 //                                      PyRK23
 //===========================================================================================
 
+PyRK23::PyRK23(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+
 PyRK23::PyRK23(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, args, events, "RK23", scalar_type){
 }
 
@@ -411,6 +413,8 @@ py::object PyRK23::copy() const{
 //===========================================================================================
 //                                      PyRK45
 //===========================================================================================
+
+PyRK45::PyRK45(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
 
 PyRK45::PyRK45(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, args, events, "RK45", scalar_type){}
 
@@ -424,6 +428,8 @@ py::object PyRK45::copy() const{
 
 PyDOP853::PyDOP853(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, args, events, "DOP853", scalar_type){}
 
+PyDOP853::PyDOP853(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+
 py::object PyDOP853::copy() const{
     return py::cast(PyDOP853(*this));
 }
@@ -434,6 +440,8 @@ py::object PyDOP853::copy() const{
 
 PyBDF::PyBDF(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(f, jac, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, args, events, "BDF", scalar_type){}
 
+PyBDF::PyBDF(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+
 py::object PyBDF::copy() const{
     return py::cast(PyBDF(*this));
 }
@@ -443,6 +451,8 @@ py::object PyBDF::copy() const{
 //===========================================================================================
 
 PyRK4::PyRK4(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type) : PySolver(ode, py::none(), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, args, events, "RK4", scalar_type){}
+
+PyRK4::PyRK4(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
 
 py::object PyRK4::copy() const{
     return py::cast(PyRK4(*this));
@@ -600,6 +610,8 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
         }
     )
 }
+
+PyODE::PyODE(const std::string& scalar_type) : DtypeDispatcher(scalar_type){}
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
@@ -845,6 +857,14 @@ py::object PyVarODE::copy() const{
 
 
 //===========================================================================================
+//                                      PyVecField2D, 3D
+//===========================================================================================
+
+PyVecField2D::PyVecField2D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& vx, const py::array_t<double>& vy) : Base(x, y, vx, vy) {}
+
+PyVecField3D::PyVecField3D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& z, const py::array_t<double>& vx, const py::array_t<double>& vy, const py::array_t<double>& vz) : Base(x, y, z, vx, vy, vz) {}
+
+//===========================================================================================
 //                                      Additional functions
 //===========================================================================================
 
@@ -988,39 +1008,6 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
 //===========================================================================================
 //                          Explicit Template Instantiations
 //===========================================================================================
-// These explicit instantiations ensure templates are compiled here, allowing
-// external projects to use extern template declarations to avoid recompilation.
-
-#define INSTANTIATE_FOR_SCALAR(T) \
-    template OdeRichSolver<T>* PySolver::cast<T>(); \
-    template const OdeRichSolver<T>* PySolver::cast<T>() const; \
-    template void PySolver::init_solver<T>(py::object, py::object, const py::object&, const py::iterable&, const py::object&, const py::object&, const py::object&, const py::object&, const py::object&, int, const py::iterable&, const py::iterable&, const std::string&); \
-    template const NormalizationEvent<T>& PyVarSolver::main_event<T>() const; \
-    template const OdeResult<T>* PyOdeResult::cast<T>() const; \
-    template OdeResult<T>* PyOdeResult::cast<T>(); \
-    template py::object PyOdeSolution::_get_frame<T>(const py::object&) const; \
-    template py::object PyOdeSolution::_get_array<T>(const py::array&) const; \
-    template Func<T> PyEvent::mask<T>() const; \
-    template ObjFun<T> PyPrecEvent::when<T>() const; \
-    template void* PyPrecEvent::get_new_event<T>(); \
-    template void* PyPerEvent::get_new_event<T>(); \
-    template ODE<T>* PyODE::cast<T>(); \
-    template const ODE<T>* PyODE::cast<T>() const; \
-    template VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode<T>(); \
-    template const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode<T>() const; \
-    template std::vector<Event<T>*> to_Events<T>(const py::iterable&, const std::vector<py::ssize_t>&, const py::iterable&); \
-    template OdeData<Func<T>, void> init_ode_data<T>(PyStruct&, std::vector<T>&, const py::object&, const py::iterable&, const py::object&, const py::iterable&, const py::iterable&); \
-    template std::string get_scalar_type<T>();
-
-INSTANTIATE_FOR_SCALAR(float)
-INSTANTIATE_FOR_SCALAR(double)
-INSTANTIATE_FOR_SCALAR(long double)
-
-#ifdef MPREAL
-INSTANTIATE_FOR_SCALAR(mpfr::mpreal)
-#endif
-
-#undef INSTANTIATE_FOR_SCALAR
 
 // Template classes - base classes first
 template class RegularGridInterpolator<double, 1>;
@@ -1035,5 +1022,12 @@ template class PyScalarField<2>;
 template class PyScalarField<3>;
 template class PyVecField<2>;
 template class PyVecField<3>;
+
+// Explicit instantiations for PyScalarField::operator() member function template
+// These are needed because operator() is a template member function that gets called
+// from dynamically compiled ODE code
+template double PyScalarField<1>::operator()(double) const;
+template double PyScalarField<2>::operator()(double, double) const;
+template double PyScalarField<3>::operator()(double, double, double) const;
 
 } // namespace ode
