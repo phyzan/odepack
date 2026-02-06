@@ -10,7 +10,7 @@ _LIB_PATH = Path(__file__).resolve().parent
 _LIB_DIR = os.path.join(_LIB_PATH, "lib")
 _LIB_NAME = "odepack"
 
-_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "PyMain.hpp")
+_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "PythonOde.hpp")
 
 
 class SymbolicEvent:
@@ -656,7 +656,10 @@ class OdeSystem:
         """
         extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
 
-        return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+        if self.get_fields(scalar_type=scalar_type, variational=variational):
+            return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+        else:
+            return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_funcs=[extra_func_code])
     
     def get_fields(self, scalar_type: str, variational: bool):
         evaluated_fields: list[EvaluatedScalarField] = []
@@ -723,7 +726,10 @@ class OdeSystem:
           The binary is named 'module_name_<scalar_type>' for each scalar type.
         """
         extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational, links=[(_LIB_DIR, _LIB_NAME)]), extra_code_block=extra_code_block, extra_funcs=[extra_func_code], links=[(_LIB_DIR, _LIB_NAME)], extra_header_block=self.header)
+        if self.get_fields(scalar_type=scalar_type, variational=variational):
+            result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), extra_code_block=extra_code_block, extra_funcs=[extra_func_code], links=[(_LIB_DIR, _LIB_NAME)], extra_header_block=self.header, extra_flags=["DNO_ODE_TEMPLATE", "fvisibility=hidden"])
+        else:
+            result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), extra_funcs=[extra_func_code], extra_code_block=extra_code_block, extra_flags=["DNO_ODE_TEMPLATE", "fvisibility=hidden"])
         return result # (pointers, ...), set_field
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
@@ -1444,7 +1450,7 @@ class OdeSystem:
             shape = [self.Nsys*factor]
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header, links=[(_LIB_DIR, _LIB_NAME)])[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header if self.get_fields(scalar_type, variational) else "", links=[(_LIB_DIR, _LIB_NAME)], extra_flags=["DNO_ODE_TEMPLATE", "fvisibility=hidden"])[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')

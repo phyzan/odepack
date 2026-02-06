@@ -1,4 +1,4 @@
-#include "pyode/pyode.hpp"
+#include "../../include/pyode/pyode.hpp"
 
 namespace ode{
 
@@ -843,9 +843,20 @@ py::object PyVarODE::copy() const{
     return py::cast(PyVarODE(*this));
 }
 
+
 //===========================================================================================
 //                                      Additional functions
 //===========================================================================================
+
+bool is_sorted(const py::array_t<double>& arr){
+    const double* ptr = arr.data();
+    for (ssize_t i = 1; i < arr.size(); ++i){
+        if (ptr[i] <= ptr[i-1]){
+            return false;
+        }
+    }
+    return true;
+}
 
 bool all_are_lowlevel(const py::iterable& events){
     if (events.is_none()){
@@ -973,5 +984,56 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
 
 }
 
+
+//===========================================================================================
+//                          Explicit Template Instantiations
+//===========================================================================================
+// These explicit instantiations ensure templates are compiled here, allowing
+// external projects to use extern template declarations to avoid recompilation.
+
+#define INSTANTIATE_FOR_SCALAR(T) \
+    template OdeRichSolver<T>* PySolver::cast<T>(); \
+    template const OdeRichSolver<T>* PySolver::cast<T>() const; \
+    template void PySolver::init_solver<T>(py::object, py::object, const py::object&, const py::iterable&, const py::object&, const py::object&, const py::object&, const py::object&, const py::object&, int, const py::iterable&, const py::iterable&, const std::string&); \
+    template const NormalizationEvent<T>& PyVarSolver::main_event<T>() const; \
+    template const OdeResult<T>* PyOdeResult::cast<T>() const; \
+    template OdeResult<T>* PyOdeResult::cast<T>(); \
+    template py::object PyOdeSolution::_get_frame<T>(const py::object&) const; \
+    template py::object PyOdeSolution::_get_array<T>(const py::array&) const; \
+    template Func<T> PyEvent::mask<T>() const; \
+    template ObjFun<T> PyPrecEvent::when<T>() const; \
+    template void* PyPrecEvent::get_new_event<T>(); \
+    template void* PyPerEvent::get_new_event<T>(); \
+    template ODE<T>* PyODE::cast<T>(); \
+    template const ODE<T>* PyODE::cast<T>() const; \
+    template VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode<T>(); \
+    template const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode<T>() const; \
+    template std::vector<Event<T>*> to_Events<T>(const py::iterable&, const std::vector<py::ssize_t>&, const py::iterable&); \
+    template OdeData<Func<T>, void> init_ode_data<T>(PyStruct&, std::vector<T>&, const py::object&, const py::iterable&, const py::object&, const py::iterable&, const py::iterable&); \
+    template std::string get_scalar_type<T>();
+
+INSTANTIATE_FOR_SCALAR(float)
+INSTANTIATE_FOR_SCALAR(double)
+INSTANTIATE_FOR_SCALAR(long double)
+
+#ifdef MPREAL
+INSTANTIATE_FOR_SCALAR(mpfr::mpreal)
+#endif
+
+#undef INSTANTIATE_FOR_SCALAR
+
+// Template classes - base classes first
+template class RegularGridInterpolator<double, 1>;
+template class RegularGridInterpolator<double, 2>;
+template class RegularGridInterpolator<double, 3>;
+template class SampledVectorField<double, 2>;
+template class SampledVectorField<double, 3>;
+
+// Derived classes
+template class PyScalarField<1>;
+template class PyScalarField<2>;
+template class PyScalarField<3>;
+template class PyVecField<2>;
+template class PyVecField<3>;
 
 } // namespace ode

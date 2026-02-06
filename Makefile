@@ -12,7 +12,7 @@ install:
 	cp -r include/ndspan/* $(INCLUDEDIR)/odepack/ndspan/
 	cp -r include/pyode/*.hpp $(INCLUDEDIR)/odepack/pyode/
 	cp include/odepack.hpp $(INCLUDEDIR)/odepack/
-	cp include/PyMain.hpp $(INCLUDEDIR)/odepack/
+	cp include/PythonOde.hpp $(INCLUDEDIR)/odepack/
 	@echo "Done. You can now use: #include <odepack/odepack.hpp>"
 
 uninstall:

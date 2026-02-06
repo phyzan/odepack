@@ -436,15 +436,7 @@ public:
 
 
 
-static bool is_sorted(const py::array_t<double>& arr){
-    const double* ptr = arr.data();
-    for (ssize_t i = 1; i < arr.size(); ++i){
-        if (ptr[i] <= ptr[i-1]){
-            return false;
-        }
-    }
-    return true;
-}
+bool is_sorted(const py::array_t<double>& arr);
 
 
 template<size_t NDIM>
@@ -476,23 +468,7 @@ public:
 private:
 
     template<typename... PyArray>
-    static std::nullptr_t parse_args(const PyArray&... args){
-        if (((pack_elem<0>(args...).ndim() != NDIM))){
-            throw py::value_error("The SampledScarField"+std::to_string(NDIM) + "D requires an array with " + std::to_string(NDIM) + " dimensions for the field values");
-        }
-        EXPAND(size_t, NDIM, I,
-            if (((pack_elem<I+1>(args...).ndim() != 1) || ...)){
-                throw py::value_error("All grid dimensions must be 1D arrays");
-            }else if (((!is_sorted(pack_elem<I+1>(args...))) || ...)){
-                throw py::value_error("All grid dimensions must be 1D arrays");
-            }
-            const py::array_t<double>& field = pack_elem<0>(args...);
-            if (((field.shape(I) != pack_elem<I+1>(args...).size()) || ...)){
-                throw py::value_error("Scalar field shape does not match grid size");
-            }
-        );
-        return nullptr;
-    }
+    static std::nullptr_t parse_args(const PyArray&... args);
 };
 
 
@@ -545,63 +521,11 @@ public:
 
     // ==========================================
 
-    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const{
+    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const;
 
-        if (q0.ndim() != 1 || q0.shape(0) != NDIM){
-            throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
-        }
+    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const;
 
-        EXPAND(size_t, NDIM, I,
-            check_coords(q0.at(I)...);
-        );
-    
-        StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
-        try{
-            double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
-            auto* result = new OdeResult<double>(this->streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>()));
-            PyOdeResult py_res(result, {NDIM}, DTYPE_MAP.at("double"));
-            return py::cast(py_res);
-        } catch (const std::runtime_error& e){
-            throw py::value_error(e.what());
-        }
-    }
-
-    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
-        if (direction != 1 && direction != -1){
-            throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
-        }else if (q0.ndim() != 1 || q0.shape(0) != NDIM){
-            throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
-        }
-
-        EXPAND(size_t, NDIM, I,
-            check_coords(q0.at(I)...);
-        );
-
-        if (normalized){
-            return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
-        }else{
-            return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
-        }
-    }
-
-    py::object py_streamplot_data(double max_length, double ds, int density) const{
-        if (density <= 1){
-            throw py::value_error("Density must be greater than 1");
-        }
-        if (max_length <= 0){
-            throw py::value_error("Max length must be a positive number");
-        }
-        if (ds <= 0){
-            throw py::value_error("ds must be a positive number");
-        }
-
-        std::vector<Array2D<double, NDIM, 0>> streamlines = this->streamplot_data(max_length, ds, size_t(density));
-        py::list result;
-        for (const Array2D<double, NDIM, 0>& line : streamlines){
-            result.append(py::cast(line));
-        }
-        return result;
-    }
+    py::object py_streamplot_data(double max_length, double ds, int density) const;
 
 private:
 
@@ -615,24 +539,7 @@ private:
     }
 
     template<typename... PyArray>
-    static std::nullptr_t parse_args(const PyArray&... args){
-        EXPAND(size_t, NDIM, I,
-            if (((pack_elem<I>(args...).ndim() != 1) || ...)){
-                throw py::value_error("All grid dimensions must be 1D arrays");
-            }else if (((pack_elem<I+NDIM>(args...).ndim() != NDIM) || ...)){
-                throw py::value_error("All vector component arrays must be " + std::to_string(NDIM) + "D");
-            }else if (((!is_sorted(pack_elem<I>(args...))) || ...)){
-                throw py::value_error("All grid dimensions must be 1D arrays");
-            }
-            FOR_LOOP(size_t, J, NDIM,
-                const py::array_t<double>& field = pack_elem<J+NDIM>(args...);
-                if (((field.shape(I) != pack_elem<I>(args...).size()) || ...)){
-                    throw py::value_error("Grid size does not match vector component array size");
-                }
-            );
-        );
-        return nullptr;
-    }
+    static std::nullptr_t parse_args(const PyArray&... args);
 
 
 
@@ -866,6 +773,121 @@ const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode() const {
 }
 
 
+// ============================================================================================
+//                                      PyScalarField
+// ============================================================================================
+
+template<size_t NDIM>
+template<typename... PyArray>
+std::nullptr_t PyScalarField<NDIM>::parse_args(const PyArray&... args){
+    if (((pack_elem<0>(args...).ndim() != NDIM))){
+        throw py::value_error("The SampledScarField"+std::to_string(NDIM) + "D requires an array with " + std::to_string(NDIM) + " dimensions for the field values");
+    }
+    EXPAND(size_t, NDIM, I,
+        if (((pack_elem<I+1>(args...).ndim() != 1) || ...)){
+            throw py::value_error("All grid dimensions must be 1D arrays");
+        }else if (((!is_sorted(pack_elem<I+1>(args...))) || ...)){
+            throw py::value_error("All grid dimensions must be 1D arrays");
+        }
+        const py::array_t<double>& field = pack_elem<0>(args...);
+        if (((field.shape(I) != pack_elem<I+1>(args...).size()) || ...)){
+            throw py::value_error("Scalar field shape does not match grid size");
+        }
+    );
+    return nullptr;
+}
+
+
+//===========================================================================================
+//                                      PyVecField
+//===========================================================================================
+
+
+#ifndef NO_ODE_TEMPLATE
+
+template<size_t NDIM>
+py::object PyVecField<NDIM>::py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const{
+
+    if (q0.ndim() != 1 || q0.shape(0) != NDIM){
+        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+    }
+
+    EXPAND(size_t, NDIM, I,
+        check_coords(q0.at(I)...);
+    );
+
+    StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
+    try{
+        double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
+        auto* result = new OdeResult<double>(this->streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>()));
+        PyOdeResult py_res(result, {NDIM}, DTYPE_MAP.at("double"));
+        return py::cast(py_res);
+    } catch (const std::runtime_error& e){
+        throw py::value_error(e.what());
+    }
+}
+
+template<size_t NDIM>
+py::object PyVecField<NDIM>::py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
+    if (direction != 1 && direction != -1){
+        throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
+    }else if (q0.ndim() != 1 || q0.shape(0) != NDIM){
+        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+    }
+
+    EXPAND(size_t, NDIM, I,
+        check_coords(q0.at(I)...);
+    );
+
+    if (normalized){
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func_norm()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+    }else{
+        return py::cast(PyODE(OdeData{.rhs=this->ode_func()}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+    }
+}
+
+template<size_t NDIM>
+py::object PyVecField<NDIM>::py_streamplot_data(double max_length, double ds, int density) const{
+    if (density <= 1){
+        throw py::value_error("Density must be greater than 1");
+    }
+    if (max_length <= 0){
+        throw py::value_error("Max length must be a positive number");
+    }
+    if (ds <= 0){
+        throw py::value_error("ds must be a positive number");
+    }
+
+    std::vector<Array2D<double, NDIM, 0>> streamlines = this->streamplot_data(max_length, ds, size_t(density));
+    py::list result;
+    for (const Array2D<double, NDIM, 0>& line : streamlines){
+        result.append(py::cast(line));
+    }
+    return result;
+}
+
+template<size_t NDIM>
+template<typename... PyArray>
+std::nullptr_t PyVecField<NDIM>::parse_args(const PyArray&... args){
+    EXPAND(size_t, NDIM, I,
+        if (((pack_elem<I>(args...).ndim() != 1) || ...)){
+            throw py::value_error("All grid dimensions must be 1D arrays");
+        }else if (((pack_elem<I+NDIM>(args...).ndim() != NDIM) || ...)){
+            throw py::value_error("All vector component arrays must be " + std::to_string(NDIM) + "D");
+        }else if (((!is_sorted(pack_elem<I>(args...))) || ...)){
+            throw py::value_error("All grid dimensions must be 1D arrays");
+        }
+        FOR_LOOP(size_t, J, NDIM,
+            const py::array_t<double>& field = pack_elem<J+NDIM>(args...);
+            if (((field.shape(I) != pack_elem<I>(args...).size()) || ...)){
+                throw py::value_error("Grid size does not match vector component array size");
+            }
+        );
+    );
+    return nullptr;
+}
+
+#endif
 //===========================================================================================
 //                                      Templated functions
 //===========================================================================================

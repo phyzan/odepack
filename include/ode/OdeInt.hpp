@@ -462,7 +462,8 @@ OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>
         _register_state();
     }
     TimePoint t2 = now();
-    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), _solver->message());
+    std::string message = _solver->t() == t_max ? "t-goal" : _solver->message();
+    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), as_duration(t1, t2), message);
     _runtime += res.runtime();
     return res;
 }

@@ -1,4 +1,4 @@
-#include "pyode/pyode.hpp"
+#include "../../include/pyode/pyode.hpp"
 
 namespace ode{
 

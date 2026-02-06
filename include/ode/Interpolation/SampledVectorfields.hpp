@@ -36,8 +36,7 @@ private:
 // IMPLEMENTATIONS
 // ============================================================================
 
-
-
+#ifndef NO_ODE_TEMPLATE
 
 // ----------------------------------------------------------------------------
 // SampledVectorField
@@ -48,6 +47,8 @@ template<typename... Args>
 SampledVectorField<T, NDIM>::SampledVectorField(const Args&... args) : Base(args...) {
     static_assert(sizeof...(args) == 2*NDIM, "SampledVectorField constructor requires NDIM grid arrays and NDIM field arrays");
 }
+
+#endif // NO_ODE_TEMPLATE
 
 template<typename T, size_t NDIM>
 auto SampledVectorField<T, NDIM>::ode_func_norm() const {
@@ -142,7 +143,7 @@ std::vector<Array2D<T, NDIM, 0>> SampledVectorField<T, NDIM>::streamplot_data_co
         // x[I] are preallocated arrays of size max_pts + 1. x[I][0] = x0[I], so at each step, we write to x[I][step], starting from x[I][1]
         std::array<T, NDIM> ics = {x[I][0]...};
         assert(this->coords_in_bounds(ics[I]...) && "Initial point out of bounds");
-        assert(dir == 1 || dir == -1 && "Direction must be either +1 or -1");
+        assert((dir == 1 || dir == -1) && "Direction must be either +1 or -1");
 
         size_t n_steps = 0;
         solver.set_ics(0, ics.data(), ds, dir);

@@ -87,6 +87,8 @@ private:
 // IMPLEMENTATIONS
 // ============================================================================
 
+#ifndef NO_ODE_TEMPLATE
+
 // ----------------------------------------------------------------------------
 // RegularGridInterpolator
 // ----------------------------------------------------------------------------
@@ -111,6 +113,8 @@ RegularGridInterpolator<T, NDIM>::RegularGridInterpolator(const Args&... args){
         );
     );
 }
+
+#endif // NO_ODE_TEMPLATE
 
 template<typename T, size_t NDIM>
 inline constexpr size_t RegularGridInterpolator<T, NDIM>::ndim() const{
@@ -284,8 +288,6 @@ void RegularGridInterpolator<T, NDIM>::get_helper(T* out, const T* q) const{
         }
     }
 }
-
-
 
 } // namespace ode
 
