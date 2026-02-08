@@ -857,6 +857,49 @@ py::object PyVarODE::copy() const{
 
 
 //===========================================================================================
+//                                      PyScatteredField
+//===========================================================================================
+
+PyScatteredField::PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values) : PyScatteredField(parse_args(x, values), x, values){}
+
+PyScatteredField::PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values) : Base(x, std::array<const double*, 1>{values.data()}) {}
+
+py::object PyScatteredField::py_points() const{
+    return py::cast(this->get_points());
+}
+
+py::object PyScatteredField::py_values() const{
+    return py::cast(this->get_field(0));
+}
+
+double PyScatteredField::py_value_at(const py::args& x) const{
+    // TODO: optimize this. Currently a temporary vector is created on each call.
+    std::vector<double> point(x.size());
+    if (x.size() != this->ndim()){
+        // throw informative error including ndim of input and expected ndim
+        throw py::value_error("Expected " + std::to_string(this->ndim()) + " input points, but got " + std::to_string(x.size()));
+    }
+    for (size_t i=0; i<x.size(); i++){
+        point[i] = x[i].cast<double>();
+    }
+    return Base::operator()(point.data(), 0);
+}
+
+std::nullptr_t PyScatteredField::parse_args(const py::array_t<double>& x, const py::array_t<double>& values){
+    if (x.ndim() > 2){
+        throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");
+    }else if (values.ndim() != 1){
+        throw py::value_error("ScatteredField requires a 1D array for the field values");
+    }else if (x.shape(0) != values.size()){
+        throw py::value_error("Number of input points must match number of field values");
+    }else if (x.ndim() == 2 && x.shape(0) < x.shape(1)+1){
+        throw py::value_error("Number of input points must be at least one more than the number of dimensions");
+    }
+    return nullptr;
+}
+
+
+//===========================================================================================
 //                                      PyVecField2D, 3D
 //===========================================================================================
 

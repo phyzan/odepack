@@ -369,6 +369,14 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("y"),
             py::arg("z"));
 
+    py::class_<PyScatteredField>(m, "ScatteredScalarField")
+        .def(py::init<py::array_t<double>, py::array_t<double>>(),
+            py::arg("points"),
+            py::arg("values"))
+        .def_property_readonly("points", &PyScatteredField::py_points)
+        .def_property_readonly("values", &PyScatteredField::py_values)
+        .def("__call__", &PyScatteredField::py_value_at);
+
 #ifdef MPREAL
     m.def("set_mpreal_prec",
       &mpfr::mpreal::set_default_prec,

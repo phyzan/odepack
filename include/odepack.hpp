@@ -1,10 +1,12 @@
-
+#ifndef ODEPACK_HPP
+#define ODEPACK_HPP
 
 
 #include "ode/SolverDispatcher.hpp"
 #include "ode/OdeInt.hpp"
 #include "ode/Chaos/VariationalSolvers.hpp"
 #include "ode/Interpolation/SampledVectorfields.hpp"
+#include "ode/Interpolation/LinearNdInterpolator.hpp"
 
 /**
  * @file odepack.h
@@ -20,3 +22,5 @@
  *       functionalities.
  * @note Compile with -DNO_ODE_WARN to turn off unnecessary warnings that the solvers may throw on the console
  */
+
+#endif // ODEPACK_HPP

@@ -2265,7 +2265,56 @@ class SampledScalarField3D:
 
         '''
         ...
+
+
+class ScatteredScalarField:
+
+    def __init__(self, points: np.ndarray, values: np.ndarray):
+        '''
+        Initialize a scattered scalar field, for interpolation from scattered data points in any number of dimensions.
+        Linear interpolation is used.
+
+
+        Parameters
+        ----------
+        points : np.ndarray
+            Coordinates of the scattered points. Shape should be (n_points, n_dimensions).
+        values : np.ndarray
+            Scalar field values at the scattered points. Shape should be (n_points,).
+        '''
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        '''
+        Coordinates of the scattered points.
+        '''
+        ...
+
+    @property
+    def values(self)->np.ndarray:
+        '''
+        Scalar field values at the scattered points.
+        '''
+        ...
+
+    def __call__(self, *args: float)->float:
+        '''
+        Get the interpolated scalar field value at a specific point in n-dimensional space.
+
+        Parameters
+        ----------
+        *args : float
+            Coordinates of the point at which to evaluate the scalar field. The number of arguments should match the dimensionality of the points.
+
+        Returns
+        -------
+        float
+            Interpolated scalar field value at the given coordinates.
+        '''
+        ...
         
+    
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:
     """

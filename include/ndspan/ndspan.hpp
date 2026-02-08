@@ -275,7 +275,6 @@ public:
     void resize(const Int* shape, size_t ndim){
         assert(Base::_is_valid_shape(shape, ndim) && "Invalid dims");
         //TODO make sure non of these are zero at runtime, and they are equal to the template parameter
-        
         assert(ndim == Base::ND && "SemiStaticNdSpan::resize invalid shape");
 
         _data[0] = prod(shape, ndim);

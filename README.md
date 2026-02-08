@@ -111,6 +111,12 @@ There are optional build flags for the Python bindings:
 
 Use any of them by setting the `CMAKE_ARGS` environment variable before installation, and adding the `-D` character before the flag, for example:
 
+For a standard debug build, run
+```bash
+CMAKE_ARGS="-DDEBUG=ON" pip install ./python
+```
+
+or for a debug build with accurate RK4 dense output, run
 ```bash
 CMAKE_ARGS="-DDEBUG=ON -DRK4_DENSE=ON" pip install ./python
 ```

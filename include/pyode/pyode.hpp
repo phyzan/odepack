@@ -459,6 +459,33 @@ private:
 };
 
 
+class PyScatteredField : public LinearNdInterpolator<double> {
+
+    using Base = LinearNdInterpolator<double>;
+
+public:
+
+    // Python signature is ScatteredField(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints)), where
+    PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values);
+
+    template<typename... Scalar>
+    double operator()(Scalar... x) const;
+
+    py::object py_points() const;
+
+    py::object py_values() const;
+
+    double py_value_at(const py::args& x) const;
+
+private:
+
+    PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values);
+
+    static std::nullptr_t parse_args(const py::array_t<double>& x, const py::array_t<double>& values);
+
+};
+
+
 class PyVecFieldBase {
 
 public:

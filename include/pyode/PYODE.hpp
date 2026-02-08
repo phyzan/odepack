@@ -199,6 +199,20 @@ double PyScalarField<NDIM>::operator()(Scalar... x) const{
 
 
 //===========================================================================================
+//                                      PyScatteredField
+//===========================================================================================
+
+
+
+template<typename... Scalar>
+double PyScatteredField::operator()(Scalar... x) const{
+    assert(sizeof...(Scalar) == this->ndim() && "Number of coordinates must match NDIM");
+    double p[]  = {double(x)...};
+    return Base::operator()(p, 0);
+}
+
+
+//===========================================================================================
 //                                      PyVecField
 //===========================================================================================
 
