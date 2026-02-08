@@ -2,6 +2,8 @@
 #define SAMPLED_VECTORFIELDS_HPP
 
 #include "GridInterp.hpp"
+#include "../OdeInt.hpp"
+
 
 namespace ode {
 

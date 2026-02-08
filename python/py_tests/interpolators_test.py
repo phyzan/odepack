@@ -16,7 +16,7 @@ X, Y = np.meshgrid(*grid.x, indexing="ij")
 V_array = (X**2 + Y**2) / 2 + X**2*Y - Y**3 / 3
 
 #define the sampled potential as a symbolic object with built-in interpolation and finite differences
-V = ScalarField(V_array, grid, "V", x, y)
+V = RegularScalarField("V", grid, V_array, x, y)
 
 #define equations of motion symbolically
 qdot = [px, py, -V(x, y).diff(x), -V(x, y).diff(y)]

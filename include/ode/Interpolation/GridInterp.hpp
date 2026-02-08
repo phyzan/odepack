@@ -2,7 +2,7 @@
 #define GRID_INTERP_HPP
 
 #include <cmath>
-#include "../OdeInt.hpp"
+#include "../odepack/include/ndspan/arrays.hpp"
 
 
 

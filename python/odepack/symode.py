@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Iterable, Callable
+from typing import Iterable, Callable, Iterator
 from .odesolvers import * #type: ignore
 from numiphy.lowlevelsupport import *
 from pathlib import Path
-import sys
+from .interpolate import *
 
 
 _LIB_PATH = Path(__file__).resolve().parent
@@ -11,6 +11,20 @@ _LIB_DIR = os.path.join(_LIB_PATH, "lib")
 _LIB_NAME = "odepack"
 
 _HEADER_PATH =  os.path.join(_LIB_PATH, "include", "pyode", "pyode.hpp")
+
+
+class ArrayofExpr:
+
+    def __init__(self, obj: Iterable[Expr], shape: tuple[int, ...] = None):
+        self.array = np.array(obj, dtype=object)
+        if shape is not None:
+            self.array = self.array.reshape(shape)
+
+    def __getitem__(self, *args) -> Expr:
+        return self.array[*args]
+    
+    def __iter__(self) -> Iterator[Expr]:
+        return iter(self.array.flat)
 
 
 class SymbolicEvent:
@@ -71,6 +85,13 @@ class SymbolicEvent:
             else:
                 return (self.name, self.mask, self.hide_mask) == (other.name, other.mask, other.hide_mask)
         return False
+    
+    @property
+    def symbolic_expressions(self)-> tuple[Expr, ...]:
+        if self.mask is None:
+            return ()
+        else:
+            return tuple(self.mask)
     
     @property
     def kwargs(self):
@@ -222,6 +243,11 @@ class SymbolicPreciseEvent(SymbolicEvent):
             else:
                 return (self.event, self.direction, self.event_tol) == (other.event, other.direction, other.event_tol) and SymbolicEvent.__eq__(self, other)
         return False
+    
+    @property
+    def symbolic_expressions(self) -> tuple[Expr, ...]:
+        base_exprs = SymbolicEvent.symbolic_expressions.__get__(self)()
+        return (self.event,) + base_exprs
     
     @property
     def kwargs(self):
@@ -437,7 +463,6 @@ class OdeSystem:
     SymbolicPeriodicEvent : Event triggered at time intervals
     """
 
-    _cached_fields: list = []
     _cls_instances: list[OdeSystem] = []
 
     def __init__(self, ode_sys: Iterable[Expr], t: Symbol, q: Iterable[Symbol], args: Iterable[Symbol] = (), events: Iterable[SymbolicEvent]=(), module_name: str=None, directory: str = None):
@@ -515,7 +540,7 @@ class OdeSystem:
         return self._cached_expressions['odesys']
     
     @property
-    def jacmat(self)->list[list[Expr]]:
+    def jacmat(self)->ArrayofExpr:
         if self._cached_expressions['jacmat'] is None:
             self._cached_expressions['jacmat'] = self._get_jacmat
         return self._cached_expressions['jacmat']
@@ -527,7 +552,7 @@ class OdeSystem:
         return self._cached_expressions['odesys_aug']
     
     @property
-    def jacmat_augmented(self)->list[list[Expr]]:
+    def jacmat_augmented(self)->ArrayofExpr:
         if self._cached_expressions['jacmat_aug'] is None:
             self._cached_expressions['jacmat_aug'] = self._get_jacmat_augmented
         return self._cached_expressions['jacmat_aug']
@@ -568,6 +593,75 @@ class OdeSystem:
         return len(self.lowlevel_callables())
 
     # ==================== CACHED PROPERTIES ====================
+
+    def symbolic_expressions(self, variational=False)->tuple[Expr,...]:
+        """All symbolic expressions in the system, including events and masks.
+
+        Parameters
+        ----------
+        variational : bool, default False
+            If True, include expressions from the augmented variational system.
+            If False, include only expressions from the original system.
+
+        Returns
+        -------
+        tuple[Expr, ...]
+            Tuple of all symbolic expressions used in the system, including ODEs,
+            event conditions, and mask expressions. If variational=True, also includes
+            expressions from the augmented system.
+
+        Notes
+        -----
+        This is used internally to determine which expressions need to be compiled
+        into low-level callables. It ensures that all relevant expressions are included
+        in the compilation process.
+        """
+        exprs = [self.t, *self.q, *self.args]
+        if variational:
+            exprs += self.ode_sys_augmented + tuple(item for item in self.jacmat_augmented)
+            for event in self.events:
+                exprs += event.symbolic_expressions
+        else:
+            exprs += self.ode_sys + tuple(item for item in self.jacmat)
+            for event in self.events:
+                exprs += event.symbolic_expressions
+        return tuple(exprs)
+    
+    def _get_fields(self, variational=False)->tuple[RegularScalarField,...]:
+        fields = []
+        for f in self.symbolic_expressions(variational=variational):
+            for g in f.deepsearch(RegularScalarField):
+                if g not in fields:
+                    fields.append(g)
+        return tuple(fields)
+    
+    @cached_property
+    def _fields(self):
+        return self._get_fields(variational=False)
+    
+    @cached_property
+    def _fields_var(self):
+        return self._get_fields(variational=True)
+    
+    def get_fields(self, variational=False):
+        return self._fields_var if variational else self._fields
+    
+    @cached_property
+    def _contains_fields(self):
+        for f in self.symbolic_expressions(variational=False):
+            for _ in f.deepsearch(RegularScalarField):
+                return True
+        return False
+    
+    @cached_property
+    def _contains_fields_var(self):
+        for f in self.symbolic_expressions(variational=True):
+            for _ in f.deepsearch(RegularScalarField):
+                return True
+        return False
+    
+    def contains_fields(self, variational=False):
+        return self._contains_fields_var if variational else self._contains_fields
 
     @cached_property
     def q_augmented(self):
@@ -654,23 +748,15 @@ class OdeSystem:
         The generated code includes function pointers that can be called from
         Python after compilation.
         """
-        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
+        extra_code_block, extra_func_code = self.extra_code(variational)
+        extra_kw = dict(extra_funcs=[extra_func_code])
+        if self.contains_fields(variational=variational):
+            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
 
-        if self.get_fields(scalar_type=scalar_type, variational=variational):
-            return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
-        else:
-            return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), extra_funcs=[extra_func_code])
+        return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), **extra_kw)
     
-    def get_fields(self, scalar_type: str, variational: bool):
-        evaluated_fields: list[EvaluatedScalarField] = []
-        for func in self.lowlevel_callables(scalar_type=scalar_type, variational=variational):
-            for field in func.evaluated_fields():
-                if field not in evaluated_fields:
-                    evaluated_fields.append(field)
-        return evaluated_fields
-    
-    def extra_code(self, scalar_type: str, variational: bool)->tuple[str, tuple[str, str]]:
-        fields = self.get_fields(scalar_type, variational)
+    def extra_code(self, variational: bool)->tuple[str, tuple[str, str]]:
+        fields = self.get_fields(variational=variational)
         field_block = '\n'.join([f'const ode::PyScalarField<{f.ndim}>* {f.name} = nullptr;' for f in fields])
 
         if fields:
@@ -725,11 +811,12 @@ class OdeSystem:
           directory specified (or current working directory if directory was None).
           The binary is named 'module_name_<scalar_type>' for each scalar type.
         """
-        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
-        if self.get_fields(scalar_type=scalar_type, variational=variational):
-            result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), extra_code_block=extra_code_block, extra_funcs=[extra_func_code], links=[(_LIB_DIR, _LIB_NAME)], extra_header_block=self.header, extra_flags=["fvisibility=hidden"])
-        else:
-            result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), extra_funcs=[extra_func_code], extra_code_block=extra_code_block, extra_flags=["fvisibility=hidden"])
+        extra_code_block, extra_func_code = self.extra_code(variational)
+        extra_kw = dict(extra_funcs=[extra_func_code])
+        if self.contains_fields(variational=variational):
+            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+        
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[(_LIB_DIR, _LIB_NAME)], extra_flags=["fvisibility=hidden"], **extra_kw)
         return result # (pointers, ...), set_field
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
@@ -768,8 +855,11 @@ class OdeSystem:
             Low-level representation of the Jacobian matrix
         """
         q, _, jacmat = self._ode_data(variational=variational)
+        n = self.Nsys if not variational else 2*self.Nsys
         if layout == 'F':
-            jacmat = [[jacmat[j][i] for j in range(len(jacmat))] for i in range(len(jacmat[0]))]
+            jacmat = [[jacmat[j, i] for j in range(n)] for i in range(n)]
+        else:
+            jacmat = [[jacmat[i, j] for j in range(n)] for i in range(n)]
         return TensorLowLevelCallable(array=jacmat, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
 
     def true_compiled_events(self, scalar_type='double', variational=False):
@@ -817,7 +907,7 @@ class OdeSystem:
         return
     
     def override_jacmat(self, jacmat: list[list[Expr]]):
-        self._cached_expressions['jacmat'] = jacmat
+        self._cached_expressions['jacmat'] = ArrayofExpr(np.array(jacmat, dtype=object), shape=(self.Nsys, self.Nsys))
         return
     
     def override_variational_odesys(self, variational_odesys: Iterable[Expr]):
@@ -825,7 +915,7 @@ class OdeSystem:
         return
     
     def override_variational_jacmat(self, jacmat: list[list[Expr]]):
-        self._cached_expressions['jacmat_aug'] = jacmat
+        self._cached_expressions['jacmat_aug'] = ArrayofExpr(np.array(jacmat, dtype=object), shape=(2*self.Nsys, 2*self.Nsys))
         return
     
     def override_pointers(self, pointers: dict[str, tuple[Pointer, ...]]):
@@ -1179,7 +1269,7 @@ class OdeSystem:
         for i in range(self.Nsys):
             for j in range(self.Nsys):
                 matrix[i][j] = array[i].diff(symbols[j])
-        return matrix
+        return ArrayofExpr(matrix, shape=(self.Nsys, self.Nsys))
     
     @cached_property
     def _get_ode_sys_augmented(self):
@@ -1200,7 +1290,7 @@ class OdeSystem:
         for i in range(2*self.Nsys):
             for j in range(2*self.Nsys):
                 matrix[i][j] = array[i].diff(symbols[j])
-        return matrix
+        return ArrayofExpr(matrix, shape=(2*self.Nsys, 2*self.Nsys))
     
     @cached_property
     def _event_obj_map(self):
@@ -1296,19 +1386,11 @@ class OdeSystem:
                 default_ptrs = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational)).pointers()
             except ImportError:
                 default_ptrs, setter = self.compile(scalar_type=scalar_type, variational=variational)
-                fields = self._get_evaluated_fields(variational=variational)
+                fields = self.get_fields(variational=variational)
                 new_sampled_fields = []
                 for f in fields:
-                    if f.ndim == 1:
-                        new_sampled_fields.append(SampledScalarField1D(f._ndarray, *f.grid.x))
-                    elif f.ndim == 2:
-                        new_sampled_fields.append(SampledScalarField2D(f._ndarray, *f.grid.x))
-                    elif f.ndim == 3:
-                        new_sampled_fields.append(SampledScalarField3D(f._ndarray, *f.grid.x))
-                    else:
-                        raise ValueError(f"Unsupported field dimension: {f.ndim}")
+                    new_sampled_fields.append(f.to_sampled_scalar_field)
                 setter(*new_sampled_fields)
-                self._cached_fields += new_sampled_fields
             cache[scalar_type] = tuple(first) + default_ptrs[len(first):]
         else:
             cache[scalar_type] = tuple(first) + cache[scalar_type][len(first):]
@@ -1344,22 +1426,6 @@ class OdeSystem:
                 extra_kwargs[param_name] = items[i+2]
                 i+=1
             res.append(event._toEvent(scalar_type=scalar_type, **extra_kwargs))
-        return res
-    
-    def _get_evaluated_fields(self, variational: bool)->list[EvaluatedScalarField]:
-        res = []
-        expressions = [*self.ode_sys]
-        for row in self.jacmat:
-            expressions += row
-        if variational:
-            expressions += [*self.ode_sys_augmented]
-            for row in self.jacmat_augmented:
-                expressions += row
-
-        for expr in expressions:
-            for item in expr.deepsearch(EvaluatedScalarField):
-                if item not in res:
-                    res.append(item)
         return res
 
     def _get(self, t0: float, q0: np.ndarray, *, rtol=1e-6, atol=1e-12, min_step=0., max_step=np.inf, stepsize=0., direction=1, args=(), method="RK45", period=None, compiled=True, scalar_type='double'):
