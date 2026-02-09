@@ -64,7 +64,25 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 ---
 
-## Installation
+# Installation
+
+
+### Prerequisites
+
+The library contains modules for interpolating sampled fields using the Q-Hull headers.
+To exploit this functionality, install Q-Hull by running the following command.
+For the Python installation, this is a required dependency.
+
+```bash
+sudo apt install libqhull-dev
+```
+
+To use the arbitrary precision features, install the C++ wrapper of MPFR and GMP:
+
+```bash
+sudo apt install libmpfrc++-dev
+```
+
 
 ### C++ (Header-Only)
 
@@ -86,18 +104,21 @@ sudo make uninstall
 
 Then include in your code:
 ```cpp
-#include <odepack/odepack.hpp>
+#include <odepack/ODEPACK.hpp> 
 ```
 
 **Requirements:**
 - C++20 compatible compiler
-- OpenMP (optional, for parallel integration)
-- MPFR/GMP (optional, for arbitrary precision)
 
 ### Python
 
 ```bash
 pip install ./python
+```
+
+To install with arbitrary precision support, assuming that the C++ wrapper of MPFR and GMP is installed (see above), run
+```bash
+CMAKE_ARGS="-DMPREAL=ON" pip install ./python
 ```
 
 **Requirements:**
@@ -128,7 +149,7 @@ CMAKE_ARGS="-DDEBUG=ON -DMPREAL=ON" pip install ./python
 ### C++ Example
 
 ```cpp
-#include <odepack/odepack.hpp>
+#include <odepack/ODEPACK.hpp>
 
 using namespace ode;
 
@@ -251,7 +272,7 @@ print("Expected state:", "[..., 1]")
 ### ODE classes use an internal solver to store integration history
 
 ```cpp
-#include <odepack/odepack.hpp>
+#include <odepack/ODEPACK.hpp>
 
 using namespace ode;
 
@@ -500,7 +521,7 @@ odepack/
 ODEPACK supports arbitrary precision arithmetic via MPFR:
 
 ```cpp
-#include <odepack/odepack.hpp>
+#include <odepack/ODEPACK.hpp>
 
 using namespace ode;
 
