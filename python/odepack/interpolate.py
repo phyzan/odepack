@@ -195,6 +195,11 @@ class IrregularScalarField(NumericalScalarField):
             The values of the scalar field at the scattered points. Must have the same length as the number of points.
         *expressions : Expr
             Optional expressions for interpolation on each axis. The number of expressions must match the number of dimensions of the grid.
+
+        IMPORTANT
+        ----------------------
+        The name will be th unique identifiers used for comparison with other instances of this class, because comparing the points and values is expensive
+        when constructing a symbolic expression. Make sure to give different names to objects with different points or values.
         '''
         expressions = tuple([asexpr(x) for x in expressions])
         if isinstance(points, (DelaunayTriangulation)):
@@ -298,21 +303,15 @@ class IrregularScalarField(NumericalScalarField):
     def __eq__(self, other):
         if not isinstance(other, IrregularScalarField):
             return False
-        elif self is other:
-            return True
-        elif (self.values is other.values and self.points is other.points):
-            return True
-        elif self.points.shape == other.points.shape:
-            return np.all(self.points == other.points) and np.all(self.values == other.values) and self.args[3:] == other.args[3:]
         else:
-            return False
+            return self.name == other.name # only compare names, since comparing points and values is expensive. The name should be unique for different points and values, so this should be sufficient for correct behavior in symbolic expressions.
         
     def __hash__(self):
         return hash((self.__class__,) + self._hashable_content)
     
     @property
     def _hashable_content(self):
-        return (_HashableNdArray(self.points), _HashableNdArray(self.values), *self.expressions)
+        return (self.name, *self.expressions)
     
     def eval(self):
         if len(self.symbols) == 0:

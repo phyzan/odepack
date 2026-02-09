@@ -96,13 +96,40 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
     int prev = -1; // track previous simplex to avoid oscillation
     int max_iter = num_simplices; // prevent infinite loops
 
-    for (int iter = 0; iter < max_iter; ++iter) {
-        compute_barycentric(bary.data(), s, point);
+    auto is_inside = [&](int simplex_idx) {
+        if (!compute_barycentric(bary.data(), simplex_idx, point)) {
+            return false;
+        }
+        for (int i = 0; i <= nd; ++i) {
+            if (bary[i] < -EPS) {
+                return false;
+            }
+        }
+        return true;
+    };
 
-        // Find most negative barycentric coordinate, excluding the face we came from
+    for (int iter = 0; iter < max_iter; ++iter) {
+        if (!compute_barycentric(bary.data(), s, point)) {
+            break;
+        }
+
+        // Find most negative barycentric coordinate (with and without prev-skip)
         int min_idx = -1;
         double min_val = -EPS;
+        int min_idx_any = -1;
+        double min_val_any = -EPS;
+        bool any_negative = false;
+
         for (int i = 0; i <= nd; ++i) {
+            if (bary[i] < -EPS) {
+                any_negative = true;
+            }
+
+            if (bary[i] < min_val_any) {
+                min_val_any = bary[i];
+                min_idx_any = i;
+            }
+
             // Skip if this neighbor is the previous simplex (avoid oscillation)
             if (neighbors_(s, i) == prev) {
                 continue;
@@ -113,23 +140,33 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
             }
         }
 
-        if (min_idx == -1) {
-            // All coordinates >= -EPS (or lead back to prev), point is inside this simplex
+        if (!any_negative) {
+            // All coordinates >= -EPS, point is inside this simplex
             this->last_simplex_ = s; // cache for next query
             return s;
         }
 
-        // Move to neighbor opposite the most negative vertex
-        int next = neighbors_(s, min_idx);
-        if (next == -1) {
-            // Hit boundary, point is outside the convex hull
-            return -1;
+        if (min_idx == -1) {
+            // Only the previous neighbor is a candidate; fall back to the most negative face.
+            min_idx = min_idx_any;
+        }
+
+        int next = (min_idx >= 0) ? neighbors_(s, min_idx) : -1;
+        if (next == -1 || next == s) {
+            break;
         }
         prev = s;
         s = next;
     }
 
-    // Fallback: should not reach here for well-formed triangulation
+    // Fallback: brute force check in case the walk stalls (degenerate/simplex mapping issues).
+    for (int sidx = 0; sidx < num_simplices; ++sidx) {
+        if (is_inside(sidx)) {
+            this->last_simplex_ = sidx;
+            return sidx;
+        }
+    }
+
     return -1;
 }
 
@@ -162,7 +199,7 @@ bool DelaunayTri<NDIM>::compute_barycentric(double* out, int simplex_idx, const 
     }
     out[ND] = sumb;
 
-    return true;
+    return all_are_finite(out, ND + 1);
 
 };
 
@@ -297,52 +334,24 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
     int num_simplices = int(facet_list.size());
     simplices_ = Array2D<int, 0, DIM_SPX>(simplex_array.data(), num_simplices, n + 1);
 
-    // Second pass: extract neighbors mapped to the vertex they are opposite to.
+    // Second pass: extract neighbors
     neighbors_.resize(num_simplices, n + 1);
     neighbors_.set(-1); // default to -1 (no neighbor)
 
     for (int s = 0; s < num_simplices; ++s) {
         facetT* f = facet_list[s];
-        const int* simplex = simplices_.ptr(s, 0);
+        facetT** neighborp;
+        facetT* neighbor;
+        int i = 0;
 
-        ridgeT* ridge;
-        ridgeT** ridgep;
-        FOREACHridge_(f->ridges) {
-            facetT* neighbor = (ridge->top == f) ? ridge->bottom : ridge->top;
-            if (!neighbor || neighbor->upperdelaunay) {
-                continue;
-            }
-
-            auto it = facet_to_idx.find(neighbor);
-            if (it == facet_to_idx.end()) {
-                continue;
-            }
-
-            std::vector<char> in_ridge(n + 1, 0);
-
-            vertexT* vertex;
-            vertexT** vertexp;
-            FOREACHvertex_(ridge->vertices) {
-                int point_idx = qh_pointid(qh, vertex->point);
-                for (int i = 0; i < n + 1; ++i) {
-                    if (simplex[i] == point_idx) {
-                        in_ridge[i] = 1;
-                        break;
-                    }
+        FOREACHneighbor_(f) {
+            if (neighbor && !neighbor->upperdelaunay) {
+                auto it = facet_to_idx.find(neighbor);
+                if (it != facet_to_idx.end()) {
+                    neighbors_(s, i) = it->second;
                 }
             }
-
-            int missing = -1;
-            for (int i = 0; i < n + 1; ++i) {
-                if (!in_ridge[i]) {
-                    missing = i;
-                    break;
-                }
-            }
-
-            if (missing >= 0) {
-                neighbors_(s, missing) = it->second;
-            }
+            ++i;
         }
     }
 

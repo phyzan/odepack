@@ -66,7 +66,7 @@ private:
     Array2D<int, 0, DIM_SPX>        neighbors_; // (nsimplices, ndim+1), -1 = boundary
     Array2D<double, 0, NDIM>        v0_;        // (nsimplices, ndim)
     Array3D<double, 0, NDIM, NDIM>  invT_;      // (nsimplices, ndim, ndim)
-    mutable int                     last_simplex_ = 0; // cache for walking algorithm
+    mutable int                     last_simplex_ = -1; // cache for walking algorithm
 
 };
 
