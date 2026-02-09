@@ -123,6 +123,7 @@ CMAKE_ARGS="-DMPREAL=ON" pip install ./python
 
 **Requirements:**
 - Python 3.12+
+- g++ 13.3.0 for installation and compiling ODE systems at runtime
 
 There are optional build flags for the Python bindings:
 
@@ -461,43 +462,66 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 ```
 odepack/
 ├── include/
-│   ├── odepack/
+│   ├── ode/                         # Core ODE library
 │   │   ├── Core/                    # Foundation & base classes
 │   │   │   ├── VirtualBase.hpp      # Virtual interfaces & solver policies
 │   │   │   ├── SolverBase.hpp       # CRTP base solver
 │   │   │   ├── RichBase.hpp         # Event-aware solver extension
-│   │   │   └── Events.hpp           # Event detection system
+│   │   │   ├── Events.hpp           # Event detection system
+│   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Solvers/                 # Concrete solver implementations
 │   │   │   ├── Euler.hpp            # Simple Euler method (1st order)
+│   │   │   ├── RungeKutta.hpp       # Generic Runge-Kutta framework
 │   │   │   ├── DOPRI.hpp            # Runge-Kutta RK23, RK45 (adaptive)
 │   │   │   ├── DOP853.hpp           # High-order explicit RK (8th order)
-│   │   │   └── BDF.hpp              # Implicit solver for stiff systems
+│   │   │   ├── BDF.hpp              # Implicit solver for stiff systems
+│   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Interpolation/           # Dense output & interpolation
 │   │   │   ├── Interpolators.hpp    # Base interpolator interface
-│   │   │   └── GridInterp.hpp       # Grid & vector field interpolation
+│   │   │   ├── GridInterp.hpp       # Grid interpolation utilities
+│   │   │   ├── LinearNdInterpolator.hpp  # N-dimensional linear interpolation
+│   │   │   ├── SampledVectorfields.hpp   # Sampled vector field interpolation
+│   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Chaos/                   # Dynamical systems analysis
-│   │   │   └── VariationalSolvers.hpp  # Lyapunov exponent computation
+│   │   │   ├── VariationalSolvers.hpp    # Lyapunov exponent computation
+│   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
-│   │   ├── odepack.hpp              # Main include (all headers)
 │   │   ├── OdeInt.hpp               # High-level ODE wrapper
 │   │   ├── SolverDispatcher.hpp     # Factory for solver instantiation
 │   │   ├── SolverState.hpp          # Solver state & status reporting
 │   │   └── Tools.hpp                # Utilities (PolyWrapper, etc.)
 │   │
-│   └── ndspan/                      # Multi-dimensional array library
-│       ├── ndspan.hpp
-│       ├── arrays.hpp
-│       └── ...
+│   ├── ndspan/                      # Multi-dimensional array library
+│   │   ├── layouts/                 # Layout implementations
+│   │   │   ├── standard_layouts.hpp
+│   │   │   └── morton.hpp
+│   │   ├── ndspan.hpp
+│   │   ├── arrays.hpp
+│   │   ├── ndview.hpp
+│   │   ├── iterators.hpp
+│   │   └── ...
+│   │
+│   ├── pyode/                       # Python binding utilities
+│   │   ├── pyode.hpp                # Main Python ODE interface
+│   │   ├── pytools.hpp              # Python utility functions
+│   │   ├── ode_caster.hpp           # Type casters for pybind11
+│   │   └── *_impl.hpp               # Implementation files
+│   │
+│   ├── odepack.hpp                  # Main C++ include (all headers)
+│   ├── ndspan.hpp                   # Main ndspan include
+│   ├── pyodehead.hpp                # Convenience include for pyode
+│   └── pyodepack.hpp                # Main Python bindings include
 │
 ├── python/
 │   ├── src/                         # Python bindings (pybind11)
 │   ├── odepack/                     # Python package
-│   └── tests/                       # Python tests
+│   └── py_tests/                    # Python tests
 │
 ├── tests/                           # C++ tests
+├── cmake/                           # CMake configuration files
 ├── LICENSE
 └── README.md
 ```
@@ -506,13 +530,15 @@ odepack/
 
 | Component | Description |
 |-----------|-------------|
-| **Core/** | Base classes, virtual interfaces, event system, and solver policies |
-| **Solvers/** | Concrete integrator implementations (Euler, RK23, RK45, DOP853, BDF) |
-| **Interpolation/** | Dense output providers and grid interpolation utilities |
-| **Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
-| **OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
-| **SolverDispatcher.hpp** | Factory functions for solver instantiation |
-| **Tools.hpp** | Utilities including `PolyWrapper` for polymorphic type ownership |
+| **ode/Core/** | Base classes, virtual interfaces, event system, and solver policies |
+| **ode/Solvers/** | Concrete integrator implementations (Euler, RK23, RK45, DOP853, BDF) |
+| **ode/Interpolation/** | Dense output providers, grid interpolation, and scattered data interpolation |
+| **ode/Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
+| **ode/OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
+| **ode/SolverDispatcher.hpp** | Factory functions for solver instantiation |
+| **ode/Tools.hpp** | Utilities including `PolyWrapper` for polymorphic type ownership |
+| **ndspan/** | Multi-dimensional array views and utilities |
+| **pyode/** | Python binding utilities and type casters for pybind11 integration |
 
 ---
 
