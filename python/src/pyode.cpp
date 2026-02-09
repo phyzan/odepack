@@ -1,4 +1,4 @@
-#include "../../include/PySolve_IMPL.hpp"
+#include "../../include/pyodepack.hpp"
 
 namespace ode{
 

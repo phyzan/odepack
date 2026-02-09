@@ -2,12 +2,15 @@
 #define ODEPACK_HPP
 
 
-#include "ode/Tools.hpp"
-#include "ode/SolverDispatcher.hpp"
-#include "ode/OdeInt.hpp"
-#include "ode/Chaos/VariationalSolvers.hpp"
-#include "ode/Interpolation/SampledVectorfields.hpp"
-#include "ode/Interpolation/LinearNdInterpolator.hpp"
+#include "ode/Tools_impl.hpp"
+#include "ode/SolverDispatcher_impl.hpp"
+#include "ode/OdeInt_impl.hpp"
+#include "ode/SolverState_impl.hpp"
+
+#include "ode/Core/Core_impl.hpp"
+#include "ode/Solvers/Solvers_impl.hpp"
+#include "ode/Interpolation/Interpolation_impl.hpp"
+#include "ode/Chaos/Chaos_impl.hpp"
 
 /**
  * @file odepack.hpp

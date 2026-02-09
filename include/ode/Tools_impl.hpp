@@ -221,6 +221,12 @@ const Array2D<T, 0, N>& OdeResult<T, N>::q() const {
 }
 
 template<typename T, size_t N>
+template<std::integral INT1, std::integral INT2>
+const T& OdeResult<T, N>::q(INT1 i, INT2 j) const{
+    return _q(i, j);
+}
+
+template<typename T, size_t N>
 const EventMap& OdeResult<T, N>::event_map() const {
     return _event_map;
 }

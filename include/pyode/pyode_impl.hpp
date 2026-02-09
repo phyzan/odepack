@@ -2,7 +2,7 @@
 #define PYODE_IMPL_TPP
 
 #include "pyode.hpp"
-#include "pytools_IMPL.hpp"
+#include "pytools_impl.hpp"
 
 
 //===========================================================================================

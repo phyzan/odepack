@@ -104,7 +104,7 @@ sudo make uninstall
 
 Then include in your code:
 ```cpp
-#include <odepack/ODEPACK.hpp> 
+#include <odepack/odepack.hpp> 
 ```
 
 **Requirements:**
@@ -149,7 +149,7 @@ CMAKE_ARGS="-DDEBUG=ON -DMPREAL=ON" pip install ./python
 ### C++ Example
 
 ```cpp
-#include <odepack/ODEPACK.hpp>
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 
@@ -272,7 +272,7 @@ print("Expected state:", "[..., 1]")
 ### ODE classes use an internal solver to store integration history
 
 ```cpp
-#include <odepack/ODEPACK.hpp>
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 
@@ -521,7 +521,7 @@ odepack/
 ODEPACK supports arbitrary precision arithmetic via MPFR:
 
 ```cpp
-#include <odepack/ODEPACK.hpp>
+#include <odepack/odepack.hpp>
 
 using namespace ode;
 
@@ -591,7 +591,11 @@ int main() {
 }
 ```
 
-Compile with `-DMPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`.
+Compile with `-DMPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`:
+
+```
+g++ -std=c++20 -DMPREAL test.cpp -o test -lmpfr -lgmp
+```
 
 ---
 

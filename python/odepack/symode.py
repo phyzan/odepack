@@ -10,7 +10,7 @@ _LIB_PATH = Path(__file__).resolve().parent
 _LIB_DIR = os.path.join(_LIB_PATH, "lib")
 _LIB_NAME = "odepack"
 
-_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "pyode", "pyode.hpp")
+_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "pyodehead.hpp")
 
 
 class ArrayofExpr:
