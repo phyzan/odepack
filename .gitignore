@@ -1,4 +1,29 @@
 .cache
 __pycache__/
 .venv
-build
+build/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+**/Makefile
+!Makefile
+*.cmake
+!CMakeLists.txt
+
+# Compiled files
+*.so
+*.o
+*.a
+*.dylib
+
+# IDE
+.vscode/
+.idea/
+.clangd
+
+# Python
+*.egg-info/
+dist/
+*.pyc

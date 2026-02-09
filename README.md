@@ -116,9 +116,9 @@ For a standard debug build, run
 CMAKE_ARGS="-DDEBUG=ON" pip install ./python
 ```
 
-or for a debug build with accurate RK4 dense output, run
+or for a debug build with arbitrary precision support, run
 ```bash
-CMAKE_ARGS="-DDEBUG=ON -DRK4_DENSE=ON" pip install ./python
+CMAKE_ARGS="-DDEBUG=ON -DMPREAL=ON" pip install ./python
 ```
 
 ---

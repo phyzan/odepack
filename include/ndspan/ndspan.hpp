@@ -123,9 +123,11 @@ protected:
 
     template<INT_T... IntType>
     INLINE static void _shape_check(IntType... dim) {
-        EXPAND(size_t, sizeof...(dim), I,
-            assert(((dim >= 0 ) && ...) && "Invalid dims");
-        );
+        if constexpr ((std::is_signed_v<IntType> || ...)) {
+            EXPAND(size_t, sizeof...(dim), I,
+                assert(((dim >= 0 ) && ...) && "Invalid dims");
+            );
+        }
     }
 
     template<INT_T Int>
@@ -496,7 +498,9 @@ public:
             ptr()[1] = (shape*...);
 
             EXPAND(size_t, new_nd, I,
-                assert(((shape >= 0 ) && ...) && "Invalid dims");
+                if constexpr ((std::is_signed_v<Args> || ...)) {
+                    assert(((shape >= 0 ) && ...) && "Invalid dims");
+                }
                 ((ptr()[I+2] = shape), ...);
             );
         }

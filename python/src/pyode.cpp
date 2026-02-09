@@ -1,4 +1,4 @@
-#include "../../include/pyode/PYODE.hpp"
+#include "../../include/PySolve_IMPL.hpp"
 
 namespace ode{
 
@@ -148,7 +148,7 @@ py::object PyPerEvent::period() const{
 //                                      Helper Functions
 //===========================================================================================
 
-inline std::vector<EventOptions> to_Options(const py::iterable& d) {
+ std::vector<EventOptions> to_Options(const py::iterable& d) {
     std::vector<EventOptions> result;
 
     for (const py::handle& item : d) {
@@ -856,48 +856,6 @@ py::object PyVarODE::copy() const{
 }
 
 
-//===========================================================================================
-//                                      PyScatteredField
-//===========================================================================================
-
-PyScatteredField::PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values) : PyScatteredField(parse_args(x, values), x, values){}
-
-PyScatteredField::PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values) : Base(x, std::array<const double*, 1>{values.data()}) {}
-
-py::object PyScatteredField::py_points() const{
-    return py::cast(this->get_points());
-}
-
-py::object PyScatteredField::py_values() const{
-    return py::cast(this->get_field(0));
-}
-
-double PyScatteredField::py_value_at(const py::args& x) const{
-    // TODO: optimize this. Currently a temporary vector is created on each call.
-    std::vector<double> point(x.size());
-    if (x.size() != this->ndim()){
-        // throw informative error including ndim of input and expected ndim
-        throw py::value_error("Expected " + std::to_string(this->ndim()) + " input points, but got " + std::to_string(x.size()));
-    }
-    for (size_t i=0; i<x.size(); i++){
-        point[i] = x[i].cast<double>();
-    }
-    return Base::operator()(point.data(), 0);
-}
-
-std::nullptr_t PyScatteredField::parse_args(const py::array_t<double>& x, const py::array_t<double>& values){
-    if (x.ndim() > 2){
-        throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");
-    }else if (values.ndim() != 1){
-        throw py::value_error("ScatteredField requires a 1D array for the field values");
-    }else if (x.shape(0) != values.size()){
-        throw py::value_error("Number of input points must match number of field values");
-    }else if (x.ndim() == 2 && x.shape(0) < x.shape(1)+1){
-        throw py::value_error("Number of input points must be at least one more than the number of dimensions");
-    }
-    return nullptr;
-}
-
 
 //===========================================================================================
 //                                      PyVecField2D, 3D
@@ -1066,11 +1024,75 @@ template class PyScalarField<3>;
 template class PyVecField<2>;
 template class PyVecField<3>;
 
+// Explicit constructor instantiations for PyScalarField
+template PyScalarField<1>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&);
+template PyScalarField<2>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
+template PyScalarField<3>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
+
 // Explicit instantiations for PyScalarField::operator() member function template
 // These are needed because operator() is a template member function that gets called
 // from dynamically compiled ODE code
 template double PyScalarField<1>::operator()(double) const;
 template double PyScalarField<2>::operator()(double, double) const;
 template double PyScalarField<3>::operator()(double, double, double) const;
+
+
+// PyVecField<2> template member functions
+template py::object PyVecField<2>::py_x<0>() const;
+template py::object PyVecField<2>::py_x<1>() const;
+template py::object PyVecField<2>::py_vx<0>() const;
+template py::object PyVecField<2>::py_vx<1>() const;
+template py::object PyVecField<2>::py_vx_at<0, double, double>(double, double) const;
+template py::object PyVecField<2>::py_vx_at<1, double, double>(double, double) const;
+template py::object PyVecField<2>::py_vector<double, double>(double, double) const;
+template bool PyVecField<2>::py_in_bounds<double, double>(double, double) const;
+
+// PyVecField<3> template member functions
+template py::object PyVecField<3>::py_x<0>() const;
+template py::object PyVecField<3>::py_x<1>() const;
+template py::object PyVecField<3>::py_x<2>() const;
+template py::object PyVecField<3>::py_vx<0>() const;
+template py::object PyVecField<3>::py_vx<1>() const;
+template py::object PyVecField<3>::py_vx<2>() const;
+template py::object PyVecField<3>::py_vx_at<0, double, double, double>(double, double, double) const;
+template py::object PyVecField<3>::py_vx_at<1, double, double, double>(double, double, double) const;
+template py::object PyVecField<3>::py_vector<double, double, double>(double, double, double) const;
+template bool PyVecField<3>::py_in_bounds<double, double, double>(double, double, double) const;
+
+// PyScatteredField::operator() instantiations for dynamically compiled ODEs
+
+#define INST_PY_TRI(N) \
+template PyDelaunay<N>::PyDelaunay(const py::array_t<double>& x);\
+template py::object PyDelaunay<N>::py_points() const;\
+
+INST_PY_TRI(0)
+INST_PY_TRI(1)
+INST_PY_TRI(2)
+INST_PY_TRI(3)
+
+
+// For NDIM = 0:
+#define INST_PY_SCAT_FIELD(N)\
+template PyScatteredField<N>::PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values);\
+template PyScatteredField<N>::PyScatteredField(const PyDelaunay<N>& tri, const py::array_t<double>& values);\
+template py::object PyScatteredField<N>::py_points() const;\
+template py::object PyScatteredField<N>::py_values() const;\
+template py::object PyScatteredField<N>::py_delaunay_obj() const;\
+template double PyScatteredField<N>::py_value_at(const py::args& x) const;\
+
+
+INST_PY_SCAT_FIELD(0)
+template double PyScatteredField<0>::operator()(double) const;
+template double PyScatteredField<0>::operator()(double, double) const;
+template double PyScatteredField<0>::operator()(double, double, double) const;
+
+INST_PY_SCAT_FIELD(1)
+template double PyScatteredField<1>::operator()(double) const;
+
+INST_PY_SCAT_FIELD(2)
+template double PyScatteredField<2>::operator()(double, double) const;
+
+INST_PY_SCAT_FIELD(3)
+template double PyScatteredField<3>::operator()(double, double, double) const;
 
 } // namespace ode

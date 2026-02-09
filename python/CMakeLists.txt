@@ -3,6 +3,10 @@
 pybind11_add_module(odesolvers src/bindings.cpp)
 target_link_libraries(odesolvers PRIVATE odepack_lib)
 
+if(MPREAL)
+    target_compile_definitions(odesolvers PRIVATE MPREAL)
+endif()
+
 # Install the compiled module into the odepack Python package
 install(TARGETS odesolvers
     LIBRARY DESTINATION odepack

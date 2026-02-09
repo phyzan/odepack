@@ -32,7 +32,7 @@ y_equals_1_event = PreciseEvent(
     name="y_equals_1",
     when=event_condition,
     direction=0,  # Detect crossing in any direction
-    event_tol=1e-12
+    event_tol=1e-12, scalar_type="mpreal"
 )
 
 # Initial conditions: [x, y, vx, vy]
@@ -46,7 +46,7 @@ solver = RK45(
     q0=q0,
     rtol=1e-9,
     atol=1e-12,
-    events=[y_equals_1_event]
+    events=[y_equals_1_event], scalar_type="mpreal"
 )
 
 # Set up the plot

@@ -20,8 +20,8 @@ class ArrayofExpr:
         if shape is not None:
             self.array = self.array.reshape(shape)
 
-    def __getitem__(self, *args) -> Expr:
-        return self.array[*args]
+    def __getitem__(self, key) -> Expr:
+        return self.array[key]
     
     def __iter__(self) -> Iterator[Expr]:
         return iter(self.array.flat)
@@ -75,7 +75,7 @@ class SymbolicEvent:
         if (self.__class__ == SymbolicEvent):
             raise NotImplementedError('The SymbolicEvent class is an abstract base class. It can only be instanciated through a subclass')
         self.name = name
-        self.mask = mask
+        self.mask = tuple(asexpr(arg) for arg in mask) if mask is not None else None
         self.hide_mask = hide_mask
 
     def __eq__(self, other):
@@ -232,7 +232,7 @@ class SymbolicPreciseEvent(SymbolicEvent):
 
     def __init__(self, name: str, event: Expr, direction=0, mask: Iterable[Expr]=None, hide_mask=False, event_tol=1e-12):
         SymbolicEvent.__init__(self, name, mask, hide_mask)
-        self.event = event
+        self.event = asexpr(event)
         self.direction = direction
         self.event_tol = event_tol
     
@@ -246,7 +246,7 @@ class SymbolicPreciseEvent(SymbolicEvent):
     
     @property
     def symbolic_expressions(self) -> tuple[Expr, ...]:
-        base_exprs = SymbolicEvent.symbolic_expressions.__get__(self)()
+        base_exprs = SymbolicEvent.symbolic_expressions.__get__(self)
         return (self.event,) + base_exprs
     
     @property
@@ -618,19 +618,23 @@ class OdeSystem:
         """
         exprs = [self.t, *self.q, *self.args]
         if variational:
-            exprs += self.ode_sys_augmented + tuple(item for item in self.jacmat_augmented)
+            exprs += self.ode_sys_augmented
+            if self.has_jac:
+                exprs += tuple(item for item in self.jacmat_augmented)
             for event in self.events:
                 exprs += event.symbolic_expressions
         else:
-            exprs += self.ode_sys + tuple(item for item in self.jacmat)
+            exprs += self.ode_sys
+            if self.has_jac:
+                exprs += tuple(item for item in self.jacmat)
             for event in self.events:
                 exprs += event.symbolic_expressions
         return tuple(exprs)
     
-    def _get_fields(self, variational=False)->tuple[RegularScalarField,...]:
+    def _get_fields(self, variational=False)->tuple[NumericalScalarField,...]:
         fields = []
         for f in self.symbolic_expressions(variational=variational):
-            for g in f.deepsearch(RegularScalarField):
+            for g in f.deepsearch(NumericalScalarField):
                 if g not in fields:
                     fields.append(g)
         return tuple(fields)
@@ -649,14 +653,14 @@ class OdeSystem:
     @cached_property
     def _contains_fields(self):
         for f in self.symbolic_expressions(variational=False):
-            for _ in f.deepsearch(RegularScalarField):
+            for _ in f.deepsearch(NumericalScalarField):
                 return True
         return False
     
     @cached_property
     def _contains_fields_var(self):
         for f in self.symbolic_expressions(variational=True):
-            for _ in f.deepsearch(RegularScalarField):
+            for _ in f.deepsearch(NumericalScalarField):
                 return True
         return False
     
@@ -751,16 +755,16 @@ class OdeSystem:
         extra_code_block, extra_func_code = self.extra_code(variational)
         extra_kw = dict(extra_funcs=[extra_func_code])
         if self.contains_fields(variational=variational):
-            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block)
 
         return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), **extra_kw)
     
     def extra_code(self, variational: bool)->tuple[str, tuple[str, str]]:
         fields = self.get_fields(variational=variational)
-        field_block = '\n'.join([f'const ode::PyScalarField<{f.ndim}>* {f.name} = nullptr;' for f in fields])
+        field_block = '\n'.join([f.compiled_signature for f in fields])
 
         if fields:
-            set_fields_params = ', '.join([f'const ode::PyScalarField<{f.ndim}>& {f.name}_tmp' for f in fields])
+            set_fields_params = ', '.join([f'const ode::{f.c_class_name}& {f.name}_tmp' for f in fields])
             set_fields_body = '\n'.join([f'\t{f.name} = &{f.name}_tmp;' for f in fields])
             set_fields_func = f'void set_fields({set_fields_params}){{\n{set_fields_body}\n}}'
         else:
@@ -773,6 +777,14 @@ class OdeSystem:
     @property
     def header(self):
         return f'#include "{_HEADER_PATH}"'
+    
+    @property
+    def has_jac(self) -> bool:
+        try:
+            self.jacmat
+            return True
+        except NotImplementedError:
+            return False
 
 
     def compile(self, scalar_type='double', variational=False, start_from=0)->tuple:
@@ -812,12 +824,15 @@ class OdeSystem:
           The binary is named 'module_name_<scalar_type>' for each scalar type.
         """
         extra_code_block, extra_func_code = self.extra_code(variational)
-        extra_kw = dict(extra_funcs=[extra_func_code])
+        extra_kw = dict(extra_funcs=[extra_func_code], extra_code_block=extra_code_block)
         if self.contains_fields(variational=variational):
-            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block, extra_funcs=[extra_func_code])
+            extra_kw.update(extra_header_block=self.header)
         
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[(_LIB_DIR, _LIB_NAME)], extra_flags=["fvisibility=hidden"], **extra_kw)
-        return result # (pointers, ...), set_field
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[(_LIB_DIR, _LIB_NAME), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"], **extra_kw)
+        if self.has_jac:
+            return result # (pointers, ...), set_field
+        else:
+            return tuple([result[0][0], None, *result[0][1:]]), result[1] # (ode_ptr, None, *event_ptrs), set_field
 
     def ode_to_compile(self, scalar_type='double', variational=False)->TensorLowLevelCallable:
         """Get the ODE right-hand side ready for compilation.
@@ -835,8 +850,8 @@ class OdeSystem:
         TensorLowLevelCallable
             Low-level representation of the ODE right-hand side
         """
-        q, odesys, _ = self._ode_data(variational=variational)
-        return TensorLowLevelCallable(array=odesys, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
+        data = self._ode_data(variational=variational)
+        return TensorLowLevelCallable(array=data[1], t=self.t, q=data[0], scalar_type=scalar_type, args=self.args)
 
     def jacobian_to_compile(self, scalar_type='double', variational=False, layout = 'F')->TensorLowLevelCallable:
         """Get the Jacobian matrix ready for compilation.
@@ -854,13 +869,16 @@ class OdeSystem:
         TensorLowLevelCallable
             Low-level representation of the Jacobian matrix
         """
-        q, _, jacmat = self._ode_data(variational=variational)
-        n = self.Nsys if not variational else 2*self.Nsys
-        if layout == 'F':
-            jacmat = [[jacmat[j, i] for j in range(n)] for i in range(n)]
+        if self.has_jac:
+            q, _, jacmat = self._ode_data(variational=variational)
+            n = self.Nsys if not variational else 2*self.Nsys
+            if layout == 'F':
+                jacmat = [[jacmat[j, i] for j in range(n)] for i in range(n)]
+            else:
+                jacmat = [[jacmat[i, j] for j in range(n)] for i in range(n)]
+            return TensorLowLevelCallable(array=jacmat, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
         else:
-            jacmat = [[jacmat[i, j] for j in range(n)] for i in range(n)]
-        return TensorLowLevelCallable(array=jacmat, t=self.t, q=q, scalar_type=scalar_type, args=self.args)
+            raise NotImplementedError('Jacobian matrix is not defined for this system.')
 
     def true_compiled_events(self, scalar_type='double', variational=False):
         """Create compiled Event objects from symbolic event definitions.
@@ -900,7 +918,10 @@ class OdeSystem:
         for event_dict in self._event_data(scalar_type=scalar_type, variational=variational):
             for param_name, lowlevel_callable in event_dict.items():
                 event_objs.append(lowlevel_callable)
-        return (self.ode_to_compile(scalar_type=scalar_type, variational=variational), self.jacobian_to_compile(scalar_type=scalar_type, variational=variational), *event_objs)
+        if self.has_jac:
+            return (self.ode_to_compile(scalar_type=scalar_type, variational=variational), self.jacobian_to_compile(scalar_type=scalar_type, variational=variational), *event_objs)
+        else:
+            return (self.ode_to_compile(scalar_type=scalar_type, variational=variational), *event_objs)
     
     def override_odesys(self, odesys: Iterable[Expr]):
         self._cached_expressions['odesys'] = tuple(odesys)
@@ -1336,9 +1357,15 @@ class OdeSystem:
             (q_vars, ode_system, jacobian_matrix)
         """
         if variational:
-            return self.q_augmented, self.ode_sys_augmented, self.jacmat_augmented
+            if self.has_jac:
+                return self.q_augmented, self.ode_sys_augmented, self.jacmat_augmented
+            else:
+                return self.q_augmented, self.ode_sys_augmented
         else:
-            return self.q, self.ode_sys, self.jacmat
+            if self.has_jac:
+                return self.q, self.ode_sys, self.jacmat
+            else:
+                return self.q, self.ode_sys
 
     def _event_data(self, scalar_type='double', variational=False)->tuple[dict[str, LowLevelCallable], ...]:
         """Compile event function callables for the specified scalar type and variational mode.
@@ -1508,15 +1535,17 @@ class OdeSystem:
             A callable wrapper around compiled function pointers
         """
 
-        extra_code_block, extra_func_code = self.extra_code(scalar_type, variational)
+        extra_code_block, extra_func_code = self.extra_code(variational)
 
         factor = 1 if not variational else 2
         if func == 'rhs':
             idx = 0
             shape = [self.Nsys*factor]
+        elif func == 'jac' and not self.has_jac:
+            raise NotImplementedError("Jacobian matrix is not defined for this system.")
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header if self.get_fields(scalar_type, variational) else "", links=[(_LIB_DIR, _LIB_NAME)], extra_flags=["fvisibility=hidden"])[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header if self.get_fields(variational) else "", links=[(_LIB_DIR, _LIB_NAME), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"])[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')

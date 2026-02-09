@@ -15,203 +15,9 @@
 
 namespace ode {
 
+using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::complex;
+
 using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
-
-template<typename Type>
-class PolyWrapper{
-
-    /*
-    Takes ownership of a pointer to a heap-allocated object.
-    Is constructed by passing the pointer, so make sure
-    noone else has ownership.
-
-    MUST:
-        Type has a clone() method that returns a new Type*,
-        so that it creates a perfect copy.
-    */
-
-public:
-    
-    PolyWrapper(Type* object) : _ptr(object) {}
-
-    PolyWrapper(const PolyWrapper& other) : _ptr(other.new_ptr()) {}
-
-    PolyWrapper(PolyWrapper&& other) noexcept : _ptr(other.release()) {}
-
-    PolyWrapper& operator=(const PolyWrapper& other){
-        if (&other != this){
-            delete _ptr;
-            _ptr = other.new_ptr();
-        }
-        return *this;
-    }
-
-    PolyWrapper& operator=(PolyWrapper&& other) noexcept{
-        if (&other != this){
-            delete _ptr;
-            _ptr = other.release();
-        }
-        return *this;
-    }
-
-    inline ~PolyWrapper(){
-        delete _ptr;
-        _ptr = nullptr;
-    }
-    
-    inline Type* operator->(){
-        assert(_ptr != nullptr && "pointer is null");
-        return _ptr;
-    }
-
-    inline const Type* operator->() const{
-        assert(_ptr != nullptr && "pointer is null");
-        return _ptr;
-    }
-
-    inline const Type* ptr() const{
-        return _ptr;
-    }
-
-    inline Type* ptr() {
-        return _ptr;
-    }
-
-    inline Type* new_ptr() const{
-        return _ptr == nullptr ? nullptr : _ptr->clone();
-    }
-
-    inline Type* release() {
-        Type* tmp = _ptr;
-        _ptr = nullptr;
-        return tmp;
-    }
-
-    template<typename Base>
-    inline Base* cast(){
-        return dynamic_cast<Base*>(this->_ptr);
-    }
-
-    inline void take_ownership(Type* ptr){
-        delete _ptr;
-        _ptr = ptr;
-    }
-
-    PolyWrapper() = default;
-    
-protected:
-
-    Type* _ptr = nullptr;
-};
-
-
-
-template<typename T>
-class State{
-
-    //provides a view of data, does not own it. The lifetime of a State object must be shorter
-    //than that of the underlying data, otherwise the program will crash or behave incorrectly
-
-public:
-
-    State(const T* data, size_t Nsys) : _data(data), _nsys(Nsys) {}
-
-    inline const T& t() const{
-        return _data[0];
-    }
-
-    inline const T& habs() const{
-        return _data[1];
-    }
-
-    inline const T* vector() const{
-        return _data+2;
-    }
-
-    inline size_t Nsys() const{
-        return _nsys;
-    }
-
-protected:
-
-    const T* _data;
-    size_t _nsys;
-};
-
-template<typename T>
-class MutState : State<T>{
-
-    MutState(T* data, size_t Nsys) : State<T>(data, Nsys) {}
-
-    inline T* vector(){
-        return const_cast<T*>(this->_data)+2;
-    }
-
-};
-
-
-template<typename T>
-class EventState{
-
-    Array1D<T> data;
-    size_t Nsys = 0;
-
-public:
-
-    EventState() = default;
-
-    const T& t() const{
-        return data[0];
-    }
-
-    State<T> True() const{
-        return {data.data(), Nsys};
-    }
-
-    State<T> exposed() const{
-        return choose_true ? this->True() : State<T>{data.data()+Nsys+2, Nsys};
-    }
-
-    T* true_vector(){
-        return data.data()+2;
-    }
-
-    T* exposed_vector(){
-        return data.data() + Nsys+4;
-    }
-
-    void set_t(T t){
-        data[0] = data[Nsys+2] = t;
-    }
-
-    void set_stepsize(T habs){
-        data[1] = data[Nsys+3] = habs;
-    }
-
-    void set_true_vector(const T* vec){
-        copy_array(data.data()+2, vec, Nsys);
-    }
-
-    void set_exposed_vector(const T* vec){
-        copy_array(data.data()+Nsys+4, vec, Nsys);
-    }
-
-    inline void resize(size_t nsys){
-        data.resize(nsys*2+4);
-        Nsys = nsys;
-    }
-
-    inline size_t nsys() const{
-        return Nsys;
-    }
-
-    inline bool is_valid() const{
-        return triggered;
-    }
-    
-    bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
-    bool triggered = false;
-};
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
@@ -235,314 +41,189 @@ using JacMat = Array2D<T, N, N, Allocation::Heap, Layout::F>;
 
 using EventMap = std::map<std::string, std::vector<size_t>>;
 
-using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::complex;
-
-template<typename... Arg>
-void print(Arg... x){
-    ((std::cout << x << ' '), ...);
-    std::cout << "\n";
-}
+using VoidType = void(*)();
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-inline TimePoint now(){
-    return std::chrono::high_resolution_clock::now();
-}
-
-inline double as_duration(const TimePoint& t1, const TimePoint& t2){
-    std::chrono::duration<double> duration = t2-t1;
-    return duration.count();
-}
-
-template<typename A, typename B>
-inline auto max(A a, B b) {
-    return (a > b) ? a : b;
-}
-
-template <typename T>
-T inf() {
-    // When using -ffast-math, infinity() may cause issues or segfaults
-    // Use a very large finite number instead that's safe with -ffast-math
-    #ifdef __FAST_MATH__
-    return std::numeric_limits<T>::max();
-    #else
-    return std::numeric_limits<T>::infinity();
-    #endif
-}
-
-template<typename T>
-T norm_squared(const T* x, size_t size){
-    //optimize
-    T res = 0;
-    // #pragma omp simd reduction(+:res)
-    for (size_t i=0; i<size; i++){
-        res += x[i]*x[i];
-    }
-    return res;
-}
-
-template<typename T>
-bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step){
-    bool res = false;
-    if (habs*factor < min_step){
-        factor = min_step/habs;
-        habs = min_step;
-    }
-    else if (habs*factor > max_step){
-        factor = max_step/habs;
-        habs = max_step;
-    }
-    else{
-        habs *= factor;
-        res = true;
-    }
-    return res;
-}
-
-template <typename T>
-inline bool is_finite(const T& value) {
-    if constexpr (std::is_floating_point_v<T>) {
-        #ifdef __FAST_MATH__
-        // When -ffast-math is enabled, std::isfinite may not work correctly
-        // Use range check instead: value is finite if it's within representable range
-        return (value < std::numeric_limits<T>::max());
-        #else
-        return std::isfinite(value);
-        #endif
-    } else if constexpr (std::is_integral_v<T>) {
-        return true;
-    } else {
-        static_assert(std::is_arithmetic_v<T>, "T must be arithmetic");
-        return false;
-    }
-}
-
-#ifdef MPREAL
-template <>
-inline bool is_finite(const mpfr::mpreal& value) {
-    return mpfr_number_p(value.mpfr_ptr()) != 0;
-}
-#endif
-
-template<typename T>
-T rms_norm(const T* x, size_t size){
-    return sqrt(norm_squared(x, size)/size);
-}
-
-template<typename T>
-T rms_norm(const T* x, const T* scale, size_t size){
-    T norm_sq = 0;
-    // #pragma omp simd reduction(+:norm_sq)
-    for (size_t i=0; i<size; i++){
-        norm_sq += x[i]*x[i]/(scale[i]*scale[i]);
-    }
-    return sqrt(norm_sq/size);
-}
-
-template<typename T>
-T inf_norm(const T* x, size_t size){
-    T max_val = 0;
-    for (size_t i = 0; i < size; i++){
-        max_val = std::max(max_val, std::abs(x[i]));
-    }
-    return max_val;
-}
-
-template<typename T>
-T norm(const T* x, size_t size){
-    return sqrt(norm_squared(x, size));
-}
-
-template<typename T>
-int sgn(const T& x){
-    return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
-}
-
-template<typename T>
-int sgn(const T& t1, const T& t2){
-    //same as sgn(t2-t1), but avoids roundoff error
-    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
-}
-
-template<typename T>
-std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size) {
-    if (start >= x.size()) {
-        return {}; // Return an empty vector if start is out of bounds
-    }
-    return std::vector<T>(x.begin() + start, x.begin() + start + size);
-}
-
-template<typename T>
-bool all_are_finite(const T* data, size_t n){
-    for (size_t i=0; i<n; i++){
-        if (!is_finite(data[i])){
-            return false;
-        }
-    }
-    return true;
-}
-
-
-template<typename T>
-std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event){
-    const std::vector<size_t>& ind = event_map.at(event);
-    std::vector<T> data(ind.size());
-    for (size_t i=0; i<data.size(); i++){
-        data[i] = t[ind[i]];
-    }
-    return data;
-}
-
-template<typename T, size_t N>
-Array2D<T, 0, N> _q_event_data(const T* q, const EventMap& event_map, const std::string& event, size_t Nsys){
-    const std::vector<size_t>& ind = event_map.at(event);
-    Array2D<T, 0, N> data(ind.size(), Nsys);
-    for (size_t i=0; i<ind.size(); i++){
-        for (size_t j=0; j<Nsys; j++){
-            data(i, j) = q[ind[i]*Nsys+j];
-        }
-    }
-    return data;
-}
-
-//BISECTION USED FOR EVENTS IN ODES
-
 enum class RootPolicy : std::uint8_t { Left, Middle, Right};
 
-template<typename T, RootPolicy RP, typename Callable>
-T bisect(Callable&& f, const T& a, const T& b, const T& atol){
-    T err = 2*atol+1;
-    T _a = a;
-    T _b = b;
-    T c = a;
-    T fm;
+template<typename Type>
+class PolyWrapper{
 
-    assert((f(a) * f(b) <= 0) && "Root not bracketed" );
-    
-    while (err > atol){
-        c = (_a+_b)/2;
-        if (c == _a || c == _b){
-            break;
-        }
-        fm = f(c);
-        if (f(_a) * fm  > 0){
-            _a = c;
-        }
-        else{
-            _b = c;
-        }
-        err = abs(fm);
-    }
-
-    if constexpr (RP == RootPolicy::Left) {
-        return _a;
-    }else if constexpr (RP == RootPolicy::Middle) {
-        return c;
-    }else {
-        return _b;
-    }
-}
-
-
-template<typename T>
-void mat_vec_prod(T* result, const T* mat, const T* vec, size_t rows, size_t cols, const T& factor=1){
     /*
-    result[i] = sum_j mat[i, j] * vec[j]
+    Takes ownership of a pointer to a heap-allocated object.
+    Is constructed by passing the pointer, so make sure
+    noone else has ownership.
+
+    MUST:
+        Type has a clone() method that returns a new Type*,
+        so that it creates a perfect copy.
     */
-    for (size_t i=0; i<rows; i++){
-        T _sum = 0;
-        for (size_t j=0; j<cols; j++){
-            _sum += mat[i*cols+j]*vec[j];
-        }
-        result[i] = _sum*factor;
-    }
-}
-
-template<typename T>
-void mat_T_vec_prod(T* result, const T* mat, const T* vec, size_t rows, size_t cols, const T& factor=1){
-    /*
-    The same as above but the transpose matrix is used
-    */
-    for (size_t i=0; i<cols; i++){
-        T _sum = 0;
-        for (size_t j=0; j<rows; j++){
-            _sum += mat[j*cols+i]*vec[j];
-        }
-        result[i] = _sum*factor;
-    }
-}
-
-template<class S>
-void mat_mat_prod(S* r, const S* a, const S* b, size_t m, size_t s, size_t n, const S& factor=1){
-    /*
-    a : (m x s)
-    b : (s x n)
-    */
-    for (size_t k=0; k<m*n; k++){
-        size_t i = k/n;
-        size_t j = k % n;
-        S _sum = 0;
-        for (size_t q=0; q<s; q++){
-            _sum += a[i*s + q] * b[q*n + j];
-        }
-        r[i*n+j] = _sum*factor;
-    }
-}
-
-template<class S>
-void mat_T_mat_prod(S* r, const S* a, const S* b, size_t m, size_t s, size_t n, const S& factor=1){
-    /*
-    a : (s x m)
-    b : (s x n)
-    */
-    for (size_t k=0; k<m*n; k++){
-        size_t i = k/n;
-        size_t j = k % n;
-        S _sum = 0;
-        for (size_t q=0; q<s; q++){
-            _sum += a[q*n+j] * b[q*n + j];
-        }
-        r[i*n+j] = _sum*factor;
-    }
-}
-
-
-inline std::string format_duration(double t){
-    int h = int(t/3600);
-    int m = int((t - h*3600)/60);
-    int s = int(t - h*3600 - m*60);
-
-    return std::to_string(h) + " h, " + std::to_string(m) + " m, " + std::to_string(s) + " s";  
-}
-
-class Clock{
 
 public:
+    
+    PolyWrapper(Type* object);
 
-    Clock()=default;
+    PolyWrapper(const PolyWrapper& other);
 
-    inline void start(){
-        _start = now();
-    }
+    PolyWrapper(PolyWrapper&& other) noexcept;
 
-    inline double seconds() const{
-        return as_duration(_start, now());
-    }
+    PolyWrapper& operator=(const PolyWrapper& other);
 
-    inline std::string message() const{
-        return format_duration(seconds());
-    }
+    PolyWrapper& operator=(PolyWrapper&& other) noexcept;
 
-private:
+    ~PolyWrapper();
+    
+    Type* operator->();
 
-    TimePoint _start;
+    const Type* operator->() const;
+
+    const Type* ptr() const;
+
+    Type* ptr();
+
+    Type* new_ptr() const;
+
+    Type* release();
+
+    template<typename Base>
+    Base* cast();
+
+    void take_ownership(Type* ptr);
+
+    PolyWrapper() = default;
+    
+protected:
+
+    Type* _ptr = nullptr;
 };
 
 
-inline void show_progress(const int& n, const int& target, const Clock& clock){
-    std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << format_duration(target*clock.seconds()/n) << std::flush;
-}
 
+template<typename T>
+class State{
+
+    //provides a view of data, does not own it. The lifetime of a State object must be shorter
+    //than that of the underlying data, otherwise the program will crash or behave incorrectly
+
+public:
+
+    State(const T* data, size_t Nsys);
+
+     const T& t() const;
+
+     const T& habs() const;
+
+     const T* vector() const;
+
+     size_t Nsys() const;
+
+protected:
+
+    const T* _data;
+    size_t _nsys;
+};
+
+template<typename T>
+class MutState : State<T>{
+
+    MutState(T* data, size_t Nsys);
+
+    T* vector();
+
+};
+
+
+template<typename T>
+class EventState{
+
+    Array1D<T> data;
+    size_t Nsys = 0;
+
+public:
+
+    EventState() = default;
+
+    const T& t() const;
+
+    State<T> True() const;
+
+    State<T> exposed() const;
+
+    T* true_vector();
+
+    T* exposed_vector();
+
+    void set_t(T t);
+
+    void set_stepsize(T habs);
+
+    void set_true_vector(const T* vec);
+
+    void set_exposed_vector(const T* vec);
+
+    void resize(size_t nsys);
+
+    size_t nsys() const;
+
+    bool is_valid() const;
+    
+    bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
+    bool triggered = false;
+};
+
+//ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
+
+template<typename T, size_t N=0>
+class OdeResult{
+
+public:
+
+    OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message);
+
+    OdeResult() = default;
+
+    DEFAULT_RULE_OF_FOUR(OdeResult);
+
+    virtual ~OdeResult() = default;
+
+    const std::vector<T>& t() const;
+
+    const Array2D<T, 0, N>& q() const;
+
+    template<std::integral INT1, std::integral INT2>
+    const T& q(INT1 i, INT2 j) const;
+
+    const EventMap& event_map() const;
+
+    bool diverges() const;
+
+    bool success() const;
+
+    double runtime() const;
+
+    const std::string& message() const;
+
+    void examine() const;
+
+    std::string event_log() const;
+
+    std::vector<T> t_filtered(const std::string& event) const;
+
+    Array2D<T, 0, N> q_filtered(const std::string& event) const;
+
+    virtual OdeResult<T, N>* clone() const;
+    
+private:
+
+    std::vector<T> _t;
+    Array2D<T, 0, N> _q;
+    EventMap _event_map;
+    bool _diverges = false;
+    bool _success = false;
+    double _runtime = 0;
+    std::string _message = "No integration performed";
+};
 
 template<typename RHS, typename JAC = std::nullptr_t>
 struct OdeData {
@@ -572,7 +253,7 @@ struct OdeData {
     */
 };
 
-using VoidType = void(*)();
+
 
 template<typename RHS>
 struct OdeData<RHS, void> {
@@ -583,83 +264,113 @@ struct OdeData<RHS, void> {
 };
 
 
-//ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
-
-template<typename T, size_t N=0>
-class OdeResult{
+class Clock{
 
 public:
 
-    OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message) : _t(t), _q(q), _event_map(std::move(event_map)), _diverges(diverges), _success(success), _runtime(runtime), _message(std::move(message)) {}
+    Clock() = default;
 
-    OdeResult() = default;
-
-    DEFAULT_RULE_OF_FOUR(OdeResult);
-
-    virtual ~OdeResult() = default;
-
-    const std::vector<T>& t() const {return _t;}
-
-    const Array2D<T, 0, N>& q() const {return _q;}
-
-    template<std::integral INT1, std::integral INT2>
-    const T& q(INT1 i, INT2 j) const {return _q(i, j);}
-
-    const EventMap& event_map() const { return _event_map;}
-
-    bool diverges() const {return _diverges;}
-
-    bool success() const {return _success;}
-
-    double runtime() const {return _runtime;}
-
-    const std::string& message() const {return _message;}
-
-    void examine() const{
-        std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n" <<
-        "\tPoints           : " << _t.size() << "\n" <<
-        "\tDiverges         : " << (_diverges ? "true" : "false") << "\n" << 
-        "\tSuccess          : " << (_success ? "true" : "false") << "\n" <<
-        "\tRuntime          : " << _runtime << "\n" <<
-        "\tTermination cause: " << _message << "\n" <<
-        event_log();
+    inline static TimePoint now(){
+        return std::chrono::high_resolution_clock::now();
     }
 
-    std::string event_log() const{
-        std::string res;
-        res += "\tEvents:\n\t----------\n";
-        for (const auto& [name, array] : _event_map){
-            res += "\t    " + name + " : " + std::to_string(array.size()) + "\n";
-        }
-        res += "\n\t----------\n";
-        return res;
+    inline static double as_duration(const TimePoint& t1, const TimePoint& t2){
+        std::chrono::duration<double> duration = t2-t1;
+        return duration.count();
     }
 
-    std::vector<T> t_filtered(const std::string& event) const {
-        return _t_event_data(this->_t.data(), this->_event_map, event);
+
+    inline static std::string format_duration(double t){
+        int h = int(t/3600);
+        int m = int((t - h*3600)/60);
+        int s = int(t - h*3600 - m*60);
+
+        return std::to_string(h) + " h, " + std::to_string(m) + " m, " + std::to_string(s) + " s";  
     }
 
-    Array2D<T, 0, N> q_filtered(const std::string& event) const {
-        return _q_event_data<T, N>(this->_q.data(), this->_event_map, event, _q.Ncols());
+    inline void start(){
+        _start = now();
     }
 
-    virtual OdeResult<T, N>* clone() const{ return new OdeResult<T, N>(*this);}
-    
+    inline double seconds() const{
+        return as_duration(_start, now());
+    }
+
+    inline std::string message() const{
+        return format_duration(seconds());
+    }
+
 private:
 
-    std::vector<T> _t;
-    Array2D<T, 0, N> _q;
-    EventMap _event_map;
-    bool _diverges = false;
-    bool _success = false;
-    double _runtime = 0;
-    std::string _message = "No integration performed";
+    TimePoint _start;
 };
 
+template<typename A, typename B>
+auto max(A a, B b);
+
 template<typename T>
-inline T choose_step(const T& habs, const T& hmin, const T& hmax){
-    return std::max(std::min(habs, hmax), hmin);
+T inf();
+
+template<typename T>
+T norm_squared(const T* x, size_t size);
+
+template<typename T>
+bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
+
+template<typename T>
+bool is_finite(const T& value);
+
+#ifdef MPREAL
+template <>
+bool is_finite(const mpfr::mpreal& value);
+#endif
+
+template<typename T>
+T rms_norm(const T* x, size_t size);
+
+template<typename T>
+T rms_norm(const T* x, const T* scale, size_t size);
+
+template<typename T>
+T inf_norm(const T* x, size_t size);
+
+template<typename T>
+T norm(const T* x, size_t size);
+
+template<typename T>
+int sgn(const T& x);
+
+template<typename T>
+int sgn(const T& t1, const T& t2);
+
+template<typename T>
+std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
+
+template<typename T>
+bool all_are_finite(const T* data, size_t n);
+
+template<typename T>
+std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event);
+
+template<typename T, size_t N>
+Array2D<T, 0, N> _q_event_data(const T* q, const EventMap& event_map, const std::string& event, size_t Nsys);
+
+template<typename T, RootPolicy RP, typename Callable>
+T bisect(Callable&& f, const T& a, const T& b, const T& atol);
+
+template<typename T>
+void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot);
+
+
+inline void show_progress(int n, int target, const Clock& clock){
+    std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << Clock::format_duration(target*clock.seconds()/n) << std::flush;
 }
+
+
+
+
+template<typename T>
+T choose_step(const T& habs, const T& hmin, const T& hmax);
 
 } // namespace ode
 

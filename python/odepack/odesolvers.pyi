@@ -2267,8 +2267,60 @@ class SampledScalarField3D:
         ...
 
 
-class ScatteredScalarField:
+class DelaunayTriND:
 
+    def __init__(self, points: np.ndarray):
+        '''
+        Initialize a Delaunay triangulation for scattered points in n-dimensional space.
+
+        Parameters
+        ----------
+        points : np.ndarray
+            Coordinates of the scattered points. Shape should be (n_points, n_dimensions).
+        '''
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        '''
+        Coordinates of the scattered points.
+        '''
+        ...
+
+
+class DelaunayTri1D:
+
+    def __init__(self, points: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+
+class DelaunayTri2D:
+
+    def __init__(self, points: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+
+class DelaunayTri3D:
+
+    def __init__(self, points: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+
+class ScatteredScalarFieldND:
+
+    @overload
     def __init__(self, points: np.ndarray, values: np.ndarray):
         '''
         Initialize a scattered scalar field, for interpolation from scattered data points in any number of dimensions.
@@ -2279,6 +2331,20 @@ class ScatteredScalarField:
         ----------
         points : np.ndarray
             Coordinates of the scattered points. Shape should be (n_points, n_dimensions).
+        values : np.ndarray
+            Scalar field values at the scattered points. Shape should be (n_points,).
+        '''
+        ...
+
+    @overload
+    def __init__(self, tri: DelaunayTriND, values: np.ndarray):
+        '''
+        Initialize a scattered scalar field from a Delaunay triangulation and corresponding scalar values.
+
+        Parameters
+        ----------
+        tri : DelaunayTriND
+            Delaunay triangulation of the scattered points.
         values : np.ndarray
             Scalar field values at the scattered points. Shape should be (n_points,).
         '''
@@ -2298,6 +2364,14 @@ class ScatteredScalarField:
         '''
         ...
 
+    @property
+    def tri(self)->DelaunayTriND:
+        '''
+        Delaunay triangulation of the scattered points.
+        '''
+        ...
+        
+
     def __call__(self, *args: float)->float:
         '''
         Get the interpolated scalar field value at a specific point in n-dimensional space.
@@ -2313,8 +2387,86 @@ class ScatteredScalarField:
             Interpolated scalar field value at the given coordinates.
         '''
         ...
+
+
+class ScatteredScalarField1D:
+
+    @overload
+    def __init__(self, points: np.ndarray, values: np.ndarray):
+        ...
+
+    @overload
+    def __init__(self, tri: DelaunayTri1D, values: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+    @property
+    def values(self)->np.ndarray:
+        ...
+
+    @property
+    def tri(self)->DelaunayTri1D:
+        ...
+
+    def __call__(self, x: float)->float:
+        ...
         
-    
+
+class ScatteredScalarField2D:
+
+    @overload
+    def __init__(self, points: np.ndarray, values: np.ndarray):
+        ...
+
+    @overload
+    def __init__(self, tri: DelaunayTri2D, values: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+    @property
+    def values(self)->np.ndarray:
+        ...
+
+    @property
+    def tri(self)->DelaunayTri2D:
+        ...
+
+    def __call__(self, x: float, y: float)->float:
+        ...
+
+
+class ScatteredScalarField3D:
+
+    @overload
+    def __init__(self, points: np.ndarray, values: np.ndarray):
+        ...
+
+    @overload
+    def __init__(self, tri: DelaunayTri3D, values: np.ndarray):
+        ...
+
+    @property
+    def points(self)->np.ndarray:
+        ...
+
+    @property
+    def values(self)->np.ndarray:
+        ...
+
+    @property
+    def tri(self)->DelaunayTri3D:
+        ...
+
+    def __call__(self, x: float, y: float, z: float)->float:
+        ...
+
+
 
 def integrate_all(ode_array: Iterable[LowLevelODE], interval: float, t_eval: Iterable = None, event_options: Iterable[EventOpt] = (), threads=-1, display_progress=False)->None:
     """

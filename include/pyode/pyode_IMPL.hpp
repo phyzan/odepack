@@ -1,7 +1,8 @@
-#ifndef PYODE_TPP
-#define PYODE_TPP
+#ifndef PYODE_IMPL_TPP
+#define PYODE_IMPL_TPP
 
 #include "pyode.hpp"
+#include "pytools_IMPL.hpp"
 
 
 //===========================================================================================
@@ -199,16 +200,107 @@ double PyScalarField<NDIM>::operator()(Scalar... x) const{
 
 
 //===========================================================================================
+//                                      PyDelaunay
+//===========================================================================================
+
+template<size_t NDIM>
+PyDelaunay<NDIM>::PyDelaunay(const py::array_t<double>& x) : PyDelaunay(parse_args(x), x) {}
+
+template<size_t NDIM>
+PyDelaunay<NDIM>::PyDelaunay(std::nullptr_t, const py::array_t<double>& x) : Base(x) {}
+
+template<size_t NDIM>
+py::object PyDelaunay<NDIM>::py_points() const{
+    return py::cast(this->get_points());
+}
+
+template<size_t NDIM>
+std::nullptr_t PyDelaunay<NDIM>::parse_args(const py::array_t<double>& x){
+    if (x.ndim() != 1 && x.ndim() != 2){
+        throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");
+    }else if (x.ndim() == 2 && x.shape(0) < x.shape(1)+1){
+        throw py::value_error("Number of input points must be at least one more than the number of dimensions");
+    }
+    return nullptr;
+}
+
+
+
+//===========================================================================================
 //                                      PyScatteredField
 //===========================================================================================
 
+template<size_t NDIM>
+PyScatteredField<NDIM>::PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values) : PyScatteredField(parse_args(x, values), x, values){}
+
+template<size_t NDIM>
+PyScatteredField<NDIM>::PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values) : Base(x, values.data()) {}
+
+template<size_t NDIM>
+PyScatteredField<NDIM>::PyScatteredField(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values) : PyScatteredField(parse_tri_args(tri, values), tri, values) {}
+
+template<size_t NDIM>
+PyScatteredField<NDIM>::PyScatteredField(std::nullptr_t, const PyDelaunay<NDIM>& tri, const py::array_t<double>& values) : Base(static_cast<const DelaunayTri<NDIM>&>(tri), values.data()) {}
+
+template<size_t NDIM>
+py::object PyScatteredField<NDIM>::py_points() const{
+    return py::cast(this->get_points());
+}
+
+template<size_t NDIM>
+py::object PyScatteredField<NDIM>::py_values() const{
+    return py::cast(this->get_field());
+}
+
+template<size_t NDIM>
+py::object PyScatteredField<NDIM>::py_delaunay_obj() const{
+    return py::cast(&(this->get_delaunay()));
+}
 
 
+template<size_t NDIM>
+double PyScatteredField<NDIM>::py_value_at(const py::args& x) const{
+    constexpr Allocation Alloc = NDIM == 0 ? Allocation::Heap : Allocation::Stack;
+    Array1D<double, NDIM, Alloc> point(x.size());// TODO: optimize this. Currently a temporary vector on the heap is allocated on each call when NDIM == 0
+    if (x.size() != this->ndim()){
+        // throw informative error including ndim of input and expected ndim
+        throw py::value_error("Expected " + std::to_string(this->ndim()) + " input points, but got " + std::to_string(x.size()));
+    }
+    for (size_t i=0; i<x.size(); i++){
+        point[i] = x[i].cast<double>();
+    }
+    return Base::get_value(point.data());
+}
+
+template<size_t NDIM>
+std::nullptr_t PyScatteredField<NDIM>::parse_args(const py::array_t<double>& x, const py::array_t<double>& values){
+    if (x.ndim() > 2){
+        throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");
+    }else if (values.ndim() != 1){
+        throw py::value_error("ScatteredField requires a 1D array for the field values");
+    }else if (x.shape(0) != values.size()){
+        throw py::value_error("Number of input points must match number of field values");
+    }else if (x.ndim() == 2 && x.shape(0) < x.shape(1)+1){
+        throw py::value_error("Number of input points must be at least one more than the number of dimensions");
+    }
+    return nullptr;
+}
+
+template<size_t NDIM>
+std::nullptr_t PyScatteredField<NDIM>::parse_tri_args(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values){
+    if (values.ndim() != 1){
+        throw py::value_error("ScatteredField requires a 1D array for the field values");
+    }else if (tri.npoints() != values.size()){
+        throw py::value_error("Number of field values must match number of points in the Delaunay triangulation");
+    }
+    return nullptr;
+}
+
+
+template<size_t NDIM>
 template<typename... Scalar>
-double PyScatteredField::operator()(Scalar... x) const{
-    assert(sizeof...(Scalar) == this->ndim() && "Number of coordinates must match NDIM");
-    double p[]  = {double(x)...};
-    return Base::operator()(p, 0);
+double PyScatteredField<NDIM>::operator()(Scalar... x) const{
+    return Base::operator()(x...);
 }
 
 

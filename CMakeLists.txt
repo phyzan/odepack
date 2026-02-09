@@ -48,6 +48,7 @@ set(COMMON_COMPILE_OPTIONS
     -Wno-unused-parameter
     -fopenmp
     -march=x86-64
+    -Wno-attributes
     -DPYBIND11_DETAILED_ERROR_MESSAGES
 )
 
@@ -73,6 +74,21 @@ endif()
 # Find OpenMP
 find_package(OpenMP)
 
+# Find Qhull (for Delaunay triangulation in LinearNdInterpolator)
+# libqhull-dev on Ubuntu installs to /usr/include/libqhull_r and /usr/lib
+find_library(QHULL_R_LIBRARY NAMES qhull_r)
+find_path(QHULL_INCLUDE_DIR libqhull_r/qhull_ra.h)
+
+# Find Qhull (for Delaunay triangulation in LinearNdInterpolator)
+find_package(Qhull CONFIG QUIET)
+if(NOT Qhull_FOUND)
+    # Try pkg-config as fallback
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(QHULL QUIET qhull_r)
+    endif()
+endif()
+
 #===========================================================================================
 #                           INTERFACE target: pure C++ header-only library
 #===========================================================================================
@@ -93,6 +109,16 @@ target_link_libraries(odepack_lib PUBLIC odepack_headers pybind11::pybind11 Pyth
 if(OpenMP_FOUND)
     target_link_libraries(odepack_lib PUBLIC OpenMP::OpenMP_CXX)
 endif()
+
+# Link Qhull for Delaunay triangulation
+if(QHULL_R_LIBRARY AND QHULL_INCLUDE_DIR)
+    message(STATUS "Found Qhull: ${QHULL_R_LIBRARY}")
+    target_include_directories(odepack_lib PUBLIC ${QHULL_INCLUDE_DIR})
+    target_link_libraries(odepack_lib PUBLIC ${QHULL_R_LIBRARY})
+else()
+    message(FATAL_ERROR "Qhull not found. LinearNdInterpolator requires Qhull. Install with: sudo apt install libqhull-dev")
+endif()
+
 target_compile_options(odepack_lib PRIVATE ${COMMON_COMPILE_OPTIONS})
 set_target_properties(odepack_lib PROPERTIES
     POSITION_INDEPENDENT_CODE ON

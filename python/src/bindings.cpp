@@ -1,4 +1,4 @@
-#include "../../include/pyode/PYODE.hpp"
+#include "../../include/pyode/pyode.hpp"
 
 namespace ode{
 
@@ -369,13 +369,74 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("y"),
             py::arg("z"));
 
-    py::class_<PyScatteredField>(m, "ScatteredScalarField")
+    py::class_<PyDelaunay<0>>(m, "DelaunayTriND")
+        .def(py::init<py::array_t<double>>(),
+            py::arg("points"))
+        .def_property_readonly("points", &PyDelaunay<0>::py_points);
+
+    py::class_<PyDelaunay<1>>(m, "DelaunayTri1D")
+        .def(py::init<py::array_t<double>>(),
+            py::arg("points"))
+        .def_property_readonly("points", &PyDelaunay<1>::py_points);
+
+    py::class_<PyDelaunay<2>>(m, "DelaunayTri2D")
+        .def(py::init<py::array_t<double>>(),
+            py::arg("points"))
+        .def_property_readonly("points", &PyDelaunay<2>::py_points);
+
+    py::class_<PyDelaunay<3>>(m, "DelaunayTri3D")
+        .def(py::init<py::array_t<double>>(),
+            py::arg("points"))
+        .def_property_readonly("points", &PyDelaunay<3>::py_points);
+    
+
+    py::class_<PyScatteredField<0>>(m, "ScatteredScalarFieldND")
         .def(py::init<py::array_t<double>, py::array_t<double>>(),
             py::arg("points"),
             py::arg("values"))
-        .def_property_readonly("points", &PyScatteredField::py_points)
-        .def_property_readonly("values", &PyScatteredField::py_values)
-        .def("__call__", &PyScatteredField::py_value_at);
+        .def(py::init<PyDelaunay<0>, py::array_t<double>>(),
+            py::arg("tri"),
+            py::arg("values"))
+        .def_property_readonly("points", &PyScatteredField<0>::py_points)
+        .def_property_readonly("values", &PyScatteredField<0>::py_values)
+        .def_property_readonly("tri", &PyScatteredField<0>::py_delaunay_obj)
+        .def("__call__", &PyScatteredField<0>::py_value_at);
+
+    py::class_<PyScatteredField<1>>(m, "ScatteredScalarField1D")
+        .def(py::init<py::array_t<double>, py::array_t<double>>(),
+            py::arg("points"),
+            py::arg("values"))
+        .def(py::init<PyDelaunay<1>, py::array_t<double>>(),
+            py::arg("tri"),
+            py::arg("values"))
+        .def_property_readonly("points", &PyScatteredField<1>::py_points)
+        .def_property_readonly("values", &PyScatteredField<1>::py_values)
+        .def_property_readonly("tri", &PyScatteredField<1>::py_delaunay_obj)
+        .def("__call__", &PyScatteredField<1>::py_value_at);
+
+    py::class_<PyScatteredField<2>>(m, "ScatteredScalarField2D")
+        .def(py::init<py::array_t<double>, py::array_t<double>>(),
+            py::arg("points"),
+            py::arg("values"))
+        .def(py::init<PyDelaunay<2>, py::array_t<double>>(),
+            py::arg("tri"),
+            py::arg("values"))
+        .def_property_readonly("points", &PyScatteredField<2>::py_points)
+        .def_property_readonly("values", &PyScatteredField<2>::py_values)
+        .def_property_readonly("tri", &PyScatteredField<2>::py_delaunay_obj)
+        .def("__call__", &PyScatteredField<2>::py_value_at);
+
+    py::class_<PyScatteredField<3>>(m, "ScatteredScalarField3D")
+        .def(py::init<py::array_t<double>, py::array_t<double>>(),
+            py::arg("points"),
+            py::arg("values"))
+        .def(py::init<PyDelaunay<3>, py::array_t<double>>(),
+            py::arg("tri"),
+            py::arg("values"))
+        .def_property_readonly("points", &PyScatteredField<3>::py_points)
+        .def_property_readonly("values", &PyScatteredField<3>::py_values)
+        .def_property_readonly("tri", &PyScatteredField<3>::py_delaunay_obj)
+        .def("__call__", &PyScatteredField<3>::py_value_at);
 
 #ifdef MPREAL
     m.def("set_mpreal_prec",

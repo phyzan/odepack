@@ -459,14 +459,37 @@ private:
 };
 
 
-class PyScatteredField : public LinearNdInterpolator<double> {
+template<size_t NDIM>
+class PyDelaunay : public DelaunayTri<NDIM> {
 
-    using Base = LinearNdInterpolator<double>;
+    using Base = DelaunayTri<NDIM>;
+
+public:
+
+    PyDelaunay(const py::array_t<double>& x);
+
+    py::object py_points() const;
+
+private:
+
+    PyDelaunay(std::nullptr_t, const py::array_t<double>& x);
+
+    static std::nullptr_t parse_args(const py::array_t<double>& x);
+
+};
+
+
+template<size_t NDIM>
+class PyScatteredField : public ScatteredScalarField<NDIM> {
+
+    using Base = ScatteredScalarField<NDIM>;
 
 public:
 
     // Python signature is ScatteredField(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints)), where
     PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values);
+
+    PyScatteredField(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
 
     template<typename... Scalar>
     double operator()(Scalar... x) const;
@@ -475,13 +498,19 @@ public:
 
     py::object py_values() const;
 
+    py::object py_delaunay_obj() const;
+
     double py_value_at(const py::args& x) const;
 
 private:
 
     PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values);
 
+    PyScatteredField(std::nullptr_t, const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
+
     static std::nullptr_t parse_args(const py::array_t<double>& x, const py::array_t<double>& values);
+
+    static std::nullptr_t parse_tri_args(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
 
 };
 

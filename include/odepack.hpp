@@ -2,6 +2,7 @@
 #define ODEPACK_HPP
 
 
+#include "ode/Tools.hpp"
 #include "ode/SolverDispatcher.hpp"
 #include "ode/OdeInt.hpp"
 #include "ode/Chaos/VariationalSolvers.hpp"
@@ -9,7 +10,7 @@
 #include "ode/Interpolation/LinearNdInterpolator.hpp"
 
 /**
- * @file odepack.h
+ * @file odepack.hpp
  * @brief Main include file for odepack library.
  *
  * This file includes all necessary headers to use the odepack library for
