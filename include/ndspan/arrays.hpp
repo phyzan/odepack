@@ -156,8 +156,18 @@ public:
 
     template<INT_T... Size>
     void resize(Size... newsize){
-        std::array<size_t, sizeof...(newsize)> new_size = {static_cast<size_t>(newsize)...};
-        this->resize(new_size.data(), new_size.size());
+        size_t current_size = this->size();
+        Base::resize(newsize...);
+        size_t total_size = (newsize * ... * 1);
+        if (total_size != current_size){
+            delete[] _data;
+            if (total_size == 0){
+                _data = nullptr;
+            }
+            else{
+                _data = new T[this->size()];
+            }
+        }
     }
 
     T* release(){

@@ -215,6 +215,54 @@ py::object PyDelaunay<NDIM>::py_points() const{
 }
 
 template<size_t NDIM>
+int PyDelaunay<NDIM>::py_ndim() const{
+    return Base::ndim();
+}
+
+template<size_t NDIM>
+int PyDelaunay<NDIM>::py_npoints() const{
+    return Base::npoints();
+}
+
+template<size_t NDIM>
+int PyDelaunay<NDIM>::py_nsimplices() const{
+    return Base::nsimplices();
+}
+
+template<size_t NDIM>
+int PyDelaunay<NDIM>::py_find_simplex(const py::array_t<double>& point) const{
+    if (point.ndim() != 1 || point.shape(0) != NDIM){
+        throw py::value_error("Query point must be a 1D array of length " + std::to_string(this->ndim()));
+    }
+    return Base::find_simplex(point.data());
+}
+
+template<size_t NDIM>
+py::object PyDelaunay<NDIM>::py_get_simplices() const{
+    const auto& simplices = Base::get_simplices();
+    return py::cast(simplices);
+}
+
+template<size_t NDIM>
+py::object PyDelaunay<NDIM>::py_get_simplex(const py::array_t<double>& point) const{
+    int simplex_idx = py_find_simplex(point);
+    if (simplex_idx == -1){
+        return py::none();
+    }
+    const int* simplex = Base::get_simplex(simplex_idx);
+
+    // Now get array of (ndim+1, ndim) containing the coordinates of the simplex vertices
+    Array2D<double, 0, Base::DIM_SPX> simplex_coords(this->ndim()+1, this->ndim());
+    const auto& points = Base::get_points();
+    for (size_t i=0; i<this->ndim()+1; i++){
+        const double* vertex_coords = points.ptr(simplex[i], 0);
+        copy_array(simplex_coords.ptr(i, 0), vertex_coords, this->ndim());
+    }
+    return py::cast(simplex_coords);
+}
+
+
+template<size_t NDIM>
 std::nullptr_t PyDelaunay<NDIM>::parse_args(const py::array_t<double>& x){
     if (x.ndim() != 1 && x.ndim() != 2){
         throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");

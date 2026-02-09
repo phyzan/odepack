@@ -2267,7 +2267,80 @@ class SampledScalarField3D:
         ...
 
 
-class DelaunayTriND:
+class DelaunayTriangulation:
+
+    @property
+    def ndim(self)->int:
+        '''
+        Dimensionality of the triangulation.
+        '''
+        ...
+        
+    @property
+    def npoints(self)->int:
+        '''
+        Number of scattered points.
+        '''
+        ...
+
+    @property
+    def nsimplices(self)->int:
+        '''
+        Number of simplices in the triangulation.
+        '''
+        ...
+
+
+    @property
+    def points(self)->np.ndarray[float]:
+        '''
+        Coordinates of the scattered points. Shape: (npoints, ndim).
+        '''
+        ...
+
+    @property
+    def simplices(self)->np.ndarray[int]:
+        '''
+        Indices of the points forming each simplex. Shape: (nsimplices, ndim+1).
+        Each row contains the indices of the points that form a simplex.
+        '''
+        ...
+    
+
+    def find_simplex(self, coords: np.ndarray)->int:
+        '''
+        Get the index of the simplex containing the given coordinates.
+
+        Parameters
+        ----------
+        coords : np.ndarray
+            Coordinates of the point to locate. Shape should be (n_dimensions,).
+
+        Returns
+        -------
+        int
+            Index of the simplex containing the point. Returns -1 if the point is outside the convex hull.
+        '''
+        ...
+
+    def get_simplex(self, coords: np.ndarray)->np.ndarray[float]:
+        '''
+        Get the vertices of the simplex containing the given coordinates.
+
+        Parameters
+        ----------
+        coords : np.ndarray
+            Coordinates of the point to locate. Shape should be (n_dimensions,).
+
+        Returns
+        -------
+        np.ndarray
+            Array of shape (ndim+1, ndim) containing the coordinates of the vertices for the simplex containing the point. Returns an empty array if the point is outside the convex hull.
+        '''
+        ...
+
+
+class DelaunayTriND(DelaunayTriangulation):
 
     def __init__(self, points: np.ndarray):
         '''
@@ -2280,15 +2353,8 @@ class DelaunayTriND:
         '''
         ...
 
-    @property
-    def points(self)->np.ndarray:
-        '''
-        Coordinates of the scattered points.
-        '''
-        ...
 
-
-class DelaunayTri1D:
+class DelaunayTri1D(DelaunayTriangulation):
 
     def __init__(self, points: np.ndarray):
         ...
@@ -2298,7 +2364,7 @@ class DelaunayTri1D:
         ...
 
 
-class DelaunayTri2D:
+class DelaunayTri2D(DelaunayTriangulation):
 
     def __init__(self, points: np.ndarray):
         ...
@@ -2308,7 +2374,7 @@ class DelaunayTri2D:
         ...
 
 
-class DelaunayTri3D:
+class DelaunayTri3D(DelaunayTriangulation):
 
     def __init__(self, points: np.ndarray):
         ...

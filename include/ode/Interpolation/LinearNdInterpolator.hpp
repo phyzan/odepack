@@ -33,7 +33,9 @@ public:
     int                 npoints() const;
     const PointStorage& get_points() const;
     int                 nsimplices() const;
+    const Array2D<int, 0, DIM_SPX>& get_simplices() const;
     const int*          get_simplex(int simplex_idx) const; //ndim + 1 elements
+    const int*          get_neighbors(int simplex_idx) const; // ndim + 1 elements, -1 = no neighbor (boundary)
     int                 find_simplex(const double* point) const; // array of ndim elements, returns simplex index or -1 if not found
     bool                compute_barycentric(double* out, int simplex_idx, const double* point) const; // bary should have ndim+1 elements, returns false if simplex is degenerate
     
@@ -59,10 +61,12 @@ private:
 
     void compute_delaunay();
 
-    PointStorage                    points_;  // (npoints, ndim)
+    PointStorage                    points_;    // (npoints, ndim)
     Array2D<int, 0, DIM_SPX>        simplices_; // (nsimplices, ndim+1)
-    Array2D<double, 0, NDIM>        v0_;     // (nsimplices, ndim)
-    Array3D<double, 0, NDIM, NDIM>  invT_;   // (nsimplices, ndim, ndim)
+    Array2D<int, 0, DIM_SPX>        neighbors_; // (nsimplices, ndim+1), -1 = boundary
+    Array2D<double, 0, NDIM>        v0_;        // (nsimplices, ndim)
+    Array3D<double, 0, NDIM, NDIM>  invT_;      // (nsimplices, ndim, ndim)
+    mutable int                     last_simplex_ = 0; // cache for walking algorithm
 
 };
 

@@ -1064,6 +1064,12 @@ template bool PyVecField<3>::py_in_bounds<double, double, double>(double, double
 #define INST_PY_TRI(N) \
 template PyDelaunay<N>::PyDelaunay(const py::array_t<double>& x);\
 template py::object PyDelaunay<N>::py_points() const;\
+template int PyDelaunay<N>::py_ndim() const;\
+template int PyDelaunay<N>::py_npoints() const;\
+template int PyDelaunay<N>::py_nsimplices() const;\
+template int PyDelaunay<N>::py_find_simplex(const py::array_t<double>&) const;\
+template py::object PyDelaunay<N>::py_get_simplex(const py::array_t<double>& point) const;\
+template py::object PyDelaunay<N>::py_get_simplices() const;\
 
 INST_PY_TRI(0)
 INST_PY_TRI(1)

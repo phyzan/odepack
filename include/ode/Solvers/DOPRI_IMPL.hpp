@@ -149,7 +149,7 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt
             factor = std::max(this->MIN_FACTOR, _factor);
             step_rejected = true;
         }
-        if (!resize_step(factor, habs, h_min, max_step)){
+        if (!resize_step(factor, habs, h_min, max_step) || habs < this->MIN_STEP){
             break;
         }
     }

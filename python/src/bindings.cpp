@@ -369,25 +369,31 @@ PYBIND11_MODULE(odesolvers, m) {
             py::arg("y"),
             py::arg("z"));
 
-    py::class_<PyDelaunay<0>>(m, "DelaunayTriND")
-        .def(py::init<py::array_t<double>>(),
-            py::arg("points"))
-        .def_property_readonly("points", &PyDelaunay<0>::py_points);
+    py::class_<PyDelaunayBase>(m, "DelaunayTriangulation")
+        .def_property_readonly("ndim", &PyDelaunayBase::py_ndim)
+        .def_property_readonly("npoints", &PyDelaunayBase::py_npoints)
+        .def_property_readonly("nsimplices", &PyDelaunayBase::py_nsimplices)
+        .def_property_readonly("points", &PyDelaunayBase::py_points)
+        .def_property_readonly("simplices", &PyDelaunayBase::py_get_simplices)
+        .def("find_simplex", &PyDelaunayBase::py_find_simplex, py::arg("coords"))
+        .def("get_simplex", &PyDelaunayBase::py_get_simplex,
+            py::arg("coords"));
 
-    py::class_<PyDelaunay<1>>(m, "DelaunayTri1D")
+    py::class_<PyDelaunay<0>, PyDelaunayBase>(m, "DelaunayTriND")
         .def(py::init<py::array_t<double>>(),
-            py::arg("points"))
-        .def_property_readonly("points", &PyDelaunay<1>::py_points);
+            py::arg("points"));
 
-    py::class_<PyDelaunay<2>>(m, "DelaunayTri2D")
+    py::class_<PyDelaunay<1>, PyDelaunayBase>(m, "DelaunayTri1D")
         .def(py::init<py::array_t<double>>(),
-            py::arg("points"))
-        .def_property_readonly("points", &PyDelaunay<2>::py_points);
+            py::arg("points"));
 
-    py::class_<PyDelaunay<3>>(m, "DelaunayTri3D")
+    py::class_<PyDelaunay<2>, PyDelaunayBase>(m, "DelaunayTri2D")
         .def(py::init<py::array_t<double>>(),
-            py::arg("points"))
-        .def_property_readonly("points", &PyDelaunay<3>::py_points);
+            py::arg("points"));
+
+    py::class_<PyDelaunay<3>, PyDelaunayBase>(m, "DelaunayTri3D")
+        .def(py::init<py::array_t<double>>(),
+            py::arg("points"));
     
 
     py::class_<PyScatteredField<0>>(m, "ScatteredScalarFieldND")

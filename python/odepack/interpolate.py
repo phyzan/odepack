@@ -181,7 +181,7 @@ class IrregularScalarField(NumericalScalarField):
 
     _priority = 35 # TODO: choose correct
 
-    def __new__(cls, name: str, points: np.ndarray, values: np.ndarray, *expressions: Expr, simplify=True):
+    def __new__(cls, name: str, points: np.ndarray | DelaunayTriangulation, values: np.ndarray, *expressions: Expr, simplify=True):
         '''
         An irregular scalar field defined on scattered points, with values at those points and optional expressions for interpolation.
 
@@ -197,7 +197,7 @@ class IrregularScalarField(NumericalScalarField):
             Optional expressions for interpolation on each axis. The number of expressions must match the number of dimensions of the grid.
         '''
         expressions = tuple([asexpr(x) for x in expressions])
-        if isinstance(points, (DelaunayTri1D, DelaunayTri2D, DelaunayTri3D, DelaunayTriND)):
+        if isinstance(points, (DelaunayTriangulation)):
             points, tri = points.points, points
         else:
             tri = None
@@ -225,7 +225,7 @@ class IrregularScalarField(NumericalScalarField):
         return 'tri' in self.__dict__
     
     @cached_property
-    def tri(self):
+    def tri(self)->DelaunayTriangulation:
         print(f"Computing Delaunay triangulation for irregular scalar field for {self.name}") # this can be expensive, so it's good to have a print statement to indicate when it's happening
         if self.ndim == 1:
             return DelaunayTri1D(self.points)

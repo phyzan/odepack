@@ -67,32 +67,69 @@ template<size_t NDIM>
 int DelaunayTri<NDIM>::nsimplices() const { return simplices_.Nrows(); }
 
 template<size_t NDIM>
+const Array2D<int, 0, DelaunayTri<NDIM>::DIM_SPX>& DelaunayTri<NDIM>::get_simplices() const { return simplices_; }
+
+template<size_t NDIM>
 const int* DelaunayTri<NDIM>::get_simplex(int simplex_idx) const {
     assert(simplex_idx >= 0 && simplex_idx < nsimplices() && "Simplex index out of bounds");
     return simplices_.ptr(simplex_idx, 0);
 }
 
 template<size_t NDIM>
+const int* DelaunayTri<NDIM>::get_neighbors(int simplex_idx) const {
+    assert(simplex_idx >= 0 && simplex_idx < nsimplices() && "Simplex index out of bounds");
+    return neighbors_.ptr(simplex_idx, 0);
+}
+
+template<size_t NDIM>
 int DelaunayTri<NDIM>::find_simplex(const double* point) const {
     int num_simplices = nsimplices();
-    int nd = ndim();
+    if (num_simplices == 0) {
+        return -1;
+    }
 
-    // For NDIM>0, this is allocated on the stack, for NDIM=0 we fall back to heap allocation
+    int nd = ndim();
     Array1D<double, DIM_SPX, SPX_ALLOC> bary(nd + 1);
 
+    // Walking algorithm: start from cached simplex and walk towards the point
+    int s = (this->last_simplex_ >= 0 && this->last_simplex_ < num_simplices) ? this->last_simplex_ : 0;
+    int prev = -1; // track previous simplex to avoid oscillation
+    int max_iter = num_simplices; // prevent infinite loops
 
-    for (int s = 0; s < num_simplices; ++s) {
-        if (compute_barycentric(bary.data(), s, point)) {
-            bool inside = true;
-            for (int i = 0; i <= nd; ++i) {
-                if (bary[i] < -EPS) {
-                    inside = false;
-                    break;
-                }
+    for (int iter = 0; iter < max_iter; ++iter) {
+        compute_barycentric(bary.data(), s, point);
+
+        // Find most negative barycentric coordinate, excluding the face we came from
+        int min_idx = -1;
+        double min_val = -EPS;
+        for (int i = 0; i <= nd; ++i) {
+            // Skip if this neighbor is the previous simplex (avoid oscillation)
+            if (neighbors_(s, i) == prev) {
+                continue;
             }
-            if (inside){ return s;}
+            if (bary[i] < min_val) {
+                min_val = bary[i];
+                min_idx = i;
+            }
         }
+
+        if (min_idx == -1) {
+            // All coordinates >= -EPS (or lead back to prev), point is inside this simplex
+            this->last_simplex_ = s; // cache for next query
+            return s;
+        }
+
+        // Move to neighbor opposite the most negative vertex
+        int next = neighbors_(s, min_idx);
+        if (next == -1) {
+            // Hit boundary, point is outside the convex hull
+            return -1;
+        }
+        prev = s;
+        s = next;
     }
+
+    // Fallback: should not reach here for well-formed triangulation
     return -1;
 }
 
@@ -169,6 +206,7 @@ double DelaunayTri<NDIM>::weighted_field(const double* field, const double* bary
 template<size_t NDIM>
 void DelaunayTri<NDIM>::compute_delaunay_1d() {
     int num_points = npoints();
+    int num_simplices = num_points - 1;
 
     std::vector<std::pair<double, int>> sorted_points(num_points);
     for (int i = 0; i < num_points; ++i) {
@@ -177,13 +215,22 @@ void DelaunayTri<NDIM>::compute_delaunay_1d() {
 
     std::sort(sorted_points.begin(), sorted_points.end(),
         [](const auto& a, const auto& b) {
-            return a.first < b.first; 
+            return a.first < b.first;
         });
 
-    simplices_.resize((num_points - 1) * 2);
-    for (int i = 0; i < num_points - 1; ++i) {
-        simplices_[2 * i] = sorted_points[i].second;
-        simplices_[2 * i + 1] = sorted_points[i + 1].second;
+    // Build simplices
+    simplices_.resize(num_simplices, 2);
+    for (int i = 0; i < num_simplices; ++i) {
+        simplices_(i, 0) = sorted_points[i].second;
+        simplices_(i, 1) = sorted_points[i + 1].second;
+    }
+
+    // Build neighbors: neighbor[0] is opposite vertex[0], neighbor[1] is opposite vertex[1]
+    // In 1D: neighbor opposite left vertex is the simplex to the left, etc.
+    neighbors_.resize(num_simplices, 2);
+    for (int i = 0; i < num_simplices; ++i) {
+        neighbors_(i, 0) = (i > 0) ? (i - 1) : -1;                    // left neighbor
+        neighbors_(i, 1) = (i < num_simplices - 1) ? (i + 1) : -1;    // right neighbor
     }
 }
 
@@ -193,7 +240,6 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
     int n = int(ndim());
     int num_points = npoints();
 
-    // Prepare points array for Qhull (row-major: point0_dim0, point0_dim1, ..., point1_dim0, ...)
     const PointStorage& coords = get_points();
 
     // Initialize Qhull
@@ -207,7 +253,7 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
     // "d" = Delaunay, "Qt" = triangulated output, "Qbb" = scale to unit box, "Qz" = add point at infinity
     char flags[] = "qhull d Qt Qbb Qz";
     int exitcode = qh_new_qhull(qh, n, num_points,
-                                    const_cast<double*>(coords.data()), false, flags, nullptr, nullptr);
+                                const_cast<double*>(coords.data()), false, flags, nullptr, nullptr);
 
     if (exitcode != 0) {
         qh_freeqhull(qh, !qh_ALL);
@@ -216,12 +262,13 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
         throw std::runtime_error("Qhull Delaunay triangulation failed");
     }
 
-    // Extract simplices from Qhull
+    // First pass: build facet pointer -> index map and collect simplices
+    std::unordered_map<facetT*, int> facet_to_idx;
+    std::vector<facetT*> facet_list;
     std::vector<int> simplex_array;
 
     facetT* facet;
     FORALLfacets {
-        // Skip facets at infinity (upper Delaunay)
         if (!facet->upperdelaunay) {
             vertexT* vertex;
             vertexT** vertexp;
@@ -236,22 +283,73 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
                 }
             }
 
-            // Only add complete simplices
             if (simplex_verts.size() == size_t(n + 1)) {
+                int idx = int(facet_list.size());
+                facet_to_idx[facet] = idx;
+                facet_list.push_back(facet);
                 for (int v : simplex_verts) {
                     simplex_array.push_back(v);
                 }
             }
         }
     }
-    // simplex_array.shrink_to_fit();
-    simplices_ = Array2D<int, 0, DIM_SPX>(simplex_array.data(), simplex_array.size() / (n + 1), n + 1);
+
+    int num_simplices = int(facet_list.size());
+    simplices_ = Array2D<int, 0, DIM_SPX>(simplex_array.data(), num_simplices, n + 1);
+
+    // Second pass: extract neighbors mapped to the vertex they are opposite to.
+    neighbors_.resize(num_simplices, n + 1);
+    neighbors_.set(-1); // default to -1 (no neighbor)
+
+    for (int s = 0; s < num_simplices; ++s) {
+        facetT* f = facet_list[s];
+        const int* simplex = simplices_.ptr(s, 0);
+
+        ridgeT* ridge;
+        ridgeT** ridgep;
+        FOREACHridge_(f->ridges) {
+            facetT* neighbor = (ridge->top == f) ? ridge->bottom : ridge->top;
+            if (!neighbor || neighbor->upperdelaunay) {
+                continue;
+            }
+
+            auto it = facet_to_idx.find(neighbor);
+            if (it == facet_to_idx.end()) {
+                continue;
+            }
+
+            std::vector<char> in_ridge(n + 1, 0);
+
+            vertexT* vertex;
+            vertexT** vertexp;
+            FOREACHvertex_(ridge->vertices) {
+                int point_idx = qh_pointid(qh, vertex->point);
+                for (int i = 0; i < n + 1; ++i) {
+                    if (simplex[i] == point_idx) {
+                        in_ridge[i] = 1;
+                        break;
+                    }
+                }
+            }
+
+            int missing = -1;
+            for (int i = 0; i < n + 1; ++i) {
+                if (!in_ridge[i]) {
+                    missing = i;
+                    break;
+                }
+            }
+
+            if (missing >= 0) {
+                neighbors_(s, missing) = it->second;
+            }
+        }
+    }
 
     // Cleanup Qhull
     qh_freeqhull(qh, !qh_ALL);
     int curlong, totlong;
     qh_memfreeshort(qh, &curlong, &totlong);
-
 }
 
 

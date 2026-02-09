@@ -479,14 +479,14 @@ protected:
 
 private:
 
-     void                 jac_exact(T* j, const T& t, const T* q) const;
-     const T*             aux_state_ptr() const;
-     T*                   aux_state_ptr();
-    void                        register_states();
-    bool                        validate_it(const T* state);
-    void                        update_state(const T& time);
-    void                        move_state(const T& time);
-    void                        set_state(const T& time, T* state);
+    void                    jac_exact(T* j, const T& t, const T* q) const;
+    const T*                aux_state_ptr() const;
+    T*                      aux_state_ptr();
+    void                    register_states();
+    bool                    validate_it(const T* state);
+    void                    update_state(const T& time);
+    void                    move_state(const T& time);
+    void                    set_state(const T& time, T* state);
 
 
     Array2D<T, 6, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;

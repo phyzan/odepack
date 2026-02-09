@@ -459,8 +459,23 @@ private:
 };
 
 
+class PyDelaunayBase{
+
+public:
+
+    virtual ~PyDelaunayBase() = default;
+    virtual py::object py_points() const = 0;
+    virtual int py_ndim() const = 0;
+    virtual int py_npoints() const = 0;
+    virtual int py_nsimplices() const = 0;
+    virtual int py_find_simplex(const py::array_t<double>& point) const = 0;
+    virtual py::object py_get_simplices() const = 0;
+    virtual py::object py_get_simplex(const py::array_t<double>& point) const = 0;
+};
+
+
 template<size_t NDIM>
-class PyDelaunay : public DelaunayTri<NDIM> {
+class PyDelaunay : public DelaunayTri<NDIM>, public PyDelaunayBase {
 
     using Base = DelaunayTri<NDIM>;
 
@@ -468,7 +483,19 @@ public:
 
     PyDelaunay(const py::array_t<double>& x);
 
-    py::object py_points() const;
+    py::object py_points() const override;
+
+    int py_ndim() const override;
+    int py_npoints() const override;
+    int py_nsimplices() const override;
+    int py_find_simplex(const py::array_t<double>& point) const override;
+
+    //returns array of shape (ndim+1,), or None if point is out of bounds.
+    py::object py_get_simplex(const py::array_t<double>& point) const override;
+    
+    // array of shape (nsimplices, ndim+1) containing the indices of the points that form each simplex
+    py::object py_get_simplices() const override;
+    
 
 private:
 
