@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from matplotlib.pyplot import grid
 from numiphy.symlib import Expr, Symbol, asexpr, S, InterpedArray
 from numiphy.symlib.hashing import _HashableNdArray, _HashableGrid
@@ -7,7 +6,7 @@ from numiphy.findiffs import Grid
 from functools import cached_property
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
-from .odesolvers import * #type: ignore
+from .fields import * #type: ignore
 
 
 class NumericalScalarField(Expr):

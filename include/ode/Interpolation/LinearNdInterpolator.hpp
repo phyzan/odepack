@@ -26,6 +26,8 @@ public:
     using PointStorage = Array2D<double, 0, NDIM>;
     static constexpr int DIM_SPX = (NDIM == 0 ? 0 : NDIM+1);
 
+    DEFAULT_RULE_OF_FOUR(DelaunayTri)
+
     template<typename PointsArrayType>
     DelaunayTri(const PointsArrayType& points);
 

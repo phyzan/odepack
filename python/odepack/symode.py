@@ -1,16 +1,12 @@
 from __future__ import annotations
 from typing import Iterable, Callable, Iterator
-from .odesolvers import * #type: ignore
 from numiphy.lowlevelsupport import *
 from pathlib import Path
 from .interpolate import *
-
-
-_LIB_PATH = Path(__file__).resolve().parent
-_LIB_DIR = os.path.join(_LIB_PATH, "lib")
-_LIB_NAME = "odepack"
-
-_HEADER_PATH =  os.path.join(_LIB_PATH, "include", "pyodehead.hpp")
+from .events import * #type: ignore
+from .ode import * #type: ignore
+from .chaos import * #type: ignore
+from .solvers import * #type: ignore
 
 
 class ArrayofExpr:
@@ -755,7 +751,7 @@ class OdeSystem:
         extra_code_block, extra_func_code = self.extra_code(variational)
         extra_kw = dict(extra_funcs=[extra_func_code])
         if self.contains_fields(variational=variational):
-            extra_kw.update(extra_header_block=self.header, extra_code_block=extra_code_block)
+            extra_kw.update(extra_header_block=OdeSystem.header(), extra_code_block=extra_code_block)
 
         return generate_cpp_code(self.lowlevel_callables(scalar_type=scalar_type, variational=variational), self.module_name(scalar_type=scalar_type, variational=variational), **extra_kw)
     
@@ -774,8 +770,13 @@ class OdeSystem:
         extra_func = ('set_fields', "&set_fields")
         return main_block, extra_func
     
-    @property
-    def header(self):
+    @staticmethod
+    def lib_path():
+        return Path(__file__).resolve().parent
+    
+    @staticmethod
+    def header():
+        _HEADER_PATH =  os.path.join(OdeSystem.lib_path(), "include", "pyodepack.hpp")
         return f'#include "{_HEADER_PATH}"'
     
     @property
@@ -826,9 +827,9 @@ class OdeSystem:
         extra_code_block, extra_func_code = self.extra_code(variational)
         extra_kw = dict(extra_funcs=[extra_func_code], extra_code_block=extra_code_block)
         if self.contains_fields(variational=variational):
-            extra_kw.update(extra_header_block=self.header)
+            extra_kw.update(extra_header_block=OdeSystem.header())
         
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[(_LIB_DIR, _LIB_NAME), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"], **extra_kw)
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"], **extra_kw)
         if self.has_jac:
             return result # (pointers, ...), set_field
         else:
@@ -1545,12 +1546,24 @@ class OdeSystem:
             raise NotImplementedError("Jacobian matrix is not defined for this system.")
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=self.header if self.get_fields(variational) else "", links=[(_LIB_DIR, _LIB_NAME), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"])[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=OdeSystem.header() if self.get_fields(variational) else "", links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"])[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')
         p = self._pointers(scalar_type=scalar_type, variational=variational)[idx]
         return LowLevelFunction(pointer=p, input_size=factor*self.Nsys, output_shape=shape, Nargs=self.Nargs, scalar_type=scalar_type)
+    
+    @staticmethod
+    def get_link_names():
+        main = ["chaos", "fields", "ode", "solvers", "events", "oderesult", "pytools"]
+        return ["odepack_" + name for name in main]
+
+    @staticmethod
+    def get_links():
+        lib_path = OdeSystem.lib_path()
+        lib_dir = os.path.join(lib_path, "lib")
+        link_names = OdeSystem.get_link_names()
+        return [(lib_dir, name) for name in link_names]
 
 
 def HamiltonianSystem2D(V: Expr, t: Symbol, x, y, px, py, args = (), events=()):

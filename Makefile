@@ -14,7 +14,7 @@ install:
 	cp include/odepack.hpp $(INCLUDEDIR)/odepack/
 	cp include/ndspan.hpp $(INCLUDEDIR)/odepack/
 	cp include/pyodepack.hpp $(INCLUDEDIR)/odepack/
-	cp include/pyodehead.hpp $(INCLUDEDIR)/odepack/
+	cp include/pyodepack_impl.hpp $(INCLUDEDIR)/odepack/
 	@echo "Done. You can now use: #include <odepack/odepack.hpp>"
 
 uninstall:

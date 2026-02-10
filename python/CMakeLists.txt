@@ -1,21 +1,58 @@
-# Python extension module — thin wrapper linked against libodepack
+# Python extension modules — thin wrappers linked against static libraries
 
-pybind11_add_module(odesolvers src/bindings.cpp)
-target_link_libraries(odesolvers PRIVATE odepack_lib)
+# Helper function to configure Python extension modules
+function(configure_py_module target_name)
+    if(MPREAL)
+        target_compile_definitions(${target_name} PRIVATE MPREAL)
+    endif()
+endfunction()
 
-if(MPREAL)
-    target_compile_definitions(odesolvers PRIVATE MPREAL)
-endif()
+# 1. solvers module: ODE solvers (RK23, RK45, DOP853, BDF, RK4)
+pybind11_add_module(solvers src/solvers.cpp)
+target_link_libraries(solvers PRIVATE odepack_solvers)
+configure_py_module(solvers)
 
-# Install the compiled module into the odepack Python package
-install(TARGETS odesolvers
+# 2. events module: Event handling
+pybind11_add_module(events src/events.cpp)
+target_link_libraries(events PRIVATE odepack_events)
+configure_py_module(events)
+
+# 3. oderesult module: ODE result containers
+pybind11_add_module(oderesult src/oderesult.cpp)
+target_link_libraries(oderesult PRIVATE odepack_oderesult)
+configure_py_module(oderesult)
+
+# 4. ode module: Low-level ODE interface
+pybind11_add_module(ode src/ode.cpp)
+target_link_libraries(ode PRIVATE odepack_ode)
+configure_py_module(ode)
+
+# 5. chaos module: Variational/Lyapunov solvers
+pybind11_add_module(chaos src/chaos.cpp)
+target_link_libraries(chaos PRIVATE odepack_chaos)
+configure_py_module(chaos)
+
+# 6. fields module: Vector field interpolation
+pybind11_add_module(fields src/fields.cpp)
+target_link_libraries(fields PRIVATE odepack_fields)
+configure_py_module(fields)
+
+# Install all Python extension modules into the odepack Python package
+install(TARGETS solvers events oderesult ode chaos fields
     LIBRARY DESTINATION odepack
     COMPONENT python
 )
 
-# Install the static library and headers into the Python package
+# Install the static libraries and headers into the Python package
 # so C++ projects can link against them after pip install
-install(TARGETS odepack_lib
+install(TARGETS
+    odepack_pytools
+    odepack_solvers
+    odepack_events
+    odepack_oderesult
+    odepack_ode
+    odepack_chaos
+    odepack_fields
     ARCHIVE DESTINATION odepack/lib
     COMPONENT python
 )

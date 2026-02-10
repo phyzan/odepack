@@ -101,32 +101,98 @@ target_include_directories(odepack_headers INTERFACE
 target_compile_features(odepack_headers INTERFACE cxx_std_20)
 
 #===========================================================================================
-#                           STATIC library: compiled Py* wrapper classes
+#                           STATIC libraries: compiled Py* wrapper classes (6 modules)
 #===========================================================================================
 
-add_library(odepack_lib STATIC python/src/pyode.cpp)
-target_link_libraries(odepack_lib PUBLIC odepack_headers pybind11::pybind11 Python::Module)
-if(OpenMP_FOUND)
-    target_link_libraries(odepack_lib PUBLIC OpenMP::OpenMP_CXX)
-endif()
-
-# Link Qhull for Delaunay triangulation
-if(QHULL_R_LIBRARY AND QHULL_INCLUDE_DIR)
-    message(STATUS "Found Qhull: ${QHULL_R_LIBRARY}")
-    target_include_directories(odepack_lib PUBLIC ${QHULL_INCLUDE_DIR})
-    target_link_libraries(odepack_lib PUBLIC ${QHULL_R_LIBRARY})
-else()
+# Check for Qhull first (needed by odepack_fields)
+if(NOT QHULL_R_LIBRARY OR NOT QHULL_INCLUDE_DIR)
     message(FATAL_ERROR "Qhull not found. LinearNdInterpolator requires Qhull. Install with: sudo apt install libqhull-dev")
+else()
+    message(STATUS "Found Qhull: ${QHULL_R_LIBRARY}")
 endif()
 
-target_compile_options(odepack_lib PRIVATE ${COMMON_COMPILE_OPTIONS})
-set_target_properties(odepack_lib PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    OUTPUT_NAME odepack
+# Helper function to configure static library targets
+function(configure_odepack_lib target_name)
+    target_link_libraries(${target_name} PUBLIC odepack_headers pybind11::pybind11 Python::Module)
+    if(OpenMP_FOUND)
+        target_link_libraries(${target_name} PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+    target_compile_options(${target_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
+    set_target_properties(${target_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if(MPREAL)
+        target_link_libraries(${target_name} PUBLIC ${MPFR_LIBRARY} ${GMP_LIBRARY})
+    endif()
+endfunction()
+
+# 0. odepack_pytools: Shared Python utilities (DtypeDispatcher, etc.) - no dependencies
+add_library(odepack_pytools STATIC
+    python/src/bindings/PyTools.cpp
 )
-if(MPREAL)
-    target_link_libraries(odepack_lib PUBLIC ${MPFR_LIBRARY} ${GMP_LIBRARY})
-endif()
+configure_odepack_lib(odepack_pytools)
+set_target_properties(odepack_pytools PROPERTIES OUTPUT_NAME odepack_pytools)
+
+# 1. odepack_events: Event handling implementations (depends on pytools)
+add_library(odepack_events STATIC
+    python/src/bindings/PyEvents.cpp
+)
+configure_odepack_lib(odepack_events)
+target_link_libraries(odepack_events PUBLIC odepack_pytools)
+set_target_properties(odepack_events PROPERTIES OUTPUT_NAME odepack_events)
+
+# 2. odepack_solvers: Core solver implementations (depends on events, pytools)
+add_library(odepack_solvers STATIC
+    python/src/bindings/PySolver.cpp
+    python/src/bindings/PySubSolver.cpp
+    python/src/bindings/PyFunc.cpp
+)
+configure_odepack_lib(odepack_solvers)
+target_link_libraries(odepack_solvers PUBLIC odepack_events odepack_pytools)
+set_target_properties(odepack_solvers PROPERTIES OUTPUT_NAME odepack_solvers)
+
+# 3. odepack_oderesult: ODE result implementations
+add_library(odepack_oderesult STATIC
+    python/src/bindings/PyResult.cpp
+)
+configure_odepack_lib(odepack_oderesult)
+target_link_libraries(odepack_oderesult PUBLIC odepack_solvers)
+set_target_properties(odepack_oderesult PROPERTIES OUTPUT_NAME odepack_oderesult)
+
+# 4. odepack_ode: Low-level ODE interface implementations
+add_library(odepack_ode STATIC
+    python/src/bindings/PyOde.cpp
+)
+configure_odepack_lib(odepack_ode)
+target_link_libraries(odepack_ode PUBLIC odepack_solvers odepack_events odepack_oderesult odepack_pytools)
+set_target_properties(odepack_ode PROPERTIES OUTPUT_NAME odepack_ode)
+
+# 5. odepack_chaos: Variational/Lyapunov solver implementations
+add_library(odepack_chaos STATIC
+    python/src/bindings/PyChaos.cpp
+)
+configure_odepack_lib(odepack_chaos)
+target_link_libraries(odepack_chaos PUBLIC odepack_solvers odepack_events odepack_oderesult odepack_ode odepack_pytools)
+set_target_properties(odepack_chaos PROPERTIES OUTPUT_NAME odepack_chaos)
+
+# 6. odepack_fields: Vector field implementations (needs Qhull)
+add_library(odepack_fields STATIC
+    python/src/bindings/PyField.cpp
+)
+configure_odepack_lib(odepack_fields)
+target_include_directories(odepack_fields PUBLIC ${QHULL_INCLUDE_DIR})
+target_link_libraries(odepack_fields PUBLIC odepack_solvers odepack_oderesult odepack_ode odepack_pytools ${QHULL_R_LIBRARY})
+set_target_properties(odepack_fields PROPERTIES OUTPUT_NAME odepack_fields)
+
+# Convenience target that groups all static libraries
+add_library(odepack_all INTERFACE)
+target_link_libraries(odepack_all INTERFACE
+    odepack_pytools
+    odepack_solvers
+    odepack_events
+    odepack_oderesult
+    odepack_ode
+    odepack_chaos
+    odepack_fields
+)
 
 #===========================================================================================
 #                           Install rules (C++ library)
@@ -142,8 +208,17 @@ install(DIRECTORY include/
     FILES_MATCHING PATTERN "*.hpp"
 )
 
-# Install static library
-install(TARGETS odepack_lib odepack_headers
+# Install static libraries
+install(TARGETS
+    odepack_pytools
+    odepack_headers
+    odepack_solvers
+    odepack_events
+    odepack_oderesult
+    odepack_ode
+    odepack_chaos
+    odepack_fields
+    odepack_all
     EXPORT odepackTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT cpp
 )

@@ -512,8 +512,8 @@ odepack/
 │   │
 │   ├── odepack.hpp                  # Main C++ include (all headers)
 │   ├── ndspan.hpp                   # Main ndspan include
-│   ├── pyodehead.hpp                # Convenience include for pyode
-│   └── pyodepack.hpp                # Main Python bindings include
+│   ├── pyodepack.hpp                # Header-only declaration include for pyode
+│   └── pyodepack_impl.hpp           # Template implementations for pyode
 │
 ├── python/
 │   ├── src/                         # Python bindings (pybind11)

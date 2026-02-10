@@ -1,159 +1,13 @@
-#ifndef PYODE_IMPL_TPP
-#define PYODE_IMPL_TPP
+#ifndef PY_FIELD_IMPL_HPP
+#define PY_FIELD_IMPL_HPP
 
-#include "pyode.hpp"
-#include "pytools_impl.hpp"
+#include "../bindings/PyResult.hpp"
+#include "../bindings/PyField.hpp"
+#include "PyOde_impl.hpp"
+#include "../pytools/pycast.hpp"
 
-
-//===========================================================================================
-//                          Template Method Implementations
-//===========================================================================================
 
 namespace ode{
-
-template<typename T>
-OdeRichSolver<T>* PySolver::cast(){
-    return reinterpret_cast<OdeRichSolver<T>*>(this->s);
-}
-
-template<typename T>
-const OdeRichSolver<T>* PySolver::cast()const{
-    return reinterpret_cast<const OdeRichSolver<T>*>(this->s);
-}
-
-
-template<typename T>
-const NormalizationEvent<T>& PyVarSolver::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(0));
-}
-
-template<typename T>
-const OdeResult<T>* PyOdeResult::cast() const{
-    return reinterpret_cast<OdeResult<T>*>(this->res);
-}
-
-template<typename T>
-OdeResult<T>* PyOdeResult::cast() {
-    return reinterpret_cast<OdeResult<T>*>(this->res);
-}
-
-
-template<typename T>
-Func<T> PyEvent::mask() const{
-    if (_py_mask){
-        return py_mask<T>;
-    }
-    else if (this->_mask != nullptr){
-        return reinterpret_cast<Func<T>>(this->_mask);
-    }
-    else{
-        return nullptr;
-    }
-}
-
-template<typename T>
-ObjFun<T> PyPrecEvent::when() const{
-    if (_when == nullptr){
-        return py_event<T>;
-    }
-    else{
-        return reinterpret_cast<ObjFun<T>>(this->_when);
-    }
-}
-
-template<typename T>
-void* PyPrecEvent::get_new_event(){
-    return new ObjectOwningEvent<PreciseEvent<T>, PyStruct>(this->data, this->name(), this->when<T>(), _dir, this->mask<T>(), this->hide_mask(), this->_event_tol.cast<T>());
-}
-
-template<typename T>
-void* PyPerEvent::get_new_event(){
-    return new ObjectOwningEvent<PeriodicEvent<T>, PyStruct>(this->data, this->name(), _period.cast<T>(), this->mask<T>(), this->hide_mask());
-}
-
-template<typename T>
-std::vector<Event<T>*> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args){
-    if (events.is_none()){
-        return {};
-    }
-    std::vector<Event<T>*> res;
-    for (py::handle item : events){
-        Event<T>* ev_ptr = reinterpret_cast<Event<T>*>(item.cast<PyEvent&>().toEvent(shape, args));
-        res.push_back(ev_ptr);
-    }
-    return res;
-}
-
-
-template<typename T, typename RhsType, typename JacType>
-PyODE::PyODE(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, const std::string& method) : DtypeDispatcher(get_scalar_type<T>()){
-    data.is_lowlevel = true;
-    data.shape = {py::ssize_t(nsys)};
-    this->ode = new ODE<T, 0>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events, method);
-}
-
-template<typename T>
-ODE<T>* PyODE::cast(){
-    return reinterpret_cast<ODE<T>*>(this->ode);
-}
-
-template<typename T>
-const ODE<T>* PyODE::cast() const {
-    return reinterpret_cast<const ODE<T>*>(this->ode);
-}
-
-
-
-
-template<typename T>
-void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
-    std::vector<T> args;
-    OdeData<Func<T>, void> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
-    std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
-    std::vector<const Event<T>*> evs(safe_events.size());
-    for (size_t i=0; i<evs.size(); i++){
-        evs[i] = safe_events[i];
-    }
-    auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_virtual_solver<T, 0>(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs).release();
-    for (size_t i=0; i<evs.size(); i++){
-        delete safe_events[i];
-    }
-}
-
-template<typename T>
-py::object PyOdeSolution::_get_frame(const py::object& t) const{
-    return py::cast(Array<T>(reinterpret_cast<OdeSolution<T>*>(this->res)->operator()(t.cast<T>()).data(), this->q0_shape.data(), this->q0_shape.size()));
-}
-
-template<typename T>
-py::object PyOdeSolution::_get_array(const py::array& py_array) const{
-    const auto nt = size_t(py_array.size());
-    std::vector<py::ssize_t> final_shape(py_array.shape(), py_array.shape()+py_array.ndim());
-    final_shape.insert(final_shape.end(), this->q0_shape.begin(), this->q0_shape.end());
-    Array<T> res(final_shape.data(), final_shape.size());
-    const auto* solution = reinterpret_cast<const OdeSolution<T>*>(this->res);
-
-    // Extract array values and cast them to T using Python's item access
-    for (size_t i=0; i<nt; i++){
-        py::object item = py_array.attr("flat")[py::int_(i)];
-        T t_value = py::cast<T>(item);
-        copy_array(res.data()+i*nsys, solution->operator()(t_value).data(), nsys);
-    }
-    return py::cast(res);
-}
-
-
-template<typename T>
-VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode(){
-    return *static_cast<VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
-}
-
-template<typename T>
-const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode() const {
-    return *static_cast<const VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
-}
-
 
 // ============================================================================================
 //                                      PyScalarField
@@ -254,7 +108,7 @@ py::object PyDelaunay<NDIM>::py_get_simplex(const py::array_t<double>& point) co
     // Now get array of (ndim+1, ndim) containing the coordinates of the simplex vertices
     Array2D<double, 0, Base::DIM_SPX> simplex_coords(this->ndim()+1, this->ndim());
     const auto& points = Base::get_points();
-    for (size_t i=0; i<this->ndim()+1; i++){
+    for (int i=0; i<this->ndim()+1; i++){
         const double* vertex_coords = points.ptr(simplex[i], 0);
         copy_array(simplex_coords.ptr(i, 0), vertex_coords, this->ndim());
     }
@@ -310,7 +164,7 @@ template<size_t NDIM>
 double PyScatteredField<NDIM>::py_value_at(const py::args& x) const{
     constexpr Allocation Alloc = NDIM == 0 ? Allocation::Heap : Allocation::Stack;
     Array1D<double, NDIM, Alloc> point(x.size());// TODO: optimize this. Currently a temporary vector on the heap is allocated on each call when NDIM == 0
-    if (x.size() != this->ndim()){
+    if (x.size() != size_t(this->ndim())){
         // throw informative error including ndim of input and expected ndim
         throw py::value_error("Expected " + std::to_string(this->ndim()) + " input points, but got " + std::to_string(x.size()));
     }
@@ -324,6 +178,10 @@ template<size_t NDIM>
 std::nullptr_t PyScatteredField<NDIM>::parse_args(const py::array_t<double>& x, const py::array_t<double>& values){
     if (x.ndim() > 2){
         throw py::value_error("ScatteredField requires a 2D array for the input points (or optionally a 1D array for 1D fields)");
+    }else if (x.ndim() == 1 && NDIM != 1){
+        throw py::value_error("1D input points are only allowed for 1D fields");
+    }else if (x.ndim() != 1 && NDIM != 0 && x.shape(1) != NDIM){
+        throw py::value_error("Invalid shape for input points array. Expected shape (npoints, " + std::to_string(NDIM) + ") but got (" + std::to_string(x.shape(0)) + ", " + std::to_string(x.shape(1)) + ")");
     }else if (values.ndim() != 1){
         throw py::value_error("ScatteredField requires a 1D array for the field values");
     }else if (x.shape(0) != values.size()){
@@ -496,103 +354,6 @@ std::nullptr_t PyVecField<NDIM>::parse_args(const PyArray&... args){
     return nullptr;
 }
 
-
-//===========================================================================================
-//                                      Templated functions
-//===========================================================================================
-
-template<typename T>
-OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
-    std::string scalar_type = get_scalar_type<T>();
-    data.shape = shape(q0);
-    data.py_args = py::tuple(py_args);
-    size_t _size = prod(data.shape);
-
-    bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
-    bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
-    args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<Func<T>, void> ode_rhs = {nullptr, nullptr, &data};
-    if (f_is_compiled){
-        if (py::isinstance<PyFuncWrapper>(f)){
-            //safe approach
-            auto& _f = f.cast<PyFuncWrapper&>();
-            ode_rhs.rhs = reinterpret_cast<Func<T>>(_f.rhs);
-            if (_f.Nsys != _size){
-                throw py::value_error("The array size of the initial conditions differs from the ode system size");
-            }
-            else if (_f.Nargs != args.size()){
-                throw py::value_error("The number of the provided extra args (" + std::to_string(args.size()) + ") differs from the number of args specified for this ode system ("+std::to_string(_f.Nargs)+").");
-            }
-        }
-        else{
-            ode_rhs.rhs = open_capsule<Func<T>>(f.cast<py::capsule>());
-        }
-    }
-    else{
-        data.rhs = f;
-        ode_rhs.rhs = py_rhs;
-    }
-    if (jac_is_compiled){
-        if (py::isinstance<PyFuncWrapper>(jacobian)){
-            //safe approach
-            auto& _j = jacobian.cast<PyFuncWrapper&>();
-            ode_rhs.jacobian = (VoidType)_j.rhs;
-            if (_j.Nsys != _size){
-                throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
-            }
-            else if (_j.Nargs != args.size()){
-                throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
-            }
-        }
-        else{
-            ode_rhs.jacobian = (VoidType)open_capsule<Func<T>>(jacobian.cast<py::capsule>());
-        }
-    }else if (!jacobian.is_none()){
-        data.jac = jacobian;
-        ode_rhs.jacobian = (VoidType)py_jac<T>;
-    }
-    for (py::handle ev : events){
-        if (!py::isinstance<PyEvent>(ev)) {
-            throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class, not " + py::str(ev.get_type()).cast<std::string>());
-        }
-        const auto& _ev = ev.cast<const PyEvent&>();
-        if (_ev.scalar_type != DTYPE_MAP.at(scalar_type)){
-            throw py::value_error("All event objects in 'events' must have scalar type " + scalar_type + ".");
-        }
-        _ev.check_sizes(_size, args.size());
-    }
-
-    // allocate dummy array in PyStruct data
-    if constexpr (std::is_floating_point_v<T>) {
-        py::array_t<T>& array = data.template get_array<T>();
-        array.resize({static_cast<py::ssize_t>(_size)});
-    }
-
-    data.is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);
-    return ode_rhs;
 }
 
-template<typename T>
-std::string get_scalar_type(){
-    if constexpr (std::is_same_v<T, float>){
-        return "float";
-    }
-    else if constexpr (std::is_same_v<T, double>){
-        return "double";
-    }
-    else if constexpr (std::is_same_v<T, long double>){
-        return "long double";
-    }
-#ifdef MPREAL
-    else if constexpr (std::is_same_v<T, mpfr::mpreal>){
-        return "mpreal";
-    }
-#endif
-    else{
-        static_assert(false, "Unsupported scalar type T");
-    }
-}
-
-}
-
-#endif // PYODE_TPP
+#endif // PY_FIELD_IMPL_HPP

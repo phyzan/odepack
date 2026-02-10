@@ -4,39 +4,14 @@
 #include <cstddef>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include "../ndspan/arrays.hpp"
+#include "../../ndspan/arrays.hpp"
 #include "pytools.hpp"
-#include  "ode_caster.hpp"
+#include  "pycast.hpp"
 
 
 
 
 namespace ode{
-
-#define DISPATCH(RETURN_TYPE, ...)                                              \
-call_dispatch(this->scalar_type, [&]<typename T>() -> RETURN_TYPE {__VA_ARGS__ });
-
-
-template<typename Callable>
-auto call_dispatch(int scalar_type, Callable&& f){
-    switch (scalar_type) {
-        case 0:
-            return f.template operator()<float>();
-        case 1:
-            return f.template operator()<double>();
-#ifdef MPREAL
-        case 2:
-            return f.template operator()<long double>();
-        default:
-            assert(scalar_type == 3 && "Invalid scalar type");
-            return f.template operator()<mpfr::mpreal>();
-#else
-        default:
-            assert(scalar_type == 2 && "Invalid scalar type");
-            return f.template operator()<long double>();
-#endif
-    }
-}
 
 
 namespace py = pybind11;
@@ -76,15 +51,6 @@ StepSequence<T> to_step_sequence(const py::object& t_eval){
     }
 }
 
- py::dict to_PyDict(const EventMap& _map){
-    py::dict py_dict;
-    for (const auto& [key, vec] : _map) {
-        py::array_t<size_t> np_array(static_cast<py::ssize_t>(vec.size()), vec.data()); // Create NumPy array
-        py_dict[key.c_str()] = np_array; // Assign to dictionary
-    }
-    return py_dict;
-}
-
 template<typename Int>
  std::vector<Int> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
     std::vector<Int> result;
@@ -93,15 +59,6 @@ template<typename Int>
     for (size_t i=0; i<shape.size(); i++){
         result.push_back(shape[i]);
     }
-    return result;
-}
-
-template<>
- std::vector<py::ssize_t> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
-    std::vector<py::ssize_t> result;
-    result.reserve(1 + shape.size()); // Pre-allocate memory for efficiency
-    result.push_back(dim1);        // Add the first element
-    result.insert(result.end(), shape.begin(), shape.end()); // Append the original vector
     return result;
 }
 
@@ -124,13 +81,7 @@ py::array_t<T> array(T* data, const std::vector<py::ssize_t>& shape){
 }
 
 
- std::vector<py::ssize_t> shape(const py::object& obj) {
-    py::array arr = py::array::ensure(obj);
-    const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
-    auto ndim = static_cast<size_t>(arr.ndim());  // Number of dimensions
-    std::vector<py::ssize_t> res(shape_ptr, shape_ptr + ndim);
-    return res;
-}
+ std::vector<py::ssize_t> shape(const py::object& obj);
 
 template<typename T>
 T open_capsule(const py::capsule& f){
