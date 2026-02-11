@@ -7,7 +7,7 @@ function(configure_py_module target_name)
     endif()
 endfunction()
 
-# 1. solvers module: ODE solvers (RK23, RK45, DOP853, BDF, RK4)
+# 1. solvers module: ODE solvers (e.g. RK23, RK45, DOP853, BDF, RK4)
 pybind11_add_module(solvers src/bindings/solvers.cpp)
 target_link_libraries(solvers PRIVATE odepack_solvers)
 configure_py_module(solvers)

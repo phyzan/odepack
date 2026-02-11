@@ -451,7 +451,9 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0,
         this->reset();
         return true;
     }else {
+#ifndef NO_ODE_WARN
         std::cerr << "Tried to set invalid initial conditions" << std::endl;
+#endif
         return false;
     }
 }

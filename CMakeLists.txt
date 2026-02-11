@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.15...3.26)
 
-# optional flags: -DMPREAL=ON -DDEBUG=ON, -DRK4_DENSE=ON, -DBUILD_PYTHON=ON
+# optional flags: -DMPREAL=ON -DDEBUG=ON, -DRK4_DENSE=ON, -DBUILD_PYTHON=ON, -DNO_ODE_WARN=ON
 option(MPREAL "Enable MPFR multi-precision support" OFF)
 option(DEBUG "Enable debug build" OFF)
 option(RK4_DENSE "Enable accurate RK4 dense output" OFF) #by default Hermite interpolation is used
 option(BUILD_PYTHON "Build Python extension module" OFF)
+option(NO_ODE_WARN "Disable ODE warnings" OFF)
 
 set(CMAKE_CXX_COMPILER "g++")
 
@@ -64,6 +65,10 @@ if(DEBUG)
     list(APPEND COMMON_COMPILE_OPTIONS -O0 -g -ggdb3 -fno-omit-frame-pointer)
 else()
     list(APPEND COMMON_COMPILE_OPTIONS -O3 -DNDEBUG -fno-math-errno -fno-trapping-math)
+endif()
+
+if(NO_ODE_WARN)
+    list(APPEND COMMON_COMPILE_OPTIONS -DNO_ODE_WARN)
 endif()
 
 if(MPREAL)
