@@ -12,7 +12,7 @@
 #include <numeric>
 #include <concepts>
 #ifdef MPREAL
-#include "mpreal.h"
+#include <mpreal.h>
 #endif
 
 #define THIS static_cast<Derived*>(this)

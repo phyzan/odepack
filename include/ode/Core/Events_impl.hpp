@@ -2,6 +2,10 @@
 #define EVENTS_IMPL_HPP
 
 #include "Events.hpp"
+#include "../Tools_impl.hpp"
+
+// "../Tools_impl.hpp" is required as explicit instanciation
+// of bisect<T> is needed.
 
 namespace ode{
 
@@ -345,8 +349,7 @@ template<typename T>
 EventView<T>::EventView(const AnyEvent<T>* events, const size_t* detection, size_t size) : Base(detection, size), event_data(events) {}
 
 template<typename T>
-template<std::integral Int>
-const Event<T>* EventView<T>::operator[](Int i) const{
+const Event<T>* EventView<T>::operator[](size_t i) const{
     return event_data[Base::operator[](i)].ptr();
 }
 

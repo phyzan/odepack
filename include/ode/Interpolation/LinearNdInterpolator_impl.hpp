@@ -4,10 +4,9 @@
 
 #include "LinearNdInterpolator.hpp"
 #include "../Tools.hpp"
+#include <libqhull_r/qhull_ra.h>
 
 namespace ode{
-
-#include <libqhull_r/qhull_ra.h>
 
 //===========================================================================
 //                          DelaunayTri implementation
@@ -92,7 +91,8 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
     Array1D<double, DIM_SPX, SPX_ALLOC> bary(nd + 1);
 
     // Walking algorithm: start from cached simplex and walk towards the point
-    int s = (this->last_simplex_ >= 0 && this->last_simplex_ < num_simplices) ? this->last_simplex_ : 0;
+    int& last_simplex = this->thread_cache(); // start from the last simplex found by this thread on this object
+    int s = (last_simplex >= 0 && last_simplex < num_simplices) ? last_simplex : 0;
     int prev = -1; // track previous simplex to avoid oscillation
     int max_iter = num_simplices; // prevent infinite loops
 
@@ -142,7 +142,7 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
 
         if (!any_negative) {
             // All coordinates >= -EPS, point is inside this simplex
-            this->last_simplex_ = s; // cache for next query
+            last_simplex = s; // cache for next query
             return s;
         }
 
@@ -162,7 +162,7 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
     // Fallback: brute force check in case the walk stalls (degenerate/simplex mapping issues).
     for (int sidx = 0; sidx < num_simplices; ++sidx) {
         if (is_inside(sidx)) {
-            this->last_simplex_ = sidx;
+            last_simplex = sidx;
             return sidx;
         }
     }
@@ -374,6 +374,16 @@ void DelaunayTri<NDIM>::compute_delaunay() {
     } else {
         compute_delaunay_nd();
     }
+}
+
+template<size_t NDIM>
+int& DelaunayTri<NDIM>::thread_cache() const {
+    // each thread keeps track of the last simplex it found a point in, to speed up subsequent queries
+    // each spawned object will have its own cache.
+    // So it is a per-thread cache, but also per-object cache.
+    // This is so that the interpolation of each sampled function from multiple threads is safe and efficient.
+    thread_local std::unordered_map<const DelaunayTri*, int> cache;
+    return cache[this];
 }
 
 

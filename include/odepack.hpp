@@ -7,10 +7,23 @@
 #include "ode/OdeInt_impl.hpp"
 #include "ode/SolverState_impl.hpp"
 
-#include "ode/Core/Core_impl.hpp"
+#include "ode/Core/SolverBase_impl.hpp"
+#include "ode/Core/RichBase_impl.hpp"
+#include "ode/Core/VirtualBase_impl.hpp"
+#include "ode/Core/Events_impl.hpp"
+
+#include "ode/OdeResult/OdeResult_impl.hpp"
+
+#include "ode/Interpolation/GridInterp_impl.hpp"
+#include "ode/Interpolation/LinearNdInterpolator_impl.hpp"
+#include "ode/Interpolation/SampledVectorfields_impl.hpp"
+#include "ode/Interpolation/StateInterp_impl.hpp"
+
 #include "ode/Solvers/Solvers_impl.hpp"
-#include "ode/Interpolation/Interpolation_impl.hpp"
-#include "ode/Chaos/Chaos_impl.hpp"
+
+#include "ode/Chaos/VariationalSolvers_impl.hpp"
+
+
 
 /**
  * @file odepack.hpp

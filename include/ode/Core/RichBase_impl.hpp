@@ -42,7 +42,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
         if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
             return View1D<T, N>(Base::vector_impl(), this->Nsys());
         }else{
-            return View1D<T, N>(_events.state(*ev_idx).True().vector(), this->Nsys());
+            return View1D<T, N>(_events.state(*ev_idx).true_state().vector(), this->Nsys());
         }
     }else{
         return View1D<T, N>(Base::vector_impl(), this->Nsys());

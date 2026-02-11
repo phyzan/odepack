@@ -24,7 +24,7 @@ class RegularGridInterpolator{
 
     Only multilinear interpolation is supported at the moment.
     */
-
+    
     static_assert(NDIM >= 1, "Number of dimensions and fields must be at least 1");
 
 public:

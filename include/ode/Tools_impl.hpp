@@ -35,12 +35,6 @@ PolyWrapper<Type>& PolyWrapper<Type>::operator=(PolyWrapper&& other) noexcept{
 }
 
 template<typename Type>
-PolyWrapper<Type>::~PolyWrapper(){
-    delete _ptr;
-    _ptr = nullptr;
-}
-
-template<typename Type>
 Type* PolyWrapper<Type>::operator->(){
     assert(_ptr != nullptr && "pointer is null");
     return _ptr;
@@ -140,13 +134,13 @@ const T& EventState<T>::t() const{
 }
 
 template<typename T>
-State<T> EventState<T>::True() const{
+State<T> EventState<T>::true_state() const{
     return {data.data(), Nsys};
 }
 
 template<typename T>
 State<T> EventState<T>::exposed() const{
-    return choose_true ? this->True()
+    return choose_true ? this->true_state()
                        : State<T>{data.data() + Nsys + 2, Nsys};
 }
 
@@ -196,123 +190,64 @@ bool EventState<T>::is_valid() const{
     return triggered;
 }
 
+
 //===========================================================================================
-//                                      OdeResult<T, N>
+//                                    StepSequence<T>
 //===========================================================================================
 
-template<typename T, size_t N>
-OdeResult<T, N>::OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message) : _t(t), _q(q), _event_map(std::move(event_map)), _diverges(diverges), _success(success), _runtime(runtime), _message(std::move(message)) {}
-
-
-
-template<typename T, size_t N>
-OdeResult<T, N>* OdeResult<T, N>::clone() const {
-    return new OdeResult<T, N>(*this);
-}
-
-template<typename T, size_t N>
-const std::vector<T>& OdeResult<T, N>::t() const {
-    return _t;
-}
-
-template<typename T, size_t N>
-const Array2D<T, 0, N>& OdeResult<T, N>::q() const {
-    return _q;
-}
-
-template<typename T, size_t N>
-template<std::integral INT1, std::integral INT2>
-const T& OdeResult<T, N>::q(INT1 i, INT2 j) const{
-    return _q(i, j);
-}
-
-template<typename T, size_t N>
-const EventMap& OdeResult<T, N>::event_map() const {
-    return _event_map;
-}
-
-template<typename T, size_t N>
-bool OdeResult<T, N>::diverges() const {
-    return _diverges;
-}
-
-template<typename T, size_t N>
-bool OdeResult<T, N>::success() const {
-    return _success;
-}
-
-template<typename T, size_t N>
-double OdeResult<T, N>::runtime() const {
-    return _runtime;
-}
-
-template<typename T, size_t N>
-const std::string& OdeResult<T, N>::message() const {
-    return _message;
-}
-
-template<typename T, size_t N>
-void OdeResult<T, N>::examine() const {
-    std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n"
-              << "\tPoints           : " << _t.size() << "\n"
-              << "\tDiverges         : " << (_diverges ? "true" : "false") << "\n"
-              << "\tSuccess          : " << (_success ? "true" : "false") << "\n"
-              << "\tRuntime          : " << _runtime << "\n"
-              << "\tTermination cause: " << _message << "\n"
-              << event_log();
-}
-
-template<typename T, size_t N>
-std::string OdeResult<T, N>::event_log() const {
-    std::string res;
-    res += "\tEvents:\n\t----------\n";
-    for (const auto& [name, array] : _event_map) {
-        res += "\t    " + name + " : " + std::to_string(array.size()) + "\n";
+// StepSequence implementations
+template<typename T>
+StepSequence<T>::StepSequence(T* data, long int size, bool own_it) : _size(size){
+    if (size < 1 || data == nullptr){
+        _data = nullptr;
     }
-    res += "\n\t----------\n";
-    return res;
-}
-
-template<typename T, size_t N>
-std::vector<T> OdeResult<T, N>::t_filtered(const std::string& event) const {
-    return _t_event_data(this->_t.data(), this->_event_map, event);
-}
-
-template<typename T, size_t N>
-Array2D<T, 0, N> OdeResult<T, N>::q_filtered(const std::string& event) const {
-    return _q_event_data<T, N>(this->_q.data(), this->_event_map, event, _q.Ncols());
+    else if (own_it){
+        _data = data;
+    }
+    else{
+        _data = new T[size];
+        copy_array(_data, data, size);
+    }
 }
 
 template<typename T>
-T choose_step(const T& habs, const T& hmin, const T& hmax) {
-    return std::max(std::min(habs, hmax), hmin);
+StepSequence<T>::StepSequence(const StepSequence& other) : _size(other.size()){
+    if (_size > 0){
+        _data = new T[_size];
+        copy_array(_data, other._data, other._size);
+    }
+    else{
+        _data = nullptr;
+    }
 }
+
+template<typename T>
+StepSequence<T>::StepSequence(StepSequence&& other) noexcept : _data(other._data), _size(other._size) {
+    other._data = nullptr;
+}
+
+template<typename T>
+StepSequence<T>::~StepSequence(){
+    delete[] _data;
+    _data = nullptr;
+}
+
+template<typename T>
+long int StepSequence<T>::size() const{
+    return _size;
+}
+
+template<typename T>
+const T* StepSequence<T>::data() const{
+    return _data;
+}
+
 
 //===========================================================================================
 //                                      Additional Tools
 //===========================================================================================
 
-template<typename... Arg>
-void print(Arg... x){
-    ((std::cout << x << ' '), ...);
-    std::cout << "\n";
-}
 
-template<typename A, typename B>
-inline auto max(A a, B b) {
-    return (a > b) ? a : b;
-}
-
-template <typename T>
-T inf() {
-    // When using -ffast-math, infinity() may cause issues or segfaults
-    // Use a very large finite number instead that's safe with -ffast-math
-    #ifdef __FAST_MATH__
-    return std::numeric_limits<T>::max();
-    #else
-    return std::numeric_limits<T>::infinity();
-    #endif
-}
 
 template<typename T>
 T norm_squared(const T* x, size_t size){
@@ -343,30 +278,7 @@ bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step){
     return res;
 }
 
-template <typename T>
-bool is_finite(const T& value) {
-    if constexpr (std::is_floating_point_v<T>) {
-        #ifdef __FAST_MATH__
-        // When -ffast-math is enabled, std::isfinite may not work correctly
-        // Use range check instead: value is finite if it's within representable range
-        return (value < std::numeric_limits<T>::max());
-        #else
-        return std::isfinite(value);
-        #endif
-    } else if constexpr (std::is_integral_v<T>) {
-        return true;
-    } else {
-        static_assert(std::is_arithmetic_v<T>, "T must be arithmetic");
-        return false;
-    }
-}
 
-#ifdef MPREAL
-template <>
-bool is_finite(const mpfr::mpreal& value) {
-    return mpfr_number_p(value.mpfr_ptr()) != 0;
-}
-#endif
 
 template<typename T>
 T rms_norm(const T* x, size_t size){
@@ -395,17 +307,6 @@ T inf_norm(const T* x, size_t size){
 template<typename T>
 T norm(const T* x, size_t size){
     return sqrt(norm_squared(x, size));
-}
-
-template<typename T>
-int sgn(const T& x){
-    return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
-}
-
-template<typename T>
-int sgn(const T& t1, const T& t2){
-    //same as sgn(t2-t1), but avoids roundoff error
-    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
 }
 
 template<typename T>
@@ -551,6 +452,12 @@ void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot) {
         }
 
     }
+}
+
+
+template<typename T>
+T choose_step(const T& habs, const T& hmin, const T& hmax) {
+    return std::max(std::min(habs, hmax), hmin);
 }
 
 } // namespace ode

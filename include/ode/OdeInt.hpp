@@ -2,6 +2,7 @@
 #define ODE_HPP
 
 #include "SolverDispatcher.hpp"
+#include "OdeResult/OdeResult.hpp"
 
 namespace ode {
 
@@ -14,38 +15,6 @@ struct EventOptions{
     int max_events=-1;
     bool terminate=false;
     int period=1;
-};
-
-template<typename T>
-class StepSequence{
-
-public:
-
-    StepSequence() = default;
-
-    StepSequence(T* data, long int size, bool own_it = false);
-
-    template<std::integral INT>
-    const T& operator[](INT i) const;
-
-    StepSequence(const StepSequence& other);
-
-    StepSequence(StepSequence&& other) noexcept;
-
-    ~StepSequence();
-
-    StepSequence& operator=(const StepSequence& other) = delete;
-
-    StepSequence& operator=(StepSequence&& other) noexcept = delete;
-
-    long int size() const;
-
-    const T* data() const;
-
-private:
-
-    T* _data = nullptr;
-    long int _size = -1;
 };
 
 

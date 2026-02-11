@@ -64,7 +64,7 @@ public:
     template<typename... Type>
     RK4(MAIN_DEFAULT_CONSTRUCTOR(T), Type&&... extras);
 
-     VirtualInterp<T, N>  state_interpolator(int bdr1, int bdr2) const;
+    VirtualInterp<T, N>  state_interpolator(int bdr1, int bdr2) const;
 
 private:
 

@@ -8,32 +8,32 @@ function(configure_py_module target_name)
 endfunction()
 
 # 1. solvers module: ODE solvers (RK23, RK45, DOP853, BDF, RK4)
-pybind11_add_module(solvers src/solvers.cpp)
+pybind11_add_module(solvers src/bindings/solvers.cpp)
 target_link_libraries(solvers PRIVATE odepack_solvers)
 configure_py_module(solvers)
 
 # 2. events module: Event handling
-pybind11_add_module(events src/events.cpp)
+pybind11_add_module(events src/bindings/events.cpp)
 target_link_libraries(events PRIVATE odepack_events)
 configure_py_module(events)
 
 # 3. oderesult module: ODE result containers
-pybind11_add_module(oderesult src/oderesult.cpp)
+pybind11_add_module(oderesult src/bindings/oderesult.cpp)
 target_link_libraries(oderesult PRIVATE odepack_oderesult)
 configure_py_module(oderesult)
 
 # 4. ode module: Low-level ODE interface
-pybind11_add_module(ode src/ode.cpp)
+pybind11_add_module(ode src/bindings/ode.cpp)
 target_link_libraries(ode PRIVATE odepack_ode)
 configure_py_module(ode)
 
 # 5. chaos module: Variational/Lyapunov solvers
-pybind11_add_module(chaos src/chaos.cpp)
+pybind11_add_module(chaos src/bindings/chaos.cpp)
 target_link_libraries(chaos PRIVATE odepack_chaos)
 configure_py_module(chaos)
 
 # 6. fields module: Vector field interpolation
-pybind11_add_module(fields src/fields.cpp)
+pybind11_add_module(fields src/bindings/fields.cpp)
 target_link_libraries(fields PRIVATE odepack_fields)
 configure_py_module(fields)
 

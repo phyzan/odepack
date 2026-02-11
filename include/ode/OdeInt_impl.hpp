@@ -6,59 +6,6 @@
 namespace ode{
 
 
-// StepSequence implementations
-template<typename T>
-StepSequence<T>::StepSequence(T* data, long int size, bool own_it) : _size(size){
-    if (size < 1 || data == nullptr){
-        _data = nullptr;
-    }
-    else if (own_it){
-        _data = data;
-    }
-    else{
-        _data = new T[size];
-        copy_array(_data, data, size);
-    }
-}
-
-template<typename T>
-template<std::integral INT>
-const T& StepSequence<T>::operator[](INT i) const{
-    return _data[i];
-}
-
-template<typename T>
-StepSequence<T>::StepSequence(const StepSequence& other) : _size(other.size()){
-    if (_size > 0){
-        _data = new T[_size];
-        copy_array(_data, other._data, other._size);
-    }
-    else{
-        _data = nullptr;
-    }
-}
-
-template<typename T>
-StepSequence<T>::StepSequence(StepSequence&& other) noexcept : _data(other._data), _size(other._size) {
-    other._data = nullptr;
-}
-
-template<typename T>
-StepSequence<T>::~StepSequence(){
-    delete[] _data;
-    _data = nullptr;
-}
-
-template<typename T>
-long int StepSequence<T>::size() const{
-    return _size;
-}
-
-template<typename T>
-const T* StepSequence<T>::data() const{
-    return _data;
-}
-
 // EventCounter implementations
 template<typename T, size_t N>
 EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size(), 0) {

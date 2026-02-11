@@ -18,32 +18,32 @@ public:
     template<typename... Args>
     SampledVectorField(const Args&... args);
 
-    INLINE auto ode_func_norm() const {
-        return [this](T* out, const T& t, const T* q, const T* args, const void* ptr){
-            for (size_t i = 0; i < NDIM; i++) {
-                if (!this->value_in_axis(q[i], i)) {
-                    for (size_t j = 0; j < NDIM; j++) {
-                        out[j] = 0;
-                    }
-                    return;
+    static void ode_func_norm(T* out, const T& t, const T* q, const T* args, const void* ptr){
+        assert(ptr != nullptr && "pointer is null");
+        const auto* self = reinterpret_cast<const SampledVectorField<T, NDIM>*>(ptr);
+        for (size_t i = 0; i < NDIM; i++) {
+            if (!self->value_in_axis(q[i], i)) {
+                for (size_t j = 0; j < NDIM; j++) {
+                    out[j] = 0;
                 }
+                return;
             }
-            this->get_norm(out, q);
-        };
-    }
+        }
+        self->get_norm(out, q);
+    };
 
-    INLINE auto ode_func() const {
-        return [this](T* out, const T& t, const T* q, const T* args, const void* ptr){
-            for (size_t i = 0; i < NDIM; i++) {
-                if (!this->value_in_axis(q[i], i)) {
-                    for (size_t j = 0; j < NDIM; j++){
-                        out[j] = 0;
-                    }
-                    return;
+    static void ode_func(T* out, const T& t, const T* q, const T* args, const void* ptr){
+        assert(ptr != nullptr && "pointer is null");
+        const auto* self = reinterpret_cast<const SampledVectorField<T, NDIM>*>(ptr);
+        for (size_t i = 0; i < NDIM; i++) {
+            if (!self->value_in_axis(q[i], i)) {
+                for (size_t j = 0; j < NDIM; j++){
+                    out[j] = 0;
                 }
+                return;
             }
-            this->get(out, q);
-        };
+        }
+        self->get(out, q);
     }
 
     OdeResult<T>                        streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, const std::string& method) const;

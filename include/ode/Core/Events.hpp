@@ -433,8 +433,7 @@ public:
     EventView(const AnyEvent<T>* events, const size_t* detection, size_t size);
 
     /// @brief Access event by index within this view.
-    template<std::integral Int>
-    const Event<T>* operator[](Int i) const;
+    const Event<T>* operator[](size_t i) const;
 
     /// @brief Get number of events in this view.
     size_t size() const;

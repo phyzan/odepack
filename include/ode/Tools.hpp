@@ -9,7 +9,7 @@
 #include <cmath>
 #include "../ndspan/arrays.hpp"
 #ifdef MPREAL
-#include "mpreal.h"
+#include <mpreal.h>
 #endif
 
 
@@ -72,7 +72,7 @@ public:
 
     PolyWrapper& operator=(PolyWrapper&& other) noexcept;
 
-    ~PolyWrapper();
+    inline ~PolyWrapper(){ delete _ptr;}
     
     Type* operator->();
 
@@ -146,7 +146,7 @@ public:
 
     const T& t() const;
 
-    State<T> True() const;
+    State<T> true_state() const;
 
     State<T> exposed() const;
 
@@ -172,58 +172,6 @@ public:
     bool triggered = false;
 };
 
-//ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
-
-template<typename T, size_t N=0>
-class OdeResult{
-
-public:
-
-    OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message);
-
-    OdeResult() = default;
-
-    DEFAULT_RULE_OF_FOUR(OdeResult);
-
-    virtual ~OdeResult() = default;
-
-    const std::vector<T>& t() const;
-
-    const Array2D<T, 0, N>& q() const;
-
-    template<std::integral INT1, std::integral INT2>
-    const T& q(INT1 i, INT2 j) const;
-
-    const EventMap& event_map() const;
-
-    bool diverges() const;
-
-    bool success() const;
-
-    double runtime() const;
-
-    const std::string& message() const;
-
-    void examine() const;
-
-    std::string event_log() const;
-
-    std::vector<T> t_filtered(const std::string& event) const;
-
-    Array2D<T, 0, N> q_filtered(const std::string& event) const;
-
-    virtual OdeResult<T, N>* clone() const;
-    
-private:
-
-    std::vector<T> _t;
-    Array2D<T, 0, N> _q;
-    EventMap _event_map;
-    bool _diverges = false;
-    bool _success = false;
-    double _runtime = 0;
-    std::string _message = "No integration performed";
-};
 
 template<typename RHS, typename JAC = std::nullptr_t>
 struct OdeData {
@@ -253,14 +201,46 @@ struct OdeData {
     */
 };
 
-
-
 template<typename RHS>
 struct OdeData<RHS, void> {
 
     RHS rhs;
     VoidType jacobian = [](){}; //will be cast to Func<T> and will be checked for nullptr at runtime
     const void* obj = nullptr;
+};
+
+template<typename T>
+class StepSequence{
+
+public:
+
+    StepSequence() = default;
+
+    StepSequence(T* data, long int size, bool own_it = false);
+
+    template<std::integral INT>
+    inline const T& operator[](INT i) const{
+        return _data[i];
+    }
+
+    StepSequence(const StepSequence& other);
+
+    StepSequence(StepSequence&& other) noexcept;
+
+    ~StepSequence();
+
+    StepSequence& operator=(const StepSequence& other) = delete;
+
+    StepSequence& operator=(StepSequence&& other) noexcept = delete;
+
+    long int size() const;
+
+    const T* data() const;
+
+private:
+
+    T* _data = nullptr;
+    long int _size = -1;
 };
 
 
@@ -306,10 +286,20 @@ private:
 };
 
 template<typename A, typename B>
-auto max(A a, B b);
+inline auto max(A a, B b) {
+    return (a > b) ? a : b;
+}
 
-template<typename T>
-T inf();
+template <typename T>
+inline T inf() {
+    // When using -ffast-math, infinity() may cause issues or segfaults
+    // Use a very large finite number instead that's safe with -ffast-math
+    #ifdef __FAST_MATH__
+    return std::numeric_limits<T>::max();
+    #else
+    return std::numeric_limits<T>::infinity();
+    #endif
+}
 
 template<typename T>
 T norm_squared(const T* x, size_t size);
@@ -317,12 +307,29 @@ T norm_squared(const T* x, size_t size);
 template<typename T>
 bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
 
-template<typename T>
-bool is_finite(const T& value);
+template <typename T>
+inline bool is_finite(const T& value) {
+    if constexpr (std::is_floating_point_v<T>) {
+        #ifdef __FAST_MATH__
+        // When -ffast-math is enabled, std::isfinite may not work correctly
+        // Use range check instead: value is finite if it's within representable range
+        return (value < std::numeric_limits<T>::max());
+        #else
+        return std::isfinite(value);
+        #endif
+    } else if constexpr (std::is_integral_v<T>) {
+        return true;
+    } else {
+        static_assert(std::is_arithmetic_v<T>, "T must be arithmetic");
+        return false;
+    }
+}
 
 #ifdef MPREAL
 template <>
-bool is_finite(const mpfr::mpreal& value);
+inline bool is_finite(const mpfr::mpreal& value) {
+    return mpfr_number_p(value.mpfr_ptr()) != 0;
+}
 #endif
 
 template<typename T>
@@ -338,10 +345,15 @@ template<typename T>
 T norm(const T* x, size_t size);
 
 template<typename T>
-int sgn(const T& x);
+inline int sgn(const T& x){
+    return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
+}
 
 template<typename T>
-int sgn(const T& t1, const T& t2);
+inline int sgn(const T& t1, const T& t2){
+    //same as sgn(t2-t1), but avoids roundoff error
+    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
+}
 
 template<typename T>
 std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
@@ -366,8 +378,11 @@ inline void show_progress(int n, int target, const Clock& clock){
     std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << Clock::format_duration(target*clock.seconds()/n) << std::flush;
 }
 
-
-
+template<typename... Arg>
+inline void print(Arg... x){
+    ((std::cout << x << ' '), ...);
+    std::cout << "\n";
+}
 
 template<typename T>
 T choose_step(const T& habs, const T& hmin, const T& hmax);

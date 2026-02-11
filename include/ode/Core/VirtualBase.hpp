@@ -2,7 +2,7 @@
 #define VIRTUALSOLVER_HPP
 
 #include <functional>
-#include "../Interpolation/Interpolators.hpp"
+#include "../Interpolation/StateInterp.hpp"
 #include "Events.hpp"
 
 namespace ode {

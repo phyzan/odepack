@@ -11,9 +11,6 @@ namespace ode {
 // DECLARATIONS
 // ============================================================================
 
-template<typename T>
-void normalized(T* q, size_t nsys);
-
 template<typename T, typename Derived = void>
 class NormalizationEvent : public PeriodicEvent<T, GetDerived<NormalizationEvent<T, Derived>, Derived>>{
 
@@ -103,6 +100,10 @@ private:
     std::vector<T> _delta_s_arr = {};
 
 };
+
+
+template<typename T>
+void normalized(T* q, size_t nsys);
 
 
 } // namespace ode

@@ -776,7 +776,7 @@ class OdeSystem:
     
     @staticmethod
     def header():
-        _HEADER_PATH =  os.path.join(OdeSystem.lib_path(), "include", "pyodepack.hpp")
+        _HEADER_PATH =  os.path.join(OdeSystem.lib_path(), "include", "pyodepackDecl.hpp")
         return f'#include "{_HEADER_PATH}"'
     
     @property

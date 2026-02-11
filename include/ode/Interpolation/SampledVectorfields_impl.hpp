@@ -24,7 +24,7 @@ OdeResult<T> SampledVectorField<T, NDIM>::streamline(const T* x0, T length, T rt
     direction: +1 forward, -1 backward
     */
 
-    ODE<T> ode(OdeData{.rhs=this->ode_func(), .obj=this}, 0, x0, NDIM, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
+    ODE<T> ode(OdeData<Func<T>, void>{.rhs=ode_func, .obj=this}, 0, x0, NDIM, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
 
     return ode.integrate(length, t_eval);
 }
@@ -40,9 +40,11 @@ std::vector<Array2D<T, NDIM, 0>> SampledVectorField<T, NDIM>::streamplot_data_co
 
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");
-    auto ode = this->ode_func_norm();
 
-    using Solver = RK4<T, NDIM, SolverPolicy::Static, decltype(ode), std::nullptr_t>;
+    // using RK4<T, 0, RichVirtual> because it is the Python bindings instanciate these templates parameters,
+    // event though they are not the optimal ones. Ideally we want RK4<T, NDIM, Static, decltype(lambda_func), std::nullptr_t>, but the performance
+    // gain is far too small to justify the increase in binary size and compilation time.
+    using Solver = RK4<T, 0, SolverPolicy::RichVirtual, Func<T>, void>;
 
     const std::array<Array1D<T>, NDIM>& X = this->x_all();
     std::array<size_t, NDIM> N;
@@ -77,14 +79,15 @@ std::vector<Array2D<T, NDIM, 0>> SampledVectorField<T, NDIM>::streamplot_data_co
         return sqrt((((q_new[I] - q_old[I])* (q_new[I] - q_old[I])) + ...));
     };
 
-    auto IntegrateDirection = [&](Solver& solver, T& s_total, T* const * x, size_t& n_steps_tot, const int dir){
+    auto IntegrateDirection = [&](Solver& solver, T& s_total, T* const * x, size_t& n_steps_tot, const int dir) -> size_t {
         // x[I] are preallocated arrays of size max_pts + 1. x[I][0] = x0[I], so at each step, we write to x[I][step], starting from x[I][1]
         std::array<T, NDIM> ics = {x[I][0]...};
         assert(this->coords_in_bounds(ics[I]...) && "Initial point out of bounds");
         assert((dir == 1 || dir == -1) && "Direction must be either +1 or -1");
-
+        if (!solver.set_ics(0, ics.data(), ds, dir)) {
+            return 0;
+        }
         size_t n_steps = 0;
-        solver.set_ics(0, ics.data(), ds, dir);
         const T* q_new;
         const T* q_old;
 
@@ -112,12 +115,17 @@ std::vector<Array2D<T, NDIM, 0>> SampledVectorField<T, NDIM>::streamplot_data_co
     };
 
 
-    auto GetStreamline = [&](bool& success, Array2D<T, NDIM, 0>& worker_line, T* x0) {
+    auto GetStreamline = [&](bool& success, Array2D<T, NDIM, 0>& worker_line, const T* x0) {
         assert(worker_line.shape(1) == 2*max_pts + 1 && "Line array must have shape (2, 2*max_pts + 1)");
         ((worker_line(I, max_pts) = x0[I]), ...);
 
         size_t n_steps_tot = 0;
-        Solver solver({.rhs=ode}, 0, nullptr, NDIM, 1e-5, 1e-5, 0, inf<T>(), ds, +1);
+
+        // The args and events are passed as const & because this exact signature is compiled in the
+        // Python bindings, so this saves binary size and compilation time.
+        std::vector<T> args{};
+        std::vector<const Event<T>*> events{};
+        Solver solver(OdeData<Func<T>, void>{.rhs=ode_func_norm, .obj=this}, 0, nullptr, NDIM, 1e-5, 1e-5, 0, inf<T>(), ds, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
 
         T s_total = 0;
         ((reached[I].clear()), ...);

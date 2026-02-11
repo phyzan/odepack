@@ -101,7 +101,7 @@ target_include_directories(odepack_headers INTERFACE
 target_compile_features(odepack_headers INTERFACE cxx_std_20)
 
 #===========================================================================================
-#                           STATIC libraries: compiled Py* wrapper classes (6 modules)
+#                           STATIC libraries: compiled Python wrapper classes
 #===========================================================================================
 
 # Check for Qhull first (needed by odepack_fields)
@@ -126,14 +126,14 @@ endfunction()
 
 # 0. odepack_pytools: Shared Python utilities (DtypeDispatcher, etc.) - no dependencies
 add_library(odepack_pytools STATIC
-    python/src/bindings/PyTools.cpp
+    python/src/staticlib/PyTools.cpp
 )
 configure_odepack_lib(odepack_pytools)
 set_target_properties(odepack_pytools PROPERTIES OUTPUT_NAME odepack_pytools)
 
 # 1. odepack_events: Event handling implementations (depends on pytools)
 add_library(odepack_events STATIC
-    python/src/bindings/PyEvents.cpp
+    python/src/staticlib/PyEvents.cpp
 )
 configure_odepack_lib(odepack_events)
 target_link_libraries(odepack_events PUBLIC odepack_pytools)
@@ -141,9 +141,9 @@ set_target_properties(odepack_events PROPERTIES OUTPUT_NAME odepack_events)
 
 # 2. odepack_solvers: Core solver implementations (depends on events, pytools)
 add_library(odepack_solvers STATIC
-    python/src/bindings/PySolver.cpp
-    python/src/bindings/PySubSolver.cpp
-    python/src/bindings/PyFunc.cpp
+    python/src/staticlib/PySolver.cpp
+    python/src/staticlib/PySubSolver.cpp
+    python/src/staticlib/PyTools.cpp
 )
 configure_odepack_lib(odepack_solvers)
 target_link_libraries(odepack_solvers PUBLIC odepack_events odepack_pytools)
@@ -151,7 +151,7 @@ set_target_properties(odepack_solvers PROPERTIES OUTPUT_NAME odepack_solvers)
 
 # 3. odepack_oderesult: ODE result implementations
 add_library(odepack_oderesult STATIC
-    python/src/bindings/PyResult.cpp
+    python/src/staticlib/PyResult.cpp
 )
 configure_odepack_lib(odepack_oderesult)
 target_link_libraries(odepack_oderesult PUBLIC odepack_solvers)
@@ -159,7 +159,7 @@ set_target_properties(odepack_oderesult PROPERTIES OUTPUT_NAME odepack_oderesult
 
 # 4. odepack_ode: Low-level ODE interface implementations
 add_library(odepack_ode STATIC
-    python/src/bindings/PyOde.cpp
+    python/src/staticlib/PyOde.cpp
 )
 configure_odepack_lib(odepack_ode)
 target_link_libraries(odepack_ode PUBLIC odepack_solvers odepack_events odepack_oderesult odepack_pytools)
@@ -167,7 +167,7 @@ set_target_properties(odepack_ode PROPERTIES OUTPUT_NAME odepack_ode)
 
 # 5. odepack_chaos: Variational/Lyapunov solver implementations
 add_library(odepack_chaos STATIC
-    python/src/bindings/PyChaos.cpp
+    python/src/staticlib/PyChaos.cpp
 )
 configure_odepack_lib(odepack_chaos)
 target_link_libraries(odepack_chaos PUBLIC odepack_solvers odepack_events odepack_oderesult odepack_ode odepack_pytools)
@@ -175,7 +175,7 @@ set_target_properties(odepack_chaos PROPERTIES OUTPUT_NAME odepack_chaos)
 
 # 6. odepack_fields: Vector field implementations (needs Qhull)
 add_library(odepack_fields STATIC
-    python/src/bindings/PyField.cpp
+    python/src/staticlib/PyField.cpp
 )
 configure_odepack_lib(odepack_fields)
 target_include_directories(odepack_fields PUBLIC ${QHULL_INCLUDE_DIR})

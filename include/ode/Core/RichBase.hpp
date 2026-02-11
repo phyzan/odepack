@@ -172,7 +172,7 @@ protected:
      * @param events Vector of event pointers to monitor during integration.
      * @see SOLVER_CONSTRUCTOR macro for other parameter details.
      */
-    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events);
+    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events = {});
 
     DEFAULT_RULE_OF_FOUR(RichSolver)
 

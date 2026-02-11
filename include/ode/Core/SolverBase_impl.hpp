@@ -2,6 +2,7 @@
 #define SOLVERBASE_IMPL_HPP
 
 #include "SolverBase.hpp"
+#include "../Tools_impl.hpp"
 
 namespace ode{
 

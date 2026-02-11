@@ -6,14 +6,6 @@
 namespace ode{
 
 
-template<typename T>
-void normalized(T* q, size_t nsys){
-    T N = norm(q+nsys, nsys);
-    for (size_t i=0; i<nsys; i++){
-        q[i+nsys] /= N;
-    }
-}
-
 // NormalizationEvent implementations
 template<typename T, typename Derived>
 NormalizationEvent<T, Derived>::NormalizationEvent(const std::string& name, T period) : Base(name, period, nullptr, true, nullptr) {}
@@ -82,7 +74,7 @@ VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, Ja
 
 template<typename T, size_t N, typename RhsType, typename JacType>
  const NormalizationEvent<T>& VariationalSolver<T, N, RhsType, JacType>::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(this->ptr->event_col().event(0));
+    return static_cast<const NormalizationEvent<T>&>(this->ptr()->event_col().event(0));
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
@@ -181,6 +173,15 @@ void VariationalODE<T, N, RhsType, JacType>::_register_event(size_t event){
     }
 }
 
+
+template<typename T>
+void normalized(T* q, size_t nsys){
+    T N = norm(q+nsys, nsys);
+    for (size_t i=0; i<nsys; i++){
+        q[i+nsys] /= N;
+    }
 }
+
+} // namespace ode
 
 #endif

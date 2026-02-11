@@ -4,7 +4,7 @@ from .oderesult import OdeResult
 from .ode import LowLevelODE
 
 
-class SampleVectorField:
+class SampledVectorField:
 
 
     def streamline(self, q0: np.ndarray, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
