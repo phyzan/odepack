@@ -362,6 +362,9 @@ template<typename T>
 bool all_are_finite(const T* data, size_t n);
 
 template<typename T>
+bool allEqual(const T* a, const T* b, size_t n);
+
+template<typename T>
 std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event);
 
 template<typename T, size_t N>

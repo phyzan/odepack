@@ -14,43 +14,17 @@ namespace ode{
 //                                      PyScalarField
 // ============================================================================================
 
-template<size_t NDIM>
-template<typename... PyArray>
-std::nullptr_t PyScalarField<NDIM>::parse_args(const PyArray&... args){
-    if (((pack_elem<0>(args...).ndim() != NDIM))){
-        throw py::value_error("The SampledScarField"+std::to_string(NDIM) + "D requires an array with " + std::to_string(NDIM) + " dimensions for the field values");
-    }
-    EXPAND(size_t, NDIM, I,
-        if (((pack_elem<I+1>(args...).ndim() != 1) || ...)){
-            throw py::value_error("All grid dimensions must be 1D arrays");
-        }else if (((!is_sorted(pack_elem<I+1>(args...))) || ...)){
-            throw py::value_error("All grid dimensions must be 1D arrays");
-        }
-        const py::array_t<double>& field = pack_elem<0>(args...);
-        if (((field.shape(I) != pack_elem<I+1>(args...).size()) || ...)){
-            throw py::value_error("Scalar field shape does not match grid size");
-        }
-    );
-    return nullptr;
-}
 
-template<size_t NDIM>
-template<size_t... I, typename... PyArray>
-PyScalarField<NDIM>::PyScalarField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args) : Base(pack_elem<I+1>(args...)..., pack_elem<0>(args...).data()) {}
-
-template<size_t NDIM>
-template<typename... PyArray>
-PyScalarField<NDIM>::PyScalarField(const PyArray&... args) : PyScalarField(parse_args(args...), std::make_index_sequence<NDIM>(), args...) {}
-
-template<size_t NDIM>
 template<typename... Scalar>
-double PyScalarField<NDIM>::operator()(Scalar... x) const{
-    static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
-    if (!this->coords_in_bounds(x...)){
+double PyScalarField::operator()(Scalar... x) const{
+    assert(sizeof...(Scalar) == this->ndim() && "Number of coordinates must match field dimensionality");
+    Array1D<double, 0, Base::Alloc> coords = {double(x)...};
+    if (!this->coords_in_bounds(coords.data())){
         return std::numeric_limits<double>::quiet_NaN();
     }
-    std::array<double, NDIM> coords = {double(x)...};
-    return this->template get_single<0>(coords.data());
+    double res;
+    this->interp(&res, coords.data());
+    return res;
 }
 
 
@@ -219,70 +193,89 @@ double PyScatteredField<NDIM>::operator()(Scalar... x) const{
 
 
 template<size_t NDIM>
-template<size_t... I, typename... PyArray>
-PyVecField<NDIM>::PyVecField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args) : Base(pack_elem<I>(args...)..., pack_elem<I+NDIM>(args...).data()...) {}
+PyVecField<NDIM>::PyVecField(const double* values, const std::vector<MutView1D<double>>& grid) : Base(values, grid, true) {}
 
 template<size_t NDIM>
-template<typename... PyArray>
-PyVecField<NDIM>::PyVecField(const PyArray&... args) : PyVecField(parse_args(args...), std::make_index_sequence<NDIM>(), args...) {}
+PyVecField<NDIM>::PyVecField(const py::array_t<double>& values, const py::args& grid) : PyVecField(values.data(), parse_args(values, grid)) {}
 
 template<size_t NDIM>
-template<size_t Axis>
-py::object PyVecField<NDIM>::py_x() const{
-    return py::cast(this->x(Axis));
+py::object PyVecField<NDIM>::py_x(int axis) const{
+    if (axis < 0 || axis >= int(this->ndim())){
+        throw py::value_error("Axis index out of bounds");
+    }
+    return py::cast(this->x(axis));
 }
 
 template<size_t NDIM>
-template<size_t FieldIdx>
-py::object PyVecField<NDIM>::py_vx() const{
-    return py::cast(this->field(FieldIdx));
-}
-
-template<size_t NDIM>
-template<size_t FieldIdx, typename... Scalar>
-py::object PyVecField<NDIM>::py_vx_at(Scalar... x) const{
-    static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
-    this->check_coords(x...);
-    std::array<double, NDIM> coords = {double(x)...};
-    return py::cast(this->template get_single<FieldIdx>(coords.data()));
-}
-
-template<size_t NDIM>
-template<typename... Scalar>
-py::object PyVecField<NDIM>::py_vector(Scalar... x) const{
-    static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
-    this->check_coords(x...);
-    Array1D<double, NDIM> res;
-    this->fill(res.data(), x...);
+py::object PyVecField<NDIM>::py_vx(int component) const{
+    if (component < 0 || component >= int(this->ndim())){
+        throw py::value_error("Vector component index out of bounds");
+    }
+    const auto& values = this->values();
+    Array<double> res(values.shape(), values.ndim()-1);
+    for (size_t i=0; i<res.size(); i++){
+        res[i] = values[i*this->ndim() + component];
+    }
     return py::cast(res);
 }
 
 template<size_t NDIM>
-template<typename... Scalar>
-bool PyVecField<NDIM>::py_in_bounds(Scalar... x) const{
-    return this->coords_in_bounds(x...);
+py::object PyVecField<NDIM>::py_coords() const{
+    py::list coords;
+    for (size_t i=0; i<this->ndim(); i++){
+        coords.append(py::cast(this->x(i)));
+    }
+    return py::tuple(coords);
 }
 
 template<size_t NDIM>
-template<typename... Scalar>
-void PyVecField<NDIM>::check_coords(Scalar... x) const{
-    static_assert(sizeof...(Scalar) == NDIM, "Number of coordinates must match NDIM");
-    if (!this->coords_in_bounds(x...)){
-        py::array_t<double> py_coords = py::cast(Array1D<double, NDIM>{double(x)...});
-        throw py::value_error("Coordinates " + py::repr(py_coords).cast<std::string>() + " are out of bounds");
+py::object PyVecField<NDIM>::py_data() const{
+    return py::cast(this->values());
+}
+
+template<size_t NDIM>
+py::object PyVecField<NDIM>::py_value(const py::args& coords) const{
+    if (coords.size() != this->ndim()){
+        throw py::value_error("Expected " + std::to_string(this->ndim()) + " coordinates, but got " + std::to_string(coords.size()));
+    }
+    Array1D<double, NDIM, Base::Alloc> res(this->ndim());
+    Array1D<double, NDIM, Base::Alloc> q(this->ndim());
+    for (size_t i=0; i<coords.size(); i++){
+        q[i] = coords[i].cast<double>();
+    }
+    check_coords(q.data());
+    this->interp(res.data(), q.data());
+    return py::cast(res);
+}
+
+template<size_t NDIM>
+bool PyVecField<NDIM>::py_in_bounds(const py::args& coords) const{
+    Array1D<double, NDIM, Base::Alloc> q(this->ndim());
+    if (coords.size() != this->ndim()){
+        throw py::value_error("Expected " + std::to_string(this->ndim()) + " coordinates, but got " + std::to_string(coords.size()));
+    }
+    for (size_t i=0; i<coords.size(); i++){
+        q[i] = coords[i].cast<double>();
+    }
+    return this->coords_in_bounds(q.data());
+}
+
+template<size_t NDIM>
+void PyVecField<NDIM>::check_coords(const double* coords) const{
+    if (!this->coords_in_bounds(coords)){
+        Array1D<double, NDIM, Base::Alloc> q(coords, this->ndim());
+        throw py::value_error("Coordinates " + py::repr(py::cast(q)).template cast<std::string>() + " are out of bounds");
     }
 }
 
 template<size_t NDIM>
 py::object PyVecField<NDIM>::py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const{
 
-    if (q0.ndim() != 1 || q0.shape(0) != NDIM){
-        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+    if (q0.ndim() != 1 || size_t(q0.shape(0)) != this->ndim()){
+        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(this->ndim()));
     }
 
-    EXPAND(size_t, NDIM, I,
-        check_coords(q0.at(I)...);
-    );
+    check_coords(q0.data());
 
     StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
     try{
@@ -299,18 +292,16 @@ template<size_t NDIM>
 py::object PyVecField<NDIM>::py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
     if (direction != 1 && direction != -1){
         throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
-    }else if (q0.ndim() != 1 || q0.shape(0) != NDIM){
-        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(NDIM));
+    }else if (q0.ndim() != 1 || q0.shape(0) != this->ndim()){
+        throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(this->ndim()));
     }
 
-    EXPAND(size_t, NDIM, I,
-        check_coords(q0.at(I)...);
-    );
+    check_coords(q0.data());
 
     if (normalized){
-        return py::cast(PyODE(OdeData<Func<double>, void>{.rhs=Base::ode_func_norm, .obj=this}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+        return py::cast(PyODE(OdeData<Func<double>, void>{.rhs=Base::ode_func_norm, .obj=this}, 0., q0.data(), this->ndim(), rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
     }else{
-        return py::cast(PyODE(OdeData<Func<double>, void>{.rhs=Base::ode_func, .obj=this}, 0., q0.data(), NDIM, rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
+        return py::cast(PyODE(OdeData<Func<double>, void>{.rhs=Base::ode_func, .obj=this}, 0., q0.data(), this->ndim(), rtol, atol, min_step, (max_step.is_none() ? inf<double>() : max_step.cast<double>()), stepsize, direction, {}, {}, method.cast<std::string>()));
     }
 }
 
@@ -335,24 +326,47 @@ py::object PyVecField<NDIM>::py_streamplot_data(double max_length, double ds, in
 }
 
 template<size_t NDIM>
-template<typename... PyArray>
-std::nullptr_t PyVecField<NDIM>::parse_args(const PyArray&... args){
-    EXPAND(size_t, NDIM, I,
-        if (((pack_elem<I>(args...).ndim() != 1) || ...)){
-            throw py::value_error("All grid dimensions must be 1D arrays");
-        }else if (((pack_elem<I+NDIM>(args...).ndim() != NDIM) || ...)){
-            throw py::value_error("All vector component arrays must be " + std::to_string(NDIM) + "D");
-        }else if (((!is_sorted(pack_elem<I>(args...))) || ...)){
-            throw py::value_error("All grid dimensions must be 1D arrays");
-        }
-        FOR_LOOP(size_t, J, NDIM,
-            const py::array_t<double>& field = pack_elem<J+NDIM>(args...);
-            if (((field.shape(I) != pack_elem<I>(args...).size()) || ...)){
-                throw py::value_error("Grid size does not match vector component array size");
+std::vector<MutView1D<double>> PyVecField<NDIM>::parse_args(const py::array_t<double>& values, const py::args& py_grid){
+
+    if (values.ndim() == 0 || py_grid.size() == 0){
+        throw py::value_error("Values array and grid arrays cannot be empty");
+    }else if (!(values.flags() & py::array::c_style)){
+        throw py::value_error("Values array must be C-contiguous (Row major)");
+    }else if (NDIM != 0 && (values.ndim() != NDIM + 1)){
+        throw py::value_error("Values array must have " + std::to_string(NDIM + 1) + " dimensions");
+    }else if (NDIM != 0 && py_grid.size() != NDIM){
+        throw py::value_error("Number of grid arrays must match number of dimensions");
+    }else if (NDIM == 0 && (py_grid.size() + 1 != size_t(values.ndim()))){
+        throw py::value_error("The number of grid arrays must match the number of dimensions of the values array");
+    }else if (size_t(values.shape(0)) != py_grid.size()){
+        throw py::value_error("The number of vector components given was " + std::to_string(values.shape(0)) + " but expected " + std::to_string(py_grid.size()));
+    }
+
+    std::vector<MutView1D<double>> grid(py_grid.size());
+    size_t axis = 0;
+    for (const py::handle& item : py_grid){
+        try {
+            auto coords = item.cast<py::array_t<double>>();
+            if (coords.ndim() != 1){
+                throw py::value_error("Grid arrays must be 1D");
+            }else if (!is_sorted(coords)){
+                throw py::value_error("Grid arrays must be sorted in ascending order");
+            }else if (coords.size() < 2){
+                throw py::value_error("Grid arrays must have at least 2 points");
+            }else if (coords.size() != values.shape(axis+1)){
+                // values.shape(0) is the number of components, so we check against shape(axis+1)
+                throw py::value_error("Size of grid array along axis " + std::to_string(axis) + " must match the corresponding dimension of the values array");
             }
-        );
-    );
-    return nullptr;
+            Array1D<double> tmp(coords.data(), coords.size());
+            MutView1D<double> view(tmp.release(), tmp.size()); // ownership transferred from tmp to view. MutView does not delete it however.
+            grid[axis] = view;
+        }catch (const py::cast_error &e) {
+            throw py::value_error("Grid arrays must be 1D numpy arrays of real numbers");
+        }
+        axis++;
+    }
+
+    return grid;
 }
 
 }

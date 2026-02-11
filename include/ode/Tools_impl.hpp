@@ -329,6 +329,17 @@ bool all_are_finite(const T* data, size_t n){
 
 
 template<typename T>
+bool allEqual(const T* a, const T* b, size_t n){
+    for (size_t i=0; i<n; i++){
+        if (a[i] != b[i]){
+            return false;
+        }
+    }
+    return true;
+}
+
+
+template<typename T>
 std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event){
     const std::vector<size_t>& ind = event_map.at(event);
     std::vector<T> data(ind.size());

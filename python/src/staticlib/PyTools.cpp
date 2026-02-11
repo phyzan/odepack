@@ -91,6 +91,7 @@ bool is_sorted(const py::array_t<double>& arr){
     template const py::array_t<T>& PyStruct::get_array<T>() const; \
     template py::array_t<T>& PyStruct::get_array<T>(); \
 
+template bool allEqual(const int *a, const int *b, size_t n);
 template std::vector<size_t> getShape<size_t>(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape);
 
 DEFINE_PYTOOLS(float)

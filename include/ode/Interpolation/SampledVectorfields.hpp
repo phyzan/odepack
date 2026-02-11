@@ -15,36 +15,15 @@ class SampledVectorField : public RegularGridInterpolator<T, NDIM>{
 
 public:
 
-    template<typename... Args>
-    SampledVectorField(const Args&... args);
+    static constexpr Allocation Alloc = (NDIM == 0) ? Allocation::Heap : Allocation::Stack;
 
-    static void ode_func_norm(T* out, const T& t, const T* q, const T* args, const void* ptr){
-        assert(ptr != nullptr && "pointer is null");
-        const auto* self = reinterpret_cast<const SampledVectorField<T, NDIM>*>(ptr);
-        for (size_t i = 0; i < NDIM; i++) {
-            if (!self->value_in_axis(q[i], i)) {
-                for (size_t j = 0; j < NDIM; j++) {
-                    out[j] = 0;
-                }
-                return;
-            }
-        }
-        self->get_norm(out, q);
-    };
+    SampledVectorField(const T* values, std::vector<View1D<T>> grid, bool values_axis_first = false);
 
-    static void ode_func(T* out, const T& t, const T* q, const T* args, const void* ptr){
-        assert(ptr != nullptr && "pointer is null");
-        const auto* self = reinterpret_cast<const SampledVectorField<T, NDIM>*>(ptr);
-        for (size_t i = 0; i < NDIM; i++) {
-            if (!self->value_in_axis(q[i], i)) {
-                for (size_t j = 0; j < NDIM; j++){
-                    out[j] = 0;
-                }
-                return;
-            }
-        }
-        self->get(out, q);
-    }
+    SampledVectorField(const T* values, std::vector<MutView1D<T>> grid, bool values_axis_first = false);
+    
+    static void ode_func_norm(T* out, const T& t, const T* q, const T* args, const void* ptr);
+
+    static void ode_func(T* out, const T& t, const T* q, const T* args, const void* ptr);
 
     OdeResult<T>                        streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, const std::string& method) const;
 

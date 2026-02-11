@@ -4,75 +4,109 @@
 
 namespace ode{
 
-//===========================================================================================
-//                                      PyVecField2D, 3D
-//===========================================================================================
 
-PyVecField2D::PyVecField2D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& vx, const py::array_t<double>& vy) : Base(x, y, vx, vy) {}
+PyScalarField::PyScalarField(const py::array_t<double>& values, const py::args& py_grid) : PyScalarField(values.data(), parse_args(values, py_grid, 0)) {}
+PyScalarField::PyScalarField(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM) : PyScalarField(values.data(), parse_args(values, py_grid, NDIM)) {}
+PyScalarField::PyScalarField(const double* values, const std::vector<MutView1D<double>>& grid) : Base(values, 1, grid) {}
 
-PyVecField3D::PyVecField3D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& z, const py::array_t<double>& vx, const py::array_t<double>& vy, const py::array_t<double>& vz) : Base(x, y, z, vx, vy, vz) {}
+double PyScalarField::py_value_at(const py::args& x) const{
+    if (x.size() != this->ndim()){
+        throw py::value_error("Expected " + std::to_string(this->ndim()) + " coordinates, but got " + std::to_string(x.size()));
+    }
+    Array1D<double, 0, Base::Alloc> coords(x.size());
+    for (size_t i=0; i<x.size(); i++){
+        try {
+            coords[i] = x[i].cast<double>();
+        }catch (const py::cast_error &e) {
+            throw py::value_error("All coordinates must be real numbers");
+        }
+    }
+    if (!this->coords_in_bounds(coords.data())){
+        throw py::value_error("Coordinates out of bounds");
+    }
+    double res;
+    this->interp(&res, coords.data());
+    return res;
+}
+
+std::vector<MutView1D<double>> PyScalarField::parse_args(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM){
+    if (py_grid.size() == 0){
+        throw py::value_error("Grid arrays cannot be empty");
+    }else if (NDIM != 0 && py_grid.size() != NDIM){
+        throw py::value_error("Number of grid arrays must match number of dimensions");
+    }else if (NDIM == 0 && py_grid.size() != size_t(values.ndim())){
+        throw py::value_error("The number of grid arrays must match the number of dimensions of the values array");
+    }
+
+    size_t expected_vals = prod(values.shape(), values.ndim());
+    size_t grid_points = 1;
+    std::vector<MutView1D<double>> grid(py_grid.size());
+    size_t axis = 0;
+    for (const py::handle& item : py_grid){
+        try {
+            auto coords = item.cast<py::array_t<double>>();
+            if (coords.ndim() != 1){
+                throw py::value_error("Grid arrays must be 1D");
+            }else if (!is_sorted(coords)){
+                throw py::value_error("Grid arrays must be sorted in ascending order");
+            }else if (coords.size() < 2){
+                throw py::value_error("Grid arrays must have at least 2 points");
+            }else if (coords.size() != values.shape(axis)){
+                throw py::value_error("Size of grid array along axis " + std::to_string(axis) + " must match the corresponding dimension of the values array");
+            }
+            Array1D<double> tmp(coords.data(), coords.size());
+            MutView1D<double> view(tmp.release(), tmp.size()); // ownership transferred from tmp to view. MutView does not delete it however.
+            grid[axis] = view;
+            grid_points *= coords.size();
+        }catch (const py::cast_error &e) {
+            throw py::value_error("Grid arrays must be 1D numpy arrays of real numbers");
+        }
+        axis++;
+    }
+
+    if (grid_points != expected_vals){
+        throw py::value_error("The total number of grid points (product of grid array sizes) must match the size of the values array");
+    }
+    return grid;
+}
+
+PyScalarField1D::PyScalarField1D(const py::array_t<double>& values, const py::args& py_grid) : Base(values, py_grid, 1) {}
+PyScalarField2D::PyScalarField2D(const py::array_t<double>& values, const py::args& py_grid) : Base(values, py_grid, 2) {}
+PyScalarField3D::PyScalarField3D(const py::array_t<double>& values, const py::args& py_grid) : Base(values, py_grid, 3) {}
 
 
+template class PyVecField<0>;
 
+py::object PyVecField2D::x() const{ return Base::py_x(0); }
+py::object PyVecField2D::y() const{ return Base::py_x(1); }
+py::object PyVecField2D::vx() const{ return Base::py_vx(0); }
+py::object PyVecField2D::vy() const{ return Base::py_vx(1); }
+
+py::object PyVecField3D::x() const{ return Base::py_x(0); }
+py::object PyVecField3D::y() const{ return Base::py_x(1); }
+py::object PyVecField3D::z() const{ return Base::py_x(2); }
+py::object PyVecField3D::vx() const{ return Base::py_vx(0); }
+py::object PyVecField3D::vy() const{ return Base::py_vx(1); }
+py::object PyVecField3D::vz() const{ return Base::py_vx(2); }
 
 //===========================================================================================
 //                          Explicit Template Instantiations
 //===========================================================================================
 
-// Template classes - base classes first
-template class RegularGridInterpolator<double, 1>;
-template class RegularGridInterpolator<double, 2>;
-template class RegularGridInterpolator<double, 3>;
-template class SampledVectorField<double, 2>;
-template class SampledVectorField<double, 3>;
-
-// Derived classes
-template class PyScalarField<1>;
-template class PyScalarField<2>;
-template class PyScalarField<3>;
-template class PyVecField<2>;
-template class PyVecField<3>;
-
-// Explicit constructor instantiations for PyVecField
-template PyVecField<2>::PyVecField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
-template PyVecField<3>::PyVecField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
-
-// Explicit constructor instantiations for PyScalarField
-template PyScalarField<1>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&);
-template PyScalarField<2>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
-template PyScalarField<3>::PyScalarField(const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&, const py::array_t<double>&);
-
 // Explicit instantiations for PyScalarField::operator() member function template
 // These are needed because operator() is a template member function that gets called
 // from dynamically compiled ODE code
-template double PyScalarField<1>::operator()(double) const;
-template double PyScalarField<2>::operator()(double, double) const;
-template double PyScalarField<3>::operator()(double, double, double) const;
+double PyScalarField1D::operator()(double x) const{
+    return Base::operator()(x);
+}
+double PyScalarField2D::operator()(double x, double y) const{
+    return Base::operator()(x, y);
+}
 
+double PyScalarField3D::operator()(double x, double y, double z) const{
+    return Base::operator()(x, y, z);
+}
 
-// PyVecField<2> template member functions
-template py::object PyVecField<2>::py_x<0>() const;
-template py::object PyVecField<2>::py_x<1>() const;
-template py::object PyVecField<2>::py_vx<0>() const;
-template py::object PyVecField<2>::py_vx<1>() const;
-template py::object PyVecField<2>::py_vx_at<0, double, double>(double, double) const;
-template py::object PyVecField<2>::py_vx_at<1, double, double>(double, double) const;
-template py::object PyVecField<2>::py_vector<double, double>(double, double) const;
-template bool PyVecField<2>::py_in_bounds<double, double>(double, double) const;
-
-// PyVecField<3> template member functions
-template py::object PyVecField<3>::py_x<0>() const;
-template py::object PyVecField<3>::py_x<1>() const;
-template py::object PyVecField<3>::py_x<2>() const;
-template py::object PyVecField<3>::py_vx<0>() const;
-template py::object PyVecField<3>::py_vx<1>() const;
-template py::object PyVecField<3>::py_vx<2>() const;
-template py::object PyVecField<3>::py_vx_at<0, double, double, double>(double, double, double) const;
-template py::object PyVecField<3>::py_vx_at<1, double, double, double>(double, double, double) const;
-template py::object PyVecField<3>::py_vector<double, double, double>(double, double, double) const;
-template bool PyVecField<3>::py_in_bounds<double, double, double>(double, double, double) const;
-
-// PyScatteredField::operator() instantiations for dynamically compiled ODEs
 
 #define INST_PY_TRI(N) \
 template PyDelaunay<N>::PyDelaunay(const py::array_t<double>& x);\

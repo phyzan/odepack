@@ -1,11 +1,132 @@
 import numpy as np
-from typing import overload
+from typing import overload, Iterable
 from .oderesult import OdeResult
 from .ode import LowLevelODE
 
 
+
+class SampledScalarField:
+
+    def __init__(self, values: np.ndarray, *grid: np.ndarray):
+        '''
+        Initialize a ND scalar field on a regular grid.
+        Parameters
+        ----------
+        values : np.ndarray
+            Scalar field values at the grid points: values[i, j, k, ...] corresponds to the scalar value at (x[i], y[j], z[k], ...).
+        *grid : np.ndarray
+            Coordinates of the grid points for each dimension. The number of grid arrays should match the number of dimensions, and the length of each grid array should match the corresponding dimension of the values array.
+        '''
+        ...
+
+    def __call__(self, *args: float)->float:
+        '''
+        Get the scalar field value at a specific point using interpolation.
+
+        Parameters
+        ----------
+        *args : float
+            Coordinates of the point at which to evaluate the scalar field. The number of arguments should match the dimensionality of the grid.
+
+        Returns
+        -------
+        float
+            Interpolated scalar field value at the given coordinates.
+        '''
+        ...
+        
+class SampledScalarField1D(SampledScalarField):
+    ...
+
+class SampledScalarField2D(SampledScalarField):
+    ...
+
+
+class SampledScalarField3D(SampledScalarField):
+    ...
+
+
 class SampledVectorField:
 
+    def __init__(self, values: Iterable[np.ndarray], *grid: np.ndarray):
+        '''
+        Initialize a ND vector field on a regular grid.
+
+        Parameters
+        ----------
+        values : Iterable of np.ndarray
+            Vector field components at the grid points. The number of arrays should match the number of dimensions, and each array should have the same shape corresponding to the grid dimensions.
+            For example, for a 3D vector field, values should be an iterable containing three arrays: (vx, vy, vz), where each array has shape (nx, ny, nz) corresponding to the grid dimensions.
+        *grid : np.ndarray
+            Coordinates of the grid points for each dimension. The number of grid arrays should match the number of dimensions, and the length of each grid array should match the corresponding dimension of the values arrays.
+
+        Notes
+        -----
+        e.g. values[i][j, k] corresponds to grid point (x[j], y[k])
+        '''
+        ...
+
+    @property
+    def coords(self)->tuple[np.ndarray, ...]:
+        '''
+        Get the coordinate arrays for each dimension of the grid.
+
+        Returns
+        -------
+        tuple of np.ndarray
+            A tuple containing the coordinate arrays for each dimension.
+        '''
+        ...
+
+    @property
+    def values(self)->np.ndarray:
+        '''
+        Get the vector field component arrays.
+
+        Returns
+        -------
+        np.ndarray
+            Array containing the vector field component arrays.
+
+        Notes
+        -----
+        The shape of the returned array is (nx, ny, ..., ndim),
+        For example, for a 2D vector field, the shape would be (nx, ny, 2).
+        In that case, vx = values[:, :, 0] and vy = values[:, :, 1].
+        '''
+        ...
+
+    def __call__(self, *args: float)->np.ndarray:
+        '''
+        Get the vector field components at a specific point using interpolation.
+
+        Parameters
+        ----------
+        *args : float
+            Coordinates of the point at which to evaluate the vector field. The number of arguments should match the dimensionality of the grid.
+
+        Returns
+        -------
+        np.ndarray
+            Array containing the vector field components at the given coordinates.
+        '''
+        ...
+
+    def in_bounds(self, *args: float)->bool:
+        '''
+        Check if the given coordinates are within the bounds of the grid.
+
+        Parameters
+        ----------
+        *args : float
+            Coordinates of the point to check. The number of arguments should match the dimensionality of the grid.
+
+        Returns
+        -------
+        bool
+            True if the point is within the bounds of the grid, False otherwise.
+        '''
+        ...
 
     def streamline(self, q0: np.ndarray, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
         '''
@@ -80,33 +201,11 @@ class SampledVectorField:
         ...
 
 
-class SampledVectorField2D:
+class SampledVectorField2D(SampledVectorField):
 
     '''
     Class representing a 2D vector field
     '''
-
-    def __init__(self, x: np.ndarray, y: np.ndarray, vx: np.ndarray, vy: np.ndarray):
-        '''
-        Initialize a 2D vector field.
-        Parameters
-        ----------
-        x : np.ndarray
-            X-coordinates of the grid points.
-        y : np.ndarray
-            Y-coordinates of the grid points.
-        vx : np.ndarray
-            X-components of the vector field at the grid points.
-        vy : np.ndarray
-            Y-components of the vector field at the grid points.
-
-        Notes
-        -----
-        The shape of vx and vy must be (len(x), len(y))
-        and vx[i, j], vy[i, j] correspond to the vector at (x[i], y[j]).
-
-        '''
-        ...
 
     @property
     def x(self)->np.ndarray:
@@ -136,63 +235,13 @@ class SampledVectorField2D:
         '''
         ...
 
-    def __call__(self, x: float, y: float)->np.ndarray:
-        '''
-        Get the vector field components (vx, vy) at a specific point (x, y) using interpolation.
-        This is equivalent to np.array([self.get_vx(x, y), self.get_vy(x, y)])
-        '''
-        ...
 
-    def get_vx(self, x: float, y: float)->float:
-        '''
-        Get the x-component of the vector field at a specific point (x, y) using interpolation.
-        '''
-        ...
-
-    def get_vy(self, x: float, y: float)->float:
-        '''
-        Get the y-component of the vector field at a specific point (x, y) using interpolation.
-        '''
-        ...
-
-    def in_bounds(self, x: float, y: float)->bool:
-        '''
-        Check if the point (x, y) is within the bounds of the grid.
-        '''
-        ...
-
-
-class SampledVectorField3D:
+class SampledVectorField3D(SampledVectorField):
 
     '''
     Class representing a 3D vector field
     '''
 
-    def __init__(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, vx: np.ndarray, vy: np.ndarray, vz: np.ndarray):
-        '''
-        Initialize a 3D vector field.
-        Parameters
-        ----------
-        x : np.ndarray
-            X-coordinates of the grid points.
-        y : np.ndarray
-            Y-coordinates of the grid points.
-        z : np.ndarray
-            Z-coordinates of the grid points.
-        vx : np.ndarray
-            X-components of the vector field at the grid points.
-        vy : np.ndarray
-            Y-components of the vector field at the grid points.
-        vz : np.ndarray
-            Z-components of the vector field at the grid points.
-
-        Notes
-        -----
-        The shape of vx, vy, and vz must be (len(x), len(y), len(z))
-        and vx[i, j, k], vy[i, j, k], vz[i, j, k] correspond to the vector at (x[i], y[j], z[k]).
-
-        '''
-        ...
 
     @property
     def x(self)->np.ndarray:
@@ -233,100 +282,6 @@ class SampledVectorField3D:
     def vz(self)->np.ndarray:
         '''
         Z-components of the vector field at the grid points.
-        '''
-        ...
-
-    def __call__(self, x: float, y: float, z: float)->np.ndarray:
-        '''
-        Get the vector field components (vx, vy, vz) at a specific point (x, y, z) using interpolation.
-        This is equivalent to np.array([self.get_vx(x, y, z), self.get_vy(x, y, z), self.get_vz(x, y, z)])
-        '''
-        ...
-
-    def get_vx(self, x: float, y: float, z: float)->float:
-        '''
-        Get the x-component of the vector field at a specific point (x, y, z) using interpolation.
-        '''
-        ...
-
-    def get_vy(self, x: float, y: float, z: float)->float:
-        '''
-        Get the y-component of the vector field at a specific point (x, y, z) using interpolation.
-        '''
-        ...
-
-    def get_vz(self, x: float, y: float, z: float)->float:
-        '''
-        Get the z-component of the vector field at a specific point (x, y, z) using interpolation.
-        '''
-        ...
-
-    def in_bounds(self, x: float, y: float, z: float)->bool:
-        '''
-        Check if the point (x, y, z) is within the bounds of the grid.
-        '''
-        ...
-
-
-class SampledScalarField1D:
-
-    def __init__(self, f: np.ndarray, x: np.ndarray):
-        '''
-        Initialize a 1D scalar field.
-        Parameters
-        ----------
-        f : np.ndarray
-            Scalar field values at the grid points.
-        x : np.ndarray
-            Coordinates of the grid points.
-        '''
-        ...
-        
-
-class SampledScalarField2D:
-
-    def __init__(self, f: np.ndarray, x: np.ndarray, y: np.ndarray):
-        '''
-        Initialize a 2D scalar field.
-        Parameters
-        ----------
-        f : np.ndarray
-            Scalar field values at the grid points.
-        x : np.ndarray
-            X-coordinates of the grid points.
-        y : np.ndarray
-            Y-coordinates of the grid points.
-
-        Notes
-        -----
-        The shape of f must be (len(x), len(y))
-        and f[i, j] corresponds to the scalar value at (x[i], y[j]).
-
-        '''
-        ...
-
-
-class SampledScalarField3D:
-
-    def __init__(self, f: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray):
-        '''
-        Initialize a 3D scalar field.
-        Parameters
-        ----------
-        f : np.ndarray
-            Scalar field values at the grid points.
-        x : np.ndarray
-            X-coordinates of the grid points.
-        y : np.ndarray
-            Y-coordinates of the grid points.
-        z : np.ndarray
-            Z-coordinates of the grid points.
-
-        Notes
-        -----
-        The shape of f must be (len(x), len(y), len(z))
-        and f[i, j, k] corresponds to the scalar value at (x[i], y[j], z[k]).
-
         '''
         ...
 

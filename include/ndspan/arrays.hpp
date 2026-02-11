@@ -329,6 +329,15 @@ public:
         return Base::offset(idx...);
     }
 
+    template<INT_T Int>
+    INLINE constexpr size_t getOffset(const Int* idx_ptr) const noexcept{
+        return Base::getOffset(idx_ptr);
+    }
+
+    INLINE const T& getElem(const size_t* idx_ptr) const{
+        return Base::getElem(idx_ptr);
+    }
+
     template<size_t Nd>
     INLINE constexpr size_t offset(const std::array<size_t, Nd>& idx) const noexcept {
         return Base::offset(idx);
@@ -432,6 +441,11 @@ public:
     template<INT_T IDX_T>
     INLINE T& operator[](IDX_T i){
         return Base::operator[](i);
+    }
+
+    template<INT_T Int>
+    INLINE T& getElem(const Int* idx_ptr) noexcept{
+        return Base::getElem(idx_ptr);
     }
 
     template<INT_T... Int>

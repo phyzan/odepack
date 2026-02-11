@@ -63,7 +63,7 @@ class RegularScalarField(NumericalScalarField):
     
     @property
     def c_class_name(self):
-        return f'PyScalarField<{self.ndim}>'
+        return f'PyScalarField{self.ndim}D'
     
     @property
     def name(self) -> str:

@@ -38,6 +38,12 @@ public:
         return THIS_C->offset_impl(idx...);
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        //override
+        return THIS_C->getOffset_impl(idx_ptr);
+    }
+
     template<INT_T... Idx>
     INLINE void unpack_idx_impl(size_t offset, Idx&... idx) const noexcept{
         //override
@@ -55,6 +61,12 @@ public:
         _dim_check(idx...);
         _bounds_check(idx...);
         return offset_impl(idx...);
+    }
+
+    template<INT_T Int>
+    INLINE constexpr size_t getOffset(const Int* idx_ptr) const noexcept{
+        assert(idx_ptr != nullptr && "Null pointer in getOffset");
+        return getOffset_impl(idx_ptr);
     }
 
     template<size_t Nd>
@@ -381,6 +393,11 @@ public:
     template<INT_T Int>
     INLINE constexpr size_t offset_impl(Int idx) const noexcept{
         return idx;
+    }
+
+    template<INT_T Int>
+    INLINE constexpr size_t getOffset_impl(const Int* idx_ptr) const noexcept{
+        return idx_ptr[0];
     }
 
     template<INT_T Int>

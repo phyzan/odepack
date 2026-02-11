@@ -7,28 +7,60 @@
 
 namespace ode{
 
-template<size_t NDIM>
-class PyScalarField : public RegularGridInterpolator<double, NDIM> {
 
-    using Base = RegularGridInterpolator<double, NDIM>;
+class PyScalarField : public RegularGridInterpolator<double, 0> {
+
+    using Base = RegularGridInterpolator<double, 0>;
 
 private:
 
-    template<size_t... I, typename... PyArray>
-    PyScalarField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args);
+
+    PyScalarField(const double* values, const std::vector<MutView1D<double>>& grid);
 
 public:
 
-    template<typename... PyArray>
-    PyScalarField(const PyArray&... args);
+    PyScalarField(const py::array_t<double>& values, const py::args& py_grid);
 
     template<typename... Scalar>
     double operator()(Scalar... x) const;
 
+    double py_value_at(const py::args& x) const;
+
+protected:
+    PyScalarField(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM);
+    
 private:
 
-    template<typename... PyArray>
-    static std::nullptr_t parse_args(const PyArray&... args);
+    static std::vector<MutView1D<double>> parse_args(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM);
+};
+
+class PyScalarField1D : public PyScalarField {
+
+    using Base = PyScalarField;
+public:
+    
+    PyScalarField1D(const py::array_t<double>& values, const py::args& py_grid);
+    double operator()(double x) const;
+
+};
+
+class PyScalarField2D : public PyScalarField {
+
+    using Base = PyScalarField;
+public:
+
+    PyScalarField2D(const py::array_t<double>& values, const py::args& py_grid);
+    double operator()(double x, double y) const;
+
+};
+
+class PyScalarField3D : public PyScalarField {
+
+    using Base = PyScalarField;
+public:
+    PyScalarField3D(const py::array_t<double>& values, const py::args& py_grid);
+    double operator()(double x, double y, double z) const;
+
 };
 
 
@@ -115,98 +147,81 @@ private:
 };
 
 
-class PyVecFieldBase {
-
-public:
-
-    virtual ~PyVecFieldBase() = default;
-
-    virtual py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const = 0;
-
-    virtual py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const = 0;
-
-    virtual py::object py_streamplot_data(double max_length, double ds, int density) const = 0;
-
-};
-
-
 template<size_t NDIM>
-class PyVecField : public SampledVectorField<double, NDIM>, public PyVecFieldBase {
+class PyVecField : public SampledVectorField<double, NDIM> {
 
     using Base = SampledVectorField<double, NDIM>;
 
 private:
 
-    template<size_t... I, typename... PyArray>
-    PyVecField(std::nullptr_t, std::index_sequence<I...>, const PyArray&... args);
+    PyVecField(const double* values, const std::vector<MutView1D<double>>& grid);
 
 public:
 
-    template<typename... PyArray>
-    PyVecField(const PyArray&... args);
+    PyVecField(const py::array_t<double>& values, const py::args& py_grid);
 
-    template<size_t Axis>
-    py::object py_x() const;
+    py::object py_x(int axis) const;
 
-    template<size_t FieldIdx>
-    py::object py_vx() const;
+    py::object py_vx(int component) const;
 
-    template<size_t FieldIdx, typename... Scalar>
-    py::object py_vx_at(Scalar... x) const;
+    py::object py_coords() const;
 
-    template<typename... Scalar>
-    py::object py_vector(Scalar... x) const;
+    py::object py_data() const;
 
-    template<typename... Scalar>
-    bool py_in_bounds(Scalar... x) const;
+    py::object py_value(const py::args& coords) const;
+
+    bool py_in_bounds(const py::args& coords) const;
 
     // ==========================================
 
-    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const override;
+    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const;
 
-    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const override;
+    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const;
 
-    py::object py_streamplot_data(double max_length, double ds, int density) const override;
+    py::object py_streamplot_data(double max_length, double ds, int density) const;
 
 private:
 
-    template<typename... Scalar>
-    void check_coords(Scalar... x) const;
+    void check_coords(const double* coords) const;
 
-    template<typename... PyArray>
-    static std::nullptr_t parse_args(const PyArray&... args);
+    static std::vector<MutView1D<double>> parse_args(const py::array_t<double>& values, const py::args& py_grid);
 
+};
 
+// Inheriting from <0>, not <2> for simpler compilation and inheritance chain
+class PyVecField2D : public PyVecField<0> {
+
+    using Base = PyVecField<0>;
+
+public:    
+
+    using Base::Base;
+
+    py::object x() const;
+    py::object y() const;
+    py::object vx() const;
+    py::object vy() const;
 
 };
 
 
-class PyVecField2D : public PyVecField<2> {
-    
-    using Base = PyVecField<2>;
+class PyVecField3D : public PyVecField<0> {
+
+    using Base = PyVecField<0>;
 
 public:
 
-    PyVecField2D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& vx, const py::array_t<double>& vy);
+    using Base::Base;
 
-    using Base::py_streamline, Base::py_streamline_ode, Base::py_streamplot_data;
+    py::object x() const;
+    py::object y() const;
+    py::object z() const;
+    py::object vx() const;
+    py::object vy() const;
+    py::object vz() const;
 
 };
 
-class PyVecField3D : public PyVecField<3> {
-    
-    using Base = PyVecField<3>;
-
-public:
-
-    PyVecField3D(const py::array_t<double>& x, const py::array_t<double>& y, const py::array_t<double>& z, const py::array_t<double>& vx, const py::array_t<double>& vy, const py::array_t<double>& vz);
-
-    using Base::py_streamline, Base::py_streamline_ode, Base::py_streamplot_data;
-    
-};
-
-
-}
-
+} // namespace ode
 
 #endif // PY_FIELD_HPP

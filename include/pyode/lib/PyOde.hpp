@@ -36,6 +36,8 @@ public:
     template<typename T>
     const ODE<T>* cast() const;
 
+    void set_pyobj(const PyODE& other);
+
     py::object call_Rhs(const py::object& t, const py::iterable& py_q) const;
 
     py::object call_Jac(const py::object& t, const py::iterable& py_q) const;

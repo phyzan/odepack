@@ -86,6 +86,12 @@ public:
         return _offset_at_id[id];
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        size_t id = _strided_span.getOffset(idx_ptr);
+        return _offset_at_id[id];
+    }
+
     template<INT_T... Idx>
     INLINE void unpack_idx_impl(size_t offset, Idx&... idx) const noexcept{
         size_t id = _id_at_offset[offset];

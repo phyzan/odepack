@@ -31,6 +31,8 @@ py::class_<PySolver>(m, "OdeSolver")
     .def("show_state", &PySolver::show_state,
         py::arg("digits") = 8
     )
+    .def("rhs", &PySolver::py_rhs, py::arg("t"), py::arg("q"))
+    .def("jac", &PySolver::py_jac, py::arg("t"), py::arg("q"))
     .def("advance", &PySolver::advance)
     .def("advance_to_event", &PySolver::advance_to_event)
     .def("advance_until", &PySolver::advance_until, py::arg("t"))

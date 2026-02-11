@@ -20,17 +20,17 @@ PySolver::PySolver(const py::object& f, const py::object& jac, const py::object&
 
 PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
     this->s = solver;
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(*this);
 }
 
 PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data){
     DISPATCH(void, this->s = other.template cast<T>()->clone();)
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
 }
 
 PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)){
     other.s = nullptr;
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
 }
 
 
@@ -39,7 +39,7 @@ PySolver& PySolver::operator=(const PySolver& other){
         data = other.data;
         DISPATCH(void, delete cast<T>();)
         DISPATCH(void, this->s = other.template cast<T>()->clone();)
-        DISPATCH(void, cast<T>()->set_obj(&data);)
+        set_pyobj(other);
     }
     return *this;
 }
@@ -50,7 +50,7 @@ PySolver& PySolver::operator=(PySolver&& other) noexcept{
         data = std::move(other.data);
         DISPATCH(void, delete cast<T>();)
         this->s = other.s;
-        DISPATCH(void, cast<T>()->set_obj(&data);)
+        set_pyobj(other);
         other.s = nullptr;
     }
     return *this;
@@ -61,6 +61,12 @@ PySolver::~PySolver(){
     DISPATCH(void, delete cast<T>();)
 }
 
+
+void PySolver::set_pyobj(const PySolver& other){
+    if (!data.is_lowlevel){
+        DISPATCH(void, cast<T>()->set_obj(&data);)
+    }
+}
 
 py::object PySolver::t() const{
     return DISPATCH(py::object,
@@ -119,6 +125,39 @@ py::object PySolver::n_evals_rhs() const{
 void PySolver::show_state(int digits) const{
     DISPATCH(void,
         return cast<T>()->show_state(digits);
+    )
+}
+
+py::object PySolver::py_rhs(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (size_t(q.size()) != cast<T>()->Nsys()){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        const OdeRichSolver<T>* solver_ptr = this->cast<T>();
+        Array1D<T> qdot(solver_ptr->Nsys());
+        solver_ptr->Rhs(qdot.data(), py::cast<T>(t), q.data());
+        return py::cast(qdot);
+    )
+}
+
+py::object PySolver::py_jac(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (size_t(q.size()) != cast<T>()->Nsys()){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        const OdeRichSolver<T>* solver_ptr = this->cast<T>();
+        Array2D<T, 0, 0, ndspan::Allocation::Heap, ndspan::Layout::F> jac(solver_ptr->Nsys(), solver_ptr->Nsys());
+        solver_ptr->Jac(jac.data(), py::cast<T>(t), q.data(), nullptr);
+        for (size_t i=0; i<solver_ptr->Nsys(); i++){
+            for (size_t j=i+1; j<solver_ptr->Nsys(); j++){
+                T tmp = jac(i, j);
+                jac(i, j) = jac(j, i);
+                jac(j, i) = tmp;
+            }
+        }
+        return py::cast(View<T, ndspan::Layout::C, 0, 0>(jac.data(), solver_ptr->Nsys(), solver_ptr->Nsys()));
     )
 }
 

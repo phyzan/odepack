@@ -7,8 +7,33 @@ using namespace ode;
 PYBIND11_MODULE(fields, m) {
 
 
-py::class_<PyVecFieldBase>(m, "SampledVectorField")
-    .def("streamline", &PyVecFieldBase::py_streamline,
+py::class_<PyScalarField>(m, "SampledScalarField")
+    .def(py::init<py::array_t<double>, py::args>(),
+        py::arg("values"))
+    .def("__call__", &PyScalarField::py_value_at); //takes N coordinates as separate arguments, returns scalar value at that point;
+
+py::class_<PyScalarField1D, PyScalarField>(m, "SampledScalarField1D")
+    .def(py::init<py::array_t<double>, py::args>(),
+         py::arg("values"));
+
+py::class_<PyScalarField2D, PyScalarField>(m, "SampledScalarField2D")
+    .def(py::init<py::array_t<double>, py::args>(),
+         py::arg("values"));
+
+py::class_<PyScalarField3D, PyScalarField>(m, "SampledScalarField3D")
+    .def(py::init<py::array_t<double>, py::args>(),
+         py::arg("values"));
+
+
+
+py::class_<PyVecField<0>>(m, "SampledVectorField")
+    .def(py::init<py::array_t<double>, py::args>(),
+        py::arg("values"))
+    .def("coords", &PyVecField<0>::py_coords) //tuple of coordinate arrays
+    .def("values", &PyVecField<0>::py_data) //(N+1)-dimensional : shape (nx, ny, ..., ndim)
+    .def("__call__", &PyVecField<0>::py_value) //takes N coordinates as separate arguments, returns vector value at that point
+    .def("in_bounds", &PyVecField<0>::py_in_bounds) //takes N coordinates as separate arguments, returns True if point is in bounds of the field
+    .def("streamline", &PyVecField<0>::py_streamline,
         py::arg("q0"),
         py::arg("length"),
         py::arg("rtol")=1e-12,
@@ -20,7 +45,7 @@ py::class_<PyVecFieldBase>(m, "SampledVectorField")
         py::arg("t_eval")=py::none(),
         py::arg("method")="RK45"
     )
-    .def("get_ode", &PyVecFieldBase::py_streamline_ode,
+    .def("get_ode", &PyVecField<0>::py_streamline_ode,
         py::arg("q0"),
         py::arg("rtol")=1e-12,
         py::arg("atol")=1e-12,
@@ -31,65 +56,30 @@ py::class_<PyVecFieldBase>(m, "SampledVectorField")
         py::arg("method")="RK45",
         py::arg("normalized")=false, py::keep_alive<0, 1>()
     )
-    .def("streamplot_data", &PyVecFieldBase::py_streamplot_data,
+    .def("streamplot_data", &PyVecField<0>::py_streamplot_data,
         py::arg("max_length"),
         py::arg("ds"),
         py::arg("density")=30
     );
 
-py::class_<PyVecField2D, PyVecFieldBase>(m, "SampledVectorField2D")
-    .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
-        py::arg("x"),
-        py::arg("y"),
-        py::arg("vx"),
-        py::arg("vy"))
-    .def_property_readonly("x", &PyVecField2D::py_x<0>)
-    .def_property_readonly("y", &PyVecField2D::py_x<1>)
-    .def_property_readonly("vx", &PyVecField2D::py_vx<0>)
-    .def_property_readonly("vy", &PyVecField2D::py_vx<1>)
-    .def("get_vx", &PyVecField2D::py_vx_at<0, double, double>, py::arg("x"), py::arg("y"))
-    .def("get_vy", &PyVecField2D::py_vx_at<1, double, double>, py::arg("x"), py::arg("y"))
-    .def("__call__", &PyVecField2D::py_vector<double, double>, py::arg("x"), py::arg("y"))
-    .def("in_bounds", &PyVecField2D::py_in_bounds<double, double>, py::arg("x"), py::arg("y"));
+py::class_<PyVecField2D, PyVecField<0>>(m, "SampledVectorField2D")
+    .def(py::init<py::array_t<double>, py::args>(),
+        py::arg("values"))
+    .def_property_readonly("x", &PyVecField2D::x)
+    .def_property_readonly("y", &PyVecField2D::y)
+    .def_property_readonly("vx", &PyVecField2D::vx)
+    .def_property_readonly("vy", &PyVecField2D::vy);
 
-py::class_<PyVecField3D, PyVecFieldBase>(m, "SampledVectorField3D")
-    .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
-        py::arg("x"),
-        py::arg("y"),
-        py::arg("z"),
-        py::arg("vx"),
-        py::arg("vy"),
-        py::arg("vz"))
-    .def_property_readonly("x", &PyVecField3D::py_x<0>)
-    .def_property_readonly("y", &PyVecField3D::py_x<1>)
-    .def_property_readonly("z", &PyVecField3D::py_x<2>)
-    .def_property_readonly("vx", &PyVecField3D::py_vx<0>)
-    .def_property_readonly("vy", &PyVecField3D::py_vx<1>)
-    .def_property_readonly("vz", &PyVecField3D::py_vx<2>)
-    .def("get_vx", &PyVecField3D::py_vx_at<0, double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
-    .def("get_vy", &PyVecField3D::py_vx_at<1, double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
-    .def("__call__", &PyVecField3D::py_vector<double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"))
-    .def("in_bounds", &PyVecField3D::py_in_bounds<double, double, double>, py::arg("x"), py::arg("y"), py::arg("z"));
+py::class_<PyVecField3D, PyVecField<0>>(m, "SampledVectorField3D")
+    .def(py::init<py::array_t<double>, py::args>(),
+        py::arg("values"))
+    .def_property_readonly("x", &PyVecField3D::x)
+    .def_property_readonly("y", &PyVecField3D::y)
+    .def_property_readonly("z", &PyVecField3D::z)
+    .def_property_readonly("vx", &PyVecField3D::vx)
+    .def_property_readonly("vy", &PyVecField3D::vy)
+    .def_property_readonly("vz", &PyVecField3D::vz);
 
-
-
-py::class_<PyScalarField<1>>(m, "SampledScalarField1D")
-    .def(py::init<py::array_t<double>, py::array_t<double>>(),
-        py::arg("f"),
-        py::arg("x"));
-
-py::class_<PyScalarField<2>>(m, "SampledScalarField2D")
-    .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
-        py::arg("f"),
-        py::arg("x"),
-        py::arg("y"));
-
-py::class_<PyScalarField<3>>(m, "SampledScalarField3D")
-    .def(py::init<py::array_t<double>, py::array_t<double>, py::array_t<double>, py::array_t<double>>(),
-        py::arg("f"),
-        py::arg("x"),
-        py::arg("y"),
-        py::arg("z"));
 
 py::class_<PyDelaunayBase>(m, "DelaunayTriangulation")
     .def_property_readonly("ndim", &PyDelaunayBase::py_ndim)

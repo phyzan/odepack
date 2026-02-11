@@ -31,13 +31,13 @@ public:
 
 protected:
 
-     void register_impl();
+    void register_impl();
 
-     void reset_impl(int direction);
+    void reset_impl(int direction);
 
-     void mask_impl(T* out, const T& t, const T* q) const;
+    void mask_impl(T* out, const T& t, const T* q) const;
 
-     bool is_masked_impl() const;
+    bool is_masked_impl() const;
 
 private:
 

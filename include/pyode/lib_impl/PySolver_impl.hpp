@@ -45,7 +45,7 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
     bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
     bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
     args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<Func<T>, void> ode_rhs = {nullptr, nullptr, &data};
+    OdeData<Func<T>, void> ode_rhs = {nullptr, nullptr, nullptr};
     if (f_is_compiled){
         if (py::isinstance<PyFuncWrapper>(f)){
             //safe approach
@@ -103,6 +103,9 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
     }
 
     data.is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);
+    if (!data.is_lowlevel){
+        ode_rhs.obj = &data;
+    }
     return ode_rhs;
 }
 

@@ -284,6 +284,45 @@ class OdeSolver:
             explaining why advancement failed.
         """
 
+    def rhs(self, t: float, q: np.ndarray)->np.ndarray:
+        """
+        Evaluate the right-hand side function at a given time and state.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the RHS.
+
+        q : np.ndarray
+            State vector at which to evaluate the RHS.
+
+        Returns
+        -------
+        np.ndarray
+            The computed right-hand side values f(t, q).
+        """
+        ...
+
+    def jac(self, t: float, q: np.ndarray)->np.ndarray:
+        """
+        Evaluate the Jacobian matrix of the RHS function at a given time and state.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the Jacobian.
+
+        q : np.ndarray
+            State vector at which to evaluate the Jacobian.
+
+        Returns
+        -------
+        np.ndarray
+            The computed Jacobian matrix J(t, q) where J[i, j] = df_i/dq_j.
+            If the solver was not instanciated with an analytical Jacobian, this method returns a finite difference approximation.
+        """
+        ...
+
     def advance_to_event(self)->bool:
         """
         Advance the solver until the next event occurrence.

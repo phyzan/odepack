@@ -47,6 +47,11 @@ public:
         return data()+this->offset(idx...);
     }
 
+    template<INT_T Int>
+    INLINE const T& getElem(const Int* idx_ptr) const{
+        return data()[this->getOffset(idx_ptr)];
+    }
+
     template<INT_T... Idx>
     INLINE constexpr const T& operator()(Idx... idx) const {
         return data()[this->offset(idx...)];
@@ -100,6 +105,11 @@ public:
     template<INT_T... Int>
     INLINE T* ptr(Int... idx){
         return data()+this->offset(idx...);
+    }
+
+    template<INT_T Int>
+    INLINE T& getElem(const Int* idx_ptr){
+        return data()[this->getOffset(idx_ptr)];
     }
 
     template<INT_T... Idx>

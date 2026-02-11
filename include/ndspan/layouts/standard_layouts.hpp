@@ -62,6 +62,15 @@ public:
         return Base::_static_offset_impl(std::make_index_sequence<Base::ND>(), idx...);
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        size_t res = 0;
+        for (size_t i = 0; i < this->ndim(); i++){
+            res += static_cast<size_t>(idx_ptr[i]) * Base::STRIDES[i];
+        }
+        return res;
+    }
+
     const size_t* strides() const{
         return Base::STRIDES.data();
     }
@@ -121,6 +130,15 @@ public:
         );
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        size_t res = 0;
+        for (size_t i = 0; i < this->ndim(); i++){
+            res += static_cast<size_t>(idx_ptr[i]) * _fixed_strides[i];
+        }
+        return res;
+    }
+
 private:
 
     inline void _remake_strides(){
@@ -159,7 +177,7 @@ protected:
 template<typename Derived, size_t R, size_t C>
 class StridedSemiStaticNdSpan<Derived, R, C> : public StridedDerivedNdSpan<Derived, R, C>{
 
-    //Specialization for the 1D case
+    //Specialization for the 2D case
 
     using Base = StridedDerivedNdSpan<Derived, R, C>;
 
@@ -281,6 +299,15 @@ public:
         );
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        size_t res = 0;
+        for (size_t i = 0; i < this->ndim(); i++){
+            res += static_cast<size_t>(idx_ptr[i]) * _dyn_strides[i];
+        }
+        return res;
+    }
+
 private:
 
     void _realloc_strides(size_t nd_old){
@@ -359,6 +386,11 @@ public:
         }
     }
 
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        return offset_impl(idx_ptr[0], idx_ptr[1]);
+    }
+
     template<INT_T Int1, INT_T Int2>
     INLINE void unpack_idx_impl(size_t offset, Int1& i, Int2& j) const {
         if constexpr (C > 0) {
@@ -434,6 +466,11 @@ public:
         }else {
             return j*this->shape(0) + i;
         }
+    }
+
+    template<INT_T Idx>
+    INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
+        return offset_impl(idx_ptr[0], idx_ptr[1]);
     }
 
     template<INT_T Int1, INT_T Int2>

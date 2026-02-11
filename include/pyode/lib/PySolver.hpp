@@ -25,6 +25,8 @@ struct PySolver : DtypeDispatcher {
 
     virtual ~PySolver();
 
+    void set_pyobj(const PySolver& other);
+
     template<typename T>
     OdeRichSolver<T>* cast();
 
@@ -54,6 +56,10 @@ struct PySolver : DtypeDispatcher {
     py::object          n_evals_rhs() const;
 
     void                show_state(int digits) const;
+
+    py::object          py_rhs(const py::object& t, const py::iterable& py_q) const;
+
+    py::object          py_jac(const py::object& t, const py::iterable& py_q) const;
 
     py::object          advance();
 

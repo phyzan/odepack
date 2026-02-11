@@ -35,12 +35,12 @@ PyODE::PyODE(const std::string& scalar_type) : DtypeDispatcher(scalar_type){}
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
 }
 
 PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)){
     other.ode = nullptr;
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
 }
 
 PyODE& PyODE::operator=(const PyODE& other){
@@ -50,7 +50,7 @@ PyODE& PyODE::operator=(const PyODE& other){
     DISPATCH(void, delete cast<T>();)
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
     data = other.data;
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
     return *this;
 }
 
@@ -62,12 +62,18 @@ PyODE& PyODE::operator=(PyODE&& other) noexcept {
     this->ode = other.ode;
     other.ode = nullptr;
     data = std::move(other.data);
-    DISPATCH(void, cast<T>()->set_obj(&data);)
+    set_pyobj(other);
     return *this;
 }
 
 PyODE::~PyODE(){
     DISPATCH(void, delete cast<T>();)
+}
+
+void PyODE::set_pyobj(const PyODE& other){
+    if (!data.is_lowlevel){
+        DISPATCH(void, cast<T>()->set_obj(&data);)
+    }
 }
 
 py::object PyODE::call_Rhs(const py::object& t, const py::iterable& py_q) const{
