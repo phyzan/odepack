@@ -51,6 +51,7 @@ public:
     virtual const std::string&  method() const = 0;
     virtual void                interp(T* result, const T& t) const = 0;
     virtual size_t              n_evals_rhs() const = 0;
+    virtual size_t              n_evals_jac() const = 0;
     virtual VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const = 0;
     virtual T                   auto_step(T t, const T* q) const = 0;
     virtual T                   auto_step() const = 0;

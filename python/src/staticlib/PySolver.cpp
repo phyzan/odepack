@@ -122,6 +122,11 @@ py::object PySolver::n_evals_rhs() const{
     )
 }
 
+py::object PySolver::n_evals_jac() const{
+    return DISPATCH(py::object, return py::cast(cast<T>()->n_evals_jac()); )
+}
+
+
 void PySolver::show_state(int digits) const{
     DISPATCH(void,
         return cast<T>()->show_state(digits);
@@ -130,34 +135,72 @@ void PySolver::show_state(int digits) const{
 
 py::object PySolver::py_rhs(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::object,
-        auto q = toCPP_Array<T, Array1D<T>>(py_q);
-        if (size_t(q.size()) != cast<T>()->Nsys()){
+        size_t nsys = cast<T>()->Nsys();
+        Array1D<T> tmp(2*nsys);
+        if (size_t(py::len(py_q)) != nsys){
             throw py::value_error("Invalid size of state array in call to rhs");
         }
-        const OdeRichSolver<T>* solver_ptr = this->cast<T>();
-        Array1D<T> qdot(solver_ptr->Nsys());
-        solver_ptr->Rhs(qdot.data(), py::cast<T>(t), q.data());
-        return py::cast(qdot);
+        pass_values(tmp.data()+nsys, py_q, nsys);
+        cast<T>()->Rhs(tmp.data(), py::cast<T>(t), tmp.data()+nsys);
+        return py::cast(View1D<T>(tmp.data(), nsys));
     )
 }
 
 py::object PySolver::py_jac(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::object,
-        auto q = toCPP_Array<T, Array1D<T>>(py_q);
-        if (size_t(q.size()) != cast<T>()->Nsys()){
+        size_t nsys = cast<T>()->Nsys();
+        Array1D<T> q(nsys);
+        Array2D<T> jac(nsys, nsys);
+        if (size_t(py::len(py_q)) != nsys){
             throw py::value_error("Invalid size of state array in call to rhs");
         }
-        const OdeRichSolver<T>* solver_ptr = this->cast<T>();
-        Array2D<T, 0, 0, ndspan::Allocation::Heap, ndspan::Layout::F> jac(solver_ptr->Nsys(), solver_ptr->Nsys());
-        solver_ptr->Jac(jac.data(), py::cast<T>(t), q.data(), nullptr);
-        for (size_t i=0; i<solver_ptr->Nsys(); i++){
-            for (size_t j=i+1; j<solver_ptr->Nsys(); j++){
-                T tmp = jac(i, j);
-                jac(i, j) = jac(j, i);
-                jac(j, i) = tmp;
+        pass_values(q.data(), py_q, nsys);
+        cast<T>()->Jac(jac.data(), t.cast<T>(), q.data(), nullptr);
+        for (size_t i=0; i<nsys; i++){
+            for (size_t j=i+1; j<nsys; j++){
+                std::swap(jac(i, j), jac(j, i));
             }
         }
-        return py::cast(View<T, ndspan::Layout::C, 0, 0>(jac.data(), solver_ptr->Nsys(), solver_ptr->Nsys()));
+        return py::cast(jac);
+    )
+}
+
+py::tuple PySolver::timeit_rhs(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::tuple,
+        size_t nsys = cast<T>()->Nsys();
+        Array1D<T> tmp(2*nsys);
+        if (size_t(py::len(py_q)) != nsys){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        pass_values(tmp.data()+nsys, py_q, nsys);
+        auto start = std::chrono::high_resolution_clock::now();
+        cast<T>()->Rhs(tmp.data(), py::cast<T>(t), tmp.data()+nsys);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = end - start;
+        return py::make_tuple(py::cast(duration.count()), py::cast(View1D<T>(tmp.data(), nsys)));
+    )
+}
+
+
+py::tuple PySolver::timeit_jac(const py::object& t, const py::iterable& py_q) const{
+    return DISPATCH(py::tuple,
+        size_t nsys = cast<T>()->Nsys();
+        Array1D<T> q(nsys);
+        Array2D<T> jac(nsys, nsys);
+        if (size_t(py::len(py_q)) != nsys){
+            throw py::value_error("Invalid size of state array in call to rhs");
+        }
+        pass_values(q.data(), py_q, nsys);
+        auto start = NOW;
+        cast<T>()->Jac(jac.data(), t.cast<T>(), q.data(), nullptr);
+        auto end = NOW;
+        std::chrono::duration<double, std::milli> duration = end - start;
+        for (size_t i=0; i<nsys; i++){
+            for (size_t j=i+1; j<nsys; j++){
+                std::swap(jac(i, j), jac(j, i));
+            }
+        }
+        return py::make_tuple(py::cast(duration.count()), py::cast(jac));
     )
 }
 
@@ -173,9 +216,22 @@ py::object PySolver::advance_to_event() {
     )
 }
 
-py::object PySolver::advance_until(const py::object& time) {
+py::object PySolver::advance_until(const py::object& time, const py::object& observer) {
     return DISPATCH(py::object,
-        return py::cast(cast<T>()->advance_until(time.cast<T>()));
+        if (observer.is_none()){
+            return py::cast(cast<T>()->advance_until(time.cast<T>()));
+        }
+        py::function py_obs;
+        try{
+            py_obs = observer.cast<py::function>();
+        } catch (const py::cast_error&){
+            throw py::value_error("The observer parameter must be a function that takes no arguments");
+        }
+        std::function<void(const T&, const T*)> obs = [py_obs](const T&, const T*){
+            py_obs();
+        };
+        OdeRichSolver<T>* solver = this->cast<T>();
+        return py::cast(solver->observe_until(time.cast<T>(), obs));
     )
 }
 
@@ -206,6 +262,8 @@ bool PySolver::resume() {
         return cast<T>()->resume();
     )
 }
+
+void PySolver::stop(const py::str& reason) { DISPATCH(void, cast<T>()->stop(reason.cast<std::string>()); ) } void PySolver::kill(const py::str& reason) { DISPATCH(void, cast<T>()->kill(reason.cast<std::string>()); ) }
 
 py::str PySolver::message() const{
     return DISPATCH(py::str,

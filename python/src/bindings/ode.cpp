@@ -13,7 +13,7 @@ py::class_<PyODE>(m, "LowLevelODE")
         py::arg("q0"),
         py::kw_only(),
         py::arg("jac")=py::none(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),

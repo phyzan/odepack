@@ -206,6 +206,12 @@ using MutView1D = MutView<T, Layout::C, Size>;
 template<typename T, size_t Size=0>
 using View1D = View<T, Layout::C, Size>;
 
+template<typename T, size_t M=0, size_t N=0>
+using View2D = View<T, Layout::C, M, N>;
+
+template<typename T, size_t M=0, size_t N=0, size_t K=0>
+using View3D = View<T, Layout::C, M, N, K>;
+
 template<typename Derived, INT_T... Int>
 inline Derived::value_type& tensor_call(Derived& x, Int... idx){
     return x(idx...);

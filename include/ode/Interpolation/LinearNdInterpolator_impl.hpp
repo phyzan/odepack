@@ -13,12 +13,10 @@ namespace ode{
 //===========================================================================
 
 template<size_t NDIM>
-template<typename PointsArrayType>
-DelaunayTri<NDIM>::DelaunayTri(const PointsArrayType& points) : points_(points.data(), points.shape(0), (points.ndim() == 1 ? 1 : points.shape(1))) {
-    assert(points.ndim() < 3 && "Points array must be 2D (shape = (Npoints, Ndim))");
+DelaunayTri<NDIM>::DelaunayTri(const double* points, size_t n_points, size_t ndim) : points_(points, n_points, ndim) {
     compute_delaunay();
 
-    int ND = ndim();
+    int ND = this->ndim();
     v0_.resize(nsimplices(), ND);
     invT_.resize(nsimplices(), ND, ND);
 
@@ -63,10 +61,19 @@ template<size_t NDIM>
 const Array2D<double, 0, NDIM>& DelaunayTri<NDIM>::get_points() const { return points_; }
 
 template<size_t NDIM>
-int DelaunayTri<NDIM>::nsimplices() const { return simplices_.Nrows(); }
+const Array2D<int, 0, DelaunayTri<NDIM>::DIM_SPX>& DelaunayTri<NDIM>::get_simplices() const { return simplices_; }
+
+template<size_t NDIM> const Array2D<int, 0, DelaunayTri<NDIM>::DIM_SPX>& DelaunayTri<NDIM>::get_neighbors() const { return neighbors_; }
 
 template<size_t NDIM>
-const Array2D<int, 0, DelaunayTri<NDIM>::DIM_SPX>& DelaunayTri<NDIM>::get_simplices() const { return simplices_; }
+const Array2D<double, 0, NDIM>& DelaunayTri<NDIM>::get_v0() const { return v0_; }
+
+template<size_t NDIM> const Array3D<double, 0, NDIM, NDIM>& DelaunayTri<NDIM>::get_invT() const {
+    return invT_; 
+}
+
+template<size_t NDIM>
+int DelaunayTri<NDIM>::nsimplices() const { return simplices_.Nrows(); }
 
 template<size_t NDIM>
 const int* DelaunayTri<NDIM>::get_simplex(int simplex_idx) const {
@@ -86,7 +93,7 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
     if (num_simplices == 0) {
         return -1;
     }
-
+    
     int nd = ndim();
     Array1D<double, DIM_SPX, SPX_ALLOC> bary(nd + 1);
 
@@ -277,7 +284,7 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
     int n = int(ndim());
     int num_points = npoints();
 
-    const PointStorage& coords = get_points();
+    const Array2D<double, 0, NDIM>& coords = get_points();
 
     // Initialize Qhull
     qhT qh_qh;
@@ -394,7 +401,7 @@ int& DelaunayTri<NDIM>::thread_cache() const {
 
 template<size_t NDIM>
 template<typename PointsArrayType, typename FieldContainer>
-LinearNdInterpolator<NDIM>::LinearNdInterpolator(const PointsArrayType& points, const FieldContainer& fields) : DelaunayTri<NDIM>(points), values_(fields.size(), points.shape(0)){
+LinearNdInterpolator<NDIM>::LinearNdInterpolator(const PointsArrayType& points, const FieldContainer& fields) : DelaunayTri<NDIM>(points.data(), points.shape(0), (points.ndim() == 1 ? 1 : points.shape(1))), values_(fields.size(), points.shape(0)){
     assert(fields.size() > 0 && "At least one field must be provided");
 
     size_t Npoints = points.shape(0);

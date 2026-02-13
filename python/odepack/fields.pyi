@@ -128,7 +128,7 @@ class SampledVectorField:
         '''
         ...
 
-    def streamline(self, q0: np.ndarray, length: float, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
+    def streamline(self, q0: np.ndarray, length: float, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, t_eval = None, method: str = "RK45") -> OdeResult:
         '''
         Compute a streamline starting from (x0, y0).
 
@@ -157,7 +157,7 @@ class SampledVectorField:
         '''
         ...
 
-    def get_ode(self, q0: np.ndarray, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
+    def get_ode(self, q0: np.ndarray, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, method: str = "RK45", normalized = False) -> LowLevelODE:
         '''
         Create a LowLevelODE object for streamlining from (x0, y0).
 

@@ -36,7 +36,7 @@ py::class_<PyVecField<0>>(m, "SampledVectorField")
     .def("streamline", &PyVecField<0>::py_streamline,
         py::arg("q0"),
         py::arg("length"),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -47,7 +47,7 @@ py::class_<PyVecField<0>>(m, "SampledVectorField")
     )
     .def("get_ode", &PyVecField<0>::py_streamline_ode,
         py::arg("q0"),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -93,19 +93,27 @@ py::class_<PyDelaunayBase>(m, "DelaunayTriangulation")
 
 py::class_<PyDelaunay<0>, PyDelaunayBase>(m, "DelaunayTriND")
     .def(py::init<py::array_t<double>>(),
-        py::arg("points"));
+        py::arg("points"))
+    .def(py::pickle([](const PyDelaunay<0>& obj){ return obj.py_get_state(); },
+        &PyDelaunay<0>::py_set_state));
 
 py::class_<PyDelaunay<1>, PyDelaunayBase>(m, "DelaunayTri1D")
     .def(py::init<py::array_t<double>>(),
-        py::arg("points"));
+        py::arg("points"))
+    .def(py::pickle([](const PyDelaunay<1>& obj){ return obj.py_get_state(); },
+                    &PyDelaunay<1>::py_set_state));
 
 py::class_<PyDelaunay<2>, PyDelaunayBase>(m, "DelaunayTri2D")
     .def(py::init<py::array_t<double>>(),
-        py::arg("points"));
+        py::arg("points"))
+    .def(py::pickle([](const PyDelaunay<2>& obj){ return obj.py_get_state(); },
+                    &PyDelaunay<2>::py_set_state));
 
 py::class_<PyDelaunay<3>, PyDelaunayBase>(m, "DelaunayTri3D")
     .def(py::init<py::array_t<double>>(),
-        py::arg("points"));
+        py::arg("points"))
+    .def(py::pickle([](const PyDelaunay<3>& obj){ return obj.py_get_state(); },
+                    &PyDelaunay<3>::py_set_state));
 
 
 py::class_<PyScatteredField<0>>(m, "ScatteredScalarFieldND")

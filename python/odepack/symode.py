@@ -829,7 +829,7 @@ class OdeSystem:
         if self.contains_fields(variational=variational):
             extra_kw.update(extra_header_block=OdeSystem.header())
         
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"], **extra_kw)
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=OdeSystem.release_extra_flags(), **extra_kw)
         if self.has_jac:
             return result # (pointers, ...), set_field
         else:
@@ -1411,14 +1411,15 @@ class OdeSystem:
         cache = self._pointers_var_cache if variational else self._pointers_cache
         if scalar_type not in cache:
             try:
-                default_ptrs = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational)).pointers()
+                module = tools.import_lowlevel_module(self.directory, self.module_name(scalar_type=scalar_type, variational=variational))
+                default_ptrs, setter = module.pointers(), module.set_fields
             except ImportError:
                 default_ptrs, setter = self.compile(scalar_type=scalar_type, variational=variational)
-                fields = self.get_fields(variational=variational)
-                new_sampled_fields = []
-                for f in fields:
-                    new_sampled_fields.append(f.to_sampled_scalar_field)
-                setter(*new_sampled_fields)
+            fields = self.get_fields(variational=variational)
+            new_sampled_fields = []
+            for f in fields:
+                new_sampled_fields.append(f.to_sampled_scalar_field)
+            setter(*new_sampled_fields)
             cache[scalar_type] = tuple(first) + default_ptrs[len(first):]
         else:
             cache[scalar_type] = tuple(first) + cache[scalar_type][len(first):]
@@ -1504,7 +1505,10 @@ class OdeSystem:
         if compiled:
             pointers = self._pointers(scalar_type=scalar_type, variational=variational)
             events = self.true_compiled_events(scalar_type=scalar_type, variational=variational)
-            f, jac = pointers[:2]
+            if len(pointers) < 2:
+                f, jac = pointers[0], None
+            else:
+                f, jac = pointers[:2]
         else:
             events = self.true_py_events if not variational else self.true_py_events_var
             f = self._odefunc if not variational else self._var_odefunc
@@ -1546,7 +1550,7 @@ class OdeSystem:
             raise NotImplementedError("Jacobian matrix is not defined for this system.")
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=OdeSystem.header() if self.get_fields(variational) else "", links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=["fvisibility=hidden"])[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=OdeSystem.header() if self.get_fields(variational) else "", links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=OdeSystem.release_extra_flags())[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')
@@ -1564,6 +1568,22 @@ class OdeSystem:
         lib_dir = os.path.join(lib_path, "lib")
         link_names = OdeSystem.get_link_names()
         return [(lib_dir, name) for name in link_names]
+
+    @staticmethod
+    def release_extra_flags():
+        return [
+            "O3",
+            "DNDEBUG",
+            "g0",
+            "fno-math-errno",
+            "fno-trapping-math",
+            "ffunction-sections",
+            "fdata-sections",
+            "march=x86-64",
+            "fvisibility=hidden",
+            "Wl,--gc-sections",
+            "Wl,--as-needed",
+        ]
 
 
 def HamiltonianSystem2D(V: Expr, t: Symbol, x, y, px, py, args = (), events=()):

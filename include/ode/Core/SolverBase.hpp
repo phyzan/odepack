@@ -81,8 +81,8 @@ public:
      * @param[out] dq_dt Output array for the derivative dq/dt (size Nsys).
      * @param[in]  t     Current time.
      * @param[in]  q     Current state vector (size Nsys).
-     */
-     void                 Rhs(T* dq_dt, const T& t, const T* q) const;
+    */
+    void                 Rhs(T* dq_dt, const T& t, const T* q) const;
 
     /**
      * @brief Compute the Jacobian matrix of the ODE system.
@@ -95,8 +95,8 @@ public:
      * @param[in]  q  Current state vector (size Nsys).
      * @param[in]  dt Optional step sizes for finite difference (size Nsys). If nullptr,
      *                step sizes are computed automatically.
-     */
-     void                 Jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+    */
+    void                 Jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
     /**
      * @brief Approximate the Jacobian using central finite differences.
@@ -104,8 +104,8 @@ public:
      * @param[in]  t  Current time.
      * @param[in]  q  Current state vector (size Nsys).
      * @param[in]  dt Step sizes for each component (size Nsys). If nullptr, computed automatically.
-     */
-     void                 jac_approx(T* j, const T& t, const T* q, const T* dt) const;
+    */
+    void                 jac_approx(T* j, const T& t, const T* q, const T* dt) const;
 
     /**
      * @brief Get a matrix view of a Jacobian array.
@@ -114,61 +114,61 @@ public:
      *
      * @param[in] j Pointer to Jacobian data in column-major order.
      * @return MutView object for convenient matrix element access.
-     */
+    */
     MutView<T, Layout::F, N, N> jac_view(T* j) const;
 
     // ACCESSORS
 
     /// @brief Get the current time value.
-     const T&             t() const;
+    const T&             t() const;
 
     /// @brief Get the time value from the previous accepted step.
-    const T&                    t_old() const;
+    const T&              t_old() const;
 
     /// @brief Get a view of the current state vector.
-     View1D<T, N>         vector() const;
+    View1D<T, N>         vector() const;
 
     /// @brief Get a view of the state vector from the previous accepted step.
-     View1D<T, N>         vector_old() const;
+    View1D<T, N>         vector_old() const;
 
     /// @brief Get the current step size (absolute value).
-     const T&             stepsize() const;
+    const T&             stepsize() const;
 
     /// @brief Get the integration direction (+1 forward, -1 backward).
-     int                  direction() const;
+    int                  direction() const;
 
     /// @brief Get the relative tolerance for error control.
-     const T&             rtol() const;
+    const T&             rtol() const;
 
     /// @brief Get the absolute tolerance for error control.
-     const T&             atol() const;
+    const T&             atol() const;
 
     /// @brief Get the minimum allowed step size.
-     const T&             min_step() const;
+    const T&             min_step() const;
 
     /// @brief Get the maximum allowed step size.
-     const T&             max_step() const;
+    const T&             max_step() const;
 
     /// @brief Get the additional arguments passed to the ODE function.
-     const Array1D<T>&    args() const;
+    const Array1D<T>&    args() const;
 
     /// @brief Get the number of equations in the ODE system.
-     size_t               Nsys() const;
+    size_t               Nsys() const;
 
     /// @brief Get the number of successful integration steps taken.
-     size_t               Nupdates() const;
+    size_t               Nupdates() const;
 
     /// @brief Check if the solver is currently running (not paused or dead).
-     bool                 is_running() const;
+    bool                 is_running() const;
 
     /// @brief Check if the solver has permanently terminated.
-     bool                 is_dead() const;
+    bool                 is_dead() const;
 
     /// @brief Check if the solution has diverged (contains inf/nan).
-     bool                 diverges() const;
+    bool                 diverges() const;
 
     /// @brief Get the current status message.
-     const std::string&   message() const;
+    const std::string&   message() const;
 
     /**
      * @brief Print the current solver state to stdout.
@@ -177,23 +177,23 @@ public:
     void                        show_state(int prec=8) const;
 
     /// @brief Get a State object representing the most recent computed step.
-     State<T>             new_state() const;
+    State<T>             new_state() const;
 
     /// @brief Get a State object representing the previous accepted step.
-     State<T>             old_state() const;
+    State<T>             old_state() const;
 
     /// @brief Get a State object representing the current solver position.
-     State<T>             state() const;
+    State<T>             state() const;
 
     /// @brief Get a State object representing the initial conditions.
-     State<T>             ics() const;
+    State<T>             ics() const;
 
     /**
      * @brief Validate proposed initial conditions.
      * @param t0 Initial time.
      * @param q0 Initial state vector.
      * @return True if the ICs are valid (finite values, finite RHS evaluation).
-     */
+    */
     bool                        validate_ics(T t0, const T* q0) const;
 
     /// @brief Get the name of the integration method (e.g., "RK45").
@@ -204,14 +204,20 @@ public:
      * @param[out] result Output array for interpolated state (size Nsys).
      * @param[in]  t      Time to interpolate at (must be in [t_old, t_new]).
      * @throws std::runtime_error If t is outside the valid interpolation range.
-     */
-     void                 interp(T* result, const T& t) const;
+    */
+    void                 interp(T* result, const T& t) const;
 
     /**
-        * @brief Get the number of RHS function evaluations performed so far.
-        * @return Total count of RHS evaluations. User calls to Rhs() do NOT increment this counter.
+     * @brief Get the number of RHS function evaluations performed so far.
+     * @return Total count of RHS evaluations. User calls to Rhs() do NOT increment this counter.
     */
-     size_t               n_evals_rhs() const;
+    size_t               n_evals_rhs() const;
+
+    /**
+     * @brief Get the number of Jacobian evaluations performed so far.
+     * @return Total count of Jacobian evaluations. User calls to Jac() do NOT increment this counter.
+    */
+    size_t               n_evals_jac() const;
 
     /**
      * @brief Compute an appropriate initial step size.

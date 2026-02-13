@@ -138,7 +138,7 @@ class VariationalSolver(OdeSolver):
     OdeSolver : Base class for step-by-step ODE integration
     """
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
         ...
 
     @property
@@ -279,7 +279,7 @@ class VariationalLowLevelODE(LowLevelODE):
     >>> lyap_exp = ode.lyap[-1]  # Final Lyapunov exponent estimate
     """
 
-    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-12, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
+    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
         ...
 
     @property

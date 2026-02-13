@@ -23,7 +23,7 @@ OdeResult<T> SampledVectorField<T, NDIM>::streamline(const T* x0, T length, T rt
     direction: +1 forward, -1 backward
     */
 
-    ODE<T> ode(OdeData<Func<T>, void>{.rhs=ode_func, .obj=this}, 0, x0, NDIM, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
+    ODE<T> ode(OdeData<Func<T>, void>{.rhs=ode_func, .obj=this}, 0, x0, this->ndim(), rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
 
     return ode.integrate(length, t_eval);
 }

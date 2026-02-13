@@ -25,6 +25,7 @@ py::class_<PySolver>(m, "OdeSolver")
     .def_property_readonly("is_dead", &PySolver::is_dead)
     .def_property_readonly("Nsys", &PySolver::Nsys)
     .def_property_readonly("n_evals_rhs", &PySolver::n_evals_rhs)
+    .def_property_readonly("n_evals_jac", &PySolver::n_evals_jac)
     .def_property_readonly("status", &PySolver::message)
     .def_property_readonly("at_event", &PySolver::py_at_event)
     .def("event_located", &PySolver::py_event_located, py::arg("event"))
@@ -33,12 +34,16 @@ py::class_<PySolver>(m, "OdeSolver")
     )
     .def("rhs", &PySolver::py_rhs, py::arg("t"), py::arg("q"))
     .def("jac", &PySolver::py_jac, py::arg("t"), py::arg("q"))
+    .def("timeit_rhs", &PySolver::timeit_rhs, py::arg("t"), py::arg("q"))
+    .def("timeit_jac", &PySolver::timeit_jac, py::arg("t"), py::arg("q"))
     .def("advance", &PySolver::advance)
     .def("advance_to_event", &PySolver::advance_to_event)
-    .def("advance_until", &PySolver::advance_until, py::arg("t"))
+    .def("advance_until", &PySolver::advance_until, py::arg("t"), py::arg("observer")=py::none())
     .def("reset", &PySolver::reset)
     .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("stepsize")=0, py::arg("direction")=0)
     .def("resume", &PySolver::resume)
+    .def("stop", &PySolver::stop, py::arg("reason"))
+    .def("kill", &PySolver::kill, py::arg("reason"))
     .def("copy", &PySolver::copy)
     .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
 
@@ -49,7 +54,7 @@ py::class_<PyRK23, PySolver>(m, "RK23")
         py::arg("t0"),
         py::arg("q0"),
         py::kw_only(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -66,7 +71,7 @@ py::class_<PyRK45, PySolver>(m, "RK45")
         py::arg("t0"),
         py::arg("q0"),
         py::kw_only(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -83,7 +88,7 @@ py::class_<PyDOP853, PySolver>(m, "DOP853")
         py::arg("t0"),
         py::arg("q0"),
         py::kw_only(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -101,7 +106,7 @@ py::class_<PyBDF, PySolver>(m, "BDF")
         py::arg("q0"),
         py::kw_only(),
         py::arg("jac")=py::none(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
@@ -119,7 +124,7 @@ py::class_<PyRK4, PySolver>(m, "RK4")
         py::arg("t0"),
         py::arg("q0"),
         py::kw_only(),
-        py::arg("rtol")=1e-12,
+        py::arg("rtol")=1e-6,
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),

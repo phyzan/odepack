@@ -6,6 +6,8 @@ option(DEBUG "Enable debug build" OFF)
 option(RK4_DENSE "Enable accurate RK4 dense output" OFF) #by default Hermite interpolation is used
 option(BUILD_PYTHON "Build Python extension module" OFF)
 option(NO_ODE_WARN "Disable ODE warnings" OFF)
+option(ODEPACK_NATIVE_ARCH "Enable -march=native for local builds" OFF)
+option(ODEPACK_STRIP_INSTALL "Strip binaries at install time" OFF)
 
 set(CMAKE_CXX_COMPILER "g++")
 
@@ -26,6 +28,16 @@ message(STATUS "Using g++ version: ${CMAKE_CXX_COMPILER_VERSION}")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Prefer standard CMake build type semantics for single-config generators.
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+
+# Reduce exported symbol surface and inline symbol leakage in release-oriented builds.
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 # Find Python and pybind11
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
@@ -48,10 +60,15 @@ set(COMMON_COMPILE_OPTIONS
     -ftemplate-backtrace-limit=0
     -Wno-unused-parameter
     -fopenmp
-    -march=x86-64
     -Wno-attributes
     -DPYBIND11_DETAILED_ERROR_MESSAGES
 )
+
+if(ODEPACK_NATIVE_ARCH)
+    list(APPEND COMMON_COMPILE_OPTIONS -march=native)
+else()
+    list(APPEND COMMON_COMPILE_OPTIONS -march=x86-64)
+endif()
 
 if(MPREAL)
     list(APPEND COMMON_COMPILE_OPTIONS -DMPREAL)
@@ -61,10 +78,49 @@ if(RK4_DENSE)
 endif()
 
 # Add optimization and debug flags based on debug mode
-if(DEBUG)
-    list(APPEND COMMON_COMPILE_OPTIONS -O0 -g -ggdb3 -fno-omit-frame-pointer)
+set(ODEPACK_DEBUG_BUILD OFF)
+if(DEBUG OR CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ODEPACK_DEBUG_BUILD ON)
+endif()
+
+set(COMMON_LINK_OPTIONS)
+
+if(ODEPACK_DEBUG_BUILD)
+    list(APPEND COMMON_COMPILE_OPTIONS
+        -O0
+        -g
+        -ggdb3
+        -fno-omit-frame-pointer
+        -UNDEBUG
+    )
 else()
-    list(APPEND COMMON_COMPILE_OPTIONS -O3 -DNDEBUG -fno-math-errno -fno-trapping-math)
+    list(APPEND COMMON_COMPILE_OPTIONS
+        -O3
+        -DNDEBUG
+        -g0
+        -fno-math-errno
+        -fno-trapping-math
+        -ffunction-sections
+        -fdata-sections
+    )
+    list(APPEND COMMON_LINK_OPTIONS
+        -Wl,--gc-sections
+        -Wl,--as-needed
+    )
+
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ODEPACK_IPO_SUPPORTED OUTPUT ODEPACK_IPO_ERROR)
+    if(ODEPACK_IPO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    else()
+        message(STATUS "IPO/LTO not enabled: ${ODEPACK_IPO_ERROR}")
+    endif()
+endif()
+
+if(ODEPACK_DEBUG_BUILD)
+    message(STATUS "ODEPACK_DEBUG_BUILD=ON (asserts enabled)")
+else()
+    message(STATUS "ODEPACK_DEBUG_BUILD=OFF (asserts disabled via NDEBUG)")
 endif()
 
 if(NO_ODE_WARN)
@@ -123,11 +179,18 @@ function(configure_odepack_lib target_name)
         target_link_libraries(${target_name} PUBLIC OpenMP::OpenMP_CXX)
     endif()
     target_compile_options(${target_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
+    if(COMMON_LINK_OPTIONS)
+        target_link_options(${target_name} PRIVATE ${COMMON_LINK_OPTIONS})
+    endif()
     set_target_properties(${target_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
     if(MPREAL)
         target_link_libraries(${target_name} PUBLIC ${MPFR_LIBRARY} ${GMP_LIBRARY})
     endif()
 endfunction()
+
+if(ODEPACK_STRIP_INSTALL)
+    set(CMAKE_INSTALL_DO_STRIP TRUE)
+endif()
 
 # 0. odepack_pytools: Shared Python utilities (DtypeDispatcher, etc.) - no dependencies
 add_library(odepack_pytools STATIC

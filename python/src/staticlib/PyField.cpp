@@ -117,6 +117,8 @@ template int PyDelaunay<N>::py_nsimplices() const;\
 template int PyDelaunay<N>::py_find_simplex(const py::array_t<double>&) const;\
 template py::object PyDelaunay<N>::py_get_simplex(const py::array_t<double>& point) const;\
 template py::object PyDelaunay<N>::py_get_simplices() const;\
+template py::dict PyDelaunay<N>::py_get_state() const;\
+template PyDelaunay<N> PyDelaunay<N>::py_set_state(const py::dict& state);\
 
 INST_PY_TRI(0)
 INST_PY_TRI(1)

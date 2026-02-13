@@ -36,7 +36,7 @@ template<size_t NDIM>
 PyDelaunay<NDIM>::PyDelaunay(const py::array_t<double>& x) : PyDelaunay(parse_args(x), x) {}
 
 template<size_t NDIM>
-PyDelaunay<NDIM>::PyDelaunay(std::nullptr_t, const py::array_t<double>& x) : Base(x) {}
+PyDelaunay<NDIM>::PyDelaunay(std::nullptr_t, const py::array_t<double>& x) : Base(x.data(), x.shape(0), (x.ndim() == 1 ? 1 : x.shape(1))) {}
 
 template<size_t NDIM>
 py::object PyDelaunay<NDIM>::py_points() const{
@@ -100,6 +100,58 @@ std::nullptr_t PyDelaunay<NDIM>::parse_args(const py::array_t<double>& x){
     }
     return nullptr;
 }
+
+template<size_t NDIM>
+py::dict PyDelaunay<NDIM>::py_get_state() const{
+    const auto& points = Base::get_points();
+    const auto& simplices = Base::get_simplices();
+    const auto& neighbors = Base::get_neighbors();
+    const auto& v0 = Base::get_v0();
+    const auto& invT = Base::get_invT();
+
+    py::dict state;
+    state["points"] = py::cast(points);
+    state["simplices"] = py::cast(simplices);
+    state["neighbors"] = py::cast(neighbors);
+    state["v0"] = py::cast(v0);
+    state["invT"] = py::cast(invT);
+    return state;
+}
+
+template<size_t NDIM>
+PyDelaunay<NDIM> PyDelaunay<NDIM>::py_set_state(const py::dict& state){
+    try {
+        //Array2D<double, 0, NDIM>
+        const auto& py_points = state["points"].cast<py::array_t<double>>(); 
+
+        // Array2D<int, 0, Base::DIM_SPX>
+        const auto& py_simplices = state["simplices"].cast<py::array_t<int>>();
+
+        // Array2D<int, 0, Base::DIM_SPX>
+        const auto& py_neighbors = state["neighbors"].cast<py::array_t<int>>();
+
+        // Array2D<double, 0, NDIM>
+        const auto& py_v0 = state["v0"].cast<py::array_t<double>>();
+
+        //Array3D<double, 0, NDIM, NDIM>
+        const auto& py_invT = state["invT"].cast<py::array_t<double>>();
+
+        PyDelaunay<NDIM> obj;
+        
+        View2D<double, 0, NDIM> points(py_points.data(), py_points.shape(), py_points.ndim());
+        View2D<int, 0, Base::DIM_SPX> simplices(py_simplices.data(), py_simplices.shape(), py_simplices.ndim());
+        View2D<int, 0, Base::DIM_SPX> neighbors(py_neighbors.data(), py_neighbors.shape(), py_neighbors.ndim());
+        View2D<double, 0, NDIM> v0(py_v0.data(), py_v0.shape(), py_v0.ndim());
+        View3D<double, 0, NDIM, NDIM> invT(py_invT.data(), py_invT.shape(), py_invT.ndim());
+
+        
+        obj.set_state(points, simplices, neighbors, v0, invT);
+        return obj;
+    }catch (const py::cast_error &e) {
+        throw py::value_error(e.what());
+    }
+}
+
 
 
 
@@ -281,7 +333,7 @@ py::object PyVecField<NDIM>::py_streamline(const py::array_t<double>& q0, double
     try{
         double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
         auto* result = new OdeResult<double>(this->streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>()));
-        PyOdeResult py_res(result, {NDIM}, DTYPE_MAP.at("double"));
+        PyOdeResult py_res(result, {this->ndim()}, DTYPE_MAP.at("double"));
         return py::cast(py_res);
     } catch (const std::runtime_error& e){
         throw py::value_error(e.what());
@@ -292,7 +344,7 @@ template<size_t NDIM>
 py::object PyVecField<NDIM>::py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const{
     if (direction != 1 && direction != -1){
         throw py::value_error("Direction must be either 1 (forward) or -1 (backward)");
-    }else if (q0.ndim() != 1 || q0.shape(0) != this->ndim()){
+    }else if (q0.ndim() != 1 || size_t(q0.shape(0)) != this->ndim()){
         throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(this->ndim()));
     }
 

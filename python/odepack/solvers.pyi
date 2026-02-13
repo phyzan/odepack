@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Iterable
 from .events import *
+from typing import Callable
 
 
 class LowLevelFunction:
@@ -216,6 +217,18 @@ class OdeSolver:
         ...
 
     @property
+    def n_evals_jac(self)->int:
+        """
+        Get the number of Jacobian function evaluations performed so far.
+
+        Returns
+        -------
+        int
+            Total count of Jacobian evaluations.
+        """
+        ...
+
+    @property
     def at_event(self)->bool:
         """
         Check if the solver is currently at any event time.
@@ -323,6 +336,46 @@ class OdeSolver:
         """
         ...
 
+    def timeit_rhs(self, t: float, q: np.ndarray)->tuple[float, np.ndarray]:
+        """
+        Time the execution of the RHS function.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the RHS.
+
+        q : np.ndarray
+            State vector at which to evaluate the RHS.
+
+        Returns
+        -------
+        tuple : (float, np.ndarray)
+            - Time in milliseconds for the RHS evaluation.
+            - The computed right-hand side values f(t, q).
+        """
+        ...
+
+    def timeit_jac(self, t: float, q: np.ndarray)->tuple[float, np.ndarray]:
+        """
+        Time the execution of the Jacobian function.
+
+        Parameters
+        ----------
+        t : float
+            Time at which to evaluate the Jacobian.
+
+        q : np.ndarray
+            State vector at which to evaluate the Jacobian.
+
+        Returns
+        -------
+        tuple : (float, np.ndarray)
+            - Time in milliseconds for the Jacobian evaluation.
+            - The computed Jacobian matrix J(t, q).
+        """
+        ...
+
     def advance_to_event(self)->bool:
         """
         Advance the solver until the next event occurrence.
@@ -343,7 +396,7 @@ class OdeSolver:
         This requires events to be registered in the solver at initialization.
         """
 
-    def advance_until(self, t: float)->bool:
+    def advance_until(self, t: float, observer: Callable = None)->bool:
         """
         Advance the solver until precisely reaching a specified time.
         If the target time t falls between steps, the solver will perform
@@ -357,6 +410,7 @@ class OdeSolver:
         ----------
         t : float
             Target time to advance to.
+        observer : Callable function that takes no arguments, that is called after each successful step until the target time is reached. This can be used to implement custom progress monitoring or logging during the advancement process. Default is None (no observer).
 
         Returns
         -------
@@ -388,6 +442,30 @@ class OdeSolver:
             False if the solver is not in a stoppable state (e.g., dead).
             If False, call message to see the reason.
         """
+
+    def stop(reason: str)->None:
+        """
+        Stops the solver, preventing any further advancement unless resume() is called.
+
+        Parameters
+        ----------
+        reason : str
+            Message to store as the solver's status.
+        """
+        ...
+
+    def kill(reason: str)->None:
+        """
+        Immediately terminates the solver, marking it as dead.
+        No further advancement is possible after this call, unless
+        the solver is reset.
+
+        Parameters
+        ----------
+        reason : str
+            Message to store as the solver's status.
+        """
+        ...
 
     def set_ics(self, t0: float, q0: np.ndarray, stepsize: float = 0., direction: int = 0)->bool:
         """
@@ -502,7 +580,7 @@ class RK23(OdeSolver):
     ...         print(f"t={solver.t:.3f}, q={solver.q}")
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -566,7 +644,7 @@ class RK45(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -630,7 +708,7 @@ class DOP853(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -710,7 +788,7 @@ class BDF(OdeSolver):
     ...     solver.advance()
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Func = None, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 
@@ -763,7 +841,7 @@ class RK4(OdeSolver):
         Numerical precision. One of "double" (default), "float", "long double", "mpreal".
     """
 
-    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-12, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
+    def __init__(self, f: Func, t0: float, q0: np.ndarray, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), scalar_type: str = "double"):
         ...
 
 

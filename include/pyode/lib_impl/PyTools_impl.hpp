@@ -18,7 +18,7 @@ namespace ode{
 namespace py = pybind11;
 
 template<typename T, typename Container>
-Container toCPP_Array(const pybind11::iterable &obj) {
+Container toCPP_Array(const py::iterable &obj) {
 
     // Get Python iterable length if possible (optional, for efficiency)
     size_t len = py::len(obj);
@@ -34,7 +34,6 @@ Container toCPP_Array(const pybind11::iterable &obj) {
 
     return res;
 }
-
 
 template<typename T>
 StepSequence<T> to_step_sequence(const py::object& t_eval){

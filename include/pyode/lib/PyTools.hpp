@@ -123,6 +123,17 @@ py::array_t<T> array(T* data, const std::vector<py::ssize_t>& shape);
 std::vector<py::ssize_t> shape(const py::object& obj);
 
 template<typename T>
+INLINE void pass_values(T* out, const py::iterable& obj, size_t n){
+    if (py::len(obj) != n){
+        throw py::value_error("Expected iterable of length " + std::to_string(n));
+    }
+    for (py::handle item : obj){
+        *out = py::cast<T>(item);
+        out++;
+    }
+}
+
+template<typename T>
 inline T open_capsule(const py::capsule& f){
     void* ptr = f.get_pointer();
     if (ptr == nullptr){

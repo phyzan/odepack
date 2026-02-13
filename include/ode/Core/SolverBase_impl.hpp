@@ -4,18 +4,23 @@
 #include "SolverBase.hpp"
 #include "../Tools_impl.hpp"
 
+#define NOW \
+std::chrono::high_resolution_clock::now()
+
+#define DURATION(T1, T2) std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(T2 - T1).count()
+
 namespace ode{
 
 
 // ODE PROPERTIES
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Rhs(T* dq_dt, const T& t, const T* q) const{
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Rhs(T* dq_dt, const T& t, const T* q) const{
     _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
     this->Rhs(dq_dt, t, q);
     this->_n_evals_rhs++;
 }
@@ -199,8 +204,13 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::n_evals_rhs() const{
+size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::n_evals_rhs() const{
     return _n_evals_rhs;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::n_evals_jac() const{
+    return _n_evals_jac;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

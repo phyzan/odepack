@@ -17,25 +17,34 @@ namespace ode{
 template<size_t NDIM>
 class DelaunayTri{
 
+    //TODO: Delete copy and assignment. This object is heavy.
+    // Implement shared_ptr
+
     static constexpr double EPS = std::numeric_limits<double>::epsilon() * 100;
 
     static constexpr Allocation SPX_ALLOC = NDIM == 0 ? Allocation::Heap : Allocation::Stack;
 
 public:
 
-    using PointStorage = Array2D<double, 0, NDIM>;
     static constexpr int DIM_SPX = (NDIM == 0 ? 0 : NDIM+1);
 
     DEFAULT_RULE_OF_FOUR(DelaunayTri)
 
-    template<typename PointsArrayType>
-    DelaunayTri(const PointsArrayType& points);
+    DelaunayTri(const double* points, size_t n_points, size_t ndim);
+
+    // Member variable accessors
+    const Array2D<double, 0, NDIM>& get_points() const;
+    const Array2D<int, 0, DIM_SPX>& get_simplices() const;
+    const Array2D<int, 0, DIM_SPX>& get_neighbors() const;
+    const Array2D<double, 0, NDIM>& get_v0() const;
+    const Array3D<double, 0, NDIM, NDIM>& get_invT() const;
+    
 
     int                 ndim() const;
     int                 npoints() const;
-    const PointStorage& get_points() const;
+    
     int                 nsimplices() const;
-    const Array2D<int, 0, DIM_SPX>& get_simplices() const;
+    
     const int*          get_simplex(int simplex_idx) const; //ndim + 1 elements
     const int*          get_neighbors(int simplex_idx) const; // ndim + 1 elements, -1 = no neighbor (boundary)
     int                 find_simplex(const double* point) const; // array of ndim elements, returns simplex index or -1 if not found
@@ -49,6 +58,34 @@ public:
 
     // auxiliary function for interpolation, used when the caller already has the barycentric coordinates and simplex index (e.g. for multiple fields)
     double              weighted_field(const double* field, const double* bary, const int* simplex) const; // res = bary[i] * field[simplex[i]], i=0..ndim (ndim+1 terms)
+
+protected:
+
+    // Allowes derived classes to set a state into the object
+    // wihtout having to recompute the triangulation. Used for pickling in Python wrapper.
+    DelaunayTri() = default;
+
+    void set_state(const View2D<double, 0, NDIM>& points, const View2D<int, 0, DIM_SPX>& simplices, const View2D<int, 0, DIM_SPX>& neighbors, const View2D<double, 0, NDIM>& v0, const View3D<double, 0, NDIM, NDIM>& invT){
+        points_.resize(points.shape(), points.ndim());
+        copy_array(points_.data(), points.data(), points.size());
+
+        simplices_.resize(simplices.shape(), simplices.ndim());
+        copy_array(simplices_.data(), simplices.data(), simplices.size());
+
+        neighbors_.resize(neighbors.shape(), neighbors.ndim());
+        copy_array(neighbors_.data(), neighbors.data(), neighbors.size());
+
+        v0_.resize(v0.shape(), v0.ndim());
+        copy_array(v0_.data(), v0.data(), v0.size());
+        
+        invT_.resize(invT.shape(), invT.ndim());
+        copy_array(invT_.data(), invT.data(), invT.size());
+    }
+
+
+
+    // ============================================================================
+    // Qhull-based Delaunay triangulation - O(n log n)
 
 private:
 
@@ -65,7 +102,7 @@ private:
 
     void compute_delaunay();
 
-    PointStorage                    points_;    // (npoints, ndim)
+    Array2D<double, 0, NDIM>        points_;    // (npoints, ndim)
     Array2D<int, 0, DIM_SPX>        simplices_; // (nsimplices, ndim+1)
     Array2D<int, 0, DIM_SPX>        neighbors_; // (nsimplices, ndim+1), -1 = boundary
     Array2D<double, 0, NDIM>        v0_;        // (nsimplices, ndim)

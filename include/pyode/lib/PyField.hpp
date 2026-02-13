@@ -76,6 +76,7 @@ public:
     virtual int py_find_simplex(const py::array_t<double>& point) const = 0;
     virtual py::object py_get_simplices() const = 0;
     virtual py::object py_get_simplex(const py::array_t<double>& point) const = 0;
+    virtual py::dict py_get_state() const = 0;
 };
 
 
@@ -100,11 +101,20 @@ public:
     
     // array of shape (nsimplices, ndim+1) containing the indices of the points that form each simplex
     py::object py_get_simplices() const override;
+
+    // ================ Pickling ===================
+    py::dict    py_get_state() const override;
+    
+    static PyDelaunay py_set_state(const py::dict& state);
+    
+    // =============================================
     
 
 private:
 
     PyDelaunay(std::nullptr_t, const py::array_t<double>& x);
+
+    PyDelaunay() = default; //for pickling, not called from outside
 
     static std::nullptr_t parse_args(const py::array_t<double>& x);
 

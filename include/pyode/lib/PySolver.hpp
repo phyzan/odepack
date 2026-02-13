@@ -55,17 +55,23 @@ struct PySolver : DtypeDispatcher {
 
     py::object          n_evals_rhs() const;
 
+    py::object          n_evals_jac() const;
+
     void                show_state(int digits) const;
 
     py::object          py_rhs(const py::object& t, const py::iterable& py_q) const;
 
     py::object          py_jac(const py::object& t, const py::iterable& py_q) const;
 
+    py::tuple           timeit_rhs(const py::object& t, const py::iterable& py_q) const;
+
+    py::tuple           timeit_jac(const py::object& t, const py::iterable& py_q) const;
+
     py::object          advance();
 
     py::object          advance_to_event();
 
-    py::object          advance_until(const py::object& time);
+    py::object          advance_until(const py::object& time, const py::object& observer);
 
     virtual py::object  copy() const = 0;
 
@@ -74,6 +80,10 @@ struct PySolver : DtypeDispatcher {
     bool                set_ics(const py::object& t0, const py::iterable& py_q0, const py::object& dt, int direction);
 
     bool                resume();
+
+    void                stop(const py::str& reason);
+
+    void                kill(const py::str& reason);
 
     py::str             message() const;       
 
