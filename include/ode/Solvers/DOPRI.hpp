@@ -20,11 +20,11 @@ protected:
     // ================ STATIC OVERRIDES ========================
     static constexpr bool   IS_IMPLICIT = false;
 
-    void adapt_impl(T* res);
+    StepResult  adapt_impl(T* res);
 
-    void reset_impl();
+    void        reset_impl();
 
-    void re_adjust_impl(const T* new_vector);
+    void        re_adjust_impl(const T* new_vector);
 
     // =========================================================
 

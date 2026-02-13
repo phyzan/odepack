@@ -210,6 +210,16 @@ py::object PySolver::advance() {
     )
 }
 
+py::tuple PySolver::timeit_step() {
+    return DISPATCH(py::tuple,
+        auto start = NOW;
+        bool success = cast<T>()->advance();
+        auto end = NOW;
+        std::chrono::duration<double, std::milli> duration = end - start;
+        return py::make_tuple(py::cast(duration.count()), py::cast(success));
+    )
+}
+
 py::object PySolver::advance_to_event() {
     return DISPATCH(py::object,
         return py::cast(cast<T>()->advance_to_event());

@@ -518,8 +518,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state){
-    THIS->adapt_impl(state);
+StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state){
+    return THIS->adapt_impl(state);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -590,8 +590,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
  bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
     if (_true_state_idx == _new_state_idx){
-        this->adapt_impl(this->aux_state_ptr());
-        if (validate_it(this->aux_state_ptr())){
+        StepResult result = this->adapt_impl(this->aux_state_ptr());
+        if (validate_it(result, this->aux_state_ptr())){
             register_states();
             this->_Nupdates++;
             return true;
@@ -789,22 +789,30 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::register_states(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(const T* state){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(StepResult result, const T* state){
     bool success = true;
-    if (this->is_dead()){
-        // The derived adapt_impl may kill the solver under the conditions that it deems so.
-        success = false;
+    switch (result){
+        case StepResult::Success:
+            break;
+        case StepResult::INF_ERROR:
+            this->set_message("ODE solution diverges (inf or nan encountered)");
+            this->_diverges = true;
+            success = false;
+            break;
+        case StepResult::TINY_STEP_ERROR:
+            this->kill("Required stepsize was smaller than machine precision");
+            success = false;
+            break;
+        case StepResult::MIN_STEP_ERROR:
+            this->kill("The next time step is smaller than the minimum allowed step");
+            success = false;
+            break;
+        case StepResult::MAX_STEP_ERROR:
+            this->kill("The next time step is larger than the maximum allowed step");
+            success = false;
+            break;
     }
-    else if (!all_are_finite(state+2, this->Nsys())){
-        this->kill("Ode solution diverges");
-        this->_diverges = true;
-        success = false;
-    }
-    else if (state[1] <= MIN_STEP){
-        this->kill("Required stepsize was smaller than machine precision");
-        success = false;
-    }
-    else if (state[0] == this->t_new()){
+    if (success && (state[0] == this->t_new())){
         this->kill("The next time step is identical to the previous one, possibly due to machine rounding error");
         success = false;
     }

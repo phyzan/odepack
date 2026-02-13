@@ -6,6 +6,7 @@ option(DEBUG "Enable debug build" OFF)
 option(RK4_DENSE "Enable accurate RK4 dense output" OFF) #by default Hermite interpolation is used
 option(BUILD_PYTHON "Build Python extension module" OFF)
 option(NO_ODE_WARN "Disable ODE warnings" OFF)
+option(NO_NAN_CHECK "Disable NaN/inf checks for performance (not recommended)" OFF)
 option(ODEPACK_NATIVE_ARCH "Enable -march=native for local builds" OFF)
 option(ODEPACK_STRIP_INSTALL "Strip binaries at install time" OFF)
 
@@ -72,6 +73,9 @@ endif()
 
 if(MPREAL)
     list(APPEND COMMON_COMPILE_OPTIONS -DMPREAL)
+endif()
+if(NO_NAN_CHECK)
+    list(APPEND COMMON_COMPILE_OPTIONS -DNO_NAN_CHECK)
 endif()
 if(RK4_DENSE)
     list(APPEND COMMON_COMPILE_OPTIONS -DRK4_DENSE)

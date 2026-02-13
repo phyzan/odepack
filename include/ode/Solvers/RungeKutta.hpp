@@ -76,15 +76,15 @@ private:
     static constexpr int            ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
 
-     void                 adapt_impl(T* res);
+    StepResult  adapt_impl(T* res);
 
-     void                 interp_impl(T* result, const T& t) const;
+    void        interp_impl(T* result, const T& t) const;
 
-     void                 reset_impl();
+    void        reset_impl();
 
-     void                 re_adjust_impl(const T* new_vector);
+    void        re_adjust_impl(const T* new_vector);
 
-    void set_interp_data() const;
+    void        set_interp_data() const;
 
     // 4 stages of size N, plus one auxiliary array. if RK4_DENSE, K has 4 extra stages for dense output. So visually K = [k1, k2, k3, k4, aux | k1, k2, l3, k4 ]
 #ifdef RK4_DENSE

@@ -348,14 +348,14 @@ protected:
      * @return Unique pointer to an interpolator object.
      * @note Must be implemented by derived class.
      */
-     VirtualInterp<T, N>  state_interpolator(int bdr1, int bdr2) const;
+    VirtualInterp<T, N>     state_interpolator(int bdr1, int bdr2) const;
 
     /**
      * @brief Perform one adaptive integration step.
      * @param[out] state Output array for the new state [t, h, q...] (size Nsys+2).
      * @note Must be implemented by derived class.
      */
-     void                 adapt_impl(T* state);
+    StepResult              adapt_impl(T* state);
 
     /**
      * @brief Interpolate solution at time t using method-specific interpolation.
@@ -363,7 +363,7 @@ protected:
      * @param[in]  t      Time to interpolate at.
      * @note Must be implemented by derived class.
      */
-     void                 interp_impl(T* result, const T& t) const;
+    void                    interp_impl(T* result, const T& t) const;
     // ================================================================================
 
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
@@ -489,7 +489,7 @@ private:
     const T*                aux_state_ptr() const;
     T*                      aux_state_ptr();
     void                    register_states();
-    bool                    validate_it(const T* state);
+    bool                    validate_it(StepResult result, const T* state);
     void                    update_state(const T& time);
     void                    move_state(const T& time);
     void                    set_state(const T& time, T* state);

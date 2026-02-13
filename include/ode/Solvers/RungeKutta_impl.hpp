@@ -100,7 +100,7 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void RK4<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult RK4<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     // standard Runge-Kutta-4 with fixed step size
 
     const T* state = this->new_state_ptr();
@@ -117,6 +117,11 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
     };
 
     rk4_step(rhs_caller, y_new, t, h, y, K.data(), n, K.data() + 4*n);
+    if (!all_are_finite(y_new, n)){
+        return StepResult::INF_ERROR;
+    }else{
+        return StepResult::Success;
+    }
 
 }
 

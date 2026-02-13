@@ -252,7 +252,7 @@ void BDF<T, N, SP, RhsType, JacType>::_reset_impl_alone(){
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
@@ -290,15 +290,17 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
 
 
     while(!step_accepted){
+
+        // Checks go at the top so that continue statements inside the loop will still trigger them.
         if (habs < h_min){
-            this->kill("The stepsize for the BDF method dropped below min_step");
-            return;
-        }
-        else if (habs > max_step){
+            return StepResult::MIN_STEP_ERROR; // TODO: The algorithm does not work properly when we go below min_step.
+        }else if (habs > max_step){
             _change_D(max_step/habs);
             habs = max_step;
             interp_idx = _idx_D;
-            return;
+            return StepResult::Success; // The step is acceptet, but the stepsize is limited by max_step.
+        }else if (habs < this->MIN_STEP){
+            return StepResult::TINY_STEP_ERROR;
         }
 
         t_new = t + habs * this->direction();
@@ -328,6 +330,9 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
             }
 
             conv_result = _solve_bdf_system(y_new, _ypred.data(), _d, t_new, c, _psi, _LU, _scale);
+            if (conv_result.flag != StepResult::Success){
+                return conv_result.flag;
+            }
             converged = conv_result.converged;
 
             if (!converged){
@@ -382,7 +387,7 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
 
     if (_n_eq_steps < _order + 1){
         interp_idx = _idx_D;
-        return;
+        return StepResult::Success;
     }
 
     if (_order > 1){
@@ -423,6 +428,7 @@ void BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     _change_D(factor);
     _valid_LU = false;
     interp_idx = _idx_D;
+    return StepResult::Success;
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -445,11 +451,9 @@ NewtConv BDF<T, N, SP, RhsType, JacType>::_solve_bdf_system(T* y, const T* y_pre
     T rate = 0;
     bool converged = false;
     size_t j=0;
+    StepResult flag = StepResult::Success;
     for (size_t k=0; k<NEWTON_MAXITER; k++){
         this->rhs(_f.data(), t_new, y);
-        if (!all_are_finite(_f.data(), n)){
-            break;
-        }
 
         #pragma omp simd
         for (size_t i=0; i<n; i++){
@@ -475,7 +479,10 @@ NewtConv BDF<T, N, SP, RhsType, JacType>::_solve_bdf_system(T* y, const T* y_pre
             d[i] += _dy[i];
         }
 
-        if (dy_norm == 0 || ((rate != 0) && (rate * dy_norm < _newton_tol * (1-rate)))){
+        if (!all_are_finite(y, n)){
+            flag = StepResult::INF_ERROR;
+            break;
+        }else if (dy_norm == 0 || ((rate != 0) && (rate * dy_norm < _newton_tol * (1-rate)))){
             converged = true;
             break;
         }
@@ -484,7 +491,7 @@ NewtConv BDF<T, N, SP, RhsType, JacType>::_solve_bdf_system(T* y, const T* y_pre
         j++;
     }
 
-    return {.converged = converged, .n_iter = j+1};
+    return {.converged = converged, .n_iter = j+1, .flag = flag};
 
 }
 

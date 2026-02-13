@@ -20,7 +20,7 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void Euler<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult Euler<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     State<T> old = this->new_state();
     T& t_new = res[0];
     T& habs = res[1];
@@ -34,6 +34,11 @@ void Euler<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
     for (size_t i=0; i<this->Nsys(); i++){
         // y2 = y1 + f*dt, f = dy/dt
         vec[i] = old.vector()[i] + vec[i]*stepsize;
+    }
+    if (!all_are_finite(vec, this->Nsys())){
+        return StepResult::INF_ERROR;
+    }else{
+        return StepResult::Success;
     }
 }
 

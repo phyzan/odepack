@@ -317,16 +317,6 @@ std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size) {
     return std::vector<T>(x.begin() + start, x.begin() + start + size);
 }
 
-template<typename T>
-bool all_are_finite(const T* data, size_t n){
-    for (size_t i=0; i<n; i++){
-        if (!is_finite(data[i])){
-            return false;
-        }
-    }
-    return true;
-}
-
 
 template<typename T>
 bool allEqual(const T* a, const T* b, size_t n){

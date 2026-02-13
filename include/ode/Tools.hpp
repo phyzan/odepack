@@ -243,6 +243,14 @@ private:
     long int _size = -1;
 };
 
+enum class StepResult : std::uint8_t {
+    Success, // Successful step
+    INF_ERROR, // Non-finite value encountered (e.g., NaN or Inf)
+    TINY_STEP_ERROR, // Step size became too small (below machine epsilon)
+    MIN_STEP_ERROR, // Step size reached minimum set by user
+    MAX_STEP_ERROR, // Step size reached maximum set by user
+};
+
 
 class Clock{
 
@@ -309,11 +317,13 @@ bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
 
 template <typename T>
 inline bool is_finite(const T& value) {
+#ifndef NO_NAN_CHECK
     if constexpr (std::is_floating_point_v<T>) {
         #ifdef __FAST_MATH__
         // When -ffast-math is enabled, std::isfinite may not work correctly
         // Use range check instead: value is finite if it's within representable range
-        return (value < std::numeric_limits<T>::max());
+        return (value >= std::numeric_limits<T>::lowest() &&
+                value <= std::numeric_limits<T>::max());
         #else
         return std::isfinite(value);
         #endif
@@ -323,7 +333,11 @@ inline bool is_finite(const T& value) {
         static_assert(std::is_arithmetic_v<T>, "T must be arithmetic");
         return false;
     }
+#else
+    return true; // If NO_NAN_CHECK is defined, assume all values are finite
+#endif
 }
+
 
 #ifdef MPREAL
 template <>
@@ -359,7 +373,16 @@ template<typename T>
 std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
 
 template<typename T>
-bool all_are_finite(const T* data, size_t n);
+INLINE bool all_are_finite(const T* data, size_t n){
+#ifndef NO_NAN_CHECK
+    for (size_t i=0; i<n; i++){
+        if (!is_finite(data[i])){
+            return false;
+        }
+    }
+#endif
+    return true;
+}
 
 template<typename T>
 bool allEqual(const T* a, const T* b, size_t n);

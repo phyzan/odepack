@@ -113,7 +113,7 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt_impl(T* res){
     this->_mat_is_set = false;
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
@@ -144,15 +144,19 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt
                 factor = factor < 1 ? factor : 1;
             }
             step_accepted = true;
-        }
-        else{
+        }else{
             factor = std::max(this->MIN_FACTOR, _factor);
             step_rejected = true;
         }
-        if (!resize_step(factor, habs, h_min, max_step) || habs < this->MIN_STEP){
+        if (!all_are_finite(q_new, n)){
+            return StepResult::INF_ERROR;
+        }else if (habs < this->MIN_STEP){
+            return StepResult::TINY_STEP_ERROR;
+        }else if (!resize_step(factor, habs, h_min, max_step)){
             break;
         }
     }
+    return StepResult::Success;
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>

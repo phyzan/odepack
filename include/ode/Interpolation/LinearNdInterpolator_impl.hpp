@@ -89,12 +89,13 @@ const int* DelaunayTri<NDIM>::get_neighbors(int simplex_idx) const {
 
 template<size_t NDIM>
 int DelaunayTri<NDIM>::find_simplex(const double* point) const {
-    int num_simplices = nsimplices();
-    if (num_simplices == 0) {
+    int num_simplices = nsimplices();    
+    int nd = ndim();
+    if (num_simplices == 0 || !all_are_finite(point, nd)) {
         return -1;
     }
-    
-    int nd = ndim();
+
+
     Array1D<double, DIM_SPX, SPX_ALLOC> bary(nd + 1);
 
     // Walking algorithm: start from cached simplex and walk towards the point
@@ -159,8 +160,11 @@ int DelaunayTri<NDIM>::find_simplex(const double* point) const {
         }
 
         int next = (min_idx >= 0) ? neighbors_(s, min_idx) : -1;
-        if (next == -1 || next == s) {
-            break;
+        if (next == -1) {
+            // Hit boundary face with negative barycentric coord -> point is outside convex hull
+            return -1;
+        }else if (next == s) {
+            break;  // Degenerate case, fall back to brute force
         }
         prev = s;
         s = next;

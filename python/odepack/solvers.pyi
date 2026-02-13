@@ -281,22 +281,6 @@ class OdeSolver:
             Number of significant digits for floating-point display. Default is 8.
         """
 
-    def advance(self)->bool:
-        """
-        Advance the solver by a single adaptive time step.
-
-        Computes the next step of the integration and updates the internal state.
-        For event-free problems, this is the basic iteration method.
-
-        Returns
-        -------
-        bool
-            True if the solver successfully advanced. False if the solver could not
-            advance further (e.g., divergence detected, validation failure, or solver
-            stopped by an event/user). When False, a diagnostic message is printed
-            explaining why advancement failed.
-        """
-
     def rhs(self, t: float, q: np.ndarray)->np.ndarray:
         """
         Evaluate the right-hand side function at a given time and state.
@@ -376,6 +360,22 @@ class OdeSolver:
         """
         ...
 
+    def advance(self)->bool:
+        """
+        Advance the solver by a single adaptive time step.
+
+        Computes the next step of the integration and updates the internal state.
+        For event-free problems, this is the basic iteration method.
+
+        Returns
+        -------
+        bool
+            True if the solver successfully advanced. False if the solver could not
+            advance further (e.g., divergence detected, validation failure, or solver
+            stopped by an event/user). When False, a diagnostic message is printed
+            explaining why advancement failed.
+        """
+
     def advance_to_event(self)->bool:
         """
         Advance the solver until the next event occurrence.
@@ -418,6 +418,17 @@ class OdeSolver:
             True if the solver successfully advanced to t.
             False if advancement failed before reaching t. When False, a diagnostic
                 message is printed explaining the reason. Alternatively, check self.status.
+        """
+
+    def timeit_step(self)->tuple[float, bool]:
+        """
+        Time the execution of a single advance() step.
+
+        Returns
+        -------
+        tuple : (float, bool)
+            - Time in milliseconds for the advance() method to execute.
+            - Whether the solver successfully advanced (same as advance() return value).
         """
 
     def reset(self)->None:

@@ -69,6 +69,8 @@ struct PySolver : DtypeDispatcher {
 
     py::object          advance();
 
+    py::tuple           timeit_step();
+
     py::object          advance_to_event();
 
     py::object          advance_until(const py::object& time, const py::object& observer);

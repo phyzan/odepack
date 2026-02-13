@@ -829,7 +829,7 @@ class OdeSystem:
         if self.contains_fields(variational=variational):
             extra_kw.update(extra_header_block=OdeSystem.header())
         
-        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=OdeSystem.release_extra_flags(), **extra_kw)
+        result = compile_funcs(self.lowlevel_callables(scalar_type=scalar_type, variational=variational)[start_from:], None if self.__nan_dir else self.directory, None if self.__nan_modname else self.module_name(scalar_type=scalar_type, variational=variational), links=self.compile_links(), extra_flags=OdeSystem.compile_flags(), **extra_kw)
         if self.has_jac:
             return result # (pointers, ...), set_field
         else:
@@ -1550,7 +1550,7 @@ class OdeSystem:
             raise NotImplementedError("Jacobian matrix is not defined for this system.")
         elif func == 'jac':
             if (scalar_type, variational) not in self._pointers_jac_cache:
-                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=OdeSystem.header() if self.get_fields(variational) else "", links=[*OdeSystem.get_links(), (None, "mpfr"), (None, "gmp"), (None, "qhull_r")], extra_flags=OdeSystem.release_extra_flags())[0][0]
+                self._pointers_jac_cache[(scalar_type, variational)] = compile_funcs([self.jacobian_to_compile(scalar_type=scalar_type, variational=variational, layout='C')], extra_code_block=extra_code_block, extra_funcs=[extra_func_code], extra_header_block=OdeSystem.header() if self.get_fields(variational) else "", links=self.compile_links(), extra_flags=OdeSystem.compile_flags())[0][0]
             return LowLevelFunction(pointer=self._pointers_jac_cache[(scalar_type, variational)], input_size=factor*self.Nsys, output_shape=[self.Nsys*factor, self.Nsys*factor], Nargs=self.Nargs, scalar_type=scalar_type)
         else:
             raise ValueError('')
@@ -1563,14 +1563,14 @@ class OdeSystem:
         return ["odepack_" + name for name in main]
 
     @staticmethod
-    def get_links():
+    def compile_links():
         lib_path = OdeSystem.lib_path()
         lib_dir = os.path.join(lib_path, "lib")
         link_names = OdeSystem.get_link_names()
-        return [(lib_dir, name) for name in link_names]
+        return [(lib_dir, name) for name in link_names] + [(None, "mpfr"), (None, "gmp"), (None, "qhull_r")]
 
     @staticmethod
-    def release_extra_flags():
+    def compile_flags():
         return [
             "O3",
             "DNDEBUG",

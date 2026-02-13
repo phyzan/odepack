@@ -36,6 +36,7 @@ struct BDFCONSTS{
 struct NewtConv{
     bool converged;
     size_t n_iter;
+    StepResult flag;
 };
 
 // Function declarations
@@ -107,11 +108,11 @@ private:
     static constexpr bool IS_IMPLICIT = true;
     static constexpr int ERR_EST_ORDER = 1;
 
-    void    adapt_impl(T* res);
-    void    interp_impl(T* result, const T& t) const;
-    void    reset_impl();
-    void    re_adjust_impl(const T* new_vector);
-    bool    validate_ics_impl(T t0, const T* q0) const;
+    StepResult      adapt_impl(T* res);
+    void            interp_impl(T* result, const T& t) const;
+    void            reset_impl();
+    void            re_adjust_impl(const T* new_vector);
+    bool            validate_ics_impl(T t0, const T* q0) const;
 
     template<typename... Type>
     BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras);
