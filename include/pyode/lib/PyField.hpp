@@ -32,6 +32,7 @@ public:
     // regardless of the number of dimensions, without needing to explicitly instantiate for each dimension in the precompiled library.
     template<typename... Scalar>
     double operator()(Scalar... x) const{
+        assert(sizeof...(Scalar) == this->ndim() && "Number of coordinates must match number of dimensions of the field");
         double coords[] = {double(x)...};
         double out;
         if (!this->interp(&out, coords)){
@@ -70,6 +71,7 @@ public:
     template<typename... Scalar>
     double operator()(Scalar... x) const{
         double coords[] = {double(x)...};
+        assert(sizeof...(Scalar) == this->ndim() && "Number of coordinates must match number of dimensions of the field");
         double out;
         if (!this->interp(&out, coords)){
             return std::numeric_limits<double>::quiet_NaN();
@@ -111,13 +113,17 @@ struct PyRegVecField {
 
     using CLS = RegularVectorField<double, 0, true>;
 
-public:
-
-    static void parse_values(const py::array_t<double>& values, const py::args& py_grid);
+    // ============================= Python interface =============================
     
     static CLS init_main(const py::array_t<double>& values, const py::args& py_grid);
 
     static py::object py_streamplot_data(const CLS& self, double max_length, double ds, int density);
+
+    static py::object component(const CLS& self, int i);
+
+    // ============================================================================
+
+    static void parse_values(const py::array_t<double>& values, const py::args& py_grid);
 
 }; // class PyRegVecField
 

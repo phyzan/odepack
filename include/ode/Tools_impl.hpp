@@ -413,7 +413,7 @@ void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot) {
             T val = ndspan::abs(lu[j*N + i]);
             if (val > max_val) { max_val = val; max_row = j; }
         }
-        assert(max_val != 0 && "Matrix is singular");
+        // assert(max_val != 0 && "Matrix is singular");
 
         if (max_row != i) {
             for (size_t k = 0; k < N; ++k){

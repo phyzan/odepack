@@ -21,22 +21,64 @@ template class DelaunayTri<0>;
 //===========================================================================================
 
 py::object PyNdInterp::py_value_at(const VirtualNdInterpolator& self, const py::args& x){
+
+    // x must always have a total of ndim elemets.
+    // These can be either scalars or arrays, in which case they must
+    // all have the same shape, so that element-wise interpolation can be performed.
+
+    // First we check that the number of coordinates matches ndim, and convert to C++ array.
+    // We also prepare an output array of the correct shape, which we will fill with the interpolated values.
+    // If the output shape has ndim == (), we will return a scalar, otherwise we return a numpy array.
+
     if (x.size() != size_t(self.ndim())){
         throw py::value_error("Expected " + std::to_string(self.ndim()) + " coordinates, but got " + std::to_string(x.size()));
     }
-    // TODO: optimize by avoiding temporary allocations
-    Array1D<double, 0> coords(x.size());
-    Array<double> out(nullptr, self.output_shape(), self.output_dims());
-    for (size_t i=0; i<x.size(); i++){
-        try {
-            coords[i] = x[i].cast<double>();
-        }catch (const py::cast_error &e) {
-            throw py::value_error("All coordinates must be real numbers");
+
+    // Prepare output array. This is the input_shape + output_shape of the interpolator.
+    std::vector<int> input_shape; // this is just from the first input coordinate, and it needs to be the same for all coordinates, but we will check that later.
+    std::vector<int> output_shape(self.output_shape(), self.output_shape()+self.output_dims());
+    
+
+    // input shape per axis can have any shape
+    std::vector<py::array_t<double>> coords(self.ndim());
+
+    for (int i=0; i<self.ndim(); i++){
+
+        // if this cannot be cast to a numpy array, a python error will be thrown anyway
+        coords[i] = x[i].cast<py::array_t<double>>();
+        if (i == 0){
+            for (ssize_t j=0; j<coords[i].ndim(); j++){
+                input_shape.push_back(int(coords[i].shape(j)));
+            }
+        }else{
+            // check that shape matches the first coordinate
+            if (coords[i].ndim() != ssize_t(input_shape.size())){
+                throw py::value_error("All coordinate arrays must have the same number of dimensions");
+            }
+            for (ssize_t j=0; j<coords[i].ndim(); j++){
+                if (int(coords[i].shape(j)) != input_shape[j]){
+                    throw py::value_error("All coordinate arrays must have the same shape");
+                }
+            }
         }
     }
-    
-    if (!self.interp(out.data(), coords.data())){
-        throw py::value_error("Coordinates out of bounds");
+
+    size_t input_size = input_shape.size() == 0? 1 : prod(input_shape);
+    // Now we can prepare the output array, which has shape = input_shape + output_shape
+    std::vector<int> full_output_shape = input_shape;
+    full_output_shape.insert(full_output_shape.end(), output_shape.begin(), output_shape.end());
+    Array<double> out(nullptr, full_output_shape.data(), full_output_shape.size()); // (out(data=nullptr, shape, ndim) just creates an uninitialized array with the correct shape, which we will fill with the interpolated values)
+
+    int output_size_per_point = self.nvals_per_point();
+    std::vector<double> q_in(self.ndim()); // dummy array for a single query point, which we will reuse for each point in the input arrays
+    for (size_t i=0; i<input_size; i++){
+        for (int j=0; j<self.ndim(); j++){
+            const double* coord_data = coords[j].data();
+            q_in[j] = coord_data[i];
+        }
+        if (!self.interp(out.data()+i*output_size_per_point, q_in.data())){
+            throw py::value_error("Coordinates out of bounds");
+        }
     }
     if (out.size() == 1){
         return py::float_(out[0]);
@@ -60,6 +102,14 @@ PyRegGridInterp::CLS PyRegGridInterp::init_main(const py::array_t<double>& value
 
 py::object PyRegGridInterp::get_values(const CLS& self) {
     return py::cast(self.values());
+}
+
+py::tuple PyRegGridInterp::get_grid(const CLS& self){
+    py::list res(self.grid().ndim());
+    for (int i=0; i<self.ndim(); i++){
+        res[i] = py::cast(self.grid().x(i));
+    }
+    return {res};
 }
 
 PyRegGridInterp::CLS PyRegGridInterp::init(const py::array_t<double>& values, const std::vector<Array1D<double>>& grid, bool coord_axis_first) {
@@ -241,7 +291,7 @@ PyDelaunay PyDelaunay::py_set_state(const py::dict& state){
         //Array3D<double, 0, NDIM, NDIM>
         const auto& py_invT = state["invT"].cast<py::array_t<double>>();
 
-        PyDelaunay obj;
+        PyDelaunay obj(std::make_shared<DelaunayTri<0>>());
         
         View2D<double, 0, 0> points(py_points.data(), py_points.shape(), py_points.ndim());
         View2D<int, 0, 0> simplices(py_simplices.data(), py_simplices.shape(), py_simplices.ndim());

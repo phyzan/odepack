@@ -38,9 +38,12 @@ public:
 
     inline const auto&  data() const {return data_;}
 
+    inline const int*   shape() const {return shape_.data();}
+
 private:
 
     std::vector<Array1D<T>> data_;
+    std::vector<int> shape_;
 };
 
 } // namespace ode

@@ -154,6 +154,23 @@ py::object PyRegVecField::py_streamplot_data(const CLS& self, double max_length,
     return result;
 }
 
+py::object PyRegVecField::component(const CLS& self, int i){
+    if (i < 0 || i >= self.ndim()){
+        throw py::value_error("Component index out of bounds");
+    }
+    assert((self.output_dims() == 1) && "Component method only works for vector fields with output dimension 1");
+    Array<double> out(self.n_points()); //uninitialized array with the same shape as the output of the vector field
+    const double* v_data = self.values().data();
+    int nd = self.ndim();
+    int n_points = self.n_points();
+    // values shape right now is (npoints, ndim)
+    for (int j=0; j<n_points; j++){
+        out[j] = v_data[j * nd + i];
+    }
+    out.reshape(self.grid().shape(), self.ndim());
+    return py::cast(out);
+}
+
 
 PyScatVecField::CLS PyScatVecField::init(const py::array_t<double>& x, const py::array_t<double>& values){
     parse_values(values);

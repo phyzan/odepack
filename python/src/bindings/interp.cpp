@@ -13,7 +13,9 @@ py::class_<VirtualNdInterpolator>(m, "NdInterpolator")
 
 py::class_<RegularGridInterpolator<double, 0, true>, VirtualNdInterpolator>(m, "RegularGridInterpolator")
     .def(py::init(&PyRegGridInterp::init_main),
-        py::arg("values"));
+        py::arg("values"))
+    .def_property_readonly("values", &PyRegGridInterp::get_values)
+    .def_property_readonly("grid", &PyRegGridInterp::get_grid);
 
 py::class_<PyDelaunay>(m, "DelaunayTri")
     .def(py::init<py::array_t<double>>(),

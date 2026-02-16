@@ -28,6 +28,8 @@ struct PyRegGridInterp {
 
     static py::object get_values(const CLS& self);
 
+    static py::tuple get_grid(const CLS& self);
+
     // ==============================================================================
 
     static CLS init(const py::array_t<double>& values, const std::vector<Array1D<double>>& grid, bool coord_axis_first);

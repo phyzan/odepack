@@ -7,13 +7,14 @@ namespace ode{
 
 template<typename T, int NDIM>
 template<typename AxisData>
-RegularGrid<T, NDIM>::RegularGrid(const AxisData& axes) : data_(axes.size()) {
+RegularGrid<T, NDIM>::RegularGrid(const AxisData& axes) : data_(axes.size()), shape_(axes.size()) {
     assert((NDIM == 0 || axes.size() == NDIM) && "Number of axes must match NDIM");
     int n_axes = axes.size();
     for (int i=0; i<n_axes; i++){
         const auto& axis = axes[i];
         assert(axis.size() >= 2 && "Each axis must have at least 2 grid points");
         data_[i] = Array1D<T>(axis.data(), axis.size());
+        shape_[i] = axis.size();
     }
 }
 

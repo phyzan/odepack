@@ -238,6 +238,7 @@ bool DelaunayTri<NDIM>::interpolate(double* out, const double* point, const doub
     const int* vertices = get_simplex(simplex_idx);
 
     View<double, Layout::C, 0, 0> field_view(field, npoints(), n_fields);
+    std::fill(out, out + n_fields, 0.0);
     for (int i=0; i <= ndim(); ++i){
         for (int f = 0; f < n_fields; ++f) {
             out[f] += bary[i] * field_view(vertices[i], f);

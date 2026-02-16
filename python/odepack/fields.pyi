@@ -22,7 +22,6 @@ class SampledScalarField:
             Interpolated scalar field value at the given coordinates.
         '''
         ...
-        
 
 
 class SampledVectorField:
@@ -152,6 +151,22 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
         Notes
         -----
         e.g. values[i][j, k] corresponds to grid point (x[j], y[k])
+        '''
+        ...
+
+    def component(self, i: int)->np.ndarray:
+        '''
+        Get the i-th component of the vector field as a scalar field on the same grid.
+
+        Parameters
+        ----------
+        i : int
+            Index of the component to retrieve. Should be in the range [0, n_dimensions-1].
+
+        Returns
+        -------
+        np.ndarray
+            Scalar field values corresponding to the i-th component of the vector field, with the same shape as the grid.
         '''
         ...
 
