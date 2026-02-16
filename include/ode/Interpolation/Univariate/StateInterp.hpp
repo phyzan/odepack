@@ -1,7 +1,7 @@
 #ifndef STATE_INTERP_HPP
 #define STATE_INTERP_HPP
 
-#include "../Tools.hpp"
+#include "../../Tools.hpp"
 
 namespace ode {
 

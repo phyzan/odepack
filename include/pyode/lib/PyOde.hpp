@@ -14,6 +14,10 @@ public:
     template<typename T, typename RhsType, typename JacType>
     PyODE(ODE_CONSTRUCTOR(T));
 
+    PyODE(void* ode_ptr, int scalar_type);
+
+    PyODE(void* ode_ptr, const std::string& scalar_type);
+
 protected:
 
     PyODE(const std::string& scalar_type); //derived classes manage ode and q0_shape creation

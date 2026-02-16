@@ -14,10 +14,13 @@
 
 #include "ode/OdeResult/OdeResult_impl.hpp"
 
-#include "ode/Interpolation/GridInterp_impl.hpp"
-#include "ode/Interpolation/LinearNdInterpolator_impl.hpp"
-#include "ode/Interpolation/SampledVectorfields_impl.hpp"
-#include "ode/Interpolation/StateInterp_impl.hpp"
+#include "ode/Interpolation/NdInterpolator_impl.hpp"
+#include "ode/Interpolation/VectorFields_impl.hpp"
+#include "ode/Interpolation/Regular/Grids_impl.hpp"
+#include "ode/Interpolation/Regular/RegularGridInterpolator_impl.hpp"
+#include "ode/Interpolation/Scattered/Delaunay_impl.hpp"
+#include "ode/Interpolation/Scattered/ScatteredNdInterpolator_impl.hpp"
+#include "ode/Interpolation/Univariate/StateInterp_impl.hpp"
 
 #include "ode/Solvers/Solvers_impl.hpp"
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
-from matplotlib.pyplot import grid
-from numiphy.symlib import Expr, Symbol, asexpr, S, InterpedArray
+from numiphy.symlib import Expr, asexpr, S, InterpedArray
 from numiphy.symlib.hashing import _HashableNdArray, _HashableGrid
 from numiphy.findiffs import Grid
 from functools import cached_property
 from scipy.interpolate import RegularGridInterpolator
 import numpy as np
+from .interp import * #type: ignore
 from .fields import * #type: ignore
 
 
@@ -63,7 +63,7 @@ class RegularScalarField(NumericalScalarField):
     
     @property
     def c_class_name(self):
-        return f'PyScalarField{self.ndim}D'
+        return f'PyRegScalarField'
     
     @property
     def name(self) -> str:
@@ -88,15 +88,7 @@ class RegularScalarField(NumericalScalarField):
     @property
     def _compiled_obj(self):
         '''Create a precompiled-class object'''
-        if self.ndim == 1:
-            cls = SampledScalarField1D
-        elif self.ndim == 2:
-            cls = SampledScalarField2D
-        elif self.ndim == 3:
-            cls = SampledScalarField3D
-        else:
-            raise NotImplementedError(f"Conversion to sampled scalar field not implemented for dimension {self.ndim}")
-        return cls(self.values, *self.grid.x)
+        return RegularGridScalarField(self.values, *self.grid.x)
 
     
     def __call__(self, *args: Expr) -> RegularScalarField:
@@ -180,7 +172,7 @@ class IrregularScalarField(NumericalScalarField):
 
     _priority = 35 # TODO: choose correct
 
-    def __new__(cls, name: str, points: np.ndarray | DelaunayTriangulation, values: np.ndarray, *expressions: Expr, simplify=True):
+    def __new__(cls, name: str, points: np.ndarray | DelaunayTri, values: np.ndarray, *expressions: Expr, simplify=True):
         '''
         An irregular scalar field defined on scattered points, with values at those points and optional expressions for interpolation.
 
@@ -201,7 +193,7 @@ class IrregularScalarField(NumericalScalarField):
         when constructing a symbolic expression. Make sure to give different names to objects with different points or values.
         '''
         expressions = tuple([asexpr(x) for x in expressions])
-        if isinstance(points, (DelaunayTriangulation)):
+        if isinstance(points, (DelaunayTri)):
             points, tri = points.points, points
         else:
             tri = None
@@ -229,21 +221,14 @@ class IrregularScalarField(NumericalScalarField):
         return 'tri' in self.__dict__
     
     @cached_property
-    def tri(self)->DelaunayTriangulation:
+    def tri(self)->DelaunayTri:
         print(f"Computing Delaunay triangulation for irregular scalar field for {self.name}") # this can be expensive, so it's good to have a print statement to indicate when it's happening
-        if self.ndim == 1:
-            return DelaunayTri1D(self.points)
-        elif self.ndim == 2:
-            return DelaunayTri2D(self.points)
-        elif self.ndim == 3:
-            return DelaunayTri3D(self.points)
-        else:
-            return DelaunayTriND(self.points)
+        return DelaunayTri(self.points)
     
     @property
     def c_class_name(self):
         ndim = self.ndim if self.ndim <= 3 else '0'
-        return f'PyScatteredField<{ndim}>'
+        return f'PyScatteredField'
     
     @property
     def name(self) -> str:
@@ -270,17 +255,8 @@ class IrregularScalarField(NumericalScalarField):
     
     @property
     def _compiled_obj(self):
-        '''Create a precompiled-class object'''
-        if self.ndim == 1:
-            cls = ScatteredScalarField1D
-        elif self.ndim == 2:
-            cls = ScatteredScalarField2D
-        elif self.ndim == 3:
-            cls = ScatteredScalarField3D
-        else:
-            cls = ScatteredScalarFieldND
-        
-        return cls(self.tri, self.values)
+        '''Create a precompiled-class object'''        
+        return ScatteredScalarField(self.tri, self.values)
 
     
     def __call__(self, *args: Expr) -> IrregularScalarField:

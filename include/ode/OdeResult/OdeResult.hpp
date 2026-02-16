@@ -2,7 +2,7 @@
 #define ODE_RESULT_HPP
 
 #include "../Tools.hpp"
-#include "../Interpolation/StateInterp.hpp"
+#include "../Interpolation/Univariate/StateInterp.hpp"
 
 namespace ode{
 

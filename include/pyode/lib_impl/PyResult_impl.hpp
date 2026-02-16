@@ -38,7 +38,7 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
     const auto nt = size_t(py_array.size());
     std::vector<py::ssize_t> final_shape(py_array.shape(), py_array.shape()+py_array.ndim());
     final_shape.insert(final_shape.end(), this->q0_shape.begin(), this->q0_shape.end());
-    Array<T> res(final_shape.data(), final_shape.size());
+    Array<T> res(nullptr, final_shape.data(), final_shape.size());
     const auto* solution = reinterpret_cast<const OdeSolution<T>*>(this->res);
 
     // Extract array values and cast them to T using Python's item access

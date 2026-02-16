@@ -121,7 +121,7 @@ py::object PyFuncWrapper::call(const py::object& t, const py::iterable& py_q, co
             throw py::value_error("Invalid array sizes in ode function call");
         }
         auto args = toCPP_Array<T, std::vector<T>>(py_args);
-        Array<T> res(output_shape.data(), output_shape.size());
+        Array<T> res(nullptr, output_shape.data(), output_shape.size());
         reinterpret_cast<Func<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data(), nullptr);
         return py::cast(res);
     )

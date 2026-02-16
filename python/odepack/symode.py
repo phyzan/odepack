@@ -1559,7 +1559,7 @@ class OdeSystem:
     
     @staticmethod
     def get_link_names():
-        main = ["chaos", "fields", "ode", "solvers", "events", "oderesult", "pytools"]
+        main = ["chaos", "fields", "interp", "ode", "solvers", "events", "oderesult", "pytools"]
         return ["odepack_" + name for name in main]
 
     @staticmethod

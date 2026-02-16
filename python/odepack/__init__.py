@@ -1,4 +1,5 @@
 from .ode import * #type: ignore
+from .interp import * #type: ignore
 from .fields import * #type: ignore
 from .solvers import * #type: ignore
 from .events import * #type: ignore

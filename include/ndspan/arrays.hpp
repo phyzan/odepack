@@ -63,23 +63,20 @@ public:
     }
 
     template<INT_T Int>
-    explicit DynamicArray(const Int* shape, size_t ndim) : Base(shape, ndim){
+    explicit DynamicArray(const T* data, const Int* shape, size_t ndim) : Base(shape, ndim){
         if (this->size() > 0){
             _data = new T[this->size()];
         }
+        if (data != nullptr){
+            copy_array<T>(this->data(), data, this->size());
+        }
     }
 
     template<INT_T Int>
-    explicit DynamicArray(const T* data, const Int* shape, size_t ndim) : DynamicArray(shape, ndim){
-        copy_array<T>(this->data(), data, this->size());
-    }
-
-    template<INT_T Int>
-    explicit DynamicArray(T* data, const Int* shape, size_t ndim, bool own_it = false) : Base(shape, ndim){
+    explicit DynamicArray(T* data, const Int* shape, size_t ndim, bool own_it) : Base(shape, ndim){
         if (own_it){
             _data = data;
-        }
-        else if (this->size() > 0){
+        }else if (this->size() > 0){
             _data = new T[this->size()];
             copy_array<T>(this->data(), data, this->size());
         }
@@ -463,20 +460,29 @@ public:
 
 
 
-template <typename T, size_t NDIM, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
+template <typename T, size_t NDIM, Layout L = Layout::C>
 struct HelperNdArray
 {
 private:
-    template <std::size_t... Is>
+    template <Allocation Alloc, std::size_t... Is>
     static Array<T, Alloc, L, (static_cast<void>(Is), 0)...> make(std::index_sequence<Is...>);
+
+    template <std::size_t... Is>
+    static View<T, L, (static_cast<void>(Is), 0)...> make_view(std::index_sequence<Is...>);
 
 public:
 
-    using type = decltype(make(std::make_index_sequence<NDIM>{}));
+    template<Allocation Alloc = Allocation::Heap>
+    using type = decltype(make<Alloc>(std::make_index_sequence<NDIM>{}));
+
+    using ViewType = decltype(make_view(std::make_index_sequence<NDIM>{}));
 };
 
 template <typename T, size_t NDIM, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
-using NdArray = HelperNdArray<T, NDIM, Alloc, L>::type;
+using NdArray = HelperNdArray<T, NDIM, L>::template type<Alloc>;
+
+template <typename T, size_t NDIM, Layout L = Layout::C>
+using NdView = HelperNdArray<T, NDIM, L>::ViewType;
 
 
 template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Heap>

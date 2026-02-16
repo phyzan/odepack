@@ -1,236 +1,144 @@
 #ifndef PY_FIELD_HPP
 #define PY_FIELD_HPP
 
-#include "../../ode/Interpolation/SampledVectorfields.hpp"
-#include "../../ode/Interpolation/LinearNdInterpolator.hpp"
-#include "PyTools.hpp"
+#include "../../ode/Interpolation/VectorFields.hpp"
+#include "PyInterp.hpp"
+#include "PyOde.hpp"
+#include "PyResult.hpp"
 
 namespace ode{
 
 
-class PyScalarField : public RegularGridInterpolator<double, 0> {
+struct PyScalarField {
 
-    using Base = RegularGridInterpolator<double, 0>;
+    // returns double (not array), as this is a scalar field.
+    static py::object py_value_at(const VirtualNdInterpolator& self, const py::args& x);
+}; // struct PyScalarField
 
-private:
 
 
-    PyScalarField(const double* values, const std::vector<MutView1D<double>>& grid);
+class PyRegScalarField : public RegularGridInterpolator<double, 0, true>, public PyScalarField {
 
 public:
 
-    PyScalarField(const py::array_t<double>& values, const py::args& py_grid);
+    using RGBase = RegularGridInterpolator<double, 0, true>;
 
+    static py::array_t<double> parse_values(const py::array_t<double>& values, const py::args& py_grid);
+    
+    PyRegScalarField(const py::array_t<double>& values, const py::args& py_grid);
+    
+
+    // Keep in the header file for easier instantiation from dynamically compiled ODE code
+    // regardless of the number of dimensions, without needing to explicitly instantiate for each dimension in the precompiled library.
     template<typename... Scalar>
-    double operator()(Scalar... x) const;
+    double operator()(Scalar... x) const{
+        double coords[] = {double(x)...};
+        double out;
+        if (!this->interp(&out, coords)){
+            return std::numeric_limits<double>::quiet_NaN();
+        }else {
+            return out;
+        }
+    }
 
-    double py_value_at(const py::args& x) const;
-
-protected:
-    PyScalarField(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM);
-    
-private:
-
-    static std::vector<MutView1D<double>> parse_args(const py::array_t<double>& values, const py::args& py_grid, size_t NDIM);
-};
-
-class PyScalarField1D : public PyScalarField {
-
-    using Base = PyScalarField;
-public:
-    
-    PyScalarField1D(const py::array_t<double>& values, const py::args& py_grid);
-    double operator()(double x) const;
-
-};
-
-class PyScalarField2D : public PyScalarField {
-
-    using Base = PyScalarField;
-public:
-
-    PyScalarField2D(const py::array_t<double>& values, const py::args& py_grid);
-    double operator()(double x, double y) const;
-
-};
-
-class PyScalarField3D : public PyScalarField {
-
-    using Base = PyScalarField;
-public:
-    PyScalarField3D(const py::array_t<double>& values, const py::args& py_grid);
-    double operator()(double x, double y, double z) const;
-
-};
+}; // class PyRegScalarField
 
 
-class PyDelaunayBase{
+
+class PyScatteredField : public ScatteredNdInterpolator<0, true>, public PyScalarField {
+
 
 public:
 
-    virtual ~PyDelaunayBase() = default;
-    virtual py::object py_points() const = 0;
-    virtual int py_ndim() const = 0;
-    virtual int py_npoints() const = 0;
-    virtual int py_nsimplices() const = 0;
-    virtual int py_find_simplex(const py::array_t<double>& point) const = 0;
-    virtual py::object py_get_simplices() const = 0;
-    virtual py::object py_get_simplex(const py::array_t<double>& point) const = 0;
-    virtual py::dict py_get_state() const = 0;
-};
+    using InterpBase = ScatteredNdInterpolator<0, true>;
 
-
-template<size_t NDIM>
-class PyDelaunay : public DelaunayTri<NDIM>, public PyDelaunayBase {
-
-    using Base = DelaunayTri<NDIM>;
-
-public:
-
-    PyDelaunay(const py::array_t<double>& x);
-
-    py::object py_points() const override;
-
-    int py_ndim() const override;
-    int py_npoints() const override;
-    int py_nsimplices() const override;
-    int py_find_simplex(const py::array_t<double>& point) const override;
-
-    //returns array of shape (ndim+1,), or None if point is out of bounds.
-    py::object py_get_simplex(const py::array_t<double>& point) const override;
-    
-    // array of shape (nsimplices, ndim+1) containing the indices of the points that form each simplex
-    py::object py_get_simplices() const override;
-
-    // ================ Pickling ===================
-    py::dict    py_get_state() const override;
-    
-    static PyDelaunay py_set_state(const py::dict& state);
-    
-    // =============================================
-    
-
-private:
-
-    PyDelaunay(std::nullptr_t, const py::array_t<double>& x);
-
-    PyDelaunay() = default; //for pickling, not called from outside
-
-    static std::nullptr_t parse_args(const py::array_t<double>& x);
-
-};
-
-
-template<size_t NDIM>
-class PyScatteredField : public ScatteredScalarField<NDIM> {
-
-    using Base = ScatteredScalarField<NDIM>;
-
-public:
-
-    // Python signature is ScatteredField(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints)), where
+    // Python signature is ScatteredField(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints,)
     PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values);
 
-    PyScatteredField(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
+    PyScatteredField(const PyDelaunay& tri, const py::array_t<double>& values);
 
-    template<typename... Scalar>
-    double operator()(Scalar... x) const;
+    py::object py_delaunay() const;
 
     py::object py_points() const;
 
     py::object py_values() const;
 
-    py::object py_delaunay_obj() const;
+    static std::nullptr_t parse_values( const py::array_t<double>& values);
 
-    double py_value_at(const py::args& x) const;
+    // Keep in the header file for easier instantiation from dynamically compiled ODE code
+    // regardless of the number of dimensions, without needing to explicitly instantiate for each dimension in the precompiled library.
+    template<typename... Scalar>
+    double operator()(Scalar... x) const{
+        double coords[] = {double(x)...};
+        double out;
+        if (!this->interp(&out, coords)){
+            return std::numeric_limits<double>::quiet_NaN();
+        }else {
+            return out;
+        }
+    }
 
 private:
 
     PyScatteredField(std::nullptr_t, const py::array_t<double>& x, const py::array_t<double>& values);
 
-    PyScatteredField(std::nullptr_t, const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
+    PyScatteredField(std::nullptr_t, const PyDelaunay& tri, const py::array_t<double>& values);
 
-    static std::nullptr_t parse_args(const py::array_t<double>& x, const py::array_t<double>& values);
-
-    static std::nullptr_t parse_tri_args(const PyDelaunay<NDIM>& tri, const py::array_t<double>& values);
-
-};
+}; // class PyScatteredField
 
 
-template<size_t NDIM>
-class PyVecField : public SampledVectorField<double, NDIM> {
-
-    using Base = SampledVectorField<double, NDIM>;
-
-private:
-
-    PyVecField(const double* values, const std::vector<MutView1D<double>>& grid);
-
-public:
-
-    PyVecField(const py::array_t<double>& values, const py::args& py_grid);
-
-    py::object py_x(int axis) const;
-
-    py::object py_vx(int component) const;
-
-    py::object py_coords() const;
-
-    py::object py_data() const;
-
-    py::object py_value(const py::args& coords) const;
-
-    bool py_in_bounds(const py::args& coords) const;
-
-    // ==========================================
-
-    py::object py_streamline(const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method) const;
-
-    py::object py_streamline_ode(const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized) const;
-
-    py::object py_streamplot_data(double max_length, double ds, int density) const;
-
-private:
-
-    void check_coords(const double* coords) const;
-
-    static std::vector<MutView1D<double>> parse_args(const py::array_t<double>& values, const py::args& py_grid);
-
-};
-
-// Inheriting from <0>, not <2> for simpler compilation and inheritance chain
-class PyVecField2D : public PyVecField<0> {
-
-    using Base = PyVecField<0>;
-
-public:    
-
-    using Base::Base;
-
-    py::object x() const;
-    py::object y() const;
-    py::object vx() const;
-    py::object vy() const;
-
-};
 
 
-class PyVecField3D : public PyVecField<0> {
+struct PyVecField {
 
-    using Base = PyVecField<0>;
+    // returns array, as this is a vector field.
+
+    using CLS = VirtualVectorField;
+
+    static void check_coords(const CLS& self, const double* coords);
+
+    static py::object py_streamline(const CLS& self, const py::array_t<double>& q0, double length, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::object& t_eval, const py::str& method, bool normalized);
+
+    static py::object py_streamline_ode(const CLS& self, const py::array_t<double>& q0, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, int direction, const py::str& method, bool normalized);
+    
+}; // class PyVecField
+
+
+struct PyRegVecField {
+
+    using RGBase = PyRegGridInterp;
+    using VFBase = PyVecField;
+
+    using CLS = RegularVectorField<double, 0, true>;
 
 public:
 
-    using Base::Base;
+    static void parse_values(const py::array_t<double>& values, const py::args& py_grid);
+    
+    static CLS init_main(const py::array_t<double>& values, const py::args& py_grid);
 
-    py::object x() const;
-    py::object y() const;
-    py::object z() const;
-    py::object vx() const;
-    py::object vy() const;
-    py::object vz() const;
+    static py::object py_streamplot_data(const CLS& self, double max_length, double ds, int density);
 
-};
+}; // class PyRegVecField
+
+
+struct PyScatVecField {
+
+    using SCBase = PyScatteredInterp;
+    using VFBase = PyVecField;
+
+    using CLS = ScatteredVectorField<0, true>;
+
+
+public:
+
+    static CLS init(const py::array_t<double>& x, const py::array_t<double>& values);
+
+    static CLS init_tri(const PyDelaunay& tri, const py::array_t<double>& values);
+
+    static void parse_values( const py::array_t<double>& values);
+
+}; // class PyScatVecField
 
 } // namespace ode
 

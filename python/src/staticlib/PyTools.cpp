@@ -1,5 +1,5 @@
 #include "../../../include/pyode/lib_impl/PyTools_impl.hpp"
-#include "../../../include/ode/Interpolation/StateInterp_impl.hpp"
+#include "../../../include/ode/Interpolation//Univariate/StateInterp_impl.hpp"
 
 namespace ode{
 
@@ -54,17 +54,6 @@ template<>
     }
     result.shrink_to_fit();
     return result;
-}
-
-
-bool is_sorted(const py::array_t<double>& arr){
-    const double* ptr = arr.data();
-    for (ssize_t i = 1; i < arr.size(); ++i){
-        if (ptr[i] <= ptr[i-1]){
-            return false;
-        }
-    }
-    return true;
 }
 
 

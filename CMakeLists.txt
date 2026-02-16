@@ -92,7 +92,7 @@ set(COMMON_LINK_OPTIONS)
 if(ODEPACK_DEBUG_BUILD)
     list(APPEND COMMON_COMPILE_OPTIONS
         -O0
-        -g
+        -g3
         -ggdb3
         -fno-omit-frame-pointer
         -UNDEBUG
@@ -245,13 +245,21 @@ configure_odepack_lib(odepack_chaos)
 target_link_libraries(odepack_chaos PUBLIC odepack_solvers odepack_events odepack_oderesult odepack_ode odepack_pytools)
 set_target_properties(odepack_chaos PROPERTIES OUTPUT_NAME odepack_chaos)
 
-# 6. odepack_fields: Vector field implementations (needs Qhull)
+# 6. odepack_interp:Interpolation in N-D space implementations (needs Qhull)
+add_library(odepack_interp STATIC
+    python/src/staticlib/PyInterp.cpp
+)
+configure_odepack_lib(odepack_interp)
+target_include_directories(odepack_interp PUBLIC ${QHULL_INCLUDE_DIR})
+target_link_libraries(odepack_interp PUBLIC odepack_solvers odepack_oderesult odepack_ode odepack_pytools ${QHULL_R_LIBRARY})
+set_target_properties(odepack_interp PROPERTIES OUTPUT_NAME odepack_interp)
+
+# 7. odepack_fields: Vector field implementations (needs Qhull)
 add_library(odepack_fields STATIC
     python/src/staticlib/PyField.cpp
 )
 configure_odepack_lib(odepack_fields)
-target_include_directories(odepack_fields PUBLIC ${QHULL_INCLUDE_DIR})
-target_link_libraries(odepack_fields PUBLIC odepack_solvers odepack_oderesult odepack_ode odepack_pytools ${QHULL_R_LIBRARY})
+target_link_libraries(odepack_fields PUBLIC odepack_interp)
 set_target_properties(odepack_fields PROPERTIES OUTPUT_NAME odepack_fields)
 
 # Convenience target that groups all static libraries
@@ -263,6 +271,7 @@ target_link_libraries(odepack_all INTERFACE
     odepack_oderesult
     odepack_ode
     odepack_chaos
+    odepack_interp
     odepack_fields
 )
 
@@ -289,6 +298,7 @@ install(TARGETS
     odepack_oderesult
     odepack_ode
     odepack_chaos
+    odepack_interp
     odepack_fields
     odepack_all
     EXPORT odepackTargets

@@ -189,6 +189,16 @@ INLINE bool equal_arrays(const T* a, const T* b){
     return true;
 }
 
+template<typename T>
+INLINE bool isStrictlyAscending(const T* array, size_t size){
+    for (size_t i=1; i<size; i++){
+        if (array[i] <= array[i-1]){
+            return false;
+        }
+    }
+    return true;
+}
+
 
 template<size_t... Args>
 size_t _validate_size(size_t size){

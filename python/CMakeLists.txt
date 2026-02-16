@@ -32,13 +32,18 @@ pybind11_add_module(chaos src/bindings/chaos.cpp)
 target_link_libraries(chaos PRIVATE odepack_chaos)
 configure_py_module(chaos)
 
-# 6. fields module: Vector field interpolation
+# 6. interp module: Vector field interpolation
+pybind11_add_module(interp src/bindings/interp.cpp)
+target_link_libraries(interp PRIVATE odepack_interp)
+configure_py_module(interp)
+
+# 7. fields module: Vector field interpolation
 pybind11_add_module(fields src/bindings/fields.cpp)
 target_link_libraries(fields PRIVATE odepack_fields)
 configure_py_module(fields)
 
 # Install all Python extension modules into the odepack Python package
-install(TARGETS solvers events oderesult ode chaos fields
+install(TARGETS solvers events oderesult ode chaos interp fields
     LIBRARY DESTINATION odepack
     COMPONENT python
 )
@@ -52,6 +57,7 @@ install(TARGETS
     odepack_oderesult
     odepack_ode
     odepack_chaos
+    odepack_interp
     odepack_fields
     ARCHIVE DESTINATION odepack/lib
     COMPONENT python

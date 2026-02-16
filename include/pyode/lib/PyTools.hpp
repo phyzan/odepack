@@ -211,7 +211,6 @@ inline mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mp
 
 #endif // MPREAL
 
-bool is_sorted(const py::array_t<double>& arr);
 
 
 template<typename T>

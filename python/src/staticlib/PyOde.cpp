@@ -31,6 +31,22 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
     )
 }
 
+PyODE::PyODE(void* ode_ptr, int scalar_type) : DtypeDispatcher(scalar_type), ode(ode_ptr) {
+    this->data.is_lowlevel = true;
+    DISPATCH(void,
+        const ODE<T>* ptr = this->cast<T>();
+        this->data.shape = {int(ptr->Nsys())};
+    )
+}
+
+PyODE::PyODE(void* ode_ptr, const std::string& scalar_type) : DtypeDispatcher(scalar_type), ode(ode_ptr) {
+    this->data.is_lowlevel = true;
+    DISPATCH(void,
+        const ODE<T>* ptr = this->cast<T>();
+        this->data.shape = {int(ptr->Nsys())};
+    )
+}
+
 PyODE::PyODE(const std::string& scalar_type) : DtypeDispatcher(scalar_type){}
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
