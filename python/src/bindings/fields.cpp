@@ -60,6 +60,7 @@ py::class_<RegularVectorField<double, 0, true>, VirtualVectorField, RegularGridI
         py::arg("atol")=1e-12,
         py::arg("min_step")=0.,
         py::arg("max_step")=py::none(),
+        py::arg("stepsize")=0.,
         py::arg("method")="RK45"
     );
         

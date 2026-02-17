@@ -457,6 +457,55 @@ void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot) {
 
 
 template<typename T>
+T detLU_row_major(T* mat, size_t N) {
+    if (N == 0) {
+        return 1;
+    }
+
+    T det = 1;
+    int sign = 1;
+
+    for (size_t i = 0; i < N; ++i) {
+        // Partial pivoting
+        size_t pivot = i;
+        T max_val = abs(mat[i * N + i]);
+        for (size_t j = i + 1; j < N; ++j) {
+            T val = abs(mat[j * N + i]);
+            if (val > max_val) {
+                pivot = j;
+                max_val = val;
+            }
+        }
+
+        if (max_val == T(0)) {
+            return T(0);
+        }
+
+        if (pivot != i) {
+            // Swap rows
+            for (size_t k = 0; k < N; ++k) {
+                T tmp = mat[i * N + k];
+                mat[i * N + k] = mat[pivot * N + k];
+                mat[pivot * N + k] = tmp;
+            }
+            sign = -sign;
+        }
+
+        det *= mat[i * N + i];
+
+        // Eliminate below pivot
+        for (size_t j = i + 1; j < N; ++j) {
+            T factor = mat[j * N + i] / mat[i * N + i];
+            for (size_t k = i; k < N; ++k) {
+                mat[j * N + k] = mat[j * N + k] - factor * mat[i * N + k];
+            }
+        }
+    }
+
+    return det*sign;
+}
+
+template<typename T>
 T choose_step(const T& habs, const T& hmin, const T& hmax) {
     return std::max(std::min(habs, hmax), hmin);
 }

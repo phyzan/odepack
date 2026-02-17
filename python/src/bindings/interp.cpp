@@ -27,6 +27,7 @@ py::class_<PyDelaunay>(m, "DelaunayTri")
     .def_property_readonly("nsimplices", &PyDelaunay::py_nsimplices)
     .def_property_readonly("points", &PyDelaunay::py_points)
     .def_property_readonly("simplices", &PyDelaunay::py_get_simplices)
+    .def_property_readonly("total_volume", &PyDelaunay::total_volume)
     .def("find_simplex", &PyDelaunay::py_find_simplex, py::arg("coords"))
     .def("get_simplex", &PyDelaunay::py_get_simplex,
         py::arg("coords"));

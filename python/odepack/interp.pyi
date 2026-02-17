@@ -78,7 +78,6 @@ class DelaunayTri:
         '''
         ...
 
-
     @property
     def points(self)->np.ndarray[float]:
         '''
@@ -91,6 +90,13 @@ class DelaunayTri:
         '''
         Indices of the points forming each simplex. Shape: (nsimplices, ndim+1).
         Each row contains the indices of the points that form a simplex.
+        '''
+        ...
+
+    @property
+    def total_volume(self)->float:
+        '''
+        Total volume of the triangulation in the parameter space.
         '''
         ...
     

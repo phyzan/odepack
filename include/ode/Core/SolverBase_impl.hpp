@@ -326,6 +326,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Call
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_by(T interval){
+    assert(interval >= 0 && "Interval must be non-negative in advance_by. Its sign is determined by the solver's direction of integration.");
+    return this->advance_until(this->t() + interval*this->direction());
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename ObjFun, typename Callable>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer, T* worker){
 

@@ -399,6 +399,8 @@ T bisect(Callable&& f, const T& a, const T& b, const T& atol);
 template<typename T>
 void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot);
 
+template<typename T>
+T detLU_row_major(T* mat, size_t N);
 
 inline void show_progress(int n, int target, const Clock& clock){
     std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << Clock::format_duration(target*clock.seconds()/n) << std::flush;

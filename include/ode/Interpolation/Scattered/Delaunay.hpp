@@ -53,12 +53,15 @@ public:
     int                 find_simplex(const double* point) const; // array of ndim elements, returns simplex index or -1 if not found
     bool                contains(const double* point) const { return find_simplex(point) != -1; }
     bool                compute_barycentric(double* out, int simplex_idx, const double* point) const; // bary should have ndim+1 elements, returns false if simplex is degenerate
-    
 
     // if n_fields > 1, then field must be a contiguous array of shape (n_fields, npoints), and output of interpolate will be a contiguous array of shape (n_fields,)
     bool                interpolate(double* out, const double* point, const double* field, int n_fields=1) const;
 
     double              get_value(const double* point, const double* field) const; // field should have npoints elements, returns interpolated value at point
+
+    double              volume(int simplex_idx) const; // returns the volume of the simplex with index simplex_idx
+
+    double              total_volume() const;
 
     // auxiliary function for interpolation, used when the caller already has the barycentric coordinates and simplex index (e.g. for multiple fields)
 
@@ -68,6 +71,8 @@ private:
     void compute_delaunay_1d();
 
     int& thread_cache() const;
+
+    Array2D<double, NDIM, NDIM>& mat_cache() const;
 
 
     // ============================================================================

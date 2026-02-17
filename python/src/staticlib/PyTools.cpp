@@ -70,6 +70,7 @@ template<>
     template void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size); \
     template void coef_mat_interp<T>(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size); \
     template void inv_mat_row_major(T *out, const T *mat, size_t N, T *work, size_t *pivot); \
+    template T detLU_row_major(T* mat, size_t N); \
     template bool all_are_finite(const T *data, size_t n); \
     
 #define DEFINE_BUILTIN_SCALAR_ONLY(T) \

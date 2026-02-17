@@ -170,7 +170,7 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
         '''
         ...
 
-    def streamplot_data(self, max_length: float, density: int, ds: float, rtol: float = 1e-6, atol: float = 1e-12, min_step: float = 0., max_step: float = None, method: str = "RK45")->list[np.ndarray]:
+    def streamplot_data(self, max_length: float, density: int, ds: float, rtol: float = 1e-6, atol: float = 1e-12, min_step: float = 0., max_step: float = None, stepsize: float = 0., method: str = "RK45")->list[np.ndarray]:
         '''
         Compute streamplot data for visualization.
 
@@ -181,7 +181,8 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
         density : int, optional
             Density of streamlines. The number of streamlines per axis will be approximately equal to the density.
         ds: float
-            Step size for the integrator. For constant step size methods, this is the fixed step size. For adaptive methods, this is the initial step size.
+            The resolution of the streamlines. Smaller values will produce smoother streamlines.
+            This does not affect the accuracy of the integration, but determines how frequently points are sampled along the streamline for visualization.
         rtol : float, optional
             Relative tolerance for the integrator.
         atol : float, optional
@@ -192,7 +193,8 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
             Maximum step size for the integrator. Default is None (no maximum).
         method : str, optional
             Integration method to use.
-        
+        stepsize : float, optional
+            Step size for the integrator. For constant step size methods, this is the fixed step size. For adaptive methods, this is the initial step size.
         
         Returns
         -------

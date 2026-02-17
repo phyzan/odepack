@@ -101,26 +101,22 @@ bool RegularVectorField<T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
 
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
-std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data(const T& max_length, const T& ds, size_t density, double rtol, double atol, double min_step, double max_step, const std::string& method) const{
-    return streamplot_data_core(max_length, ds, density, rtol, atol, min_step, max_step, method, std::make_index_sequence<NDIM>{});
+std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method) const{
+    return streamplot_data_core(max_length, ds, density, rtol, atol, min_step, max_step, stepsize, method, std::make_index_sequence<NDIM>{});
 }
 
 
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
 template<size_t... I>
-std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data_core(const T& max_length, const T& ds, size_t density, double rtol, double atol, double min_step, double max_step, const std::string& method, std::index_sequence<I...>) const{
+std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method, std::index_sequence<I...>) const{
     
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");
-
-    // using RK4<T, 0, RichVirtual> because it is the Python bindings instanciate these templates parameters,
-    // event though they are not the optimal ones. Ideally we want RK4<T, NDIM, Static, decltype(lambda_func), std::nullptr_t>, but the performance
-    // gain is far too small to justify the increase in binary size and compilation time.
-
+    
     std::vector<T> args{};
     std::vector<const Event<T>*> events{};
-    std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData<Func<T>, void>{.rhs=VFBase::ode_func_norm, .obj=this}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, ds, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
+    std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData<Func<T>, void>{.rhs=VFBase::ode_func_norm, .obj=this}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, stepsize, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
     OdeRichSolver<T, NDIM>* solver = unique_solver.get();
 
     const auto& X = this->grid().data();
@@ -195,7 +191,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         
         assert(this->contains(ics.data()) && "Initial point out of bounds");
         assert((dir == 1 || dir == -1) && "Direction must be either +1 or -1");
-        if (!solver->set_ics(0, ics.data(), ds, dir)) {
+        if (!solver->set_ics(0, ics.data(), stepsize, dir)) {
             return 0;
         }
         int n_steps = 0;
@@ -204,7 +200,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
 
         GetIdx(i_start, ics.data());
-        while ((n_steps < max_pts) && solver->advance()){
+        while ((n_steps < max_pts) && solver->advance_by(ds)){
             q_new = solver->vector().data();
             q_old = solver->vector_old().data();
             GetIdx(i_curr, q_new);

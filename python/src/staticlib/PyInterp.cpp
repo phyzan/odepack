@@ -226,6 +226,16 @@ py::object PyDelaunay::py_get_simplices() const{
     return py::cast(simplices);
 }
 
+double PyDelaunay::total_volume() const{
+    if (volume_is_cached_){
+        return cached_total_volume_;
+    }else{
+        cached_total_volume_ = tri_->total_volume();
+        volume_is_cached_ = true;
+        return cached_total_volume_;
+    }
+}
+
 py::object PyDelaunay::py_get_simplex(const py::array_t<double>& point) const{
     int simplex_idx = py_find_simplex(point);
     if (simplex_idx == -1){

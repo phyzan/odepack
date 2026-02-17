@@ -65,6 +65,8 @@ public:
     // array of shape (nsimplices, ndim+1) containing the indices of the points that form each simplex
     py::object py_get_simplices() const;
 
+    double total_volume() const;
+
     TriPtr<0> tri() const;
 
     // ================ Pickling ===================
@@ -83,6 +85,8 @@ private:
     static std::nullptr_t parse_args(const py::array_t<double>& x);
 
     TriPtr<0> tri_;
+    mutable bool volume_is_cached_ = false;
+    mutable double cached_total_volume_ = 0;
 
 }; // class PyDelaunay
 

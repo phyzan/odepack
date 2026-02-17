@@ -272,6 +272,16 @@ public:
 
     bool                        observe_until(T time, std::function<void(const T&, const T*)> observer);
 
+    /**
+     * @brief Advance the solver by a specified time interval (along the integration direction).
+     * @param interval Time interval to advance by (must be positive).
+     * @return True if the interval was successfully integrated, false if paused or dead.
+     * @note This is a convenience method equivalent to advance_until(t() + interval*direction()).
+     *      The is not a single step advance; the solver will take as many steps as needed to reach the target time,
+     *      and use interpolation to end exactly at the target time.
+    */
+    bool                        advance_by(T interval);
+
     /// @brief Reset the solver to its initial conditions.
     void                        reset();
 

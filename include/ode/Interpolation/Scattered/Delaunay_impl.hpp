@@ -256,6 +256,57 @@ double DelaunayTri<NDIM>::get_value(const double* point, const double* field) co
 }
 
 template<size_t NDIM>
+double DelaunayTri<NDIM>::volume(int simplex_idx) const {
+    const double* d  = invT_.ptr(simplex_idx, 0, 0);
+    int nd = ndim();
+
+    double det;
+    if constexpr (NDIM == 1) {
+        det = d[0];
+    } else if constexpr (NDIM == 2) {
+        det = d[0]*d[3] - d[1]*d[2];
+    } else if constexpr (NDIM == 3) {
+        det = d[0]*(d[4]*d[8] - d[5]*d[7])
+            - d[1]*(d[3]*d[8] - d[5]*d[6])
+            + d[2]*(d[3]*d[7] - d[4]*d[6]);
+    } else {
+        // NDIM == 0: runtime dimension
+        if (nd == 1) {
+            det = d[0];
+        } else if (nd == 2) {
+            det = d[0]*d[3] - d[1]*d[2];
+        } else if (nd == 3) {
+            det = d[0]*(d[4]*d[8] - d[5]*d[7])
+                - d[1]*(d[3]*d[8] - d[5]*d[6])
+                + d[2]*(d[3]*d[7] - d[4]*d[6]);
+        } else {
+            double* worker = mat_cache().data();
+            copy_array(worker, d, nd*nd);
+            det = detLU_row_major(worker, nd);
+        }
+    }
+
+    // n!
+    assert((nd < 12) && "Factorial of 12 cannot fit on an int");
+    int fact = 1;
+    for (int i = 2; i <= nd; ++i) {
+        fact *= i;
+    }
+
+    return 1.0 / (abs(det) * fact);
+}
+
+template<size_t NDIM>
+double DelaunayTri<NDIM>::total_volume() const{
+    double sum = 0;
+    int n = this->nsimplices();
+    for (int i=0; i<n; i++){
+        sum += this->volume(i);
+    }
+    return sum;
+}
+
+template<size_t NDIM>
 void DelaunayTri<NDIM>::compute_delaunay_1d() {
     int num_points = npoints();
     int num_simplices = num_points - 1;
@@ -398,6 +449,17 @@ int& DelaunayTri<NDIM>::thread_cache() const {
     // So it is a per-thread cache, but also per-object cache.
     // This is so that the interpolation of each sampled function from multiple threads is safe and efficient.
     thread_local std::unordered_map<const DelaunayTri*, int> cache;
+    return cache[this];
+}
+
+template<size_t NDIM>
+Array2D<double, NDIM, NDIM>& DelaunayTri<NDIM>::mat_cache() const {
+    // cache for temporary matrices used in barycentric coordinate computation, to avoid repeated allocations
+    // this is also per-object, per-thread cache
+    thread_local std::unordered_map<const DelaunayTri*, Array2D<double, NDIM, NDIM>> cache;
+    if (cache.find(this) == cache.end()) {
+        cache[this] = Array2D<double, NDIM, NDIM>(this->ndim(), this->ndim());
+    }
     return cache[this];
 }
 
