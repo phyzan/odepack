@@ -142,7 +142,7 @@ except ValueError as e:
 print("\nSTREAMPLOT TEST")
 
 f_rg = RegularGridVectorField([F, G], x, y)
-lines_rg = f_rg.streamplot_data(40, 0.1, density=50)
+lines_rg = f_rg.streamplot_data(max_length=40, ds=0.1, density=30)
 fig, ax = plt.subplots()
 for line in lines_rg:
     ax.plot(line[0], line[1])

@@ -170,7 +170,7 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
         '''
         ...
 
-    def streamplot_data(self, max_length: float, ds: float, density: int = 30)->list[np.ndarray]:
+    def streamplot_data(self, max_length: float, density: int, ds: float, rtol: float = 1e-6, atol: float = 1e-12, min_step: float = 0., max_step: float = None, method: str = "RK45")->list[np.ndarray]:
         '''
         Compute streamplot data for visualization.
 
@@ -178,10 +178,21 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
         ----------
         max_length : float
             Maximum length of streamlines to compute.
-        ds: float
-            Step size for the RK4 integrator.
         density : int, optional
-            Density of streamlines. The number of streamlines per axis will be approximately equal to the density. Default is 30.
+            Density of streamlines. The number of streamlines per axis will be approximately equal to the density.
+        ds: float
+            Step size for the integrator. For constant step size methods, this is the fixed step size. For adaptive methods, this is the initial step size.
+        rtol : float, optional
+            Relative tolerance for the integrator.
+        atol : float, optional
+            Absolute tolerance for the integrator.
+        min_step : float, optional
+            Minimum step size for the integrator.
+        max_step : float, optional
+            Maximum step size for the integrator. Default is None (no maximum).
+        method : str, optional
+            Integration method to use.
+        
         
         Returns
         -------

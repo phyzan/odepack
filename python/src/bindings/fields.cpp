@@ -54,8 +54,13 @@ py::class_<RegularVectorField<double, 0, true>, VirtualVectorField, RegularGridI
         py::arg("i"))
     .def("streamplot_data", &PyRegVecField::py_streamplot_data,
         py::arg("max_length"),
+        py::arg("density"),
         py::arg("ds"),
-        py::arg("density")=30
+        py::arg("rtol")=1e-6,
+        py::arg("atol")=1e-12,
+        py::arg("min_step")=0.,
+        py::arg("max_step")=py::none(),
+        py::arg("method")="RK45"
     );
         
 py::class_<PyScatteredField, PyScalarField, ScatteredNdInterpolator<0, true>>(m, "ScatteredScalarField")

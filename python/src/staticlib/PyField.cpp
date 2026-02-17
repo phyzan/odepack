@@ -135,7 +135,7 @@ PyRegVecField::CLS PyRegVecField::init_main(const py::array_t<double>& values, c
 }
 
 
-py::object PyRegVecField::py_streamplot_data(const CLS& self, double max_length, double ds, int density){
+py::object PyRegVecField::py_streamplot_data(const CLS& self, double max_length, int density, double ds, double rtol, double atol, double min_step, const py::object& max_step, const py::str& method){
     if (density <= 1){
         throw py::value_error("Density must be greater than 1");
     }
@@ -146,7 +146,7 @@ py::object PyRegVecField::py_streamplot_data(const CLS& self, double max_length,
         throw py::value_error("ds must be a positive number");
     }
 
-    std::vector<Array2D<double, 0, 0>> streamlines = self.streamplot_data(max_length, ds, size_t(density));
+    std::vector<Array2D<double, 0, 0>> streamlines = self.streamplot_data(max_length, ds, size_t(density), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), method.cast<std::string>());
     py::list result;
     for (const Array2D<double, 0, 0>& line : streamlines){
         result.append(py::cast(line));
