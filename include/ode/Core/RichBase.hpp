@@ -110,17 +110,6 @@ public:
     bool                                    is_interpolating() const;
 
     /**
-     * @brief Get a State object representing the current solver position.
-     *
-     * If at an event with a visible mask, returns the masked state.
-     * If at an event with a hidden mask, returns the pre-mask state.
-     * Otherwise returns the base solver state.
-     *
-     * @return State object with current time and state vector.
-     */
-    State<T>                                state() const;
-
-    /**
      * @brief Check if the solver is currently positioned at an event.
      * @return True if an event has triggered at the current time.
      */
@@ -179,38 +168,38 @@ protected:
     ~RichSolver() = default;
 
     /// @brief Reset implementation hook. Resets events and stops interpolation.
-     void reset_impl();
+    void reset_impl();
 
     /**
      * @brief Re-adjustment hook for state changes at events.
      * @param new_vector New state vector values (size Nsys).
      */
-     void re_adjust_impl(const T* new_vector);
+    void re_adjust_impl(const T* new_vector);
 
 private:
 
     //================= STATIC OVERRIDES ======================
-    /// @brief Time accessor that accounts for events.
-     const T&     t_impl() const;
+    /// @brief Get pointer to the current "true" state.
+    const T*   true_state_ptr() const;
 
-    /// @brief Vector accessor returning exposed state (masked or pre-mask based on visibility).
-     const T*     vector_impl() const;
+    /// @brief Get pointer to the previous "true" state.
+    const T*   last_true_state_ptr() const;
 
     /// @brief Advance implementation with event detection.
-    bool                adv_impl();
+    bool            adv_impl();
 
     /// @brief Args update that also updates event arguments.
-     void         set_args_impl(const T* new_args);
+    void         set_args_impl(const T* new_args);
     //=========================================================
 
     /// @brief Add an interpolant to the linked interpolator chain.
     void            add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant);
 
     /// @brief Check if an event requires restarting integration.
-     bool     requires_new_start() const;
+    bool     requires_new_start() const;
 
     /// @brief Check if the current state equals the new computed state.
-     bool     equiv_states() const;
+    bool     equiv_states() const;
 
     /// @brief Collection of events being monitored.
     EventCollection<T>                      _events;

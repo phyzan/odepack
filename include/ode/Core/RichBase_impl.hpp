@@ -8,52 +8,76 @@ namespace ode{
 // PUBLIC ACCESSORS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- const T& RichSolver<Derived, T, N, SP, RhsType, JacType>::t_impl() const{
+const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::true_state_ptr() const{
+    const T* base_ptr = Base::true_state_ptr();
+    int d = this->direction();
+    T base_time = base_ptr[0]*d;
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
-        if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
-            return Base::t_impl();
+        const T* derived_ptr = event.state()->get_exposed();
+        T derived_time = derived_ptr[0]*d;
+        if (base_time < derived_time){
+            return base_ptr;
         }else{
-            return event.state()->t();
+            return derived_ptr;
         }
     }else{
-        return Base::t_impl();
+        return base_ptr;
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::vector_impl() const{
-    if (const size_t* ev_idx = _events.begin()){
+const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state_ptr() const{
+    const T* base_ptr = Base::last_true_state_ptr();
+    int d = this->direction();
+    T base_time = base_ptr[0]*d;
+    if (const size_t* ev_idx = _events.last_begin()){
         const Event<T>& event = _events.event(*ev_idx);
-        if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
-            return Base::vector_impl();
+        const T* derived_ptr = event.state()->get_exposed();
+        T derived_time = derived_ptr[0]*d;
+        if (base_time > derived_time){
+            return base_ptr;
         }else{
-            return _events.state(*ev_idx).exposed().vector();
+            return derived_ptr;
         }
     }else{
-        return Base::vector_impl();
+        return base_ptr;
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector() const{
+View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector() const{
+    // The overriden true_state_ptr returns the the pointer to the **exposed** state, although the "true" in the name.
+    // The "true" actually refers to the fact that the state might not point to the solver's adapted state, but could point to
+    // any point between the old adapted state and the newly adapted state.
+    // However in the case of masked events with hidden mask, even though the "true" state (in the sense that the BaseSolver uses it) is the intermediate event state, the **true** true state is the masked state, which is the one that the solver will actually continue from. So the true_vector() returns the view of the **true** true state, which is the actual (not exposed) state of the event if at an event, and is the same as the base solver state otherwise.
+    const T* state_ptr;
+    const T* base_ptr = Base::true_state_ptr();
+    int d = this->direction();
+    T base_time = base_ptr[0]*d;
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
-        if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
-            return View1D<T, N>(Base::vector_impl(), this->Nsys());
+        const T* derived_ptr = event.state()->get_true();
+        T derived_time = derived_ptr[0]*d;
+        if (base_time < derived_time){
+            state_ptr = base_ptr;
         }else{
-            return View1D<T, N>(_events.state(*ev_idx).true_state().vector(), this->Nsys());
+            state_ptr = derived_ptr;
         }
     }else{
-        return View1D<T, N>(Base::vector_impl(), this->Nsys());
+        state_ptr = base_ptr;
     }
+    return View1D<T, N>(state_ptr + 2, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 EventView<T> RichSolver<Derived, T, N, SP, RhsType, JacType>::current_events() const{
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
-        if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
+        int d = this->direction();
+        const T& base_time = Base::true_state_ptr()[0];
+        const T& event_time = event.state()->t();
+        if (base_time * d < event_time * d){
             return EventView<T>(nullptr, nullptr, 0);
         }else{
             return _events.event_view();
@@ -79,24 +103,13 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::is_interpolating() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> RichSolver<Derived, T, N, SP, RhsType, JacType>::state() const{
-    if (const size_t* ev_idx = _events.begin()){
-        const Event<T>& event = _events.event(*ev_idx);
-        if (Base::t_impl() * this->direction() < event.state()->t()*this->direction()){
-            return Base::state();
-        }else{
-            return _events.state(*ev_idx).exposed();
-        }
-    }else{
-        return Base::state();
-    }
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event() const{
     if (const size_t* ev_idx = _events.begin()){
         const Event<T>& event = _events.event(*ev_idx);
-        return static_cast<bool>(Base::t_impl() * this->direction() >= event.state()->t()*this->direction());
+        int d = this->direction();
+        const T& base_time = Base::true_state_ptr()[0];
+        const T& event_time = event.state()->t();
+        return static_cast<bool>(base_time * d >= event_time * d);
     }else{
         return false;
     }
@@ -137,17 +150,20 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
             return false;
         }
     }else if (!Base::is_at_new_state()){
-
+        const T& base_time = Base::true_state_ptr()[0];
+        int d = this->direction();
         bool event_waiting = false;
         if (const size_t* ev_idx = _events.begin()){
             const Event<T>& event = _events.event(*ev_idx);
-            event_waiting = (Base::t_impl() * this->direction() < event.state()->t()*this->direction());
+            const T& event_time = event.state()->t();
+            event_waiting = (base_time * d < event_time * d);
         }
 
         if (Base::adv_impl()){
             if (const size_t* idx_ptr = _events.begin()){
                 const Event<T>& event = _events.event(*idx_ptr);
-                if (!event_waiting && Base::t_impl() * this->direction() >= event.state()->t()*this->direction()){
+                const T& event_time = event.state()->t();
+                if (!event_waiting && base_time * d >= event_time * d){
                     _events.next_result();
                 }
             }else{
@@ -204,8 +220,10 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
             int bdr1 = 1;
 
             if (const size_t* ev_idx = _events.begin()){
-                const T& t_event = _events.state(*ev_idx).t();
-                if ((Base::t_impl() * this->direction() < t_event*this->direction()) && _events.canon_event() && (t_event == _events.canon_state()->t()) && _events.canon_event()->hides_mask()){
+                int d = this->direction();
+                const T& base_time = Base::true_state_ptr()[0];
+                const T& t_event = _events.state(*ev_idx).get_true()[0];
+                if ((base_time * d < t_event * d) && _events.canon_event() && (t_event == _events.canon_state()->t()) && _events.canon_event()->hides_mask()){
                     _cli.take_ownership(new LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys()));
                     bdr1 = -1;
                 }
@@ -269,8 +287,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
-    return this->t_impl() == Base::t_new();
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
+    return this->t() == Base::t_new();
 }
 
 // ============================================================================

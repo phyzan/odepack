@@ -123,7 +123,7 @@ bool EventBase<Derived, T>::locate(State<T> before, State<T> after, FuncLike<T> 
     if (THIS_C->locate_impl(t, before, after, q, obj)){
         _state.set_t(t);
         _state.set_stepsize(after.habs());
-        T* q_event = this->is_masked() ? _state.exposed_vector() : _state.true_vector();
+        T* q_event = this->is_masked() ? _state.mut_exposed()+2 : _state.mut_true()+2;
         q(q_event, t, obj); //q_event has been set
         _is_located = true;
         return true;
@@ -137,8 +137,8 @@ template<typename Derived, typename T>
 bool EventBase<Derived, T>::register_it(){
     if (_is_located){
         if (this->is_masked()){
-            copy_array(_state.true_vector(), _state.exposed_vector(), _state.nsys());
-            this->apply_mask(_state.true_vector(), _state.t(), _state.exposed_vector());
+            copy_array(_state.mut_true()+2, _state.get_exposed()+2, _state.nsys());
+            this->apply_mask(_state.mut_true()+2, _state.t(), _state.get_exposed()+2);
             _state.choose_true = !this->hides_mask();
         }else{
             _state.choose_true = true;
@@ -589,7 +589,7 @@ const size_t* EventCollection<T>::end() const{
 }
 
 template<typename T>
- bool EventCollection<T>::next_result() {
+bool EventCollection<T>::next_result() {
     if (_iter+1 < _Nt){
         _iter++;
         return true;
@@ -601,7 +601,17 @@ template<typename T>
 }
 
 template<typename T>
- void EventCollection<T>::restart_iter(){
+const size_t* EventCollection<T>::last_begin() const{
+    return (_iter > 0) ? _event_idx.data() + _event_idx_start[_iter-1] : nullptr;
+}
+
+template<typename T>
+const size_t* EventCollection<T>::last_end() const{
+    return (_iter > 0) ? _event_idx.data() + _event_idx_start[_iter] : nullptr;
+}
+
+template<typename T>
+void EventCollection<T>::restart_iter(){
     _iter = 0;
 }
 

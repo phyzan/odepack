@@ -34,7 +34,7 @@ template<typename T, typename Derived>
 void NormalizationEvent<T, Derived>::register_impl(){
     //call Base::register_impl() first
     Base::register_impl();
-    _delta_s = log(norm(this->state()->exposed().vector()+Nsys_main(), Nsys_main()));
+    _delta_s = log(norm(this->state()->get_exposed()+2+Nsys_main(), Nsys_main()));
     _logksi += _delta_s;
 }
 

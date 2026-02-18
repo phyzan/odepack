@@ -56,11 +56,9 @@ PySolver& PySolver::operator=(PySolver&& other) noexcept{
     return *this;
 }
 
-
 PySolver::~PySolver(){
     DISPATCH(void, delete cast<T>();)
 }
-
 
 void PySolver::set_pyobj(const PySolver& other){
     if (!data.is_lowlevel){
@@ -74,6 +72,12 @@ py::object PySolver::t() const{
     )
 }
 
+py::object PySolver::t_last() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->t_last());
+    )
+}
+
 py::object PySolver::t_old() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->t_old());
@@ -83,6 +87,12 @@ py::object PySolver::t_old() const{
 py::object PySolver::q() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->vector());
+    )
+}
+
+py::object PySolver::q_last() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->vector_last());
     )
 }
 

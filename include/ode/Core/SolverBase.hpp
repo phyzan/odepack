@@ -120,73 +120,88 @@ public:
     // ACCESSORS
 
     /// @brief Get the current time value.
-    const T&             t() const;
+    const T&            t() const;
+
+    /// @brief Get the time value of the last "true" state.
+    const T&            t_last() const;
+
+    /// @brief Get the time value of the newest computed step.
+    const T&            t_new() const;
 
     /// @brief Get the time value from the previous accepted step.
-    const T&              t_old() const;
+    const T&            t_old() const;
 
     /// @brief Get a view of the current state vector.
-    View1D<T, N>         vector() const;
+    View1D<T, N>        vector() const;
 
     /// @brief Get a view of the state vector from the previous accepted step.
-    View1D<T, N>         vector_old() const;
+    View1D<T, N>        vector_last() const;
+
+    /// @brief Get a view of the state vector from the newest computed step.
+    View1D<T, N>        vector_new() const;
+
+    /// @brief Get a view of the state vector from the previous accepted step.
+    View1D<T, N>        vector_old() const;
+
+    /// @brief Get a State object representing the initial conditions.
+    State<T>            ics() const;
+
+    /// @brief Get a State object representing the current solver position.
+    State<T>            state() const;
+
+    /// @brief Get a State object representing the last solver position.
+    State<T>            last_state() const;
+
+    /// @brief Get a State object representing the most recent computed step.
+    State<T>            new_state() const;
+
+    /// @brief Get a State object representing the previous accepted step.
+    State<T>            old_state() const;
 
     /// @brief Get the current step size (absolute value).
-    const T&             stepsize() const;
+    const T&            stepsize() const;
 
     /// @brief Get the integration direction (+1 forward, -1 backward).
-    int                  direction() const;
+    int                 direction() const;
 
     /// @brief Get the relative tolerance for error control.
-    const T&             rtol() const;
+    const T&            rtol() const;
 
     /// @brief Get the absolute tolerance for error control.
-    const T&             atol() const;
+    const T&            atol() const;
 
     /// @brief Get the minimum allowed step size.
-    const T&             min_step() const;
+    const T&            min_step() const;
 
     /// @brief Get the maximum allowed step size.
-    const T&             max_step() const;
+    const T&            max_step() const;
 
     /// @brief Get the additional arguments passed to the ODE function.
-    const Array1D<T>&    args() const;
+    const Array1D<T>&   args() const;
 
     /// @brief Get the number of equations in the ODE system.
-    size_t               Nsys() const;
+    size_t              Nsys() const;
 
     /// @brief Get the number of successful integration steps taken.
-    size_t               Nupdates() const;
+    size_t              Nupdates() const;
 
     /// @brief Check if the solver is currently running (not paused or dead).
-    bool                 is_running() const;
+    bool                is_running() const;
 
     /// @brief Check if the solver has permanently terminated.
-    bool                 is_dead() const;
+    bool                is_dead() const;
 
     /// @brief Check if the solution has diverged (contains inf/nan).
-    bool                 diverges() const;
+    bool                diverges() const;
 
     /// @brief Get the current status message.
-    const std::string&   message() const;
+    const std::string&  message() const;
 
     /**
      * @brief Print the current solver state to stdout.
      * @param prec Number of decimal places for floating-point output.
      */
-    void                        show_state(int prec=8) const;
-
-    /// @brief Get a State object representing the most recent computed step.
-    State<T>             new_state() const;
-
-    /// @brief Get a State object representing the previous accepted step.
-    State<T>             old_state() const;
-
-    /// @brief Get a State object representing the current solver position.
-    State<T>             state() const;
-
-    /// @brief Get a State object representing the initial conditions.
-    State<T>             ics() const;
+    void                show_state(int prec=8) const;
 
     /**
      * @brief Validate proposed initial conditions.
@@ -329,13 +344,13 @@ public:
      * @brief Set the user object pointer passed to ODE callbacks.
      * @param obj Pointer to user data (must not be this solver instance).
      */
-     void                 set_obj(const void* obj);
+    void                        set_obj(const void* obj);
 
     /**
      * @brief Update the additional arguments passed to the ODE function.
      * @param new_args Pointer to new argument values (must match original size).
      */
-     void                 set_args(const T* new_args);
+    void                        set_args(const T* new_args);
 
 
 protected:
@@ -409,43 +424,31 @@ protected:
     // =========================== HELPER METHODS =====================================
 
     /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
-     void                 rhs(T* dq_dt, const T& t, const T* q) const;
+    void       rhs(T* dq_dt, const T& t, const T* q) const;
 
     /// @brief Same as this->Jac, but increments the Jacobian evaluation counter.
-     void                 jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+    void       jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
     /// @brief Get pointer to the initial conditions state data.
-     const T*             ics_ptr() const;
+    const T*   ics_ptr() const;
 
     /// @brief Get pointer to the most recently computed state.
-     const T*             new_state_ptr() const;
+    const T*   new_state_ptr() const;
 
     /// @brief Get pointer to the previous accepted state.
-     const T*             old_state_ptr() const;
-
-    /// @brief Get pointer to the current "true" state.
-     const T*             true_state_ptr() const;
-
-    /// @brief Get pointer to the previous "true" state.
-     const T*             last_true_state_ptr() const;
+    const T*   old_state_ptr() const;
 
     /// @brief Get pointer to the correct new state for interpolation
-     const T*             interp_new_state_ptr() const;
-
-    /// @brief Get the time value of the newest computed step.
-    const T&                    t_new() const;
-
-    /// @brief Get the time value of the last "true" state.
-    const T&                    t_last() const;
-
+    const T*   interp_new_state_ptr() const;
+    
     /// @brief Print a warning that the solver is paused.
-    void                        warn_paused() const;
+    void        warn_paused() const;
 
     /// @brief Print a warning that the solver is dead.
-    void                        warn_dead() const;
+    void        warn_dead() const;
 
     /// @brief Set the solver status message.
-     void                 set_message(const std::string& text);
+    void       set_message(const std::string& text);
 
     /**
     @brief Trigger re-adjustment right before state changes.
@@ -454,22 +457,22 @@ protected:
     @note The current state will be set to (t(), stepsize(), new_vector),
     where t() is the true current time, which might lie between old_state and new_state (e.g. if an event occurred). After that, any interpolation algorithms can only be valid in the interval [t_old, t), and the dense state vector output will reflect that with a discontinuity at t().
     */
-    void                        re_adjust(const T* new_vector);
+    void        re_adjust(const T* new_vector);
 
     /// @brief Check if the current true state matches the new state.
-     bool                 is_at_new_state() const;
+    bool       is_at_new_state() const;
 
     // ================================================================================
 
     // ============================ OVERRIDEN IN RICH SOLVER ==========================
-    /// @brief Time accessor implementation (overridden in RichSolver).
-     const T&             t_impl() const;
+    /// @brief Get pointer to the current "true" state.
+    const T*   true_state_ptr() const;
 
-    /// @brief Vector accessor implementation (overridden in RichSolver).
-     const T*             vector_impl() const;
+    /// @brief Get pointer to the previous "true" state.
+    const T*   last_true_state_ptr() const;
 
     /// @brief Advance implementation (overridden in RichSolver).
-     bool                 adv_impl();
+    bool        adv_impl();
     // ================================================================================
 
     DEFAULT_RULE_OF_FOUR(BaseSolver)

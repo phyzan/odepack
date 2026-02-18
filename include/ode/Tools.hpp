@@ -146,13 +146,13 @@ public:
 
     const T& t() const;
 
-    State<T> true_state() const;
+    const T* get_true() const;
 
-    State<T> exposed() const;
+    const T* get_exposed() const;
 
-    T* true_vector();
+    T* mut_true();
 
-    T* exposed_vector();
+    T* mut_exposed();
 
     void set_t(T t);
 

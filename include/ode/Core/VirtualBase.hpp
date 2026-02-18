@@ -28,9 +28,18 @@ public:
 
     // ACCESSORS
     virtual const T&            t() const = 0;
+    virtual const T&            t_last() const = 0;
+    virtual const T&            t_new() const = 0;
     virtual const T&            t_old() const = 0;
     virtual View1D<T, N>        vector() const = 0;
+    virtual View1D<T, N>        vector_last() const = 0;
+    virtual View1D<T, N>        vector_new() const = 0;
     virtual View1D<T, N>        vector_old() const = 0;
+    virtual State<T>            ics() const = 0;
+    virtual State<T>            state() const = 0;
+    virtual State<T>            last_state() const = 0;
+    virtual State<T>            new_state() const = 0;
+    virtual State<T>            old_state() const = 0;
     virtual const T&            stepsize() const = 0;
     virtual int                 direction() const = 0;
     virtual const T&            rtol() const = 0;
@@ -45,8 +54,6 @@ public:
     virtual bool                diverges() const = 0;
     virtual const std::string&  message() const = 0;
     virtual void                show_state(int prec=8) const = 0;
-    virtual State<T>            state() const = 0;
-    virtual State<T>            ics() const = 0;
     virtual bool                validate_ics(T t0, const T* q0) const = 0;
     virtual const std::string&  method() const = 0;
     virtual void                interp(T* result, const T& t) const = 0;

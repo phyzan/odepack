@@ -113,7 +113,6 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");
-    
     std::vector<T> args{};
     std::vector<const Event<T>*> events{};
     std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData<Func<T>, void>{.rhs=VFBase::ode_func_norm, .obj=this}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, stepsize, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
@@ -166,18 +165,6 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         }
     };
 
-    auto get_ds = [this](const T* q_old, const T* q_new) LAMBDA_INLINE{
-        if constexpr (NDIM > 0){
-            return sqrt((((q_new[I] - q_old[I])* (q_new[I] - q_old[I])) + ...));
-        }else{
-            T sum = 0;
-            for (int axis=0; axis<this->ndim(); axis++){
-                sum += (q_new[axis] - q_old[axis]) * (q_new[axis] - q_old[axis]);
-            }
-            return sqrt(sum);
-        }
-    };
-
     auto IntegrateDirection = [&](OdeRichSolver<T, NDIM>* solver, T& s_total, T* const * x, int& n_steps_tot, const int dir) -> int {
         // x[I] are preallocated arrays of size max_pts + 1. x[I][0] = x0[I], so at each step, we write to x[I][step], starting from x[I][1]
         Array1D<T, NDIM, InterpBase::ALLOC> ics(this->ndim());
@@ -196,15 +183,12 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         }
         int n_steps = 0;
         const T* q_new;
-        const T* q_old;
 
 
         GetIdx(i_start, ics.data());
         while ((n_steps < max_pts) && solver->advance_by(ds)){
             q_new = solver->vector().data();
-            q_old = solver->vector_old().data();
             GetIdx(i_curr, q_new);
-            s_total += get_ds(q_old, q_new);
             n_steps++;
             n_steps_tot++;
             if constexpr (NDIM > 0){
@@ -236,9 +220,9 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
             }
 
         }
+        s_total += abs(solver->t());
         return n_steps;
     };
-
 
     auto GetStreamline = [&](bool& success, Array2D<T, NDIM, 0>& worker_line, const T* x0) {
         assert(worker_line.shape(1) == size_t(2*max_pts + 1)&& "Line array must have shape (2, 2*max_pts + 1)");

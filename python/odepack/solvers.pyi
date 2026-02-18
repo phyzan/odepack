@@ -136,10 +136,22 @@ class OdeSolver:
         ...
 
     @property
+    def t_last(self)->float:
+        """
+        The time value of the last state the solver was at before the latest advance() call, whether the solver was at an intermediate step, event, or adapted step.
+
+        Returns
+        -------
+        float
+            Value of the integration variable of the previous step.
+        """
+        ...
+
+    @property
     def t_old(self)->float:
         """
         The previous integration time that was automatically adapted using the solver's method.
-        Events are not considered.
+        Thus, this does not account for intermediate steps between adapted states.
 
         Returns
         -------
@@ -149,9 +161,26 @@ class OdeSolver:
         ...
 
     @property
+    def q_last(self)->np.ndarray:
+        """
+        The state vector corresponding to t_last
+
+        Returns
+        -------
+        np.ndarray
+            State vector at t_last.
+        """
+        ...
+
+    @property
     def q_old(self)->np.ndarray:
         """
-        The previous state vector before the current step, corresponding to t_old.
+        The previous state vector before the current adapted step, corresponding to t_old.
+
+        Returns
+        -------
+        np.ndarray
+            State vector at t_old.
         """
         ...
 

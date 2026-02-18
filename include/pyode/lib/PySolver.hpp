@@ -39,9 +39,13 @@ struct PySolver : DtypeDispatcher {
 
     py::object          t() const;
 
+    py::object          t_last() const;
+
     py::object          t_old() const;
 
     py::object          q() const;
+
+    py::object          q_last() const;
 
     py::object          q_old() const;
 

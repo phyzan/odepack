@@ -127,31 +127,29 @@ T* MutState<T>::vector(){
 //                                      EventState<T>
 //===========================================================================================
 
-
 template<typename T>
 const T& EventState<T>::t() const{
     return data[0];
 }
 
 template<typename T>
-State<T> EventState<T>::true_state() const{
-    return {data.data(), Nsys};
+const T* EventState<T>::get_true() const{
+    return data.data();
 }
 
 template<typename T>
-State<T> EventState<T>::exposed() const{
-    return choose_true ? this->true_state()
-                       : State<T>{data.data() + Nsys + 2, Nsys};
+const T* EventState<T>::get_exposed() const{
+    return choose_true ? data.data() : data.data() + Nsys + 2;
 }
 
 template<typename T>
-T* EventState<T>::true_vector(){
-    return data.data() + 2;
+T* EventState<T>::mut_true(){
+    return data.data();
 }
 
 template<typename T>
-T* EventState<T>::exposed_vector(){
-    return data.data() + Nsys + 4;
+T* EventState<T>::mut_exposed(){
+    return data.data() + Nsys + 2;
 }
 
 template<typename T>

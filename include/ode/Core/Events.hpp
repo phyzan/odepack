@@ -466,28 +466,28 @@ public:
     ~EventCollection() = default;
 
     /// @brief Get event by index.
-     const Event<T>&      event(size_t i) const;
+    const Event<T>&         event(size_t i) const;
 
     /// @brief Get event state by index.
-     const EventState<T>& state(size_t i) const;
+    const EventState<T>&    state(size_t i) const;
 
     /// @brief Get total number of events.
-     size_t               size() const;
+    size_t                  size() const;
 
     /// @brief Get number of events detected in last pass.
-     size_t               detection_size() const;
+    size_t                  detection_size() const;
 
     /// @brief Get number of distinct trigger times in last pass.
-     size_t               detection_times() const;
+    size_t                  detection_times() const;
 
     /// @brief Get the pointer to the first detected event in the next time group
-    const Event<T>*             get_next_event() const;
+    const Event<T>*         get_next_event() const;
 
     /// @brief Initialize all events for use with solver.
-    void                        setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
+    void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
 
     /// @brief Update arguments for all events.
-    void                        set_args(const T* args, size_t size);
+    void                    set_args(const T* args, size_t size);
 
     /**
      * @brief Detect all events between two states.
@@ -495,23 +495,37 @@ public:
      * Locates events, sorts by time, resolves conflicts, and prepares
      * results for iteration.
      */
-    void                        detect_all_between(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+    void                    detect_all_between(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+
     /// @brief Get view of events at current iteration time.
-    EventView<T>                event_view() const;
+    EventView<T>            event_view() const;
+
     /// @brief Get iterator to start of current time group indices.
-    const size_t*               begin() const;
+    const size_t*           begin() const;
+
     /// @brief Get iterator to end of current time group indices.
-    const size_t*               end() const;
+    const size_t*           end() const;
+
     /// @brief Advance to next time group.
-     bool                 next_result();
+    bool                    next_result();
+
+    /// @brief Get iterator to start of events at the previous time group (nullptr if no previous group).
+    const size_t*           last_begin() const;
+
+    /// @brief Get iterator to end of events at the previous time group (nullptr if no previous group).
+    const size_t*           last_end() const;
+
     /// @brief Reset iteration to first time group.
-     void                 restart_iter();
+    void                    restart_iter();
+
     /// @brief Get the first masked event that determines the state transformation, if any.
-    const Event<T>*             canon_event() const;
+    const Event<T>*         canon_event() const;
+
     /// @brief Get the state of the first masked event, if any.
-    const EventState<T>*        canon_state() const;
+    const EventState<T>*    canon_state() const;
+
     /// @brief Reset all events to initial state.
-    void                        reset(int direction = 0);
+    void                    reset(int direction = 0);
 
 private:
 
