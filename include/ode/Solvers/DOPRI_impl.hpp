@@ -113,13 +113,12 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
     this->_mat_is_set = false;
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
     const T& rtol = this->rtol();
-    const T* state = this->new_state_ptr();
     const size_t n = this->Nsys();
 
     T& habs = res[1];
@@ -134,7 +133,7 @@ StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>:
     copy_array(K_, K_ + Nstages*n, n); //FSAL: K[0] for next step = K[Nstages] from this step. Doing this instead of calling this->rhs(t_current, q_current) in step_impl
     while (!step_accepted){
         h = habs * this->direction();
-        step_impl(res, h); //res and K are altered
+        step_impl(res, state, h); //res and K are altered
         adapt_scale(_scale_tmp.data(), q, q_new, atol, rtol, n);
         err_norm = this->estimate_error_norm(_K_true.data(), _scale_tmp.data(), h);
         _factor = this->SAFETY*pow(err_norm, ERR_EXP);
@@ -160,8 +159,7 @@ StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>:
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::step_impl(T* result, const T& h){
-    const T* state = this->new_state_ptr();
+void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::step_impl(T* result, const T* state, const T& h){
     const size_t n = this->Nsys();
     T* q_new = result + 2;
     T* K_ = _K_true.data();

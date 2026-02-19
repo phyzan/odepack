@@ -380,7 +380,7 @@ protected:
      * @param[out] state Output array for the new state [t, h, q...] (size Nsys+2).
      * @note Must be implemented by derived class.
      */
-    StepResult              adapt_impl(T* state);
+    StepResult              adapt_impl(T* state, const T* old_state);
 
     /**
      * @brief Interpolate solution at time t using method-specific interpolation.

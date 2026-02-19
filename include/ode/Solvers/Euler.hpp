@@ -23,7 +23,7 @@ private:
     using Base = BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
     friend Base::MainSolverType;
 
-    StepResult  adapt_impl(T* res);
+    StepResult  adapt_impl(T* res, const T* state);
 
     void        interp_impl(T* result, const T& t) const;
 

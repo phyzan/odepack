@@ -252,12 +252,11 @@ void BDF<T, N, SP, RhsType, JacType>::_reset_impl_alone(){
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-StepResult BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res){
+StepResult BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
     const T& rtol = this->rtol();
-    const T* state = this->new_state_ptr();
 
     const T& t = state[0];
     const T& stepsize = state[1];

@@ -20,7 +20,7 @@ protected:
     // ================ STATIC OVERRIDES ========================
     static constexpr bool   IS_IMPLICIT = false;
 
-    StepResult  adapt_impl(T* res);
+    StepResult  adapt_impl(T* res, const T* state);
 
     void        reset_impl();
 
@@ -46,7 +46,7 @@ protected:
 
      void set_coef_matrix() const;
 
-    void        step_impl(T* result, const T& h);
+    void        step_impl(T* result, const T* state, const T& h);
 
     // ======================= OVERRIDE =======================
      T    estimate_error_norm(const T* K, const T* scale, T h) const;

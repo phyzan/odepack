@@ -108,7 +108,7 @@ private:
     static constexpr bool IS_IMPLICIT = true;
     static constexpr int ERR_EST_ORDER = 1;
 
-    StepResult      adapt_impl(T* res);
+    StepResult      adapt_impl(T* res, const T* state);
     void            interp_impl(T* result, const T& t) const;
     void            reset_impl();
     void            re_adjust_impl(const T* new_vector);

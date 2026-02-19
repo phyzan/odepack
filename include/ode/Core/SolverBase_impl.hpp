@@ -539,8 +539,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state){
-    return THIS->adapt_impl(state);
+StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state, const T* old_state){
+    return THIS->adapt_impl(state, old_state);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -612,7 +612,7 @@ const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state_ptr() 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
     if (_true_state_idx == _new_state_idx){
-        StepResult result = this->adapt_impl(this->aux_state_ptr());
+        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
         if (validate_it(result, this->aux_state_ptr())){
             register_states();
             this->_Nupdates++;

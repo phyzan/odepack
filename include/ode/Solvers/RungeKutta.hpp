@@ -76,7 +76,7 @@ private:
     static constexpr int            ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
 
-    StepResult  adapt_impl(T* res);
+    StepResult  adapt_impl(T* res, const T* state);
 
     void        interp_impl(T* result, const T& t) const;
 
