@@ -467,9 +467,8 @@ void DOP853<T, N, SP, RhsType, JacType>::set_coef_matrix_impl() const{
         }
     }
 }
-
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-T DOP853<T, N, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* scale, T h) const{
+T DOP853<T, N, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const{
     // DOP853 uses a combination of 3rd and 5th order error estimates
     // err5 = K.T @ E5 / scale
     // err3 = K.T @ E3 / scale
@@ -487,8 +486,9 @@ T DOP853<T, N, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* s
             err5 += K[i * Nsys + j] * E5(i);
             err3 += K[i * Nsys + j] * E3(i);
         }
-        err5 /= scale[j];
-        err3 /= scale[j];
+        T scale = atol + rtol * std::max(abs(q[j]), abs(q_new[j]));
+        err5 /= scale;
+        err3 /= scale;
 
         err5_norm_2 += err5 * err5;
         err3_norm_2 += err3 * err3;
@@ -496,7 +496,7 @@ T DOP853<T, N, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* s
 
     // Handle special case
     if (err5_norm_2 == 0 && err3_norm_2 == 0){
-        return T(0);
+        return 0;
     }
 
     T denom = err5_norm_2 + T(1)/100 * err3_norm_2;

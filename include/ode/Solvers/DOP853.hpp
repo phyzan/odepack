@@ -86,7 +86,7 @@ public:
 
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
-     std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
+    std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
 
 private:
 
@@ -135,8 +135,8 @@ private:
     typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
 
     void set_coef_matrix_impl() const;
-
-    T estimate_error_norm(const T* K, const T* scale, T h) const;
+    
+    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
 };
 

@@ -5,17 +5,8 @@
 
 namespace ode{
 
-
-
-template<typename T>
- void adapt_scale(T* scale, const T* q1, const T* q2, T atol, T rtol, size_t size){
-    for (size_t i=0; i<size; i++){
-        scale[i] = atol + std::max(abs(q1[i]), abs(q2[i]))*rtol;
-    }
-}
-
 template<typename T, size_t Nstages>
-T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
+T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size) {
 
     // std::fill(tmp, tmp+size, 0);
     // for (size_t i=0; i<Nstages+1; i++){
@@ -25,19 +16,20 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
     //         tmp[j] += (K[i*size+j] * p)/scale[j];
     //     }
     // }
-
+    T r = 0;
     for (size_t j=0; j<size; j++){
         T sum = 0;
         for (size_t i=0; i<Nstages+1; i++){
             sum += K[i*size+j] * E[i]*h;
         }
-        tmp[j] = sum/scale[j];
+        sum /= (atol + std::max(abs(q[j]), abs(q_new[j]))*rtol);
+        r += sum*sum;
     }
-    return rms_norm(tmp, size);
+    return sqrt(r/size);
 }
 
 // template<typename T, size_t Nstages>
-// T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
+// T error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size) {
 //     // Single-pass: compute error and max simultaneously
 //     T max_err = 0;
 //     for (size_t j = 0; j < size; j++) {
@@ -55,7 +47,7 @@ T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t
 // RungeKuttaBase implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows)
-    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    requires (!is_rich<SP>): Base(ARGS), _K_true(Krows, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
     if (q0 != nullptr){
         this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
@@ -64,7 +56,7 @@ RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::RungeKutta
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows)
-    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _scale_tmp(nsys), _error_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    requires (is_rich<SP>): Base(ARGS, events), _K_true(Krows, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
     if (q0 != nullptr){
         this->rhs(_K_true.data()+Nstages*nsys, t0, q0);
@@ -95,8 +87,8 @@ void RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::re_ad
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
- T RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* scale, T h) const {
-    return THIS_C->estimate_error_norm(K, scale, h);
+ T RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const {
+    return THIS_C->estimate_error_norm(K, q, q_new, rtol, atol, h);
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
@@ -134,8 +126,7 @@ StepResult RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>:
     while (!step_accepted){
         h = habs * this->direction();
         step_impl(res, state, h); //res and K are altered
-        adapt_scale(_scale_tmp.data(), q, q_new, atol, rtol, n);
-        err_norm = this->estimate_error_norm(_K_true.data(), _scale_tmp.data(), h);
+        err_norm = this->estimate_error_norm(_K_true.data(), q, q_new, rtol, atol, h);
         _factor = this->SAFETY*pow(err_norm, ERR_EXP);
         if (err_norm < 1){
             factor = (err_norm == 0) ? this->MAX_FACTOR : std::min(this->MAX_FACTOR, _factor);
@@ -245,8 +236,8 @@ void StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::s
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
- T StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* scale, T h) const {
-    return _error_norm<T, Nstages>(this->_error_tmp.data(), E.data(), K, h, scale, this->Nsys());
+ T StandardRungeKutta<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const {
+    return error_norm<T, Nstages>(E.data(), K, q, q_new, rtol, atol, h, this->Nsys());
 }
 
 

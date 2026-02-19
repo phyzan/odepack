@@ -9,7 +9,7 @@ namespace ode {
 
 // Forward declarations
 template<typename T, size_t Nstages>
-T _error_norm(T* tmp, const T* E, const T* K, const T& h, const T* scale, size_t size);
+T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size);
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 class RungeKuttaBase : public BaseDispatcher<Derived, T, N, SP, RhsType, JacType>{
@@ -49,7 +49,7 @@ protected:
     void        step_impl(T* result, const T* state, const T& h);
 
     // ======================= OVERRIDE =======================
-     T    estimate_error_norm(const T* K, const T* scale, T h) const;
+     T    estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
      void set_coef_matrix_impl() const;
 
@@ -57,8 +57,6 @@ protected:
 
     mutable Array2D<T, 0, N>    _K_true;
     mutable Array1D<T, N>       _df_tmp;
-    mutable Array1D<T, N>       _scale_tmp;
-    mutable Array1D<T, N>       _error_tmp;
     mutable Array2D<T, N, 0>    _coef_mat;
     mutable bool                _mat_is_set = false;
     T                           ERR_EXP = T(-1)/T(Derived::ERR_EST_ORDER+1);
@@ -96,7 +94,7 @@ protected:
 
     void                                        set_coef_matrix_impl() const;
 
-     T                                    estimate_error_norm(const T* K, const T* scale, T h) const;
+     T                                    estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
     // ==========================================================
 };
