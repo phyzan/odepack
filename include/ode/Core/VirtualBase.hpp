@@ -97,13 +97,14 @@ public:
     virtual View1D<T, N>                    true_vector() const = 0;
     virtual EventView<T>                    current_events() const = 0;
     virtual const EventCollection<T>&       event_col() const = 0;
+    virtual int                             event_idx(const std::string& name) const = 0;
     virtual const Interpolator<T, N>*       interpolator() const = 0;
     virtual bool                            is_interpolating() const = 0;
-    virtual bool                            at_event() const = 0;
+    virtual bool                            at_event(int event = -1) const = 0;
     virtual OdeRichSolver<T, N>*            clone() const = 0;
 
     // MODIFIERS
-    virtual bool                            advance_to_event()=0;
+    virtual bool                            advance_to_event(int event = -1) = 0;
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
 

@@ -230,9 +230,26 @@ py::tuple PySolver::timeit_step() {
     )
 }
 
-py::object PySolver::advance_to_event() {
+py::object PySolver::advance_to_event(const py::object& event) {
     return DISPATCH(py::object,
-        return py::cast(cast<T>()->advance_to_event());
+        if (cast<T>()->event_col().size() == 0){
+            throw py::value_error("This solver contains no events to advance to");
+        }else if (event.is_none()){
+            return py::cast(cast<T>()->advance_to_event());
+        }
+
+        std::string name;
+        try{
+            auto py_name = event.cast<py::str>();
+            name = py_name.cast<std::string>();
+        }catch (const py::cast_error&){
+            throw py::value_error("Event parameter must be a string name of an event in the solver");
+        }
+        int event_idx = cast<T>()->event_idx(name);
+        if (event_idx == -1){
+            throw py::value_error("No event with name '" + name + "' found in the solver");
+        }
+        return py::cast(cast<T>()->advance_to_event(event_idx));
     )
 }
 
@@ -291,24 +308,25 @@ py::str PySolver::message() const{
     )
 }
 
-py::object PySolver::py_at_event() const{
-    return DISPATCH(py::object,
-        return py::cast(cast<T>()->at_event());
-    )
-}
-
-py::object PySolver::py_event_located(const py::str& name) const{
-    return DISPATCH(py::object,
-        EventView<T> events = cast<T>()->current_events();
-        std::string ev = name.cast<std::string>();
-        for (size_t i=0; i<events.size(); i++){
-            if (events[i]->name() == ev){
-                return py::cast(true);
-            }
+bool PySolver::py_at_event(py::object event) const{
+    return DISPATCH(bool,
+        if (cast<T>()->event_col().size() == 0){
+            throw py::value_error("This solver contains no events to check for");
+        }else if (event.is_none()){
+            return cast<T>()->at_event();
         }
-        return py::cast(false);
+        std::string name;
+        try {
+            name = event.cast<std::string>();
+        } catch (const py::cast_error&){
+            throw py::value_error("Event parameter must be a string name of an event in the solver");
+        }
+        int event_idx = cast<T>()->event_idx(name);
+        if (event_idx == -1){
+            throw py::value_error("No event with name '" + name + "' found in the solver");
+        }
+        return cast<T>()->at_event(event_idx);
     )
-
 }
 
 //===========================================================================================

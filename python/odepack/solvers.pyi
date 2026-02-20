@@ -258,18 +258,6 @@ class OdeSolver:
         ...
 
     @property
-    def at_event(self)->bool:
-        """
-        Check if the solver is currently at any event time.
-
-        Returns
-        -------
-        bool
-            True if the current step landed exactly on an event time, False otherwise.
-        """
-        ...
-
-    @property
     def status(self)->str:
         """
         The current status message of the solver.
@@ -281,14 +269,14 @@ class OdeSolver:
         """
         ...
 
-    def event_located(self, event: str)->bool:
+    def at_event(self, event: str = None)->bool:
         """
         Check if a specific event is located at the current step.
 
         Parameters
         ----------
         event : str
-            Name of the event to check.
+            Name of the event to check. If None (default), checks if any event at all is located at the current step.
 
         Returns
         -------
@@ -405,21 +393,22 @@ class OdeSolver:
             explaining why advancement failed.
         """
 
-    def advance_to_event(self)->bool:
+    def advance_to_event(self, event: str = None)->bool:
         """
         Advance the solver until the next event occurrence.
 
-        Continuously steps the solver forward by individual steps until an event is
-        detected. If no more events are available, advances to the end of the
-        integration interval.
+        Parameters
+        ----------
+        event : str, optional
+            Name of a specific event to advance to. If None (default), advances to the next event regardless of type.
 
         Returns
         -------
         bool
-            True if an event was detected and the solver advanced to it. False if
-            no more events are available or advancement failed. When False, a
-            diagnostic message is printed explaining the reason.
-
+            True if an event was detected and the solver advanced to it.
+            False if the solver failed to advance further before reaching the event.
+            Raise error if the specified event name is not registered in the solver,
+            or if the solver contains no events at all.
         Note
         ----
         This requires events to be registered in the solver at initialization.

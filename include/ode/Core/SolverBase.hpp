@@ -180,7 +180,7 @@ public:
     const Array1D<T>&   args() const;
 
     /// @brief Get the number of equations in the ODE system.
-    size_t              Nsys() const;
+    constexpr size_t    Nsys() const {if constexpr (N > 0) {return N;} else {return _Nsys;}}
 
     /// @brief Get the number of successful integration steps taken.
     size_t              Nupdates() const;

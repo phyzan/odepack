@@ -8,7 +8,7 @@ namespace ode{
 
 // DOP_COEFS implementations
 template<typename T>
-typename DOP_COEFS<T>::DOP_A DOP_COEFS<T>::make_A(){
+constexpr typename DOP_COEFS<T>::DOP_A DOP_COEFS<T>::make_A(){
     DOP_A res(N_STAGES_EXT, N_STAGES_EXT);
     res.set(0);
 
@@ -128,7 +128,7 @@ typename DOP_COEFS<T>::DOP_A DOP_COEFS<T>::make_A(){
 }
 
 template<typename T>
-typename DOP_COEFS<T>::DOP_B DOP_COEFS<T>::make_B(){
+constexpr typename DOP_COEFS<T>::DOP_B DOP_COEFS<T>::make_B(){
     // B coefficients are row 12 of the A matrix (the 8th order solution weights)
     DOP_A a = make_A();
     DOP_B res(N_STAGES);
@@ -139,7 +139,7 @@ typename DOP_COEFS<T>::DOP_B DOP_COEFS<T>::make_B(){
 }
 
 template<typename T>
-typename DOP_COEFS<T>::DOP_C DOP_COEFS<T>::make_C(){
+constexpr typename DOP_COEFS<T>::DOP_C DOP_COEFS<T>::make_C(){
     DOP_C res(N_STAGES_EXT);
     res(0) = 0;
     res(1) = 0.526001519587677318785587544488e-01;
@@ -161,7 +161,7 @@ typename DOP_COEFS<T>::DOP_C DOP_COEFS<T>::make_C(){
 }
 
 template<typename T>
-typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E3(){
+constexpr typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E3(){
     DOP_E res(N_STAGES + 1);
     // E3 = B - B3 (3rd order embedded method)
     // Most values are zero, only differences are specified
@@ -182,7 +182,7 @@ typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E3(){
 }
 
 template<typename T>
-typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E5(){
+constexpr typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E5(){
     DOP_E res(N_STAGES + 1);
     res.set(0);
     // E5 = B - B5 (5th order embedded method)
@@ -198,7 +198,7 @@ typename DOP_COEFS<T>::DOP_E DOP_COEFS<T>::make_E5(){
 }
 
 template<typename T>
-typename DOP_COEFS<T>::DOP_D DOP_COEFS<T>::make_D(){
+constexpr typename DOP_COEFS<T>::DOP_D DOP_COEFS<T>::make_D(){
     DOP_D res(INTERP_ORDER - 3, N_STAGES_EXT);
     res.set(0);
 
@@ -347,10 +347,10 @@ void DOP853LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 
 // DOP853 implementations
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS, N_STAGES_EXT) {}
+DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS) {}
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events, N_STAGES_EXT) {}
+DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {}
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
  void DOP853<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
@@ -367,7 +367,7 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-typename DOP853<T, N, SP, RhsType, JacType>::Base::Atype DOP853<T, N, SP, RhsType, JacType>::Amatrix(){
+constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Atype DOP853<T, N, SP, RhsType, JacType>::Amatrix(){
     typename Base::Atype result(N_STAGES, N_STAGES);
     typename DOP_COEFS<T>::DOP_A full_A = DOP_COEFS<T>::make_A();
 
@@ -380,12 +380,12 @@ typename DOP853<T, N, SP, RhsType, JacType>::Base::Atype DOP853<T, N, SP, RhsTyp
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-typename DOP853<T, N, SP, RhsType, JacType>::Base::Btype DOP853<T, N, SP, RhsType, JacType>::Bmatrix(){
+constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Btype DOP853<T, N, SP, RhsType, JacType>::Bmatrix(){
     return DOP_COEFS<T>::make_B();
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-typename DOP853<T, N, SP, RhsType, JacType>::Base::Ctype DOP853<T, N, SP, RhsType, JacType>::Cmatrix(){
+constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Ctype DOP853<T, N, SP, RhsType, JacType>::Cmatrix(){
     typename Base::Ctype result(N_STAGES);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data(), N_STAGES);
@@ -393,7 +393,7 @@ typename DOP853<T, N, SP, RhsType, JacType>::Base::Ctype DOP853<T, N, SP, RhsTyp
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-typename DOP853<T, N, SP, RhsType, JacType>::A_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Amatrix_extra(){
+constexpr typename DOP853<T, N, SP, RhsType, JacType>::A_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Amatrix_extra(){
     Array2D<T, N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT> result(N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT);
     auto A = DOP_COEFS<T>::make_A();
     copy_array(result.data(), A.data()+(N_STAGES+1)* DOP_COEFS<T>::N_STAGES_EXT, N_STAGES_EXTRA* DOP_COEFS<T>::N_STAGES_EXT);
@@ -401,7 +401,7 @@ typename DOP853<T, N, SP, RhsType, JacType>::A_EXTRA_TYPE DOP853<T, N, SP, RhsTy
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-typename DOP853<T, N, SP, RhsType, JacType>::C_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Cmatrix_extra(){
+constexpr typename DOP853<T, N, SP, RhsType, JacType>::C_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Cmatrix_extra(){
     Array1D<T, N_STAGES_EXTRA> result(N_STAGES_EXTRA);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data()+N_STAGES+1, N_STAGES_EXTRA);
@@ -415,7 +415,7 @@ void DOP853<T, N, SP, RhsType, JacType>::set_coef_matrix_impl() const{
     const T* y_old = this->old_state_ptr()+2;
     const T& t_old = this->t_old();
     size_t Nsys = this->Nsys();
-    T* K = this->_K_true.data();
+    T* K = this->K_.data();
 
     for (size_t s = 0; s < N_STAGES_EXTRA; s++){
         size_t stage_idx = N_STAGES + 1 + s;  // 13, 14, 15

@@ -145,11 +145,6 @@ const Array1D<T>& BaseSolver<Derived, T, N, SP, RhsType, JacType>::args() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::Nsys() const{
-    return _Nsys;
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::Nupdates() const{
     return _Nupdates;
 }
@@ -544,7 +539,7 @@ StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state,
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
     THIS_C->interp_impl(result, t);
 }
 
@@ -612,7 +607,7 @@ const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state_ptr() 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
     if (_true_state_idx == _new_state_idx){
-        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
+        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr()); //The --about to be -- old state is the current new state, so we pass that
         if (validate_it(result, this->aux_state_ptr())){
             register_states();
             this->_Nupdates++;
@@ -869,9 +864,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::update_state(const T& time
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::move_state(const T& time){
-    const T& time_last = this->last_true_state_ptr()[0];
-    const T& time_new = this->t_new();
-    assert( (time*this->direction() > time_last*this->direction() && time*this->direction() <= time_new*this->direction()) && "Out of bounds time requested in move_state");
+    assert( (time*this->direction() > this->t_last()*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in move_state");
 
 
     if ((time*this->direction() < this->t_new()*this->direction())) {
@@ -892,7 +885,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::move_state(const T& time){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_state(const T& time, T* state){
+void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_state(const T& time, T* state){
     state[0] = time;
     state[1] = this->stepsize();
     interp(state+2, time);

@@ -233,7 +233,7 @@ solver = ode.solver()   # get a copy of the internal solver
 print(ode.__class__)    #LowLevelODE
 print(solver.__class__) #RK45
 
-while not solver.at_event:
+while not solver.at_event():
     solver.advance()
 
 print(f"Event detected at t={solver.t:.6f}")

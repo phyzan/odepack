@@ -75,7 +75,7 @@ struct PySolver : DtypeDispatcher {
 
     py::tuple           timeit_step();
 
-    py::object          advance_to_event();
+    py::object          advance_to_event(const py::object& event);
 
     py::object          advance_until(const py::object& time, const py::object& observer);
 
@@ -93,9 +93,7 @@ struct PySolver : DtypeDispatcher {
 
     py::str             message() const;       
 
-    py::object          py_at_event() const;
-
-    py::object          py_event_located(const py::str& name) const;
+    bool                py_at_event(py::object event) const;
 
     void* s = nullptr; //OdeRichSolver<T>*
     PyStruct data;

@@ -103,16 +103,30 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::is_interpolating() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event() const{
-    if (const size_t* ev_idx = _events.begin()){
-        const Event<T>& event = _events.event(*ev_idx);
-        int d = this->direction();
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event(int event) const{
+    assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < _events.size())) && "Invalid event index passed to RichSolver::at_event");
+    T event_time;
+    if (event == -1 && _events.begin()){
+        // any event is accepted, and since we entered the loop, that means at least one event has been detected, so we can return true immediately without further checks.
+        return true;
+    }else if (const size_t* ev_idx = _events.begin()){
+        event_time = _events.event(*ev_idx).state()->t();
         const T& base_time = Base::true_state_ptr()[0];
-        const T& event_time = event.state()->t();
-        return static_cast<bool>(base_time * d >= event_time * d);
-    }else{
-        return false;
+        int d = this->direction();
+        if (base_time * d >= event_time * d){
+            for (const size_t idx : _events){
+                if (idx == size_t(event)){
+                    return true;
+                }
+            }
+        }
     }
+    return false;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+int RichSolver<Derived, T, N, SP, RhsType, JacType>::event_idx(const std::string& name) const{
+    return _events.event_idx(name);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -195,16 +209,16 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(){
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(int event){
+    assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < _events.size())) && "Invalid event index passed to advance_to_event");
     if (_events.size() == 0){
         return false;
     }
-    do {
+    do{
         if (!this->advance()){
             return false;
         }
-    }while (!this->at_event());
-
+    }while (!this->at_event(event));
     return true;
 }
 
@@ -294,7 +308,7 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
 // ============================================================================
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void interp_func(T* res, const T& t, const void* obj){
+void interp_func(T* res, const T& t, const void* obj){
     const auto* solver = reinterpret_cast<const RichSolver<Derived, T, N, SP, RhsType, JacType>*>(obj);
     solver->interp_impl(res, t);
 }

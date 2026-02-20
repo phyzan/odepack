@@ -205,37 +205,37 @@ public:
 
     StackArray() = default;
 
-    explicit StackArray(const T* data) : Base(){
+    constexpr explicit StackArray(const T* data) : Base(){
         copy_array<T>(this->data(), data, this->size());
     }
 
     template<INT_T... Args>
-    explicit StackArray(const T* data, Args... shape) : StackArray(shape...){
-        copy_array<T>(this->data(), data, this->size());
+    constexpr explicit StackArray(const T* data, Args... shape) : StackArray(shape...){
+        copy_array<T, N>(this->data(), data, this->size());
     }
 
     template<INT_T Int>
-    explicit StackArray(const T* data, const Int* shape, size_t ndim) : StackArray(shape, ndim){
-        copy_array<T>(this->data(), data, this->size());
+    constexpr explicit StackArray(const T* data, const Int* shape, size_t ndim) : StackArray(shape, ndim){
+        copy_array<T, N>(this->data(), data, this->size());
     }
 
-    StackArray(std::initializer_list<T> array) : StackArray(array.begin(), (_validate_size<DIMS...>(array.size()), DIMS)...) {}
+    constexpr StackArray(std::initializer_list<T> array) : StackArray(array.begin(), (_validate_size<DIMS...>(array.size()), DIMS)...) {}
 
     //COPY CONSTRUCTORS
-    StackArray(const StackArray& other) : Base(static_cast<const Base&>(other)) {
-        copy_array(this->data(), other.data(), this->size());
+    constexpr StackArray(const StackArray& other) : Base(static_cast<const Base&>(other)) {
+        copy_array<T, N>(this->data(), other.data(), this->size());
     }
 
     //MOVE CONSTRUCTORS
-    StackArray(StackArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))) {
-        copy_array(this->data(), other.data(), this->size());
+    constexpr StackArray(StackArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))) {
+        copy_array<T, N>(this->data(), other.data(), this->size());
     }
 
     //ASSIGNMENT OPERATORS
     StackArray& operator=(const StackArray& other) {
         if (&other != this){
             Base::operator=(other);
-            copy_array(this->data(), other.data(), this->size());
+            copy_array<T, N>(this->data(), other.data(), this->size());
         }
         return *this;
     }
@@ -244,18 +244,18 @@ public:
     StackArray& operator=(StackArray&& other) noexcept {
         if (&other != this){
             Base::operator=(std::move(other));
-            copy_array(this->data(), other.data(), this->size());
+            copy_array<T, N>(this->data(), other.data(), this->size());
         }
         return *this;
     }
 
     ~StackArray() = default;
 
-    INLINE const T* data() const{
+    INLINE constexpr const T* data() const{
         return _data;
     }
 
-    INLINE T* data() {
+    INLINE constexpr T* data() {
         return _data;
     }
 
@@ -283,7 +283,7 @@ struct ArrayAllocMap<Allocation::Auto, L, T> { using type = DynamicArray<T, L>; 
 
 template <Layout L, typename T, size_t... DIMS>
 struct ArrayAllocMap<Allocation::Auto, L, T, DIMS...> {
-    using type = std::conditional_t<(((DIMS * ...)*sizeof(T) > 80000) || ((DIMS * ...) == 0)), DynamicArray<T, L, DIMS...>, StackArray<T, L, DIMS...>>; 
+    using type = std::conditional_t<(((DIMS * ...) == 0)), DynamicArray<T, L, DIMS...>, StackArray<T, L, DIMS...>>; 
 };
 
 
@@ -377,7 +377,7 @@ public:
     }
 
     template<INT_T... Idx>
-    INLINE const T& operator()(Idx... idx) const {
+    INLINE constexpr const T& operator()(Idx... idx) const {
         return Base::operator()(idx...);
     }
 
@@ -387,7 +387,7 @@ public:
     }
 
     template<INT_T IDX_T>
-    INLINE const T& operator[](IDX_T i) const{
+    INLINE constexpr const T& operator[](IDX_T i) const{
         return Base::operator[](i);
     }
 
@@ -426,7 +426,7 @@ public:
     }
 
     template<INT_T... Idx>
-    INLINE T& operator()(Idx... idx) {
+    INLINE constexpr T& operator()(Idx... idx) {
         return Base::operator()(idx...);
     }
 
@@ -436,17 +436,17 @@ public:
     }
 
     template<INT_T IDX_T>
-    INLINE T& operator[](IDX_T i){
+    INLINE constexpr T& operator[](IDX_T i){
         return Base::operator[](i);
     }
 
     template<INT_T Int>
-    INLINE T& getElem(const Int* idx_ptr) noexcept{
+    INLINE constexpr T& getElem(const Int* idx_ptr) noexcept{
         return Base::getElem(idx_ptr);
     }
 
     template<INT_T... Int>
-    INLINE T* ptr(Int... idx){
+    INLINE constexpr T* ptr(Int... idx){
         return Base::ptr(idx...);
     }
 
@@ -463,14 +463,11 @@ public:
 template <typename T, size_t NDIM, Layout L = Layout::C>
 struct HelperNdArray
 {
-private:
     template <Allocation Alloc, std::size_t... Is>
     static Array<T, Alloc, L, (static_cast<void>(Is), 0)...> make(std::index_sequence<Is...>);
 
     template <std::size_t... Is>
     static View<T, L, (static_cast<void>(Is), 0)...> make_view(std::index_sequence<Is...>);
-
-public:
 
     template<Allocation Alloc = Allocation::Heap>
     using type = decltype(make<Alloc>(std::make_index_sequence<NDIM>{}));

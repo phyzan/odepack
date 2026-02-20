@@ -337,10 +337,10 @@ public:
     DEFAULT_RULE_OF_FOUR(RowMajorSpan)
 
     template<INT_T Int>
-    explicit RowMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
+    constexpr explicit RowMajorSpan(const Int* shape, size_t ndim) : Base(shape, ndim) {}
 
     template<INT_T... Args>
-    explicit constexpr RowMajorSpan(Args... shape) : Base(shape...){}
+    constexpr explicit RowMajorSpan(Args... shape) : Base(shape...){}
 
     template<typename StrideType, typename ShapeType>
     static constexpr void set_strides(StrideType& s, const ShapeType& shape, size_t nd) {

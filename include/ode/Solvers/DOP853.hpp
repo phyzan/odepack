@@ -12,28 +12,28 @@ namespace ode{
 template<typename T>
 struct DOP_COEFS{
 
-     static constexpr size_t N_STAGES = 12;
-     static constexpr size_t N_STAGES_EXT = 16;
-     static constexpr size_t INTERP_ORDER = 7;
-     static constexpr int ERR_EST_ORDER = 7;
+    static constexpr size_t N_STAGES = 12;
+    static constexpr size_t N_STAGES_EXT = 16;
+    static constexpr size_t INTERP_ORDER = 7;
+    static constexpr int ERR_EST_ORDER = 7;
 
-    using DOP_A = Array2D<T, N_STAGES_EXT, N_STAGES_EXT>;
-    using DOP_B = Array1D<T, N_STAGES>;
-    using DOP_C = Array1D<T, 16>;
-    using DOP_D = Array2D<T, INTERP_ORDER - 3, N_STAGES_EXT>;
-    using DOP_E = Array1D<T, N_STAGES+1>;
+    using DOP_A = Array2D<T, N_STAGES_EXT, N_STAGES_EXT, Allocation::Stack>;
+    using DOP_B = Array1D<T, N_STAGES, Allocation::Stack>;
+    using DOP_C = Array1D<T, 16, Allocation::Stack>;
+    using DOP_D = Array2D<T, INTERP_ORDER - 3, N_STAGES_EXT, Allocation::Stack>;
+    using DOP_E = Array1D<T, N_STAGES+1, Allocation::Stack>;
 
-    static DOP_A make_A();
+    static constexpr DOP_A make_A();
 
-    static DOP_B make_B();
+    static constexpr DOP_B make_B();
 
-    static DOP_C make_C();
+    static constexpr DOP_C make_C();
 
-    static DOP_E make_E3();
+    static constexpr DOP_E make_E3();
 
-    static DOP_E make_E5();
+    static constexpr DOP_E make_E5();
 
-    static DOP_D make_D();
+    static constexpr DOP_D make_D();
 
     DOP_A A = make_A();
     DOP_B B = make_B();
@@ -78,7 +78,7 @@ private:
 
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class DOP853 : public RungeKuttaBase<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, SP, RhsType, JacType>{
+class DOP853 : public RungeKuttaBaseDynamic<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, 16, SP, RhsType, JacType>{
 
 public:
 
@@ -90,8 +90,10 @@ public:
 
 private:
 
-    using Base = RungeKuttaBase<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, SP, RhsType, JacType>;
-    friend Base::MainSolverType;
+    using Base = RungeKuttaBaseDynamic<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, 16, SP, RhsType, JacType>;
+    friend Base;
+    friend Base::Base;
+    friend Base::MainSolverType; // So that Base can access specific private methods for static override
 
     static constexpr const char* name = "DOP853";
     
@@ -103,26 +105,21 @@ private:
     static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
     
 
-    
-
     using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
 
     using C_EXTRA_TYPE = Array1D<T, N_STAGES_EXTRA>;
 
-    friend Base;
-    friend Base::MainSolverType; // So that Base can access specific private methods for static override
+    void interp_impl(T* result, const T& t) const;
 
-     void interp_impl(T* result, const T& t) const;
+    static constexpr typename Base::Atype Amatrix();
 
-    static typename Base::Atype Amatrix();
+    static constexpr typename Base::Btype Bmatrix();
 
-    static typename Base::Btype Bmatrix();
+    static constexpr typename Base::Ctype Cmatrix();
 
-    static typename Base::Ctype Cmatrix();
+    static constexpr A_EXTRA_TYPE Amatrix_extra();
 
-    static A_EXTRA_TYPE Amatrix_extra();
-
-    static C_EXTRA_TYPE Cmatrix_extra();
+    static constexpr C_EXTRA_TYPE Cmatrix_extra();
 
     A_EXTRA_TYPE A_EXTRA = Amatrix_extra();
 

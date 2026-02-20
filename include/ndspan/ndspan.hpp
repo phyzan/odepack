@@ -27,7 +27,7 @@ public:
         return THIS_C->ndim();
     }
 
-    INLINE const size_t* shape() const {
+    INLINE constexpr const size_t* shape() const {
         //override
         return THIS_C->shape();
     }
@@ -153,14 +153,14 @@ protected:
     }
 
     template<INT_T... IntType>
-    INLINE void _bounds_check(IntType... idx) const {
+    INLINE constexpr void _bounds_check(IntType... idx) const {
         EXPAND(size_t, sizeof...(idx), I,
             assert(((idx >= 0 && size_t(idx) < this->shape(I)) && ...) && "Out of bounds");
         );
     }
 
     template<INT_T... Idx>
-    INLINE void _dim_check(Idx... idx) const {
+    INLINE constexpr void _dim_check(Idx... idx) const {
         //dimension check
         if constexpr (ND > 0){
             static_assert(sizeof...(idx) == ND, "Incorrect number of indices");
@@ -194,12 +194,12 @@ protected:
     DEFAULT_RULE_OF_FOUR(StaticNdSpan)
 
     template<INT_T... Args>
-    explicit StaticNdSpan(Args... args){
+    constexpr explicit StaticNdSpan(Args... args){
         this->reshape(args...);
     }
 
     template<INT_T Int>
-    explicit StaticNdSpan(const Int* shape, size_t ndim){
+    constexpr explicit StaticNdSpan(const Int* shape, size_t ndim){
         this->reshape(shape, ndim);
     }
 
@@ -213,32 +213,32 @@ public:
         return Base::ND;
     }
 
-    inline const size_t* shape() const {
+    inline constexpr const size_t* shape() const {
         return Base::SHAPE.data();
     }
 
     using Base::shape;
 
     template<INT_T... Args>
-    INLINE void reshape(Args... shape){
+    INLINE constexpr void reshape(Args... shape){
         assert(((shape == DIMS) && ...) && "Runtime dims do not match template dims in reshape");
     }
 
     template<INT_T... Args>
-    INLINE void constexpr resize(Args... shape){
+    INLINE constexpr void resize(Args... shape){
         //can only resize with the exact same shape
         reshape(shape...);
     }
 
     template<INT_T Int>
-    INLINE void reshape(const Int* shape, size_t ndim){
+    INLINE constexpr void reshape(const Int* shape, size_t ndim){
         assert(Base::_is_valid_shape(shape, ndim) && "Invalid dims");
         assert((ndim == this->ndim()) && "Invalid shape in StaticNdSpan::reshape");
         assert(this->_conserves_shape(shape, ndim) && "Runtime dims do not match template dims in reshape");
     }
 
     template<INT_T Int>
-    INLINE void resize(const Int* shape, size_t ndim){
+    INLINE constexpr void resize(const Int* shape, size_t ndim){
         reshape(shape, ndim);
     }
 

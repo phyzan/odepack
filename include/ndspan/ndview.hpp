@@ -37,7 +37,7 @@ public:
     const_iterator begin() const { return this->data(); }
     const_iterator end() const { return this->data() + this->size(); }
     
-    INLINE const T* data() const{
+    INLINE constexpr const T* data() const{
         //override
         return THIS_C->data();
     }
@@ -58,7 +58,7 @@ public:
     }
 
     template<INT_T IDX_T>
-    INLINE const T& operator[](IDX_T i) const{
+    INLINE constexpr const T& operator[](IDX_T i) const{
         BOUNDS_ASSERT(i, this->size());
         return data()[i];
     }
@@ -97,7 +97,7 @@ public:
     }
 
     template<INT_T IDX_T>
-    INLINE T& operator[](IDX_T i){
+    INLINE constexpr T& operator[](IDX_T i){
         BOUNDS_ASSERT(i, this->size());
         return data()[i];
     }

@@ -111,9 +111,18 @@ public:
 
     /**
      * @brief Check if the solver is currently positioned at an event.
+     * If an event index is provided, checks if that specific event is active.
+     * @param event Index of the event to check, or -1 to check any event.
      * @return True if an event has triggered at the current time.
      */
-    bool                                    at_event() const;
+    bool                                    at_event(int event = -1) const;
+
+    /**
+     * @brief Get the index of a named event
+     * @param name Name of the event to find.
+     * @return Integer index of the event with the given name, or -1 if not found.
+     */
+    int                                     event_idx(const std::string& name) const;
 
     /**
      * @brief Print the current solver state to stdout.
@@ -132,9 +141,10 @@ public:
      * Repeatedly calls advance() until an event triggers or the solver
      * stops (due to error or reaching a dead state).
      *
+     * @param event Optional index of a specific event to advance to. If -1 (default), advances to the next event regardless of type.
      * @return True if an event was reached, false if solver stopped for other reasons.
      */
-    bool                                    advance_to_event();
+    bool                                    advance_to_event(int event = -1);
 
     /**
      * @brief Begin collecting dense output interpolation data.

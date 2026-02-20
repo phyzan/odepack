@@ -471,6 +471,9 @@ public:
     /// @brief Get event state by index.
     const EventState<T>&    state(size_t i) const;
 
+    /// @brief Get the index of the event with the given name, or -1 if not found.
+    int                     event_idx(const std::string& name) const;
+
     /// @brief Get total number of events.
     size_t                  size() const;
 
@@ -531,6 +534,7 @@ private:
 
     bool _is_prioritized(size_t i, size_t j, int dir);
 
+    std::unordered_map<std::string, int> name_map_;  ///< Map from event names to indices for quick lookup.
     Array1D<AnyEvent<T>>    _events;
     Array1D<size_t>         _event_idx;
     Array1D<size_t>         _event_idx_start;

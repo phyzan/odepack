@@ -137,8 +137,8 @@ template<typename Derived, typename T>
 bool EventBase<Derived, T>::register_it(){
     if (_is_located){
         if (this->is_masked()){
-            copy_array(_state.mut_true()+2, _state.get_exposed()+2, _state.nsys());
-            this->apply_mask(_state.mut_true()+2, _state.t(), _state.get_exposed()+2);
+            copy_array(_state.mut_true()+2, _state.mut_exposed()+2, _state.nsys());
+            this->apply_mask(_state.mut_true()+2, _state.t(), _state.mut_exposed()+2);
             _state.choose_true = !this->hides_mask();
         }else{
             _state.choose_true = true;
@@ -211,7 +211,6 @@ template<typename T, typename Derived>
  bool PreciseEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
     T val1 = this->obj_fun(before.t(), before.vector());
     T val2 = this->obj_fun(after.t(), after.vector());
-
     int t_dir = this->direction();
     int d = this->sign_change_dir();
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
@@ -367,27 +366,32 @@ template<typename T>
 EventCollection<T>::EventCollection(const Event<T>*const* events, size_t size) : _events(size), _event_idx(size), _event_idx_start(size+1), _canon_idx(size) {
     if (size == 0){return;}
 
-    for (size_t i=0; i<size-1; i++){
-        for (size_t j=i+1; j<size; j++){
-            if (events[i]->name() == events[j]->name()){
-                throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
-            }
-        }
-    }
-
     for (size_t i=0; i<size; i++){
+        if (name_map_.find(events[i]->name()) != name_map_.end()){
+            throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
+        }
+        name_map_[events[i]->name()] = static_cast<int>(i);
         _events[i].take_ownership(events[i]->clone());
     }
 }
 
 template<typename T>
- const Event<T>& EventCollection<T>::event(size_t i) const{
+const Event<T>& EventCollection<T>::event(size_t i) const{
     return *_events[i].ptr();
 }
 
 template<typename T>
- const EventState<T>& EventCollection<T>::state(size_t i) const{
+const EventState<T>& EventCollection<T>::state(size_t i) const{
     return *_events[i]->state();
+}
+
+template<typename T>
+int EventCollection<T>::event_idx(const std::string& name) const{
+    auto it = name_map_.find(name);
+    if (it != name_map_.end()){
+        return it->second;
+    }
+    return -1;
 }
 
 template<typename T>
@@ -443,7 +447,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
      * Priority is determined by _is_prioritized(): earlier time wins, ties broken by event index.
      *
      * After this phase: _event_idx contains indices of all detected events, sorted by time.
-     */
+    */
     const int dir = sgn(before.t(), after.t());
     _N_detect = 0;
     for (size_t i=0; i<this->size(); i++){

@@ -19,7 +19,7 @@
 #define THIS_C static_cast<const Derived*>(this)
 #define CONST_CAST(TYPE, FUNC) const_cast<TYPE>(static_cast<const CLS*>(this)->FUNC);
 #define INLINE __attribute__((always_inline)) inline
-#define LAMBDA_INLINE __attribute__((always_inline))
+#define LAMBDA_INLINE __attribute__((always_inline, flatten))
 
 #define DEFAULT_RULE_OF_FOUR(CLASSNAME)                  \
     CLASSNAME(const CLASSNAME& other) = default;      \
@@ -37,18 +37,50 @@ namespace ndspan{
 
 #define MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
 
-#define EXPAND(IntType, N, I, ...) [&]<IntType... I>(INTS(IntType, I)) __attribute__((always_inline)) { \
+#define EXPAND(IntType, N, I, ...) [&]<IntType... I>(INTS(IntType, I)) \
+    __attribute__((always_inline, flatten)) { \
     __VA_ARGS__ \
 }(MAKE_INTS(IntType, N))
 
 #define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, ...) \
-[&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline)) { \
+[&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline, flatten)) { \
     ([&]<IntType I>() { __VA_ARGS__ }.template operator()<IDUMMY>(), ...); \
 }(MAKE_INTS(IntType, N))
 
 #define FOR_LOOP(IntType, I, N, ...) \
     FOR_LOOP_IMPL(IntType, I, N, CONCAT(IDUMMY,__COUNTER__), __VA_ARGS__)
 
+template<size_t START, size_t END, typename Callable>
+INLINE void for_each(Callable&& func){
+    if constexpr (START == END){
+        return;
+    }else{
+        func.template operator()<START>();
+        for_each<START + 1, END>(std::forward<Callable>(func));
+    }
+}
+
+template<typename T, size_t K, typename Callable>
+INLINE T expand_sum(Callable&& func){
+    T res = 0;
+    expand<K>([&]<size_t I>() LAMBDA_INLINE{
+        res += func.template operator()<I>();
+    });
+    return res;
+}
+
+
+#define EXPAND_SUM(T, N, I, ...) expand_sum<T, N>([&]<size_t I>() LAMBDA_INLINE{ return __VA_ARGS__; })
+
+template<size_t TERMS, typename Callable>
+INLINE void expand(Callable&& func){
+    expand_aux(std::make_index_sequence<TERMS>{}, std::forward<Callable>(func));
+}
+
+template<typename Callable, size_t... I>
+INLINE void expand_aux(std::index_sequence<I...>, Callable&& func){
+    (func.template operator()<I>(), ...);
+}
 
 template<std::size_t I, typename FirstType, typename... ArgType>
 INLINE constexpr decltype(auto) helper_pack_elem(FirstType&& x0, ArgType&&... x) {
@@ -110,7 +142,7 @@ template<typename... Ts>
 concept INT_T = (std::is_integral_v<Ts>  && ...);
 
 template<typename T>
-INLINE void copy_array(T* dest, const T* src, size_t size){
+INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
     if (size==0) {return;}
     if constexpr (std::is_trivially_copyable_v<T>){
         std::memcpy(dest, src, size*sizeof(T));
@@ -118,6 +150,13 @@ INLINE void copy_array(T* dest, const T* src, size_t size){
     else{
         std::copy(src, src+size, dest);
     }
+}
+
+template<typename T, size_t N>
+INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
+    assert((size == N) && "Size must match array template size in copy_array");
+    if (size==0) {return;}
+    std::copy(src, src+size, dest);
 }
 
 template<std::integral INT_DST, std::integral INT_SRC>
@@ -201,7 +240,7 @@ INLINE bool isStrictlyAscending(const T* array, size_t size){
 
 
 template<size_t... Args>
-size_t _validate_size(size_t size){
+constexpr size_t _validate_size(size_t size){
     assert(size == (Args * ...) && "Invalid initializer list size");
     return size;
 }

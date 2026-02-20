@@ -8,103 +8,157 @@
 namespace ode {
 
 // Forward declarations
-template<typename T, size_t Nstages>
-T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size);
+// template<typename T, size_t Nstages>
+// T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size);
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-class RungeKuttaBase : public BaseDispatcher<Derived, T, N, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
+class RungeKuttaMainBase : public BaseDispatcher<Derived, T, N, SP, RhsType, JacType>{
 
-    using Base = BaseDispatcher<Derived, T, N, SP, RhsType, JacType>;
+    
 protected:
 
     // ================ STATIC OVERRIDES ========================
     static constexpr bool   IS_IMPLICIT = false;
 
+    T    step_impl(T* result, const T* state, const T& h);
+public:
     StepResult  adapt_impl(T* res, const T* state);
-
+protected:
     void        reset_impl();
 
     void        re_adjust_impl(const T* new_vector);
 
     // =========================================================
+    using Base = BaseDispatcher<Derived, T, N, SP, RhsType, JacType>;
+    using RKBase = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
 
-    using RKBase = RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
+    using Atype = Array2D<T, Nstages, Nstages, Allocation::Stack>;
+    using Btype = Array1D<T, Nstages, Allocation::Stack>;
+    using Ctype = Array1D<T, Nstages, Allocation::Stack>;
 
-    using Atype = Array2D<T, Nstages, Nstages>;
-    using Btype = Array1D<T, Nstages>;
-    using Ctype = Array1D<T, Nstages>;
+    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    Atype A = Derived::Amatrix();
-    Btype B = Derived::Bmatrix();
-    Ctype C = Derived::Cmatrix();
+    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
 
-    RungeKuttaBase(SOLVER_CONSTRUCTOR(T), size_t Krows) requires (!is_rich<SP>);
+    DEFAULT_RULE_OF_FOUR(RungeKuttaMainBase)
 
-    RungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events, size_t Krows) requires (is_rich<SP>);
-
-    DEFAULT_RULE_OF_FOUR(RungeKuttaBase)
-
-     void set_coef_matrix() const;
-
-    void        step_impl(T* result, const T* state, const T& h);
+    void set_coef_matrix() const;
 
     // ======================= OVERRIDE =======================
-     T    estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
-     void set_coef_matrix_impl() const;
+    void set_coef_matrix_impl() const;
 
     // ========================================================
 
-    mutable Array2D<T, 0, N>    _K_true;
-    mutable Array1D<T, N>       _df_tmp;
+    mutable Array2D<T, K_ROWS, N, Allocation::Auto>    K_;
+    mutable Array1D<T, N, Allocation::Auto>       _df_tmp;
     mutable Array2D<T, N, 0>    _coef_mat;
     mutable bool                _mat_is_set = false;
-    T                           ERR_EXP = T(-1)/T(Derived::ERR_EST_ORDER+1);
+    T                           ERR_EXP = T(-1)/T(Derived::ERR_EST_ORDER + 1); // Boost uses -1/(error_order+1) for both increase and decrease
+    T                           INC_EXP = T(-1) / Norder;
+    T                           MIN_ERR = T(1) / pow(T(5), Norder);
 };
+
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
+class RungeKuttaBaseStatic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>{
+
+protected:
+    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
+    using Base::Base;
+
+    static constexpr typename Base::Atype A = Derived::Amatrix();
+    static constexpr typename Base::Btype B = Derived::Bmatrix();
+    static constexpr typename Base::Ctype C = Derived::Cmatrix();
+};
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
+class RungeKuttaBaseDynamic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>{
+
+protected:
+    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
+    using Base::Base;
+
+    typename Base::Atype A = Derived::Amatrix();
+    typename Base::Btype B = Derived::Bmatrix();
+    typename Base::Ctype C = Derived::Cmatrix();
+};
+
+template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
+using DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, RungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, K_ROWS, SP, RhsType, JacType>, RungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, K_ROWS, SP, RhsType, JacType>>;
 
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-class StandardRungeKutta : public RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>{
-
-    using Base = RungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
-
-    friend Base;
+class StandardRungeKuttaBase : public DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, RhsType, JacType>{
 
 protected:
-
+    using Base = DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, RhsType, JacType>;
+    friend Base;
+    friend Base::Base;
     friend BaseSolver<Derived, T, N, SP, RhsType, JacType>; // So that Base can access specific private methods for static override
 
-    using Etype = Array1D<T, Nstages+1>;
-    using Ptype = Array2D<T, Nstages+1, 0>;
+    using Etype = Array1D<T, Nstages+1, Allocation::Stack>;
 
-    Etype E = Derived::Ematrix();
-    Ptype P = Derived::Pmatrix();
+    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
-    StandardRungeKutta(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
 
-    StandardRungeKutta(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
-
-    DEFAULT_RULE_OF_FOUR(StandardRungeKutta)
-
+    DEFAULT_RULE_OF_FOUR(StandardRungeKuttaBase)
     // ================ STATIC OVERRIDES ========================
 
-     std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
+    std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
 
-     void                                 interp_impl(T* result, const T& t) const;
+    void                                 interp_impl(T* result, const T& t) const;
 
-    void                                        set_coef_matrix_impl() const;
-
-     T                                    estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
+    void                                 set_coef_matrix_impl() const;
 
     // ==========================================================
+
+    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h) const;
+
 };
 
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
+class StandardRungeKuttaBaseStatic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>{
+
+    
+protected:
+    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
+    using Base::Base;
+    friend Base;
+    friend Base::Base;
+    friend Base::Base::Base;
+
+    static constexpr typename Base::Etype E = Derived::Ematrix();
+
+};
+
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
+class StandardRungeKuttaBaseDynamic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>{
+
+
+protected:
+    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
+    using Base::Base;
+    friend Base;
+    friend Base::Base;
+    friend Base::Base::Base;
+
+    typename Base::Etype E = Derived::Ematrix();
+
+};
+
+template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
+using STANDARD_DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, StandardRungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>, StandardRungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>>;
 
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class RK45 : public StandardRungeKutta<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>{
+class RK45 : public STANDARD_DOPRI_DISPATCHER<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>{
 
 public:
+
+    static constexpr size_t Norder = 5;
+    static constexpr size_t Nstages = 6;
 
     RK45(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
@@ -114,27 +168,32 @@ public:
 
 private:
 
-    using Base = StandardRungeKutta<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>;
+    using Ptype = Array2D<T, Nstages+1, 4, Allocation::Stack>;
+    
     friend Base;
-    friend Base::RKBase;
+    friend Base::Base;
+    friend Base::Base::Base;
+    friend Base::Base::Base::Base;
     friend Base::MainSolverType;
 
-    static const size_t Norder = 5;
-    static const size_t Nstages = 6;
+    T    step_impl(T* result, const T* state, const T& h);
 
     static constexpr const char*    name = "RK45";
     static constexpr size_t         ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
 
-     static constexpr typename Base::Atype Amatrix();
+    static constexpr typename Base::Atype Amatrix();
 
-     static constexpr typename Base::Btype Bmatrix();
+    static constexpr typename Base::Btype Bmatrix();
 
-     static constexpr typename Base::Ctype Cmatrix();
+    static constexpr typename Base::Ctype Cmatrix();
 
-     static constexpr typename Base::Etype Ematrix();
+    static constexpr typename Base::Etype Ematrix();
 
-     static constexpr typename Base::Ptype Pmatrix();
+    static constexpr                Ptype Pmatrix();
+
+    Ptype P = Pmatrix();
 
 };
 
@@ -143,9 +202,12 @@ private:
 
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class RK23 : public StandardRungeKutta<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType> {
+class RK23 : public STANDARD_DOPRI_DISPATCHER<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType> {
 
 public:
+
+    static constexpr size_t Norder = 3;
+    static constexpr size_t Nstages = 3;
 
     RK23(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
 
@@ -155,27 +217,31 @@ public:
 
 private:
 
-    using Base = StandardRungeKutta<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType>;
+    using Ptype = Array2D<T, Nstages+1, 3, Allocation::Stack>;
     friend Base;
-    friend Base::RKBase;
+    friend Base::Base;
+    friend Base::Base::Base;
+    friend Base::Base::Base::Base;
     friend Base::MainSolverType;
 
-    static const size_t Norder = 3;
-    static const size_t Nstages = 3;
+    T    step_impl(T* result, const T* state, const T& h);
 
     static constexpr const char*    name = "RK23";
     static constexpr size_t         ERR_EST_ORDER = 2;
     static constexpr size_t         INTERP_ORDER = 3;
 
-     static constexpr typename Base::Atype Amatrix();
+    static constexpr typename Base::Atype Amatrix();
 
-     static constexpr typename Base::Btype Bmatrix();
+    static constexpr typename Base::Btype Bmatrix();
 
-     static constexpr typename Base::Ctype Cmatrix();
+    static constexpr typename Base::Ctype Cmatrix();
 
-     static constexpr typename Base::Etype Ematrix();
+    static constexpr typename Base::Etype Ematrix();
 
-     static constexpr typename Base::Ptype Pmatrix();
+    static constexpr                Ptype Pmatrix();
+
+    Ptype P = Pmatrix();
 
 };
 

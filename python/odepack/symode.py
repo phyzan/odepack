@@ -1329,7 +1329,7 @@ class OdeSystem:
     def _jac(self):
         """Python-compiled Jacobian function."""
         kwargs = {str(x): x for x in self.args}
-        return lambdify(self.jacmat, "numpy", self.t, q=self.q, **kwargs)
+        return lambdify(self.jacmat.array, "numpy", self.t, q=self.q, **kwargs)
 
     @cached_property
     def _var_odefunc(self):
@@ -1341,7 +1341,7 @@ class OdeSystem:
     def _var_jac(self):
         """Python-compiled augmented Jacobian function."""
         kwargs = {str(x): x for x in self.args}
-        return lambdify(self.jacmat_augmented, "numpy", self.t, q=self.q_augmented, **kwargs)
+        return lambdify(self.jacmat_augmented.array, "numpy", self.t, q=self.q_augmented, **kwargs)
     
     def _ode_data(self, variational: bool):
         """Get the ODE system, state variables, and Jacobian matrix for compilation.

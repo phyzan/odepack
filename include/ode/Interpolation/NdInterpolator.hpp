@@ -8,6 +8,8 @@ namespace ode {
 
 struct VirtualNdInterpolator {
 
+    virtual ~VirtualNdInterpolator() = default;
+
     virtual int ndim() const = 0;
 
     virtual int nvals_per_point() const = 0;

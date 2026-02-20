@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.backend_bases import MouseButton
+from matplotlib.backend_bases import MouseButton, MouseEvent
 from odepack import RK45, PreciseEvent
 
 
@@ -21,15 +21,15 @@ def henon_heiles(t, q):
     return np.array([dxdt, dydt, dvxdt, dvydt])
 
 
-# Define event: when y = 1
+# Define event: when y = 0.2
 def event_condition(t, q):
-    """Event triggers when y crosses 1"""
+    """Event triggers when y crosses 0.2"""
     return q[1] - 0.2
 
 
 # Create the event
-y_equals_1_event = PreciseEvent(
-    name="y_equals_1",
+crossing = PreciseEvent(
+    name="crossing",
     when=event_condition,
     direction=0,  # Detect crossing in any direction
     event_tol=1e-12, scalar_type="double"
@@ -46,8 +46,9 @@ solver = RK45(
     q0=q0,
     rtol=1e-9,
     atol=1e-12,
-    events=[y_equals_1_event], scalar_type="double"
+    events=[crossing], scalar_type="double"
 )
+
 
 # Set up the plot
 fig, ax = plt.subplots(figsize=(8, 8))
@@ -55,7 +56,7 @@ ax.set_xlim(-1.5, 1.5)
 ax.set_ylim(-0.5, 1.5)
 ax.set_xlabel('x')
 ax.set_ylabel('y')
-ax.set_title('Henon-Heiles Trajectory (Click to advance)\nRed points: y = 1')
+ax.set_title('Henon-Heiles Trajectory (Click to advance)\nRed points: y = 0.2')
 ax.grid(True, alpha=0.3)
 
 # Storage for trajectory
@@ -72,9 +73,9 @@ event_x = []
 event_y = []
 
 
-def on_click(event):
+def on_click(mouse_event : MouseEvent):
     """Advance solver by one step when user clicks"""
-    if event.button != MouseButton.LEFT:
+    if mouse_event.button != MouseButton.LEFT:
         return
 
     if solver.is_dead:
@@ -96,7 +97,7 @@ def on_click(event):
     trajectory_y.append(y)
 
     # Check if we're at an event
-    if solver.event_located("y_equals_1"):
+    if solver.at_event("crossing"):
         event_x.append(x)
         event_y.append(y)
         print(f"Event detected at t={solver.t:.6f}, (x, y) = ({x:.6f}, {y:.6f})")

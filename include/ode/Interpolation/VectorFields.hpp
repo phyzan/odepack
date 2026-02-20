@@ -9,6 +9,8 @@ namespace ode {
 
 struct VirtualVectorField {
 
+    virtual ~VirtualVectorField() = default;
+
     virtual int ndim() const = 0;
 
     virtual bool contains(const double* coords) const = 0;
