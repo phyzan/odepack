@@ -39,7 +39,7 @@ public:
     
     INLINE constexpr const T* data() const{
         //override
-        return THIS_C->data();
+        return THIS->data();
     }
 
     template<INT_T... Int>
@@ -65,7 +65,7 @@ public:
 
     template<typename... Idx>
     INLINE auto operator()(Idx... i) const{
-        return tensor_call(THIS_C, i...);
+        return tensor_call(THIS, i...);
     }
 
 };

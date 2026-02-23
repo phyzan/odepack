@@ -25,7 +25,7 @@ template<typename Derived, typename T>
 
 template<typename Derived, typename T>
  bool EventBase<Derived, T>::is_masked() const{
-    return THIS_C->is_masked_impl();
+    return THIS->is_masked_impl();
 }
 
 template<typename Derived, typename T>
@@ -35,7 +35,7 @@ template<typename Derived, typename T>
 
 template<typename Derived, typename T>
  void EventBase<Derived, T>::apply_mask(T* out, const T& t, const T* q) const{
-    return THIS_C->mask_impl(out, t, q);
+    return THIS->mask_impl(out, t, q);
 }
 
 template<typename Derived, typename T>
@@ -60,12 +60,12 @@ template<typename Derived, typename T>
 
 template<typename Derived, typename T>
 Event<T>* EventBase<Derived, T>::clone() const{
-    return new Derived(*THIS_C);
+    return new Derived(*THIS);
 }
 
 template<typename Derived, typename T>
  bool EventBase<Derived, T>::is_temporal() const{
-    return THIS_C->is_temporal_impl();
+    return THIS->is_temporal_impl();
 }
 
 template<typename Derived, typename T>
@@ -120,7 +120,7 @@ bool EventBase<Derived, T>::locate(State<T> before, State<T> after, FuncLike<T> 
     assert((sgn(before.t(), after.t()) == this->_direction) && "Invalid direction");
     T t;
     _state.triggered = false;
-    if (THIS_C->locate_impl(t, before, after, q, obj)){
+    if (THIS->locate_impl(t, before, after, q, obj)){
         _state.set_t(t);
         _state.set_stepsize(after.habs());
         T* q_event = this->is_masked() ? _state.mut_exposed()+2 : _state.mut_true()+2;

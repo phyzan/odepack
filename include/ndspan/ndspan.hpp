@@ -19,35 +19,35 @@ public:
 
     INLINE constexpr size_t size() const{
         //override
-        return THIS_C->size();
+        return THIS->size();
     }
 
     INLINE constexpr size_t ndim() const {
         //override
-        return THIS_C->ndim();
+        return THIS->ndim();
     }
 
     INLINE constexpr const size_t* shape() const {
         //override
-        return THIS_C->shape();
+        return THIS->shape();
     }
 
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
         //override
-        return THIS_C->offset_impl(idx...);
+        return THIS->offset_impl(idx...);
     }
 
     template<INT_T Idx>
     INLINE constexpr size_t getOffset_impl(const Idx* idx_ptr) const noexcept{
         //override
-        return THIS_C->getOffset_impl(idx_ptr);
+        return THIS->getOffset_impl(idx_ptr);
     }
 
     template<INT_T... Idx>
     INLINE void unpack_idx_impl(size_t offset, Idx&... idx) const noexcept{
         //override
-        return THIS_C->unpack_idx_impl(offset, idx...);
+        return THIS->unpack_idx_impl(offset, idx...);
     }
 
     template<INT_T IDX_T>

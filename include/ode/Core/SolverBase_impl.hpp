@@ -86,17 +86,17 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t() const{
-    return THIS_C->true_state_ptr()[0];
+    return THIS->true_state_ptr()[0];
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector() const{
-    return View1D<T, N>(THIS_C->true_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(THIS->true_state_ptr()+2, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_last() const{
-    return View1D<T, N>(THIS_C->last_true_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(THIS->last_true_state_ptr()+2, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -186,12 +186,12 @@ State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::old_state() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::state() const{
-    return State<T>(THIS_C->true_state_ptr(), this->Nsys());
+    return State<T>(THIS->true_state_ptr(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_state() const{
-    return State<T>(THIS_C->last_true_state_ptr(), this->Nsys());
+    return State<T>(THIS->last_true_state_ptr(), this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -261,12 +261,12 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
     d2 = rms_norm(tmp, scale, n) / h0;
 
     if (d1 <= 1e-15 && d2 <= 1e-15){
-        h1 = std::max(T(1)/1000000, h0/1000);
+        h1 = max(T(1)/1000000, h0/1000);
     }
     else{
-        h1 = pow(100*std::max(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
+        h1 = pow(100*max(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
     }
-    return std::max(std::min({100*h0, h1, this->max_step()}), this->min_step());
+    return max(std::min({T(100*h0), h1, this->max_step()}), this->min_step());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -276,7 +276,7 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 BaseSolver<Derived, T, N, SP, RhsType, JacType>::Clone* BaseSolver<Derived, T, N, SP, RhsType, JacType>::clone() const {
-    return new Derived(*THIS_C);
+    return new Derived(*THIS);
 }
 
 // PUBLIC MODIFIERS
@@ -319,7 +319,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Call
     bool condition = success;
     while (true){
         if ((success = this->advance()) && (condition = (time*d > this->t()*d))){
-            observer(this->t(), THIS_C->true_state_ptr()+2);
+            observer(this->t(), THIS->true_state_ptr()+2);
         }else{
             break;
         }
@@ -328,7 +328,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Call
 
     if (success){
         this->move_state(time);
-        observer(this->t(), THIS_C->true_state_ptr()+2);
+        observer(this->t(), THIS->true_state_ptr()+2);
         return true;
     }else{
         return false;
@@ -380,7 +380,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     };
 
     auto get_sgn = [&]() LAMBDA_INLINE {
-        return factor*sgn(ObjFunLike(this->t(), THIS_C->true_state_ptr()+2));
+        return factor*sgn(ObjFunLike(this->t(), THIS->true_state_ptr()+2));
     };
 
     auto detected = [&](int s1, int s2) LAMBDA_INLINE{
@@ -399,7 +399,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     //will enter this loop even once
     while (curr_dir == 0 && this->advance()){
         curr_dir = old_dir = get_sgn();
-        observer(this->t(), THIS_C->true_state_ptr()+2);
+        observer(this->t(), THIS->true_state_ptr()+2);
         if (curr_dir == 0 && dir == 0){
             // If a root is found while trying to find a step
             // where the objective function is non zero (required for bisection)
@@ -412,7 +412,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     bool condition = success;
     while (true){
         if ((success = this->advance()) && (old_dir = curr_dir, curr_dir = get_sgn(), condition = (!detected(old_dir, curr_dir)))){
-            observer(this->t(), THIS_C->true_state_ptr()+2);
+            observer(this->t(), THIS->true_state_ptr()+2);
         }else{
             break;
         }
@@ -421,7 +421,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     if (success){
         T time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
         this->move_state(time);
-        observer(this->t(), THIS_C->true_state_ptr()+2);
+        observer(this->t(), THIS->true_state_ptr()+2);
         return true;
     }else{
         return false;
@@ -530,7 +530,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
  std::unique_ptr<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
-    return THIS_C->state_interpolator(bdr1, bdr2);
+    return THIS->state_interpolator(bdr1, bdr2);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -540,7 +540,7 @@ StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state,
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
-    THIS_C->interp_impl(result, t);
+    THIS->interp_impl(result, t);
 }
 
 
@@ -661,7 +661,7 @@ const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_old() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_last() const{
-    return THIS_C->last_true_state_ptr()[0];
+    return THIS->last_true_state_ptr()[0];
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -697,7 +697,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust(const T* new_vec
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics(T t0, const T* q0) const {
-    return THIS_C->validate_ics_impl(t0, q0);
+    return THIS->validate_ics_impl(t0, q0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -750,7 +750,7 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
     if (q0 == nullptr){
         this->kill("Initial conditions not set (nullptr provided)");
     }else if (this->validate_ics_impl(t0, q0)){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs(stepsize));
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : T(abs(stepsize)));
 
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
@@ -838,7 +838,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(StepResult res
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::update_state(const T& time){
-    //explicitly "this" (not THIS_C),  not any derived class's
+    //explicitly "this" (not THIS),  not any derived class's
     const T& time_now = this->true_state_ptr()[0];
     const T& time_last = this->last_true_state_ptr()[0];
     assert( (time*this->direction() > time_last*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in update_state");
@@ -874,7 +874,7 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::move_state(const T& time){
             set_state(time, ptr);
             _true_state_idx = idx;
         }else{
-            T* ptr = const_cast<T*>(this->true_state_ptr()); // using this->, not THIS_C-> for this case
+            T* ptr = const_cast<T*>(this->true_state_ptr()); // using this->, not THIS-> for this case
             set_state(time, ptr);
         }
     }else if (_true_state_idx != _new_state_idx){

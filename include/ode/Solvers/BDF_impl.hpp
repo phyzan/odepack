@@ -181,7 +181,7 @@ BDF<T, N, SP, RhsType, JacType>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
         std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
 #endif
     }
-    _newton_tol = std::max(10 * std::numeric_limits<T>::epsilon() / rtol, std::min(T(3)/100, pow(rtol, T(1)/T(2))));
+    _newton_tol = std::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, std::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));
 
     if (!this->is_dead() && q0 != nullptr){
         if (this->validate_ics_impl(t0, q0)){
@@ -360,7 +360,7 @@ StepResult BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
         }
         _error_norms[1] = rms_norm(_error.data(), _scale.data(), nsys);
         if (_error_norms[1] > 1){
-            factor = std::max(this->MIN_FACTOR, safety * pow(_error_norms[1], T(-1)/(_order+1)));
+            factor = max<T, T>(this->MIN_FACTOR, safety * pow(_error_norms[1], T(-1)/(_order+1)));
             habs *= factor;
             _change_D(factor);
         }
@@ -422,7 +422,7 @@ StepResult BDF<T, N, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
 
     _order += delta_order;
 
-    factor = std::min(this->MAX_FACTOR, safety * max_factor);
+    factor = std::min<T>(this->MAX_FACTOR, safety * max_factor);
     habs *= factor;
     _change_D(factor);
     _valid_LU = false;
@@ -437,7 +437,7 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
  void BDF<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
-    bdf_interp(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->Nsys());
+    bdf_interp<T>(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->Nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

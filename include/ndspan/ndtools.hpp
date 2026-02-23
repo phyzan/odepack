@@ -15,8 +15,7 @@
 #include <mpreal.h>
 #endif
 
-#define THIS static_cast<Derived*>(this)
-#define THIS_C static_cast<const Derived*>(this)
+#define THIS static_cast<copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>*>(this)
 #define CONST_CAST(TYPE, FUNC) const_cast<TYPE>(static_cast<const CLS*>(this)->FUNC);
 #define INLINE __attribute__((always_inline)) inline
 #define LAMBDA_INLINE __attribute__((always_inline, flatten))
@@ -26,6 +25,9 @@
     CLASSNAME(CLASSNAME&& other) = default;           \
     CLASSNAME& operator=(const CLASSNAME& other) = default; \
     CLASSNAME& operator=(CLASSNAME&& other) = default;
+
+template<typename From, typename To>
+using copy_const_t = std::conditional_t<std::is_const_v<From>, const To, To>;
 
 namespace ndspan{
 

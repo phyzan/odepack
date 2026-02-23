@@ -49,7 +49,7 @@ void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, Jac
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
 void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>::set_coef_matrix_impl() const{
-    THIS_C->set_coef_matrix_impl();
+    THIS->set_coef_matrix_impl();
 }
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
@@ -67,9 +67,9 @@ T RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacTyp
     T* __restrict__ K = this->K_.data();
     T* __restrict__ r = this->_df_tmp.data();
     const T* __restrict__ q = state + 2;
-    const auto& B_ = THIS_C->B;
-    const auto& C_ = THIS_C->C;
-    const auto& A_ = THIS_C->A;
+    const auto& B_ = THIS->B;
+    const auto& C_ = THIS->C;
+    const auto& A_ = THIS->A;
 
     for_each<0, Nstages-1>([&]<size_t I>() LAMBDA_INLINE{
         for (size_t j = 0; j < this->Nsys(); j++) {
@@ -89,7 +89,7 @@ T RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacTyp
     // Final: K[Nstages] = f(t + h, q_new) for error estimation and FSAL
     this->rhs(K + Nstages*this->Nsys(), t + h, q_new);
     result[0] = t + h;
-    return THIS_C->estimate_error_norm(K, q, q_new, this->rtol(), this->atol(), h);
+    return THIS->estimate_error_norm(K, q, q_new, this->rtol(), this->atol(), h);
 }
 
 
@@ -117,16 +117,16 @@ StepResult RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsTyp
             // Accept step
             step_accepted = true;
             if (2*err_norm < 1) {
-                T err_clamped = std::max(err_norm, MIN_ERR);
+                T err_clamped = max(err_norm, MIN_ERR);
                 _factor = this->SAFETY * pow(err_clamped, INC_EXP);
-                factor = std::min(this->MAX_FACTOR, _factor);
+                factor = min(this->MAX_FACTOR, _factor);
             } else {
                 factor = 1;
             }
         } else {
             // Reject step
             _factor = this->SAFETY * pow(err_norm, ERR_EXP);
-            factor = std::max(this->MIN_FACTOR, _factor);
+            factor = max(this->MIN_FACTOR, _factor);
         }
 
         if (!all_are_finite(q_new, n)){
@@ -148,10 +148,10 @@ T StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::
     for (size_t j = 0; j < this->Nsys(); j++) {
 
         T err_total = h * EXPAND_SUM(T, Nstages+1, I,
-            THIS_C->E[I] * this->K_[I*this->Nsys()+j]
+            THIS->E[I] * this->K_[I*this->Nsys()+j]
         );
         T scale = atol + rtol * (abs(q[j]) + abs(this->K_[j]) * habs);
-        err_max = std::max(err_max, abs(err_total) / scale);
+        err_max = max(err_max, abs(err_total) / scale);
     }
     return err_max;
 }
@@ -182,7 +182,7 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
 void StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::set_coef_matrix_impl() const{
-    const auto& P = THIS_C->P;
+    const auto& P = THIS->P;
     for (size_t i=0; i<this->Nsys(); i++){
         for (size_t j=0; j<Derived::INTERP_ORDER; j++){
             T sum = 0;
@@ -324,7 +324,7 @@ T RK45<T, N, SP, RhsType, JacType>::step_impl(T* result, const T* state, const T
     for (size_t j = 0; j < n; j++) {
         const T err   = h * (e1*K0[j] + e3*K2[j] + e4*K3[j] + e5*K4[j] + e6*K5[j] + e7*K6[j]);
         const T scale = atol + rtol * (abs(q[j]) + abs(K0[j]) * habs);
-        err_max = std::max(err_max, abs(err) / scale);
+        err_max = max(err_max, abs(err) / scale);
     }
     return err_max;
 }

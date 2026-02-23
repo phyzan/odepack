@@ -20,13 +20,13 @@ public:
     template<typename Callable>
     INLINE void constexpr iterate(Callable&& f) const{
         //static override
-        return THIS_C->iterate(f);
+        return THIS->iterate(f);
     }
 
     template<INT_T... IntType>
     INLINE bool iterating_impl(IntType&... idx) const{
         //static override
-        return THIS_C->iterating_impl(idx...);
+        return THIS->iterating_impl(idx...);
     }
 
     inline size_t ndims() const{

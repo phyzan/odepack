@@ -8,17 +8,17 @@ namespace ode {
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
 bool VectorField<Derived, T, NDIM, AS_VIRTUAL>::interp(T* out, const T* coords) const{
-    return THIS_C->interp(out, coords);
+    return THIS->interp(out, coords);
 }
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
 int VectorField<Derived, T, NDIM, AS_VIRTUAL>::ndim() const {
-    return THIS_C->ndim();
+    return THIS->ndim();
 }
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
 bool VectorField<Derived, T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
-    return THIS_C->contains(coords);
+    return THIS->contains(coords);
 }
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
