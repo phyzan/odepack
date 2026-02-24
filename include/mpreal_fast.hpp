@@ -88,9 +88,7 @@ public:
 
 protected:
 
-    MP_V_INLINE static mpreal& get_aux();
-
-    static thread_local mpreal mp_aux;
+    static thread_local mpreal* mp_aux;
 
 };
 
@@ -498,15 +496,15 @@ public:
     // Default add_to: evaluate into dest's auxiliary, then add
     // Derived classes should override for efficiency
     MP_INLINE void add_to(mpreal& dest, mp_rnd_t rnd = mpreal::get_default_rnd()) const {
-        static_cast<const Derived*>(this)->assign_to(Base::get_aux(), rnd);
-        mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+        static_cast<const Derived*>(this)->assign_to(*Base::mp_aux, rnd);
+        mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
     }
 
     // Default sub_from: evaluate into dest's auxiliary, then subtract
     // Derived classes should override for efficiency
     MP_INLINE void sub_from(mpreal& dest, mp_rnd_t rnd = mpreal::get_default_rnd()) const {
-        static_cast<const Derived*>(this)->assign_to(Base::get_aux(), rnd);
-        mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+        static_cast<const Derived*>(this)->assign_to(*Base::mp_aux, rnd);
+        mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
     }
 
 protected:
@@ -751,8 +749,8 @@ struct MulExpr : public BinaryOperator<MulExpr<L, R>, L, R> {
                      this->get_rhs().mpfr_srcptr(), dest.mpfr_srcptr(), rnd);
         } else {
             // Fall back to default: evaluate then add
-            this->assign_to(Base::get_aux(), rnd);
-            mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+            this->assign_to(*Base::mp_aux, rnd);
+            mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
         }
     }
 
@@ -765,8 +763,8 @@ struct MulExpr : public BinaryOperator<MulExpr<L, R>, L, R> {
             mpfr_neg(dest.mpfr_ptr(), dest.mpfr_srcptr(), rnd);
         } else {
             // Fall back to default: evaluate then subtract
-            this->assign_to(Base::get_aux(), rnd);
-            mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+            this->assign_to(*Base::mp_aux, rnd);
+            mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
         }
     }
 
@@ -923,10 +921,10 @@ struct UnaryOperator : public ExprOperator<Derived> {
 
     MP_V_INLINE const mpreal& compute(mp_rnd_t rnd = mpreal::get_default_rnd()) const{
         if constexpr (is_operator_v<E>) {
-            apply(Base::get_aux(), operand.compute(rnd), rnd);
+            apply(*Base::mp_aux, operand.compute(rnd), rnd);
         }else{
             static_assert((std::is_same_v<std::decay_t<E>, mpreal>), "Invalid operand type for unary operator");
-            apply(Base::get_aux(), operand, rnd);
+            apply(*Base::mp_aux, operand, rnd);
         }
         return Base::mp_aux;
     }
@@ -944,14 +942,14 @@ struct UnaryOperator : public ExprOperator<Derived> {
 
     // Default add_to: evaluate into auxiliary, then add
     MP_INLINE void add_to(mpreal& dest, mp_rnd_t rnd = mpreal::get_default_rnd()) const {
-        static_cast<const Derived*>(this)->assign_to(Base::get_aux(), rnd);
-        mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+        static_cast<const Derived*>(this)->assign_to(*Base::mp_aux, rnd);
+        mpfr_add(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
     }
 
     // Default sub_from: evaluate into auxiliary, then subtract
     MP_INLINE void sub_from(mpreal& dest, mp_rnd_t rnd = mpreal::get_default_rnd()) const {
-        static_cast<const Derived*>(this)->assign_to(Base::get_aux(), rnd);
-        mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux.mpfr_srcptr(), rnd);
+        static_cast<const Derived*>(this)->assign_to(*Base::mp_aux, rnd);
+        mpfr_sub(dest.mpfr_ptr(), dest.mpfr_srcptr(), Base::mp_aux->mpfr_srcptr(), rnd);
     }
 
 };
@@ -999,22 +997,18 @@ struct AbsExpr : public UnaryOperator<AbsExpr<E>, E> {
 };
 
 template<typename Derived>
-thread_local mpreal ExprOperator<Derived>::mp_aux = mpreal(0);
+thread_local mpreal* ExprOperator<Derived>::mp_aux = [](){
+    static thread_local mpreal aux(0);
+    ExprBase::append_ptr(&aux);
+    return &aux; }();
 
 inline std::vector<mpreal*> ExprBase::aux_ptrs;
 inline std::shared_mutex ExprBase::aux_mutex;
 
 template<typename Derived>
 MP_V_INLINE const mpreal& ExprOperator<Derived>::compute(mp_rnd_t rnd) const {
-    assign_to(get_aux(), rnd);
-    return mp_aux;
-}
-
-template<typename Derived>
-MP_V_INLINE mpreal& ExprOperator<Derived>::get_aux() {
-    static thread_local bool registered = (ExprBase::append_ptr(&mp_aux), true);
-    (void)registered;
-    return mp_aux;
+    assign_to(*mp_aux, rnd);
+    return *mp_aux;
 }
 
 // ===================================================================================
