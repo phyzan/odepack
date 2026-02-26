@@ -21,9 +21,9 @@ protected:
     static constexpr bool   IS_IMPLICIT = false;
 
     T    step_impl(T* result, const T* state, const T& h);
-public:
+
     StepResult  adapt_impl(T* res, const T* state);
-protected:
+
     void        reset_impl();
 
     void        re_adjust_impl(const T* new_vector);

@@ -17,7 +17,7 @@ namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::complex;
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;

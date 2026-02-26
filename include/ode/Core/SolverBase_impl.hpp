@@ -751,7 +751,6 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
         this->kill("Initial conditions not set (nullptr provided)");
     }else if (this->validate_ics_impl(t0, q0)){
         T habs = (stepsize == 0 ? this->auto_step(t0, q0) : T(abs(stepsize)));
-
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
         copy_array(_state_data.ptr(0, 2), q0, this->Nsys());

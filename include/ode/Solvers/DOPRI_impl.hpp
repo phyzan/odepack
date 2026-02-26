@@ -108,7 +108,6 @@ StepResult RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsTyp
     bool step_accepted = false;
     T* K = K_.data();
     copy_array(K, K + Nstages*this->Nsys(), this->Nsys()); //FSAL: K[0] for next step = K[Nstages] from this step
-
     while (!step_accepted){
         h = habs * this->direction();
         err_norm = THIS->step_impl(res, state, h);
