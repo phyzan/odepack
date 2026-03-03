@@ -206,7 +206,7 @@ public:
     StackArray() = default;
 
     constexpr explicit StackArray(const T* data) : Base(){
-        copy_array<T>(this->data(), data, this->size());
+        copy_array<T, N>(this->data(), data, this->size());
     }
 
     template<INT_T... Args>
