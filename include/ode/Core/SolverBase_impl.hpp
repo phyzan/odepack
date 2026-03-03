@@ -703,7 +703,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics(T t0, const T
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics_impl(T t0, const T* q0) const {
 
-    if (!all_are_finite(q0, this->Nsys()) || !is_finite(t0)){
+    if (!all_are_finite(q0, this->Nsys()) || !isfinite(t0)){
         return false;
     }
 

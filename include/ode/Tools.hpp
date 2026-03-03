@@ -15,7 +15,7 @@
 
 namespace ode {
 
-using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::complex;
+using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, std::min, std::max, std::complex;
 
 using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
@@ -293,15 +293,6 @@ private:
     TimePoint _start;
 };
 
-template<typename A, typename B>
-inline auto max(A a, B b) {
-    return (a > b) ? a : b;
-}
-
-template<typename A, typename B>
-inline auto min(A a, B b) {
-    return (a < b) ? a : b;
-}
 
 template <typename T>
 inline T inf() {
@@ -321,7 +312,8 @@ template<typename T>
 bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
 
 template <typename T>
-inline bool is_finite(const T& value) {
+requires (std::is_arithmetic_v<T>)
+inline bool isfinite(const T& value) {
 #ifndef NO_NAN_CHECK
     if constexpr (std::is_floating_point_v<T>) {
         #ifdef __FAST_MATH__
@@ -332,24 +324,14 @@ inline bool is_finite(const T& value) {
         #else
         return std::isfinite(value);
         #endif
-    } else if constexpr (std::is_integral_v<T>) {
-        return true;
     } else {
-        static_assert(std::is_arithmetic_v<T>, "T must be arithmetic");
-        return false;
+        return true; // Integral types are always finite
     }
 #else
     return true; // If NO_NAN_CHECK is defined, assume all values are finite
 #endif
 }
 
-
-#ifdef MPREAL
-template <>
-inline bool is_finite(const mpfr::mpreal& value) {
-    return mpfr_number_p(value.mpfr_ptr()) != 0;
-}
-#endif
 
 template<typename T>
 T rms_norm(const T* x, size_t size);
@@ -381,7 +363,7 @@ template<typename T>
 INLINE bool all_are_finite(const T* data, size_t n){
 #ifndef NO_NAN_CHECK
     for (size_t i=0; i<n; i++){
-        if (!is_finite(data[i])){
+        if (!isfinite(data[i])){
             return false;
         }
     }
