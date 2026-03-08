@@ -327,7 +327,7 @@ int main() {
     std::cout << "Number of events detected: " << result.event_map().at("event").size() << "\n";
     std::cout << "Integration success: " << (result.success() ? "true" : "false") << "\n";
     std::cout << "Divergence detected: " << (result.diverges() ? "true" : "false") << "\n";
-    std::cout << "Termination message: " << result.message() << "\n";
+    std::cout << "Termination message: " << result.status() << "\n";
 
     // Extract the indices of the event occurrences
     const std::vector<size_t>& event_data = result.event_map().at("event");

@@ -81,6 +81,7 @@ public:
      * @param[out] dq_dt Output array for the derivative dq/dt (size Nsys).
      * @param[in]  t     Current time.
      * @param[in]  q     Current state vector (size Nsys).
+     * @note Derived classes should call THIS->Rhs() and not this->Rhs() in case the derived class overrides Rhs()
     */
     void                 Rhs(T* dq_dt, const T& t, const T* q) const;
 
@@ -95,6 +96,7 @@ public:
      * @param[in]  q  Current state vector (size Nsys).
      * @param[in]  dt Optional step sizes for finite difference (size Nsys). If nullptr,
      *                step sizes are computed automatically.
+     * @note Derived classes should call THIS->Jac() and not this->Jac() in case the derived class overrides Jac()
     */
     void                 Jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
@@ -195,7 +197,7 @@ public:
     bool                diverges() const;
 
     /// @brief Get the current status message.
-    const std::string&  message() const;
+    const std::string&  status() const;
 
     /**
      * @brief Print the current solver state to stdout.
@@ -305,11 +307,15 @@ public:
      *
      * @tparam Setter Function type with signature: void(T* q) that fills the state vector.
      * @param t0      New initial time.
-     * @param func    Function that writes the initial state to the provided pointer.
+     * @param func    Function that writes the initial state to the provided pointer, whose data are the solver's initial conditions, NOT the current state.
      * @param stepsize Initial step size (0 = auto-compute).
      */
     template<typename Setter>
-    void                        apply_ics_setter(T t0, Setter&& func, T stepsize = 0);
+    auto                        apply_ics_setter(T t0, Setter&& func, T stepsize = 0);
+
+    /// @brief Same as apply_ics_setter, but the setter function receives the current state as an argument to modify. Then e.g. new_vector[i] += 1 would increment the i-th component of the current state by 1 before restarting, and works as expected.
+    template<typename Setter>
+    auto                        restart_from_modified_state(T t0, Setter&& func, T stepsize = 0);
 
     /**
      * @brief Set new initial conditions without reallocating memory.
@@ -507,6 +513,9 @@ private:
     void                    move_state(const T& time);
     void                    set_state(const T& time, T* state);
 
+    template<typename Setter>
+    auto                    priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize);
+
 
     Array2D<T, 6, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
     mutable Array1D<T, 4*N, Allocation::Auto>           _dummy_state;
@@ -537,6 +546,9 @@ private:
     static constexpr int max_step_idx = 3;
 };
 
+
+template<typename cls, typename derived>
+using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
 
 } // namespace ode
 

@@ -56,8 +56,8 @@ private:
 
 };
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-class RK4 : public BaseDispatcher<RK4<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived = void>
+class RK4 : public BaseDispatcher<GetDerived<RK4<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>{
 
 public:
 
@@ -68,7 +68,7 @@ public:
 
 private:
 
-    using Base = BaseDispatcher<RK4<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
+    using Base = BaseDispatcher<GetDerived<RK4<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>;
     friend typename Base::MainSolverType;
 
     static constexpr const char*    name = "RK4";

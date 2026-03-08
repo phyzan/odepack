@@ -28,7 +28,7 @@ py::class_<PySolver>(m, "OdeSolver")
     .def_property_readonly("Nsys", &PySolver::Nsys)
     .def_property_readonly("n_evals_rhs", &PySolver::n_evals_rhs)
     .def_property_readonly("n_evals_jac", &PySolver::n_evals_jac)
-    .def_property_readonly("status", &PySolver::message)
+    .def_property_readonly("status", &PySolver::status)
     .def("at_event", &PySolver::py_at_event, py::arg("event")=py::none())
     .def("show_state", &PySolver::show_state,
         py::arg("digits") = 8

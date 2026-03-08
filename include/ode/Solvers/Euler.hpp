@@ -5,8 +5,8 @@
 
 namespace ode{
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-class Euler : public BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived = void>
+class Euler : public BaseDispatcher<GetDerived<Euler<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>{
 
 public:
 
@@ -20,7 +20,7 @@ public:
 
 private:
 
-    using Base = BaseDispatcher<Euler<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
+    using Base = BaseDispatcher<GetDerived<Euler<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>;
     friend Base::MainSolverType;
 
     StepResult  adapt_impl(T* res, const T* state);

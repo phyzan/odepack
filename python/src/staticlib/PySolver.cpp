@@ -302,9 +302,9 @@ bool PySolver::resume() {
 
 void PySolver::stop(const py::str& reason) { DISPATCH(void, cast<T>()->stop(reason.cast<std::string>()); ) } void PySolver::kill(const py::str& reason) { DISPATCH(void, cast<T>()->kill(reason.cast<std::string>()); ) }
 
-py::str PySolver::message() const{
+py::str PySolver::status() const{
     return DISPATCH(py::str,
-        return py::cast(cast<T>()->message());
+        return py::cast(cast<T>()->status());
     )
 }
 

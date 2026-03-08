@@ -16,12 +16,15 @@ namespace ode{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Rhs(T* dq_dt, const T& t, const T* q) const{
+    if constexpr (std::is_pointer_v<RhsType>){
+        assert(_ode.rhs != nullptr && "RHS function pointer cannot be nullptr");
+    }
     _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
-    this->Rhs(dq_dt, t, q);
+    THIS->Rhs(dq_dt, t, q);
     this->_n_evals_rhs++;
 }
 
@@ -44,7 +47,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
  void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
-    this->Jac(jm, t, q, dt);
+    THIS->Jac(jm, t, q, dt);
     this->_n_evals_jac++;
 }
 
@@ -165,13 +168,13 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::diverges() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const std::string& BaseSolver<Derived, T, N, SP, RhsType, JacType>::message() const{
+const std::string& BaseSolver<Derived, T, N, SP, RhsType, JacType>::status() const{
     return _message;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void BaseSolver<Derived, T, N, SP, RhsType, JacType>::show_state(int prec) const{
-    SolverState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->message()).show(prec);
+    SolverState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->status()).show(prec);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -440,18 +443,17 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::reset(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename Setter>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::apply_ics_setter(T t0, Setter&& func, T stepsize){
+auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::apply_ics_setter(T t0, Setter&& func, T stepsize){
     T* ics = const_cast<T*>(this->ics_ptr());
-    ics[0] = t0;
-    func(ics+2);
-    assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
-    if (stepsize < 0) {
-        std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
-    } else if (stepsize == 0) {
-        stepsize = this->auto_step(t0, ics+2);
-    }
-    ics[1] = stepsize;
-    this->reset();
+    return priv_apply_ics_setter(ics, t0, std::forward<Setter>(func), stepsize);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Setter>
+auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::restart_from_modified_state(T t0, Setter&& func, T stepsize){
+    T* ics = const_cast<T*>(this->ics_ptr());
+    copy_array(ics+2, this->vector().data(), this->Nsys());
+    return priv_apply_ics_setter(ics, t0, std::forward<Setter>(func), stepsize);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -551,8 +553,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
         assert(jac != nullptr && "Jacobian function pointer is null");
         jac(jm, t, q, _args.data(), _ode.obj);
     } else if constexpr (HAS_JAC) {
-        if constexpr (std::is_pointer_v<JacType>) {
-            assert(_ode.jacobian != nullptr && "Jacobian function pointer is null");
+        if constexpr (std::is_pointer_v<JacType>){
+            assert(_ode.jacobian != nullptr && "Explicitly passed Jacobian function pointer cannot be nullptr");
         }
         _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
     } else {
@@ -733,12 +735,6 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
-    if constexpr (std::is_pointer_v<RhsType>){
-        assert(ode.rhs != nullptr && "RHS function pointer cannot be nullptr");
-    }
-    if constexpr (std::is_pointer_v<JacType>){
-        assert(ode.jacobian != nullptr && "Explicitly passed Jacobian function pointer cannot be nullptr");
-    }
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
@@ -889,6 +885,36 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_state(const T& time, T
     state[1] = this->stepsize();
     interp(state+2, time);
 }
+
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Setter>
+auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize){
+    ics[0] = t0;
+    if constexpr (std::is_void_v<std::invoke_result_t<Setter, T*>>){
+        func(ics+2);
+        assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
+        if (stepsize < 0) {
+            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+        } else if (stepsize == 0) {
+            stepsize = this->auto_step(t0, ics+2);
+        }
+        ics[1] = stepsize;
+        this->reset();
+    } else {
+        auto res = func(ics+2);
+        assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
+        if (stepsize < 0) {
+            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+        } else if (stepsize == 0) {
+            stepsize = this->auto_step(t0, ics+2);
+        }
+        ics[1] = stepsize;
+        this->reset();
+        return res;
+    }
+}
+    
 
 } // namespace ode
 

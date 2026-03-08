@@ -67,9 +67,9 @@ protected:
     using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
     using Base::Base;
 
-    static constexpr typename Base::Atype A = Derived::Amatrix();
-    static constexpr typename Base::Btype B = Derived::Bmatrix();
-    static constexpr typename Base::Ctype C = Derived::Cmatrix();
+    static constexpr typename Base::Atype Am_ = Derived::Amatrix();
+    static constexpr typename Base::Btype Bm_ = Derived::Bmatrix();
+    static constexpr typename Base::Ctype Cm_ = Derived::Cmatrix();
 };
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
@@ -79,9 +79,9 @@ protected:
     using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
     using Base::Base;
 
-    typename Base::Atype A = Derived::Amatrix();
-    typename Base::Btype B = Derived::Bmatrix();
-    typename Base::Ctype C = Derived::Cmatrix();
+    typename Base::Atype Am_ = Derived::Amatrix();
+    typename Base::Btype Bm_ = Derived::Bmatrix();
+    typename Base::Ctype Cm_ = Derived::Cmatrix();
 };
 
 template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
@@ -129,7 +129,7 @@ protected:
     friend Base::Base;
     friend Base::Base::Base;
 
-    static constexpr typename Base::Etype E = Derived::Ematrix();
+    static constexpr typename Base::Etype Em_ = Derived::Ematrix();
 
 };
 
@@ -144,7 +144,7 @@ protected:
     friend Base::Base;
     friend Base::Base::Base;
 
-    typename Base::Etype E = Derived::Ematrix();
+    typename Base::Etype Em_ = Derived::Ematrix();
 
 };
 
@@ -152,8 +152,8 @@ template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, 
 using STANDARD_DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, StandardRungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>, StandardRungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>>;
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class RK45 : public STANDARD_DOPRI_DISPATCHER<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
+class RK45 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 6, 5, SP, RhsType, JacType>{
 
 public:
 
@@ -166,9 +166,9 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RK45);
 
-private:
+protected:
 
-    using Base = STANDARD_DOPRI_DISPATCHER<RK45<T, N, SP, RhsType, JacType>, T, N, 6, 5, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 6, 5, SP, RhsType, JacType>;
     using Ptype = Array2D<T, Nstages+1, 4, Allocation::Stack>;
     
     friend Base;
@@ -193,7 +193,8 @@ private:
 
     static constexpr                Ptype Pmatrix();
 
-    Ptype P = Pmatrix();
+private:
+    Ptype Pm_ = Pmatrix();
 
 };
 
@@ -201,8 +202,8 @@ private:
 
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class RK23 : public STANDARD_DOPRI_DISPATCHER<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType> {
+template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
+class RK23 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 3, 3, SP, RhsType, JacType> {
 
 public:
 
@@ -215,9 +216,9 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RK23);
 
-private:
+protected:
 
-    using Base = STANDARD_DOPRI_DISPATCHER<RK23<T, N, SP, RhsType, JacType>, T, N, 3, 3, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 3, 3, SP, RhsType, JacType>;
     using Ptype = Array2D<T, Nstages+1, 3, Allocation::Stack>;
     friend Base;
     friend Base::Base;
@@ -241,7 +242,8 @@ private:
 
     static constexpr                Ptype Pmatrix();
 
-    Ptype P = Pmatrix();
+private:
+    Ptype Pm_ = Pmatrix();
 
 };
 

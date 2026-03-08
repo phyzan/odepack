@@ -52,7 +52,7 @@ public:
     virtual bool                is_running() const = 0;
     virtual bool                is_dead() const = 0;
     virtual bool                diverges() const = 0;
-    virtual const std::string&  message() const = 0;
+    virtual const std::string&  status() const = 0;
     virtual void                show_state(int prec=8) const = 0;
     virtual bool                validate_ics(T t0, const T* q0) const = 0;
     virtual const std::string&  method() const = 0;

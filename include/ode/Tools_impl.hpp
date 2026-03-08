@@ -47,6 +47,11 @@ const Type* PolyWrapper<Type>::operator->() const{
 }
 
 template<typename Type>
+bool PolyWrapper<Type>::operator==(const Type* other) const{
+    return this->_ptr == other;
+}
+
+template<typename Type>
 const Type* PolyWrapper<Type>::ptr() const{
     return _ptr;
 }
@@ -80,6 +85,16 @@ void PolyWrapper<Type>::take_ownership(Type* ptr){
     _ptr = ptr;
 }
 
+template<typename Type>
+void PolyWrapper<Type>::unsafe_replace(Type* ptr){
+    _ptr = ptr;
+}
+
+template<typename Type>
+void PolyWrapper<Type>::setNULL(){
+    delete _ptr;
+    _ptr = nullptr;
+}
 
 //===========================================================================================
 //                                      State<T>

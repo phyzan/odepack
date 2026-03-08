@@ -5,6 +5,7 @@
 #include "ode/SolverDispatcher.hpp"
 #include "ode/OdeInt.hpp"
 #include "ode/SolverState.hpp"
+#include "ode/CustomSolver.hpp"
 
 #include "ode/Core/SolverBase.hpp"
 #include "ode/Core/RichBase.hpp"

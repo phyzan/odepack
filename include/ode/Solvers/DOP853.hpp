@@ -77,8 +77,8 @@ private:
 };
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class DOP853 : public RungeKuttaBaseDynamic<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, 16, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
+class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 12, 8, 16, SP, RhsType, JacType>{
 
 public:
 
@@ -88,9 +88,9 @@ public:
 
     std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
 
-private:
+protected:
 
-    using Base = RungeKuttaBaseDynamic<DOP853<T, N, SP, RhsType, JacType>, T, N, 12, 8, 16, SP, RhsType, JacType>;
+    using Base = RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 12, 8, 16, SP, RhsType, JacType>;
     friend Base;
     friend Base::Base;
     friend Base::MainSolverType; // So that Base can access specific private methods for static override
@@ -121,6 +121,11 @@ private:
 
     static constexpr C_EXTRA_TYPE Cmatrix_extra();
 
+    void set_coef_matrix_impl() const;
+    
+    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
+
+private:
     A_EXTRA_TYPE A_EXTRA = Amatrix_extra();
 
     C_EXTRA_TYPE C_EXTRA = Cmatrix_extra();
@@ -130,10 +135,6 @@ private:
     typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
 
     typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
-
-    void set_coef_matrix_impl() const;
-    
-    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
 };
 

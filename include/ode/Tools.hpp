@@ -62,7 +62,9 @@ class PolyWrapper{
 
 public:
     
-    PolyWrapper(Type* object);
+    explicit PolyWrapper(Type* object);
+
+    PolyWrapper() = default; ///default constructor creates a PolyWrapper that does not own any object. Its pointer is set to nullptr.
 
     PolyWrapper(const PolyWrapper& other);
 
@@ -78,20 +80,31 @@ public:
 
     const Type* operator->() const;
 
+    bool operator==(const Type* other) const;
+
+    /// @brief Returns a const view of the managed pointer.
     const Type* ptr() const;
 
+    /// @brief Returns a non-const view of the managed pointer. Do not delete the object, as the PolyWrapper still owns it.
     Type* ptr();
 
+    /// @brief Creates and returns a new pointer to a copy of the managed object. The caller takes ownership of the returned pointer and is responsible for deleting it.
     Type* new_ptr() const;
 
+    /// @brief Releases ownership of the managed pointer and returns it. After calling this function, the PolyWrapper no longer manages any object and will not delete anything in its destructor. The caller takes ownership of the returned pointer and is responsible for deleting it.
     Type* release();
 
     template<typename Base>
     Base* cast();
 
+    /// @brief Takes ownership of a new pointer, deleting the old one if it exists.
     void take_ownership(Type* ptr);
 
-    PolyWrapper() = default;
+    /// @brief Replaces the managed pointer with a new one without deleting the old one. Use with caution to avoid memory leaks.
+    void unsafe_replace(Type* ptr);
+
+    /// @brief Sets the managed pointer to nullptr without deleting the old object. Use with caution to avoid memory leaks.
+    void setNULL();
     
 protected:
 

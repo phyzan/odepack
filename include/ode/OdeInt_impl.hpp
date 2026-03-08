@@ -141,7 +141,7 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
 template<typename T, size_t N>
 OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
     if (_solver->is_dead()){
-        return OdeResult<T, N>({}, {}, {}, _solver->diverges(), false, 0, _solver->message());
+        return OdeResult<T, N>({}, {}, {}, _solver->diverges(), false, 0, _solver->status());
     }else if (t_max*_solver->direction() < _solver->t()*_solver->direction()){
         return OdeResult<T, N>({}, {}, {}, false, false, 0, "Cannot integrate in opposite direction"); //cannot integrate in opposite direction
     }
@@ -239,7 +239,7 @@ OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>
         _register_state();
     }
     TimePoint t2 = Clock::now();
-    std::string message = _solver->t() == t_max ? "t-goal" : _solver->message();
+    std::string message = _solver->t() == t_max ? "t-goal" : _solver->status();
     OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), Clock::as_duration(t1, t2), message);
     _runtime += res.runtime();
     return res;

@@ -346,28 +346,28 @@ void DOP853LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 }
 
 // DOP853 implementations
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS) {}
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+DOP853<T, N, SP, RhsType, JacType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS) {}
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-DOP853<T, N, SP, RhsType, JacType>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {}
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+DOP853<T, N, SP, RhsType, JacType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {}
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void DOP853<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ void DOP853<T, N, SP, RhsType, JacType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
     return coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- std::unique_ptr<Interpolator<T, N>> DOP853<T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ std::unique_ptr<Interpolator<T, N>> DOP853<T, N, SP, RhsType, JacType, Derived>::state_interpolator(int bdr1, int bdr2) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
     return std::unique_ptr<Interpolator<T, N>>(new DOP853LocalInterpolator<T, N>(this->_coef_mat, this->t_old(), d[0],this->old_state_ptr()+2, d+2, this->Nsys(), bdr1, bdr2));
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Atype DOP853<T, N, SP, RhsType, JacType>::Amatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+constexpr typename DOP853<T, N, SP, RhsType, JacType, Derived>::Base::Atype DOP853<T, N, SP, RhsType, JacType, Derived>::Amatrix(){
     typename Base::Atype result(N_STAGES, N_STAGES);
     typename DOP_COEFS<T>::DOP_A full_A = DOP_COEFS<T>::make_A();
 
@@ -379,37 +379,37 @@ constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Atype DOP853<T, N, 
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Btype DOP853<T, N, SP, RhsType, JacType>::Bmatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+constexpr typename DOP853<T, N, SP, RhsType, JacType, Derived>::Base::Btype DOP853<T, N, SP, RhsType, JacType, Derived>::Bmatrix(){
     return DOP_COEFS<T>::make_B();
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-constexpr typename DOP853<T, N, SP, RhsType, JacType>::Base::Ctype DOP853<T, N, SP, RhsType, JacType>::Cmatrix(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+constexpr typename DOP853<T, N, SP, RhsType, JacType, Derived>::Base::Ctype DOP853<T, N, SP, RhsType, JacType, Derived>::Cmatrix(){
     typename Base::Ctype result(N_STAGES);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data(), N_STAGES);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-constexpr typename DOP853<T, N, SP, RhsType, JacType>::A_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Amatrix_extra(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+constexpr typename DOP853<T, N, SP, RhsType, JacType, Derived>::A_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType, Derived>::Amatrix_extra(){
     Array2D<T, N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT> result(N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT);
     auto A = DOP_COEFS<T>::make_A();
     copy_array(result.data(), A.data()+(N_STAGES+1)* DOP_COEFS<T>::N_STAGES_EXT, N_STAGES_EXTRA* DOP_COEFS<T>::N_STAGES_EXT);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-constexpr typename DOP853<T, N, SP, RhsType, JacType>::C_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType>::Cmatrix_extra(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+constexpr typename DOP853<T, N, SP, RhsType, JacType, Derived>::C_EXTRA_TYPE DOP853<T, N, SP, RhsType, JacType, Derived>::Cmatrix_extra(){
     Array1D<T, N_STAGES_EXTRA> result(N_STAGES_EXTRA);
     auto C = DOP_COEFS<T>::make_C();
     copy_array(result.data(), C.data()+N_STAGES+1, N_STAGES_EXTRA);
     return result;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void DOP853<T, N, SP, RhsType, JacType>::set_coef_matrix_impl() const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+void DOP853<T, N, SP, RhsType, JacType, Derived>::set_coef_matrix_impl() const{
 
     T h = this->stepsize() * this->direction();
     const T* y_old = this->old_state_ptr()+2;
@@ -467,8 +467,8 @@ void DOP853<T, N, SP, RhsType, JacType>::set_coef_matrix_impl() const{
         }
     }
 }
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-T DOP853<T, N, SP, RhsType, JacType>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+T DOP853<T, N, SP, RhsType, JacType, Derived>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const{
     // DOP853 uses a combination of 3rd and 5th order error estimates
     // err5 = K.T @ E5 / scale
     // err3 = K.T @ E3 / scale

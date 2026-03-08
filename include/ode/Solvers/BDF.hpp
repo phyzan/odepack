@@ -83,8 +83,8 @@ private:
 };
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class BDF : public BaseDispatcher<BDF<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
+class BDF : public BaseDispatcher<GetDerived<BDF<T, N, SP, RhsType, JacType>, Derived>, T, N, SP, RhsType, JacType>{
 
 public:
 
@@ -98,7 +98,7 @@ public:
 
 private:
 
-    using Base = BaseDispatcher<BDF<T, N, SP, RhsType, JacType>, T, N, SP, RhsType, JacType>;
+    using Base = BaseDispatcher<GetDerived<BDF<T, N, SP, RhsType, JacType>, Derived>, T, N, SP, RhsType, JacType>;
     using Dlike = Array2D<T, 0, N>;
     struct None{};
     friend Base::MainSolverType;

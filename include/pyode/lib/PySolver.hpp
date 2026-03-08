@@ -91,7 +91,7 @@ struct PySolver : DtypeDispatcher {
 
     void                kill(const py::str& reason);
 
-    py::str             message() const;       
+    py::str             status() const;       
 
     bool                py_at_event(py::object event) const;
 

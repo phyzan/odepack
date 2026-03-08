@@ -71,9 +71,9 @@ template<typename T, size_t N>
 #endif
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
 template<typename... Type>
-RK4<T, N, SP, RhsType, JacType>::RK4(MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, nsys, rtol, atol, 0, inf<T>(), stepsize, dir, args, std::forward<Type>(extras)...),
+RK4<T, N, SP, RhsType, JacType, Derived>::RK4(MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, nsys, rtol, atol, 0, inf<T>(), stepsize, dir, args, std::forward<Type>(extras)...),
 #ifdef RK4_DENSE
 K(9, nsys)
 #else
@@ -84,8 +84,8 @@ K(5, nsys)
 }
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- VirtualInterp<T, N> RK4<T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ VirtualInterp<T, N> RK4<T, N, SP, RhsType, JacType, Derived>::state_interpolator(int bdr1, int bdr2) const{
     set_interp_data();
     const T* d = this->interp_new_state_ptr();
     size_t nsys = this->Nsys();
@@ -99,8 +99,8 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 #endif
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-StepResult RK4<T, N, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+StepResult RK4<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T* state){
     // standard Runge-Kutta-4 with fixed step size
 
     const T& t = state[0];
@@ -124,8 +124,8 @@ StepResult RK4<T, N, SP, RhsType, JacType>::adapt_impl(T* res, const T* state){
 
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void RK4<T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ void RK4<T, N, SP, RhsType, JacType, Derived>::interp_impl(T* result, const T& t) const{
     size_t nsys = this->Nsys();
 #ifdef RK4_DENSE    
     rk4_step([this](T* out, const T& tt, const T* y) LAMBDA_INLINE{
@@ -139,22 +139,22 @@ template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacTy
 }
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void RK4<T, N, SP, RhsType, JacType>::reset_impl(){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ void RK4<T, N, SP, RhsType, JacType, Derived>::reset_impl(){
     Base::reset_impl();
     K.set(0);
     interp_data_set = false;
 
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void RK4<T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+ void RK4<T, N, SP, RhsType, JacType, Derived>::re_adjust_impl(const T* new_vector){
     Base::re_adjust_impl(new_vector);
     set_interp_data();
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void RK4<T, N, SP, RhsType, JacType>::set_interp_data() const{
+template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+void RK4<T, N, SP, RhsType, JacType, Derived>::set_interp_data() const{
     if (!interp_data_set){
         const T* d = this->interp_new_state_ptr();
         this->rhs(K.data()+this->Nsys(), d[0], d+2);
