@@ -7,14 +7,14 @@ namespace ode{
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 requires (is_rich<SP>)
-Solver<T, N, SP, RhsType, JacType> getSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, EVENTS events) {
-    return Solver<T, N, SP, RhsType, JacType>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+Solver<T, N, SP, RhsType, JacType, void> getSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, EVENTS events) {
+    return Solver<T, N, SP, RhsType, JacType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
 }
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 requires (!is_rich<SP>)
-Solver<T, N, SP, RhsType, JacType> getSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args) {
-    return Solver<T, N, SP, RhsType, JacType>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args);
+Solver<T, N, SP, RhsType, JacType, void> getSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args) {
+    return Solver<T, N, SP, RhsType, JacType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args);
 }
 
 
