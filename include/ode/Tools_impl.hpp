@@ -312,7 +312,7 @@ template<typename T>
 T inf_norm(const T* x, size_t size){
     T max_val = 0;
     for (size_t i = 0; i < size; i++){
-        max_val = std::max(max_val, std::abs(x[i]));
+        max_val = std::max<T>(max_val, std::abs(x[i]));
     }
     return max_val;
 }
@@ -520,7 +520,7 @@ T detLU_row_major(T* mat, size_t N) {
 
 template<typename T>
 T choose_step(const T& habs, const T& hmin, const T& hmax) {
-    return std::max(std::min(habs, hmax), hmin);
+    return std::max<T>(std::min<T>(habs, hmax), hmin);
 }
 
 } // namespace ode

@@ -486,7 +486,7 @@ T DOP853<T, N, SP, RhsType, JacType, Derived>::estimate_error_norm(const T* K, c
             err5 += K[i * Nsys + j] * E5(i);
             err3 += K[i * Nsys + j] * E3(i);
         }
-        T scale = atol + rtol * std::max(abs(q[j]), abs(q_new[j]));
+        T scale = atol + rtol * std::max<T>(abs(q[j]), abs(q_new[j]));
         err5 /= scale;
         err3 /= scale;
 

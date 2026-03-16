@@ -116,16 +116,16 @@ StepResult RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsTyp
             // Accept step
             step_accepted = true;
             if (2*err_norm < 1) {
-                T err_clamped = max(err_norm, MIN_ERR);
+                T err_clamped = std::max<T>(err_norm, MIN_ERR);
                 _factor = this->SAFETY * pow(err_clamped, INC_EXP);
-                factor = min(this->MAX_FACTOR, _factor);
+                factor = std::min<T>(this->MAX_FACTOR, _factor);
             } else {
                 factor = 1;
             }
         } else {
             // Reject step
             _factor = this->SAFETY * pow(err_norm, ERR_EXP);
-            factor = max(this->MIN_FACTOR, _factor);
+            factor = std::max<T>(this->MIN_FACTOR, _factor);
         }
 
         if (!all_are_finite(q_new, n)){
@@ -150,7 +150,7 @@ T StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>::
             THIS->Em_[I] * this->K_[I*this->Nsys()+j]
         );
         T scale = atol + rtol * (abs(q[j]) + abs(this->K_[j]) * habs);
-        err_max = max(err_max, abs(err_total) / scale);
+        err_max = std::max<T>(err_max, abs(err_total) / scale);
     }
     return err_max;
 }
@@ -323,7 +323,7 @@ T RK45<T, N, SP, RhsType, JacType, Derived>::step_impl(T* result, const T* state
     for (size_t j = 0; j < n; j++) {
         const T err   = h * (e1*K0[j] + e3*K2[j] + e4*K3[j] + e5*K4[j] + e6*K5[j] + e7*K6[j]);
         const T scale = atol + rtol * (abs(q[j]) + abs(K0[j]) * habs);
-        err_max = max(err_max, abs(err) / scale);
+        err_max = std::max<T>(err_max, abs(err) / scale);
     }
     return err_max;
 }
@@ -422,7 +422,7 @@ T RK23<T, N, SP, RhsType, JacType, Derived>::step_impl(T* result, const T* state
     for (size_t j = 0; j < n; j++) {
         const T err   = h * (e1*K0[j] + e2*K1[j] + e3*K2[j] + e4*K3[j]);
         const T scale = atol + rtol * (abs(q[j]) + abs(K0[j]) * habs);
-        err_max = std::max(err_max, abs(err) / scale);
+        err_max = std::max<T>(err_max, abs(err) / scale);
     }
     return err_max;
 }

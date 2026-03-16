@@ -67,7 +67,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 
     for (size_t i = 0; i < n; i++) {
         // Compute step size: use provided dt or compute 
-        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * max(threshold, abs(q[i]));
+        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * std::max<T>(threshold, abs(q[i]));
 
         x1[i] = q[i] - h_i;
         x2[i] = q[i] + h_i;
@@ -264,12 +264,12 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
     d2 = rms_norm(tmp, scale, n) / h0;
 
     if (d1 <= 1e-15 && d2 <= 1e-15){
-        h1 = max(T(1)/1000000, h0/1000);
+        h1 = std::max<T>(T(1)/1000000, h0/1000);
     }
     else{
-        h1 = pow(100*max(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
+        h1 = pow(100*std::max<T>(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
     }
-    return max(std::min({T(100*h0), h1, this->max_step()}), this->min_step());
+    return std::max<T>(std::min<T>({T(100*h0), h1, this->max_step()}), this->min_step());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
