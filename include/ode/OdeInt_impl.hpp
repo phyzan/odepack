@@ -403,7 +403,7 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
             if (option.name == _solver->event_col().event(i).name()){
                 found = true;
                 res[i] = option;
-                res[i].max_events = std::max(option.max_events, -1);
+                res[i].max_events = ndspan::max(option.max_events, -1);
                 break;
             }
         }

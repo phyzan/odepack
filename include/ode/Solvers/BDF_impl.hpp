@@ -181,7 +181,7 @@ BDF<T, N, SP, RhsType, JacType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&.
         std::cerr << "Warning: rtol=0 not allowed in the BDF method. Setting rtol = " << rtol << std::endl;
 #endif
     }
-    _newton_tol = std::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, std::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));
+    _newton_tol = ndspan::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, ndspan::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));
 
     if (!this->is_dead() && q0 != nullptr){
         if (this->validate_ics_impl(t0, q0)){
@@ -422,7 +422,7 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
 
     _order += delta_order;
 
-    factor = std::min<T>(this->MAX_FACTOR, safety * max_factor);
+    factor = ndspan::min<T>(this->MAX_FACTOR, safety * max_factor);
     habs *= factor;
     _change_D(factor);
     _valid_LU = false;

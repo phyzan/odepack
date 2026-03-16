@@ -103,11 +103,7 @@ INLINE constexpr decltype(auto) pack_elem(Args&&... args) {
 
 template<typename... Ts>
 concept IsInt = (std::convertible_to<Ts, size_t>  && ...);
-    
-template<typename... Args>
-auto max_of_pack(Args... args) {
-    return (std::max)({args...});
-}
+
 
 template<typename... Args>
 std::string idx_string(Args... arg){
@@ -210,6 +206,27 @@ INLINE T abs(const T& x){
     return x >= 0 ? x : -x;
 }
 
+template<typename T>
+inline T max(const T& a, const T& b) {
+    return a > b ? a : b;
+}
+
+template<typename T>
+inline T min(const T& a, const T& b) {
+    return a < b ? a : b;
+}
+
+template<typename T>
+inline T min_of_pack(const auto&... args) {
+    return (std::min<T>)({args...});
+}
+
+
+template<typename... Args>
+auto max_of_pack(Args... args) {
+    return (max)({args...});
+}
+
 template<typename T, typename Array>
 std::string array_repr(const Array& array, int digits) {
     std::string result;
@@ -271,7 +288,7 @@ constexpr size_t factorial(size_t k){
 constexpr size_t comb(size_t n, size_t k) {
     assert(n >= k);
 
-    k = std::min(k, n - k);
+    k = ndspan::min(k, n - k);
 
     size_t res = 1;
     for (size_t i = 1; i <= k; ++i) {

@@ -105,7 +105,7 @@ public:
             size_t n = shape[i] - 1;
             size_t bits = 0;
             while (n >> bits) {++bits;}
-            res = std::max(bits, res);
+            res = ndspan::max(bits, res);
         }
         return res;
     }
@@ -120,7 +120,7 @@ public:
         size_t shape_arr[sizeof...(shape)] = {size_t(shape)...};
         for (size_t i=0; i<sizeof...(shape);i++){
             tmp = next_pow_of_2(shape_arr[i]);
-            p = std::max(p, tmp);
+            p = ndspan::max(p, tmp);
         }
         return ((shape*0+p)*...);
     }

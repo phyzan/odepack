@@ -508,7 +508,7 @@ public:
         for (size_t j=0; j<this->Ncols(); j++){
             size_t len = to_string((*this)(0, j), digits).size();
             for (size_t i=0; i<this->Nrows(); i++){
-                len = std::max(len, to_string((*this)(i, j), digits).size());
+                len = ndspan::max(len, to_string((*this)(i, j), digits).size());
             }
             column_str_len[j] = len;
         }
