@@ -53,17 +53,17 @@ class VariationalSolver : public PolyWrapper<OdeRichSolver<T, N>>{
 
 public:
 
-    VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, const std::string& method = "RK45");
+    VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, Integrator method = Integrator::RK45);
 
-     const NormalizationEvent<T>& main_event() const;
+    const NormalizationEvent<T>& main_event() const;
 
-     const T&                     logksi() const;
+    const T&                     logksi() const;
 
-     T                            lyap() const;
+    T                            lyap() const;
 
-     T                            t_lyap() const;
+    T                            t_lyap() const;
 
-     T                            delta_s() const;
+    T                            delta_s() const;
 
 };
 
@@ -72,17 +72,17 @@ class VariationalODE : public ODE<T, N>{
 
 public:
 
-    VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> = {}, const std::string& method = "RK45");
-
-    DEFAULT_RULE_OF_FOUR(VariationalODE);
+    VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> = {}, Integrator method = Integrator::RK45);
 
     ODE<T, N>* clone() const override;
 
-     const std::vector<T>& t_lyap() const;
+    const std::vector<T>& t_lyap() const;
 
-     const std::vector<T>& lyap() const;
+    const std::vector<T>& lyap() const;
 
-     const std::vector<T>& kicks() const;
+    const std::vector<T>& kicks() const;
+
+    DEFAULT_RULE_OF_FOUR(VariationalODE);
 
     void clear() override;
 

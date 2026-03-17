@@ -95,7 +95,7 @@ protected:
     friend Base::Base;
     friend Base::MainSolverType; // So that Base can access specific private methods for static override
 
-    static constexpr const char* name = "DOP853";
+    static constexpr Integrator integrator = Integrator::DOP853;
     
     static constexpr size_t N_STAGES = 12;
     static constexpr size_t N_ORDER = 8;

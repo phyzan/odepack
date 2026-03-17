@@ -55,7 +55,7 @@ py::class_<PyODE>(m, "LowLevelODE")
     .def_property_readonly("runtime", &PyODE::runtime)
     .def_property_readonly("diverges", &PyODE::diverges)
     .def_property_readonly("is_dead", &PyODE::is_dead)
-    .def_property_readonly("scalar_type", [](const PyODE& self){return SCALAR_TYPE[self.scalar_type];});
+    .def_property_readonly("scalar_type", [](const PyODE& self){return getScalarType(self.scalar_type);});
 
     m.def("integrate_all", &py_integrate_all, py::arg("ode_array"), py::arg("interval"), py::arg("t_eval")=py::none(), py::arg("event_options")=py::tuple(), py::arg("threads")=-1, py::arg("display_progress")=false);
 

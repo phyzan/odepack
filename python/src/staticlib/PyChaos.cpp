@@ -21,12 +21,12 @@ PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::o
             throw py::value_error("Variational solvers require an even number of system size");
         }
 
-        this->s = VariationalSolver<T, 0, Func<T>, void>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, method).release();
+        this->s = VariationalSolver<T, 0, Func<T>, void>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, getIntegrator(method)).release();
 
     )
 }
 
-PyVarSolver::PyVarSolver(void* solver, PyStruct py_data, int scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
+PyVarSolver::PyVarSolver(void* solver, PyStruct py_data, ScalarType scalar_type) : PySolver(solver, std::move(py_data), scalar_type) {}
 
 py::object PyVarSolver::py_logksi() const{
     return DISPATCH(py::object,
@@ -78,7 +78,7 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& t0, const py::iterable
             evs[i] = safe_events[i];
         }
 
-        this->ode = new VariationalODE<T, 0, Func<T>, void>(ode_rhs, py::cast<T>(t0), q0_.data(), q0_.size()/2, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, method.cast<std::string>());
+        this->ode = new VariationalODE<T, 0, Func<T>, void>(ode_rhs, py::cast<T>(t0), q0_.data(), q0_.size()/2, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
         for (size_t i=0; i<evs.size(); i++){
             delete safe_events[i];
         }

@@ -19,27 +19,23 @@ Solver<T, N, SP, RhsType, JacType, void> getSolver(OdeData<RhsType, JacType> ode
 
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(const std::string& name, MAIN_CONSTRUCTOR(T), EVENTS events) {
-    if (name == "Euler"){
-        return std::make_unique<Euler<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ode, t0, q0, nsys, stepsize, dir, args, events);
-    }
-    else if (name == "RK23") {
-        return std::make_unique<RK23<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
-    }
-    else if (name == "RK45") {
-        return std::make_unique<RK45<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
-    }
-    else if (name == "DOP853") {
-        return std::make_unique<DOP853<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
-    }
-    else if (name == "BDF"){
-        return std::make_unique<BDF<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
-    }
-    else if (name == "RK4"){
-        return std::make_unique<RK4<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-    }
-    else{
-        throw std::runtime_error("Unknown solver name: " + name);
+std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(Integrator method, MAIN_CONSTRUCTOR(T), EVENTS events) {
+
+    switch (method){
+        case Integrator::Euler:
+            return std::make_unique<Euler<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ode, t0, q0, nsys, stepsize, dir, args, events);
+        case Integrator::RK23:
+            return std::make_unique<RK23<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
+        case Integrator::RK45:
+            return std::make_unique<RK45<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
+        case Integrator::DOP853:
+            return std::make_unique<DOP853<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
+        case Integrator::BDF:
+            return std::make_unique<BDF<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ARGS, events);
+        case Integrator::RK4:
+            return std::make_unique<RK4<T, N, SolverPolicy::RichVirtual, RhsType, JacType>>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        default:
+            throw std::runtime_error("Unknown integrator enum value");
     }
 }
 

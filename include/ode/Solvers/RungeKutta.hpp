@@ -71,7 +71,7 @@ private:
     using Base = BaseDispatcher<GetDerived<RK4<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>;
     friend typename Base::MainSolverType;
 
-    static constexpr const char*    name = "RK4";
+    static constexpr Integrator integrator = Integrator::RK4;
     static constexpr bool           IS_IMPLICIT = false;
     static constexpr int            ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;

@@ -179,7 +179,7 @@ protected:
 
     T    step_impl(T* result, const T* state, const T& h);
 
-    static constexpr const char*    name = "RK45";
+    static constexpr Integrator integrator = Integrator::RK45;
     static constexpr size_t         ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
 
@@ -228,7 +228,7 @@ protected:
 
     T    step_impl(T* result, const T* state, const T& h);
 
-    static constexpr const char*    name = "RK23";
+    static constexpr Integrator integrator = Integrator::RK23;
     static constexpr size_t         ERR_EST_ORDER = 2;
     static constexpr size_t         INTERP_ORDER = 3;
 

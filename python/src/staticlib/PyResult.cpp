@@ -9,11 +9,11 @@ namespace ode{
 
 
 
-PyOdeResult::PyOdeResult(void* result, const std::vector<py::ssize_t>& q0_shape, int scalar_type): DtypeDispatcher(scalar_type), res(result), q0_shape(q0_shape){}
+PyOdeResult::PyOdeResult(void* result, const std::vector<py::ssize_t>& q0_shape, ScalarType scalar_type): DtypeDispatcher(scalar_type), res(result), q0_shape(q0_shape){}
 
 
 PyOdeResult::PyOdeResult(const PyOdeResult& other) : DtypeDispatcher(other.scalar_type), q0_shape(other.q0_shape) {
-        DISPATCH(void, this->res = other.template cast<T>()->clone();)
+    DISPATCH(void, this->res = other.template cast<T>()->clone();)
 }
 
 
@@ -23,7 +23,7 @@ PyOdeResult::PyOdeResult(PyOdeResult&& other) noexcept : DtypeDispatcher(other.s
 
 
 PyOdeResult::~PyOdeResult(){
-        DISPATCH(void, delete cast<T>();)
+    DISPATCH(void, delete cast<T>();)
     res = nullptr;
 }
 
@@ -120,7 +120,7 @@ void PyOdeResult::examine() const{
 //===========================================================================================
 
 
-PyOdeSolution::PyOdeSolution(void* result, const std::vector<py::ssize_t>& q0_shape, int scalar_type) : PyOdeResult(result, q0_shape, scalar_type), nsys(prod(q0_shape)) {}
+PyOdeSolution::PyOdeSolution(void* result, const std::vector<py::ssize_t>& q0_shape, ScalarType scalar_type) : PyOdeResult(result, q0_shape, scalar_type), nsys(prod(q0_shape)) {}
 
 py::object PyOdeSolution::operator()(const py::object& t) const{
     try {

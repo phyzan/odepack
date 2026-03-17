@@ -13,7 +13,7 @@ struct PySolver : DtypeDispatcher {
 
     PySolver(const std::string& scalar_type) : DtypeDispatcher(scalar_type){}
 
-    PySolver(void* solver, PyStruct py_data, int scalar_type);
+    PySolver(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     PySolver(const PySolver& other);
 

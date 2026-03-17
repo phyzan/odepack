@@ -21,13 +21,14 @@
 #include "VirtualBase.hpp"
 #include "../SolverState.hpp"
 
+
 #define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}
 
 #define MAIN_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
 #define SOLVER_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
-#define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, const std::string& method="RK45"
+#define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, Integrator method = Integrator::RK45
 
 #define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args
 
@@ -53,6 +54,11 @@ namespace ode{
  *       first template parameter.
  */
 
+enum class Integrator : uint8_t;
+
+Integrator getIntegrator(const std::string& name);
+
+Integrator getIntegrator(const char* name);
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 class BaseSolver : public BaseInterface<T, N, SP>{
@@ -211,10 +217,10 @@ public:
      * @param q0 Initial state vector.
      * @return True if the ICs are valid (finite values, finite RHS evaluation).
     */
-    bool                        validate_ics(T t0, const T* q0) const;
+    bool                validate_ics(T t0, const T* q0) const;
 
     /// @brief Get the name of the integration method (e.g., "RK45").
-    const std::string&          method() const;
+    Integrator          method() const;
 
     /**
      * @brief Interpolate the solution at a time within the last step interval.
@@ -222,19 +228,19 @@ public:
      * @param[in]  t      Time to interpolate at (must be in [t_old, t_new]).
      * @throws std::runtime_error If t is outside the valid interpolation range.
     */
-    void                 interp(T* result, const T& t) const;
+    void                interp(T* result, const T& t) const;
 
     /**
      * @brief Get the number of RHS function evaluations performed so far.
      * @return Total count of RHS evaluations. User calls to Rhs() do NOT increment this counter.
     */
-    size_t               n_evals_rhs() const;
+    size_t              n_evals_rhs() const;
 
     /**
      * @brief Get the number of Jacobian evaluations performed so far.
      * @return Total count of Jacobian evaluations. User calls to Jac() do NOT increment this counter.
     */
-    size_t               n_evals_jac() const;
+    size_t              n_evals_jac() const;
 
     /**
      * @brief Compute an appropriate initial step size.
@@ -242,16 +248,16 @@ public:
      * @param q Initial state vector.
      * @return Suggested step size based on local scales and tolerances.
      */
-    T                           auto_step(T t, const T* q) const;
+    T                   auto_step(T t, const T* q) const;
 
     /// @brief Compute an appropriate step size from the current state.
-    T                           auto_step() const;
+    T                   auto_step() const;
 
     /**
      * @brief Create a dynamically allocated copy of this solver.
      * @return Pointer to a new solver instance. Caller owns the memory.
      */
-    Clone*                      clone() const;
+    Clone*              clone() const;
 
     // MODIFIERS
 
@@ -259,9 +265,9 @@ public:
      * @brief Advance the solver by one integration step.
      * @return True if the step was successful, false if paused or dead.
      */
-    bool                        advance();
+    bool                advance();
 
-    bool                        advance_until(T time);
+    bool                advance_until(T time);
 
     /**
      * @brief Integrate until the specified time is reached.
@@ -270,7 +276,7 @@ public:
      * @return True if integration succeeded, false if solver stopped early.
      */
     template<typename Callable>
-    bool                        advance_until(T time, Callable&& observer);
+    bool                advance_until(T time, Callable&& observer);
 
     /**
      * @brief Integrate until an objective function crosses zero (event detection).
@@ -285,9 +291,9 @@ public:
      * @return True if event was detected and solver positioned at crossing.
      */
     template<typename ObjFun, typename Callable>
-    bool                        advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc), T* worker = nullptr);
+    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc), T* worker = nullptr);
 
-    bool                        observe_until(T time, std::function<void(const T&, const T*)> observer);
+    bool                observe_until(T time, std::function<void(const T&, const T*)> observer);
 
     /**
      * @brief Advance the solver by a specified time interval (along the integration direction).
@@ -297,10 +303,10 @@ public:
      *      The is not a single step advance; the solver will take as many steps as needed to reach the target time,
      *      and use interpolation to end exactly at the target time.
     */
-    bool                        advance_by(T interval);
+    bool                advance_by(T interval);
 
     /// @brief Reset the solver to its initial conditions.
-    void                        reset();
+    void                reset();
 
     /**
      * @brief Set new initial conditions via a setter function.
@@ -311,12 +317,11 @@ public:
      * @param stepsize Initial step size (0 = auto-compute).
      */
     template<typename Setter>
-    auto                        apply_ics_setter(T t0, Setter&& func, T stepsize = 0);
+    auto                apply_ics_setter(T t0, Setter&& func, T stepsize = 0);
 
     /// @brief Same as apply_ics_setter, but the setter function receives the current state as an argument to modify. Then e.g. new_vector[i] += 1 would increment the i-th component of the current state by 1 before restarting, and works as expected.
     template<typename Setter>
-    auto                        restart_from_modified_state(T t0, Setter&& func, T stepsize = 0);
-
+    auto                restart_from_modified_state(T t0, Setter&& func, T stepsize = 0);
     /**
      * @brief Set new initial conditions without reallocating memory.
      * @param t0      New initial time.
@@ -326,37 +331,37 @@ public:
      * @return True if ICs were valid and set successfully. Otherwise returns false and stops the solver. Simply call resume() to continue.
      * @throws std::runtime_error If stepsize is negative.
      */
-    bool                        set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0);
+    bool                set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0);
 
     /**
      * @brief Pause the solver (can be resumed later).
      * @param text Optional message describing why the solver was stopped.
      */
-    void                        stop(const std::string& text = "");
+    void                stop(const std::string& text = "");
 
     /**
      * @brief Permanently terminate the solver (cannot be resumed).
      * @param text Optional message describing why the solver was killed.
      */
-    void                        kill(const std::string& text = "");
+    void                kill(const std::string& text = "");
 
     /**
      * @brief Resume a paused solver.
      * @return True if resumed successfully, false if solver is dead.
      */
-    bool                        resume();
+    bool                resume();
 
     /**
      * @brief Set the user object pointer passed to ODE callbacks.
      * @param obj Pointer to user data (must not be this solver instance).
      */
-    void                        set_obj(const void* obj);
+    void                set_obj(const void* obj);
 
     /**
      * @brief Update the additional arguments passed to the ODE function.
      * @param new_args Pointer to new argument values (must match original size).
      */
-    void                        set_args(const T* new_args);
+    void                set_args(const T* new_args);
 
 
 protected:
@@ -366,7 +371,7 @@ protected:
     // Derived classes MUST implement these methods.
 
     /// @brief Name of the integration method (must be defined in Derived).
-    static constexpr const char*    name = Derived::name;
+    static constexpr Integrator integrator = Derived::integrator;
     /// @brief Whether the method is implicit (must be defined in Derived).
     static constexpr bool           IS_IMPLICIT = Derived::IS_IMPLICIT;
     /// @brief Order of the error estimator (must be defined in Derived).
@@ -430,22 +435,22 @@ protected:
     // =========================== HELPER METHODS =====================================
 
     /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
-    void       rhs(T* dq_dt, const T& t, const T* q) const;
+    void        rhs(T* dq_dt, const T& t, const T* q) const;
 
     /// @brief Same as this->Jac, but increments the Jacobian evaluation counter.
-    void       jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
+    void        jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
     /// @brief Get pointer to the initial conditions state data.
-    const T*   ics_ptr() const;
+    const T*    ics_ptr() const;
 
     /// @brief Get pointer to the most recently computed state.
-    const T*   new_state_ptr() const;
+    const T*    new_state_ptr() const;
 
     /// @brief Get pointer to the previous accepted state.
-    const T*   old_state_ptr() const;
+    const T*    old_state_ptr() const;
 
     /// @brief Get pointer to the correct new state for interpolation
-    const T*   interp_new_state_ptr() const;
+    const T*    interp_new_state_ptr() const;
     
     /// @brief Print a warning that the solver is paused.
     void        warn_paused() const;
@@ -454,7 +459,7 @@ protected:
     void        warn_dead() const;
 
     /// @brief Set the solver status message.
-    void       set_message(const std::string& text);
+    void        set_message(const std::string& text);
 
     /**
     @brief Trigger re-adjustment right before state changes.
@@ -466,16 +471,16 @@ protected:
     void        re_adjust(const T* new_vector);
 
     /// @brief Check if the current true state matches the new state.
-    bool       is_at_new_state() const;
+    bool        is_at_new_state() const;
 
     // ================================================================================
 
     // ============================ OVERRIDEN IN RICH SOLVER ==========================
     /// @brief Get pointer to the current "true" state.
-    const T*   true_state_ptr() const;
+    const T*    true_state_ptr() const;
 
     /// @brief Get pointer to the previous "true" state.
-    const T*   last_true_state_ptr() const;
+    const T*    last_true_state_ptr() const;
 
     /// @brief Advance implementation (overridden in RichSolver).
     bool        adv_impl();
@@ -527,7 +532,6 @@ private:
     mutable size_t                                      _n_evals_rhs = 0;
     mutable size_t                                      _n_evals_jac = 0;
     std::string                                         _message = "Running";
-    std::string                                         _name = name;
     int                                                 _direction = 1;
     int                                                 _new_state_idx = 1;
     int                                                 _old_state_idx = 2;

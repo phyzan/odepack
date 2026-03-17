@@ -27,7 +27,7 @@ private:
 
     void        interp_impl(T* result, const T& t) const;
 
-    static constexpr const char* name = "Euler";
+    static constexpr Integrator integrator = Integrator::Euler;
     static constexpr bool IS_IMPLICIT = false;
     static constexpr int ERR_EST_ORDER = 1;
 };

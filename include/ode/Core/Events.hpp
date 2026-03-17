@@ -144,48 +144,66 @@ public:
     // ACCESSORS
 
     /// @brief Get the event name.
-     const std::string&       name() const;
+    const std::string&      name() const;
+
     /// @brief Check if this event has a mask function.
-     bool                     is_masked() const;
+    bool                    is_masked() const;
+
     /// @brief Check if the masked state is hidden (showing original instead).
-     bool                     hides_mask() const;
+    bool                    hides_mask() const;
+
     /// @brief Apply the mask transformation to a state.
-     void                     apply_mask(T* out, const T& t, const T* q) const;
+    void                    apply_mask(T* out, const T& t, const T* q) const;
+
     /// @brief Check if event is temporal with no mask.
-     bool                     is_pure_temporal() const;
+    bool                    is_pure_temporal() const;
+
     /// @brief Get the ODE system size.
-     size_t                   Nsys() const;
+    size_t                  Nsys() const;
+
     /// @brief Get the trigger count.
-     size_t                   counter() const;
+    size_t                  counter() const;
+
     /// @brief Get the event arguments.
-     const std::vector<T>&    args() const;
+    const std::vector<T>&   args() const;
+
     /// @brief Clone this event.
-    Event<T>*                       clone() const;
+    Event<T>*               clone() const;
+
     /// @brief Check if this is a temporal event.
-     bool                     is_temporal() const;
+    bool                    is_temporal() const;
+
     /// @brief Get the integration direction.
-     int                      direction() const;
+    int                     direction() const;
+
     /// @brief Check if event was located in last detection pass.
-     bool                     is_located() const;
+    bool                    is_located() const;
+
     /// @brief Get the integration start time.
-     const T&                 t_start() const;
+    const T&                t_start() const;
+
     /// @brief Get the event state.
-     const EventState<T>*     state() const;
+    const EventState<T>*    state() const;
 
     // MODIFIERS
 
     /// @brief Update event arguments.
-    void                            set_args(const T* args, size_t size);
+    void                    set_args(const T* args, size_t size);
+
     /// @brief Initialize event for use with solver.
-     void                     setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
+    void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
+
     /// @brief Clear the located state.
-    void                            deactivate();
+    void                    deactivate();
+
     /// @brief Attempt to locate event in an interval.
-    bool                            locate(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+    bool                    locate(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+
     /// @brief Register the event after location.
-    bool                            register_it();
+    bool                    register_it();
+
     /// @brief Reset to initial state.
-    void                            reset(int direction = 0);
+    void                    reset(int direction = 0);
 
 protected:
 
@@ -213,20 +231,24 @@ protected:
      * @param[in]  obj    User object pointer.
      * @return True if event was found in interval.
      */
-     bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
 
     // ============= STATIC OVERRIDE (OPTIONAL) ================
 
     /// @brief Called when event is registered. Override to add custom logic.
-     void register_impl();
+    void register_impl();
+
     /// @brief Called on reset. Override to reset derived state.
-     void reset_impl(int direction);
+    void reset_impl(int direction);
+
     /// @brief Apply mask to state. Override for custom mask behavior.
-     void mask_impl(T* out, const T& t, const T* q) const;
+    void mask_impl(T* out, const T& t, const T* q) const;
+
     /// @brief Check if masked. Override to customize mask detection.
-     bool is_masked_impl() const;
+    bool is_masked_impl() const;
+
     /// @brief Check if temporal. Override to mark as temporal event.
-     bool is_temporal_impl() const;
+    bool is_temporal_impl() const;
     //==========================================================
 
 private:
@@ -281,15 +303,15 @@ public:
     PreciseEvent(std::string name, ObjFun<T> when, int dir=0, Func<T> mask=nullptr, bool hide_mask=false, T event_tol=1e-12, const void* obj = nullptr);
 
     /// @brief Evaluate the objective function at given time and state.
-     T    obj_fun(const T& t, const T* q) const;
+    T    obj_fun(const T& t, const T* q) const;
 
     /// @brief Get the required sign change direction (+1, -1, or 0).
-     int  sign_change_dir() const;
+    int  sign_change_dir() const;
 
 protected:
 
     /// @brief Locate zero crossing using bisection.
-     bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
 
     ObjFun<T>           _when = nullptr;      ///< Objective function to monitor.
     int                 _sign_dir = 1;        ///< Required crossing direction.
@@ -326,33 +348,33 @@ public:
     PeriodicEvent(std::string name, T period, Func<T> mask=nullptr, bool hide_mask=false, const void* obj = nullptr);
 
     /// @brief Get the period (time between triggers).
-     const T& period() const;
+    const T&    period() const;
 
     /// @brief Get the number of periods elapsed since start.
-     size_t   np() const;
+    size_t      np() const;
 
     /// @brief Get the absolute time elapsed (n * period).
-     T        delta_t_abs() const;
+    T           delta_t_abs() const;
 
     /// @brief Get the signed time elapsed (n * period * direction).
-     T        delta_t() const;
+    T           delta_t() const;
 
 protected:
 
     /// @brief Returns true (this is a temporal event).
-     bool     is_temporal_impl() const;
+    bool        is_temporal_impl() const;
 
     /// @brief Compute time of n-th trigger.
-     T        get_t(size_t n) const;
+    T           get_t(size_t n) const;
 
     /// @brief Locate next periodic trigger in interval.
-     bool     locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    bool        locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
 
     /// @brief Update period counter on registration.
-     void     register_impl();
+    void        register_impl();
 
     /// @brief Reset period counter.
-     void     reset_impl(int direction);
+    void        reset_impl(int direction);
 
 private:
 

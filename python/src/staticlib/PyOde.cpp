@@ -23,7 +23,7 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
         }
         auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
 
-        this->ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, method);
+        this->ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
         //clean up
         for (size_t i=0; i<evs.size(); i++){
             delete safe_events[i];
@@ -31,7 +31,7 @@ PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q
     )
 }
 
-PyODE::PyODE(void* ode_ptr, int scalar_type) : DtypeDispatcher(scalar_type), ode(ode_ptr) {
+PyODE::PyODE(void* ode_ptr, ScalarType scalar_type) : DtypeDispatcher(scalar_type), ode(ode_ptr) {
     this->data.is_lowlevel = true;
     DISPATCH(void,
         const ODE<T>* ptr = this->cast<T>();
@@ -182,18 +182,21 @@ py::object PyODE::solver_copy() const{
     return DISPATCH(py::object,
         auto* ode_ptr = reinterpret_cast<const ODE<T>*>(ode);
         auto* solver_clone = ode_ptr->solver()->clone();
-        if (ode_ptr->solver()->method() == "RK45"){
-            return py::cast(PyRK45(solver_clone, data, this->scalar_type));
-        }else if (ode_ptr->solver()->method() == "DOP853"){
-            return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
-        }else if (ode_ptr->solver()->method() == "RK23"){
-            return py::cast(PyRK23(solver_clone, data, this->scalar_type));
-        }else if (ode_ptr->solver()->method() == "BDF"){
-            return py::cast(PyBDF(solver_clone, data, this->scalar_type));
-        }else if (ode_ptr->solver()->method() == "RK4"){
-            return py::cast(PyRK4(solver_clone, data, this->scalar_type));
-        }else{
-            throw py::value_error("Unregistered solver!");
+
+
+        switch (ode_ptr->solver()->method()){
+            case Integrator::RK45:
+                return py::cast(PyRK45(solver_clone, data, this->scalar_type));
+            case Integrator::DOP853:
+                return py::cast(PyDOP853(solver_clone, data, this->scalar_type));
+            case Integrator::RK23:
+                return py::cast(PyRK23(solver_clone, data, this->scalar_type));
+            case Integrator::BDF:
+                return py::cast(PyBDF(solver_clone, data, this->scalar_type));
+            case Integrator::RK4:
+                return py::cast(PyRK4(solver_clone, data, this->scalar_type));
+            default:
+                throw py::value_error("Unregistered solver!");
         }
     )
 }
@@ -249,10 +252,18 @@ void PyODE::clear() {
 void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress){
     // Separate lists for each numeric type
     std::vector<void*> array;
-    std::vector<int> types;
+    std::vector<ScalarType> types;
+    std::unordered_map<ScalarType, void*> step_seq;
+    
+    auto options = to_Options(event_options);
 
-    std::vector<void*> step_seq;
-
+    auto clear = [&](){
+        for (auto& pair : step_seq){
+            call_dispatch(pair.first, [&]<typename T>(){
+                delete reinterpret_cast<StepSequence<T>*>(pair.second);
+            });
+        }
+    };
 
     // Iterate through the list and identify each PyODE type
     for (const py::handle& item : list) {
@@ -261,13 +272,12 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
 
             // Use the scalar_type to determine which array to add to
             if (!pyode.data.is_lowlevel) {
+                clear();
                 throw py::value_error("All ODE's in integrate_all must use only compiled functions, and no pure python functions");
             }
             array.push_back(pyode.ode);
             types.push_back(pyode.scalar_type);
-            if (size_t(pyode.scalar_type) >= step_seq.size()){
-                step_seq.resize(pyode.scalar_type+1);
-                
+            if (step_seq.find(pyode.scalar_type) == step_seq.end()){
                 step_seq[pyode.scalar_type] = call_dispatch(pyode.scalar_type, [&]<typename T>() -> void* {
                     return new StepSequence<T>(to_step_sequence<T>(t_eval));
                 });
@@ -275,12 +285,13 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
 
             }
         } catch (const py::cast_error&) {
+            clear();
             // If cast failed, throw an error
             throw py::value_error("List item is not a recognized PyODE object type.");
         }
     }
 
-    auto options = to_Options(event_options);
+
 
     const int num = (threads <= 0) ? omp_get_max_threads() : threads;
     int tot = 0;
@@ -304,11 +315,8 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
         }
     }
 
-    for (size_t i=0; i<step_seq.size(); i++){
-        call_dispatch(int(i), [&]<typename T>(){
-            delete reinterpret_cast<StepSequence<T>*>(step_seq[i]);
-        });
-    }
+    clear();
+
     std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
@@ -317,8 +325,8 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
     template class ODE<T, 0>; \
     template class EventCounter<T, 0>; \
     template void integrate_all(const std::vector<ODE<T, 0>*>&, const T&, const StepSequence<T>&, const std::vector<EventOptions>&, int, bool); \
-    template void ODE<T, 0>::_init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, const std::string& method); \
-    template PyODE::PyODE(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events, const std::string&); \
+    template void ODE<T, 0>::_init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method); \
+    template PyODE::PyODE(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events, Integrator method = Integrator::RK45); \
 
 DEFINE_ODE(float)
 DEFINE_ODE(double)

@@ -18,7 +18,7 @@ PySolver::PySolver(const py::object& f, const py::object& jac, const py::object&
     )
 }
 
-PySolver::PySolver(void* solver, PyStruct py_data, int scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
+PySolver::PySolver(void* solver, PyStruct py_data, ScalarType scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
     this->s = solver;
     set_pyobj(*this);
 }
@@ -337,7 +337,7 @@ bool PySolver::py_at_event(py::object event) const{
 void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress){
     // Separate lists for each numeric type
     std::vector<void*> array;
-    std::vector<int> types;
+    std::vector<ScalarType> types;
 
     // Iterate through the list and identify each PySolver type
     for (const py::handle& item : list) {
@@ -388,13 +388,12 @@ namespace ode{
 
 #define ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(T) \
     template std::unique_ptr<OdeRichSolver<T, 0>> \
-    get_virtual_solver<T, 0, Func<T>, void>(const std::string& name, \
+    get_virtual_solver<T, 0, Func<T>, void>(Integrator name, \
         OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, \
         T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, \
         const std::vector<const Event<T>*>& events); \
     template struct SolverState<T, 0>; \
     template struct SolverRichState<T, 0>; \
-    template RK4<T, 0, SolverPolicy::RichVirtual, Func<T>, void>::RK4(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events); \
 
 ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(float)
 ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(double)

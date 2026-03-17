@@ -14,7 +14,7 @@ public:
     template<typename T, typename RhsType, typename JacType>
     PyODE(ODE_CONSTRUCTOR(T));
 
-    PyODE(void* ode_ptr, int scalar_type);
+    PyODE(void* ode_ptr, ScalarType scalar_type);
 
     PyODE(void* ode_ptr, const std::string& scalar_type);
 

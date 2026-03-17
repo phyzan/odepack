@@ -11,7 +11,7 @@ struct PyVarSolver : public PySolver{
 
     PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type);
 
-    PyVarSolver(void* solver, PyStruct py_data, int scalar_type);
+    PyVarSolver(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyVarSolver)
 

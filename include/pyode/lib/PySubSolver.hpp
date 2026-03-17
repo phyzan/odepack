@@ -11,7 +11,7 @@ struct PyRK23 : public PySolver{
 
     PyRK23(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
-    PyRK23(void* solver, PyStruct py_data, int scalar_type);
+    PyRK23(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyRK23)
 
@@ -24,7 +24,7 @@ struct PyRK45 : public PySolver{
 
     PyRK45(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
-    PyRK45(void* solver, PyStruct py_data, int scalar_type);
+    PyRK45(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyRK45)
 
@@ -37,7 +37,7 @@ struct PyDOP853 : public PySolver{
 
     PyDOP853(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
-    PyDOP853(void* solver, PyStruct py_data, int scalar_type);
+    PyDOP853(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyDOP853)
 
@@ -50,7 +50,7 @@ struct PyBDF : public PySolver{
 
     PyBDF(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
-    PyBDF(void* solver, PyStruct py_data, int scalar_type);
+    PyBDF(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyBDF)
 
@@ -62,7 +62,7 @@ struct PyRK4 : public PySolver{
 
     PyRK4(const py::object& ode, const py::object& t0, const py::iterable& q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& args, const py::iterable& events, const std::string& scalar_type);
 
-    PyRK4(void* solver, PyStruct py_data, int scalar_type);
+    PyRK4(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyRK4)
 

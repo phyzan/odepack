@@ -56,7 +56,7 @@ public:
     template<typename ValuesContainer, typename AxisViewContainer>
     RegularVectorField(const ValuesContainer& values, const AxisViewContainer& grid, bool coord_axis_first);
 
-    std::vector<Array2D<T, NDIM, 0>>    streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method) const;
+    std::vector<Array2D<T, NDIM, 0>>    streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method) const;
 
 
     // ============ Explicit overrides for VectorField ==============
@@ -69,7 +69,7 @@ public:
 private:
 
     template<size_t... I>
-    std::vector<Array2D<T, NDIM, 0>>    streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method, std::index_sequence<I...>) const;
+    std::vector<Array2D<T, NDIM, 0>>    streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method, std::index_sequence<I...>) const;
 
 }; // RegularVectorField
 

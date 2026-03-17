@@ -9,7 +9,7 @@ namespace ode{
 
 struct PyOdeResult : DtypeDispatcher{
 
-    PyOdeResult(void* result, const std::vector<py::ssize_t>& q0_shape, int scalar_type);
+    PyOdeResult(void* result, const std::vector<py::ssize_t>& q0_shape, ScalarType scalar_type);
 
     PyOdeResult(const PyOdeResult& other);
 
@@ -53,7 +53,7 @@ struct PyOdeResult : DtypeDispatcher{
 
 struct PyOdeSolution : public PyOdeResult{
 
-    PyOdeSolution(void* result, const std::vector<py::ssize_t>& q0_shape, int scalar_type);
+    PyOdeSolution(void* result, const std::vector<py::ssize_t>& q0_shape, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyOdeSolution);
 

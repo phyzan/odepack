@@ -12,7 +12,7 @@ DtypeDispatcher::DtypeDispatcher(const std::string& dtype_){
     this->scalar_type = DTYPE_MAP.at(dtype_);
 }
 
-DtypeDispatcher::DtypeDispatcher(int dtype_) : scalar_type(dtype_) {}
+DtypeDispatcher::DtypeDispatcher(ScalarType dtype_) : scalar_type(dtype_) {}
 
 
 //===========================================================================================

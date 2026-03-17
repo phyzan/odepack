@@ -9,24 +9,6 @@
 
 namespace ode{
 
-#ifdef MPREAL
-static const std::string SCALAR_TYPE[4] = {"float", "double", "long double", "mpreal"};
-#else
-static const std::string SCALAR_TYPE[3] = {"float", "double", "long double"};
-#endif
-
-#define DISPATCH(RETURN_TYPE, ...)                                              \
-call_dispatch(this->scalar_type, [&]<typename T>() -> RETURN_TYPE {__VA_ARGS__ });
-
-
-static const std::map<std::string, int> DTYPE_MAP = {
-    {"float", 0},
-    {"double", 1},
-    {"long double", 2},
-#ifdef MPREAL
-    {"mpreal", 3}
-#endif
-};
 
 namespace py = pybind11;
 
@@ -56,9 +38,9 @@ struct DtypeDispatcher{
 
     DtypeDispatcher(const std::string& dtype_);
 
-    DtypeDispatcher(int dtype_);
+    DtypeDispatcher(ScalarType dtype_);
 
-    int scalar_type;
+    ScalarType scalar_type;
 };
 
 
@@ -80,23 +62,20 @@ struct PyFuncWrapper : DtypeDispatcher {
 
 
 template<typename Callable>
-auto call_dispatch(int scalar_type, Callable&& f){
+auto call_dispatch(ScalarType scalar_type, Callable&& f){
     switch (scalar_type) {
-        case 0:
+        case ScalarType::Float:
             return f.template operator()<float>();
-        case 1:
+        case ScalarType::Double:
             return f.template operator()<double>();
+        case ScalarType::LongDouble:
+            return f.template operator()<long double>();
 #ifdef MPREAL
-        case 2:
-            return f.template operator()<long double>();
-        default:
-            assert(scalar_type == 3 && "Invalid scalar type");
+        case ScalarType::MPReal:
             return f.template operator()<mpfr::mpreal>();
-#else
-        default:
-            assert(scalar_type == 2 && "Invalid scalar type");
-            return f.template operator()<long double>();
 #endif
+        default:
+            throw std::runtime_error("Unsupported scalar type");
     }
 }
 
@@ -210,29 +189,6 @@ inline mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mp
 }
 
 #endif // MPREAL
-
-
-
-template<typename T>
-inline std::string get_scalar_type(){
-    if constexpr (std::is_same_v<T, float>){
-        return "float";
-    }
-    else if constexpr (std::is_same_v<T, double>){
-        return "double";
-    }
-    else if constexpr (std::is_same_v<T, long double>){
-        return "long double";
-    }
-#ifdef MPREAL
-    else if constexpr (std::is_same_v<T, mpfr::mpreal>){
-        return "mpreal";
-    }
-#endif
-    else{
-        static_assert(false, "Unsupported scalar type T");
-    }
-}
 
 } // namespace ode
 

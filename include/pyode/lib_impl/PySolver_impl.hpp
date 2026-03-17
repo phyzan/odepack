@@ -18,7 +18,7 @@ void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, c
         evs[i] = safe_events[i];
     }
     auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_virtual_solver<T, 0>(name, ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs).release();
+    this->s = get_virtual_solver<T, 0>(getIntegrator(name), ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs).release();
     for (size_t i=0; i<evs.size(); i++){
         delete safe_events[i];
     }

@@ -13,7 +13,7 @@ py::class_<PyFuncWrapper>(m, "LowLevelFunction")
         py::arg("Nargs"),
         py::arg("scalar_type")="double")
     .def("__call__", &PyFuncWrapper::call, py::arg("t"), py::arg("q"))
-    .def_property_readonly("scalar_type", [](const PyFuncWrapper& self){return SCALAR_TYPE[self.scalar_type];});
+    .def_property_readonly("scalar_type", [](const PyFuncWrapper& self){return getScalarType(self.scalar_type);});
 
 py::class_<PySolver>(m, "OdeSolver")
     .def_property_readonly("t", &PySolver::t)
@@ -47,7 +47,7 @@ py::class_<PySolver>(m, "OdeSolver")
     .def("stop", &PySolver::stop, py::arg("reason"))
     .def("kill", &PySolver::kill, py::arg("reason"))
     .def("copy", &PySolver::copy)
-    .def_property_readonly("scalar_type", [](const PySolver& self){return SCALAR_TYPE[self.scalar_type];});
+    .def_property_readonly("scalar_type", [](const PySolver& self){return getScalarType(self.scalar_type);});
 
 py::class_<PyRK23, PySolver>(m, "RK23")
     .def(py::init<PyRK23>(), py::arg("solver"))

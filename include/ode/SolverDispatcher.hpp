@@ -1,10 +1,7 @@
 #ifndef SOLVERS_HPP
 #define SOLVERS_HPP
 
-#include "Solvers/DOP853.hpp"
-#include "Solvers/BDF.hpp"
-#include "Solvers/Euler.hpp"
-#include "Solvers/RungeKutta.hpp"
+#include "Solvers/Solvers.hpp"
 
 namespace ode {
 
@@ -21,7 +18,7 @@ Solver<T, N, SP, RhsType, JacType, void> getSolver(OdeData<RhsType, JacType> ode
 
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(const std::string& name, MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {});
+std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(Integrator method, MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {});
 
 } // namespace ode
 

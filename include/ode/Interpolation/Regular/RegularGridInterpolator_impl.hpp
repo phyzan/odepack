@@ -101,7 +101,7 @@ bool RegularVectorField<T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
 
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
-std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method) const{
+std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method) const{
     return streamplot_data_core(max_length, ds, density, rtol, atol, min_step, max_step, stepsize, method, std::make_index_sequence<NDIM>{});
 }
 
@@ -109,7 +109,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
 template<size_t... I>
-std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, const std::string& method, std::index_sequence<I...>) const{
+std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method, std::index_sequence<I...>) const{
     
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");

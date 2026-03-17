@@ -4,6 +4,7 @@
 #include <functional>
 #include "../Interpolation/Univariate/StateInterp.hpp"
 #include "Events.hpp"
+#include "Dispatcher.hpp"
 
 namespace ode {
 
@@ -55,7 +56,7 @@ public:
     virtual const std::string&  status() const = 0;
     virtual void                show_state(int prec=8) const = 0;
     virtual bool                validate_ics(T t0, const T* q0) const = 0;
-    virtual const std::string&  method() const = 0;
+    virtual Integrator          method() const = 0;
     virtual void                interp(T* result, const T& t) const = 0;
     virtual size_t              n_evals_rhs() const = 0;
     virtual size_t              n_evals_jac() const = 0;
@@ -140,6 +141,8 @@ using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<
 
 template<SolverPolicy SP>
 constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
+
+
 
 } // namespace ode
 

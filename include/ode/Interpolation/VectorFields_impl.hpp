@@ -54,7 +54,7 @@ void VectorField<Derived, T, NDIM, AS_VIRTUAL>::ode_func(T* out, const T& t, con
 
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
-OdeResult<T> VectorField<Derived, T, NDIM, AS_VIRTUAL>::streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, const std::string& method, bool normalized) const{
+OdeResult<T> VectorField<Derived, T, NDIM, AS_VIRTUAL>::streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, Integrator method, bool normalized) const{
     auto* ode = this->get_streamline_ode(x0, rtol, atol, min_step, max_step, stepsize, direction, method, normalized);
     OdeResult<T> result = ode->integrate(length, t_eval);
     delete ode;
@@ -63,7 +63,7 @@ OdeResult<T> VectorField<Derived, T, NDIM, AS_VIRTUAL>::streamline(const T* x0, 
 
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
-ODE<T, NDIM>* VectorField<Derived, T, NDIM, AS_VIRTUAL>::get_streamline_ode(const T* x0, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const std::string& method, bool normalized) const{
+ODE<T, NDIM>* VectorField<Derived, T, NDIM, AS_VIRTUAL>::get_streamline_ode(const T* x0, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized) const{
     auto func = normalized ? ode_func_norm : ode_func;
         return new ODE<T, NDIM>(OdeData<Func<T>, void>{.rhs=func, .obj=static_cast<const Derived*>(this)}, 0, x0, this->ndim(), rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
 }

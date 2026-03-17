@@ -8,7 +8,7 @@
 namespace ode{
 
 template<typename T, typename RhsType, typename JacType>
-PyODE::PyODE(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, const std::string& method) : DtypeDispatcher(get_scalar_type<T>()){
+PyODE::PyODE(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method) : DtypeDispatcher(get_scalar_type<T>()){
     data.is_lowlevel = true;
     data.shape = {py::ssize_t(nsys)};
     this->ode = new ODE<T, 0>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events, method);

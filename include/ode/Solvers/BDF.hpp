@@ -104,7 +104,8 @@ private:
     friend Base::MainSolverType;
     static constexpr size_t NEWTON_MAXITER = 4;
 
-    static constexpr const char* name = "BDF";
+    static constexpr Integrator integrator = Integrator::BDF;
+
     static constexpr bool IS_IMPLICIT = true;
     static constexpr int ERR_EST_ORDER = 1;
 

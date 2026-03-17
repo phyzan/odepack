@@ -16,7 +16,7 @@ py::class_<PyOdeResult>(m, "OdeResult")
     .def_property_readonly("runtime", &PyOdeResult::runtime)
     .def_property_readonly("message", &PyOdeResult::message)
     .def("examine", &PyOdeResult::examine)
-    .def_property_readonly("scalar_type", [](const PyOdeResult& self){return SCALAR_TYPE[self.scalar_type];});
+    .def_property_readonly("scalar_type", [](const PyOdeResult& self){return getScalarType(self.scalar_type);});
 
 py::class_<PyOdeSolution, PyOdeResult>(m, "OdeSolution")
     .def(py::init<PyOdeSolution>(), py::arg("result"))

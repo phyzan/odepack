@@ -88,8 +88,8 @@ py::object PyVecField::py_streamline(const CLS& self, const py::array_t<double>&
     StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
     try{
         double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
-        auto* result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, method.cast<std::string>(), normalized));
-        PyOdeResult py_res(result, {self.ndim()}, DTYPE_MAP.at("double"));
+        auto* result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, getIntegrator(method), normalized));
+        PyOdeResult py_res(result, {self.ndim()}, ScalarType::Double);
         return py::cast(py_res);
     } catch (const std::runtime_error& e){
         throw py::value_error(e.what());
@@ -104,9 +104,9 @@ py::object PyVecField::py_streamline_ode(const CLS& self, const py::array_t<doub
     }
 
     check_coords(self, q0.data());
-    ODE<double>* ode = self.get_streamline_ode(q0.data(), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, direction, method.cast<std::string>(), normalized);
+    ODE<double>* ode = self.get_streamline_ode(q0.data(), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, direction, getIntegrator(method), normalized);
 
-    return py::cast(PyODE(ode, get_scalar_type<double>()));
+    return py::cast(PyODE(ode, ScalarType::Double));
 
 }
 
@@ -148,7 +148,7 @@ py::object PyRegVecField::py_streamplot_data(const CLS& self, double max_length,
         throw py::value_error("Stepsize must be non-negative");
     }
 
-    std::vector<Array2D<double, 0, 0>> streamlines = self.streamplot_data(max_length, ds, size_t(density), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, method.cast<std::string>());
+    std::vector<Array2D<double, 0, 0>> streamlines = self.streamplot_data(max_length, ds, size_t(density), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, getIntegrator(method));
     py::list result;
     for (const Array2D<double, 0, 0>& line : streamlines){
         result.append(py::cast(line));

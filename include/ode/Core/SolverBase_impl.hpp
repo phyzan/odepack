@@ -203,8 +203,8 @@ State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::ics() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const std::string& BaseSolver<Derived, T, N, SP, RhsType, JacType>::method() const{
-    return _name;
+Integrator BaseSolver<Derived, T, N, SP, RhsType, JacType>::method() const{
+    return Derived::integrator;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

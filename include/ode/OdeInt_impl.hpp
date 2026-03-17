@@ -56,7 +56,7 @@ template<typename T, size_t N>
 // ODE implementations
 template<typename T, size_t N>
 template<typename RhsType, typename JacType>
-ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
+ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
     _init(ARGS, events, method);
 }
 
@@ -361,7 +361,7 @@ void ODE<T, N>::_register_event(size_t i){
 
 template<typename T, size_t N>
 template<typename RhsType, typename JacType>
-void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, const std::string& method){
+void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
     _Nevents = std::vector<std::vector<size_t>>(events.size());
     _solver = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events).release();
     _register_state();
