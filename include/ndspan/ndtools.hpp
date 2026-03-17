@@ -207,23 +207,23 @@ INLINE T abs(const T& x){
 }
 
 template<typename T>
-inline T max(const T& a, const T& b) {
+inline constexpr T max(const T& a, const T& b) {
     return a > b ? a : b;
 }
 
 template<typename T>
-inline T min(const T& a, const T& b) {
+inline constexpr T min(const T& a, const T& b) {
     return a < b ? a : b;
 }
 
 template<typename T>
-inline T min_of_pack(const auto&... args) {
+inline constexpr T min_of_pack(const auto&... args) {
     return (std::min<T>)({args...});
 }
 
 
 template<typename... Args>
-auto max_of_pack(Args... args) {
+inline constexpr auto max_of_pack(Args... args) {
     return (max)({args...});
 }
 
