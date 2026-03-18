@@ -169,7 +169,6 @@ OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>
     const std::vector<EventOptions> options = this->_validate_events(event_options);
 
     EventCounter<T, N> event_counter(options);
-
     auto observer = [&](const T& t, const T* q) -> void {
         t_last = t_curr;
         t_curr = _solver->t();

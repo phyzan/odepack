@@ -318,15 +318,9 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Call
         return false;
     }
 
-    bool success = this->is_running();
-    bool condition = success;
-    while (true){
-        if ((success = this->advance()) && (condition = (time*d > this->t()*d))){
-            observer(this->t(), THIS->true_state_ptr()+2);
-        }else{
-            break;
-        }
-
+    bool success;
+    while ((success = (this->is_running() && this->advance())) && (time*d > this->t()*d)){
+        observer(this->t(), THIS->true_state_ptr()+2);
     }
 
     if (success){
@@ -363,7 +357,6 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     observer: called at every advance call
     worker: optional pointer to a preallocated array of size N to be used as temporary storage. Use this
         if obj_fun is calling some of this solver's methods that may overwrite internal dummy arrays.
-        
     */
     assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
 
@@ -411,14 +404,9 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
         }
     }
 
-    bool success = this->is_running();
-    bool condition = success;
-    while (true){
-        if ((success = this->advance()) && (old_dir = curr_dir, curr_dir = get_sgn(), condition = (!detected(old_dir, curr_dir)))){
-            observer(this->t(), THIS->true_state_ptr()+2);
-        }else{
-            break;
-        }
+    bool success;
+    while ((success = (this->is_running() && this->advance())) && (old_dir = curr_dir, curr_dir = get_sgn(),  (!detected(old_dir, curr_dir)))){
+        observer(this->t(), THIS->true_state_ptr()+2);
     }
 
     if (success){
@@ -432,7 +420,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(T time, std::function<void(const T&, const T*)> observer){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(T time, std::function<void(const T&, const T*)> observer){
     return this->advance_until(time, observer);
 }
 

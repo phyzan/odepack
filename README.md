@@ -310,7 +310,7 @@ int main() {
         1,              // Integration direction
         {},            // Additional args
         {&event},// Events
-        "RK45"       // Solver method, dynamically selected
+        Integrator::RK45       // Solver method, dynamically selected
     );
 
     EventOptions options{.name = "event", .max_events = 10, .terminate = true};
@@ -327,7 +327,7 @@ int main() {
     std::cout << "Number of events detected: " << result.event_map().at("event").size() << "\n";
     std::cout << "Integration success: " << (result.success() ? "true" : "false") << "\n";
     std::cout << "Divergence detected: " << (result.diverges() ? "true" : "false") << "\n";
-    std::cout << "Termination message: " << result.status() << "\n";
+    std::cout << "Termination message: " << result.message() << "\n";
 
     // Extract the indices of the event occurrences
     const std::vector<size_t>& event_data = result.event_map().at("event");
