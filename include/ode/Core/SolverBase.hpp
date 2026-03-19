@@ -286,12 +286,10 @@ public:
      * @param tol      Tolerance for root finding (bisection).
      * @param dir      Direction of crossing: +1 (increasing), -1 (decreasing), 0 (any).
      * @param observer Callable function(t, q_ptr) that is called at each successfull step until the requested zero crossing of the objective function is reached
-     * @param worker   Optional preallocated array (size Nsys) for temporary storage.
-     *                 Use if obj_fun calls solver methods that may overwrite internal arrays.
      * @return True if event was detected and solver positioned at crossing.
      */
     template<typename ObjFun, typename Callable>
-    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc), T* worker = nullptr);
+    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc));
 
     bool                observe_until(T time, std::function<void(const T&, const T*)> observer);
 
@@ -523,8 +521,10 @@ private:
 
 
     Array2D<T, 6, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
-    mutable Array1D<T, 4*N, Allocation::Auto>           _dummy_state;
     Array1D<T, 4, Allocation::Stack>                    _scalar_data;
+    mutable Array2D<T, 4, 0>                            _cache_4; // initially empty
+    mutable Array1D<T, 0>                               _cache_advun; // initially empty
+    mutable Array1D<T, 0>                               _cache_ics; // initially empty
     Array1D<T>                                          _args;
     OdeData<RhsType, JacType>                           _ode;
     size_t                                              _Nsys = N;

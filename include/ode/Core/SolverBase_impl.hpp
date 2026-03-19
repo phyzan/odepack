@@ -57,10 +57,29 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
     const T EPS_SQRT = sqrt(std::numeric_limits<T>::epsilon());
     const T threshold = this->atol();
 
-    T* x1 = _dummy_state.data();
-    T* x2 = _dummy_state.data() + n;
-    T* f1 = _dummy_state.data() + 2*n;
-    T* f2 = _dummy_state.data() + 3*n;
+    // ----------- Used only if N > 0 --------------
+    static thread_local std::array<T, 4*N> work;
+    // ---------------------------------------------
+
+    T* x1;
+    T* x2;
+    T* f1;
+    T* f2;
+
+    if constexpr (N > 0){
+        x1 = work.data();
+        x2 = work.data() + n;
+        f1 = work.data() + 2*n;
+        f2 = work.data() + 3*n;
+    } else{
+        if (_cache_4.size() != 4*n){
+            _cache_4.resize(4, n);
+        }
+        x1 = _cache_4.data();
+        x2 = x1 + n;
+        f1 = x1 + 2*n;
+        f2 = x1 + 3*n;
+    }
 
     copy_array(x1, q, n);
     copy_array(x2, q, n);
@@ -237,7 +256,21 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
     }
     size_t n = this->Nsys();
     T h0, d2, h1;
-    T* y1 = _dummy_state.data();
+
+    
+    // ----------- Used only if N > 0 --------------
+    static thread_local std::array<T, 4*N> work;
+    // ---------------------------------------------
+
+    T* y1;
+
+    if constexpr (N > 0){
+        y1 = work.data();
+    } else{
+        _cache_4.resize(4, this->Nsys()); // will only resize the first time.
+        y1 = _cache_4.ptr(0, 0);
+    }
+
     T* f1 = y1+n;
     T* scale = y1+2*n;
     T* f0 = y1+3*n;
@@ -340,7 +373,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_by(T interval){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename ObjFun, typename Callable>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer, T* worker){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer){
 
     if (this->is_dead()){
         this->warn_dead();
@@ -360,8 +393,19 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     */
     assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
 
-    if (worker == nullptr){
-        worker = _dummy_state.data();
+    
+
+    // ----------- Used only if N > 0 --------------
+    static thread_local std::array<T, N> work;
+    // ---------------------------------------------
+
+    T* worker;
+    
+    if constexpr (N > 0){
+        worker = work.data();
+    } else{
+        _cache_advun.resize(this->Nsys());
+        worker = _cache_advun.data();
     }
 
     int factor = dir == 0 ? 1 : this->direction()*dir;
@@ -697,8 +741,21 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics_impl(T t0, co
         return false;
     }
 
-    this->rhs(_dummy_state.data(), t0, q0);
-    return all_are_finite(_dummy_state.data(), this->Nsys());
+    // ----------- Used only if N > 0 --------------
+    static thread_local std::array<T, N> work;
+    // ---------------------------------------------
+
+    T* worker;
+    
+    if constexpr (N > 0){
+        worker = work.data();
+    } else{
+        _cache_ics.resize(this->Nsys());
+        worker = _cache_ics.data();
+    }
+
+    this->rhs(worker, t0, q0);
+    return all_are_finite(worker, this->Nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -722,7 +779,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _dummy_state(4*nsys), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
