@@ -295,11 +295,9 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
         tmp[i] = f1[i] - f0[i];
     }
     d2 = rms_norm(tmp, scale, n) / h0;
-
     if (d1 <= 1e-15 && d2 <= 1e-15){
         h1 = ndspan::max<T>(T(1)/1000000, h0/1000);
-    }
-    else{
+    }else{
         h1 = pow(100*ndspan::max<T>(d1, d2), -T(1)/T(ERR_EST_ORDER+1));
     }
     return ndspan::max<T>(ndspan::min_of_pack<T>(T(100*h0), h1, this->max_step()), this->min_step());
@@ -335,8 +333,8 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-template<typename Callable>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Callable&& observer){
+template<typename Callable, typename ArrayType>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& time, Callable&& observer, const ArrayType& extra_steps){
 
     if (this->is_dead()){
         this->warn_dead();
@@ -351,17 +349,48 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time, Call
         return false;
     }
 
-    bool success;
-    while ((success = (this->is_running() && this->advance())) && (time*d > this->t()*d)){
-        observer(this->t(), THIS->true_state_ptr()+2);
-    }
+    constexpr bool explicit_steps = !std::is_same_v<std::decay_t<ArrayType>, EmptyArr<T>>;
+    const bool has_extra_steps = explicit_steps && extra_steps.size() > 0;
+    const T& t_dual = has_extra_steps ? extra_steps[extra_steps.size() - 1] : time;
 
-    if (success){
-        this->move_state(time);
-        observer(this->t(), THIS->true_state_ptr()+2);
-        return true;
+    bool success;
+    auto evolve = [&]() LAMBDA_INLINE -> bool {
+        bool res;
+        while ((res = (this->is_running() && this->advance())) && (time*d > this->t()*d)){
+            observer(this->t(), THIS->true_state_ptr()+2, nullptr);
+        }
+
+        if (res){
+            this->move_state(time);
+            const T* t_ptr = (!explicit_steps || (has_extra_steps && t_dual == time)) ? &t_dual : nullptr;
+            observer(this->t(), THIS->true_state_ptr()+2, t_ptr);
+            return true;
+        }else{
+            return false;
+        }
+    };
+
+    if (!has_extra_steps){
+        return evolve();
+    }else if (extra_steps[extra_steps.size()-1]*d > time*d){
+        throw std::runtime_error("Invalid extra steps: last extra step is " + to_string(extra_steps[extra_steps.size()-1]) + " but target time is " + to_string(time) + ". Extra steps must be in the same direction and between the current time and the target time.");
     }else{
-        return false;
+        auto validate_idx = [&](size_t idx) LAMBDA_INLINE{
+            if (extra_steps[idx]*d <= this->t()*d){
+                throw std::runtime_error("Invalid extra step: " + to_string(extra_steps[idx]) + ". Extra steps must be in the same direction and between the current time and the target time.");
+            }
+            return idx;
+        };
+        size_t idx = 0;
+        while (idx < extra_steps.size() && (success = (this->is_running() && this->advance_until(extra_steps[validate_idx(idx)], observer))) && (time*d > this->t()*d)){
+            idx++;
+        }
+
+        if (this->t() != time && success){
+            return evolve();
+        } else{
+            return success;
+        }
     }
 }
 
@@ -464,7 +493,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(T time, std::function<void(const T&, const T*)> observer){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer, View1D<T> extra_steps){
+    return this->advance_until(time, observer, extra_steps);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer){
     return this->advance_until(time, observer);
 }
 

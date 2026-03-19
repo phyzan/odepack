@@ -85,10 +85,16 @@ py::object PyVecField::py_streamline(const CLS& self, const py::array_t<double>&
 
     check_coords(self, q0.data());
 
-    StepSequence<double> t_seq = to_step_sequence<double>(t_eval);
+    
     try{
         double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
-        auto* result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, t_seq, getIntegrator(method), normalized));
+        OdeResult<double>* result;
+        if (t_eval.is_none()){
+            result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized));
+        }else{
+            std::vector<double> t_seq = toCPP_Array<double, std::vector<double>>(t_eval.cast<py::iterable>());
+            result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized, t_seq));
+        }
         PyOdeResult py_res(result, {self.ndim()}, ScalarType::Double);
         return py::cast(py_res);
     } catch (const std::runtime_error& e){

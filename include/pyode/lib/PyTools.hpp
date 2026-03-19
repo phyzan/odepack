@@ -85,9 +85,6 @@ Container toCPP_Array(const pybind11::iterable &obj);
 
 std::vector<EventOptions> to_Options(const py::iterable& d);
 
-template<typename T>
-StepSequence<T> to_step_sequence(const py::object& t_eval);
-
 py::dict to_PyDict(const EventMap& _map);
 
 template<typename Int>

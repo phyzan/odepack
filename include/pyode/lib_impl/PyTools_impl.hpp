@@ -35,20 +35,6 @@ Container toCPP_Array(const py::iterable &obj) {
     return res;
 }
 
-template<typename T>
-StepSequence<T> to_step_sequence(const py::object& t_eval){
-    if (t_eval.is_none()){
-        return StepSequence<T>();
-    }
-    else if (py::iterable(t_eval)){
-        std::vector<T> vec = toCPP_Array<T, std::vector<T>>(t_eval);
-        return StepSequence<T>(vec.data(), vec.size());
-    }
-    else{
-        throw py::type_error("Expected None, a NumPy array, or an iterable of numeric values.");
-    }
-}
-
 template<typename Int>
 std::vector<Int> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
     std::vector<Int> result;

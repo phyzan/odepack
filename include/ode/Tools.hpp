@@ -222,39 +222,6 @@ struct OdeData<RHS, void> {
     const void* obj = nullptr;
 };
 
-template<typename T>
-class StepSequence{
-
-public:
-
-    StepSequence() = default;
-
-    StepSequence(T* data, long int size, bool own_it = false);
-
-    template<std::integral INT>
-    inline const T& operator[](INT i) const{
-        return _data[i];
-    }
-
-    StepSequence(const StepSequence& other);
-
-    StepSequence(StepSequence&& other) noexcept;
-
-    ~StepSequence();
-
-    StepSequence& operator=(const StepSequence& other) = delete;
-
-    StepSequence& operator=(StepSequence&& other) noexcept = delete;
-
-    long int size() const;
-
-    const T* data() const;
-
-private:
-
-    T* _data = nullptr;
-    long int _size = -1;
-};
 
 enum class StepResult : std::uint8_t {
     Success, // Successful step
@@ -264,6 +231,23 @@ enum class StepResult : std::uint8_t {
     MAX_STEP_ERROR, // Step size reached maximum set by user
 };
 
+template<typename T>
+struct EmptyArr{
+
+    EmptyArr() = default;
+
+    inline int operator[](size_t) const{
+        return 0;
+    }
+
+    inline size_t size() const{
+        return 0;
+    }
+
+    inline const T* data() const{
+        return nullptr;
+    }
+};
 
 class Clock{
 

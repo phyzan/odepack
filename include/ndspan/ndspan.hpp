@@ -323,7 +323,7 @@ public:
 
 private:
 
-    size_t _data[ND+1] = {DIMS...};
+    size_t _data[ND+1] = {N, DIMS...};
 
 
 };

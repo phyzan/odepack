@@ -316,11 +316,10 @@ int main() {
     EventOptions options{.name = "event", .max_events = 10, .terminate = true};
 
     // Integrate until the maximum number of events is reached
-    StepSequence<double> steps_to_save; //default constructor means save all steps
 
     // Set a long integration interval to ensure we hit the event multiple times
     // The result stores all specified time steps, along with events encountered
-    OdeResult<double, 2> result = ode.integrate(1000000, steps_to_save, {options});
+    OdeResult<double, 2> result = ode.integrate(1000000, {options});
     std::cout << "Integration completed at t = " << result.t().back() << "\n";
     std::cout << "Integration completed in " << result.runtime() << " seconds.\n";
     std::cout << "Number of time points: " << result.t().size() << "\n";

@@ -69,7 +69,8 @@ public:
     virtual bool                advance() = 0;
     virtual bool                advance_by(T interval) = 0;
     virtual bool                advance_until(T time) = 0;
-    virtual bool                observe_until(T time, std::function<void(const T&, const T*)> observer) = 0;
+    virtual bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer) = 0;
+    virtual bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer, View1D<T> extra_steps) = 0;
     virtual void                reset() = 0;
     virtual bool                resume() = 0;
     virtual void                stop(const std::string& text = "") = 0;

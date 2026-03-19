@@ -70,7 +70,7 @@ class BaseSolver : public BaseInterface<T, N, SP>{
     static constexpr bool HAS_JAC = !RUNTIME_JAC_TYPE && !std::is_same_v<JacType, std::nullptr_t>;
     static_assert( !std::is_same_v<RhsType, std::nullptr_t> , "RHS function type cannot be nullptr");
 
-    static constexpr auto VoidFunc = [](const T&, const T*)LAMBDA_INLINE{};
+    static constexpr auto VoidFunc = [](const T&, const T*, const T* = nullptr)LAMBDA_INLINE{};
 
 public:
 
@@ -272,11 +272,17 @@ public:
     /**
      * @brief Integrate until the specified time is reached.
      * @param time Target time to integrate to.
-     * @param observer Callable function(t, q_ptr) that is called at each successfull step until "time" is reached.
+     * @param observer Callable function(t, q_ptr, t_ptr) that is called at each successfull step until "time" is reached.
+     *     observer arguments:
+     *          t: solver's current integration time.
+     *          q_ptr: solver's current state vector
+     *          t_ptr: if positioned at an extra_step, pointer to the t-value in the array. Otherwise nullptr. If no extra_steps passed,
+     *              then t_ptr is always nullptr except for the last call (if successfull), in which case t_ptr = &time.
+     * @param extra_steps Optional array of additional time points to observe (must be in the same direction and within the integration range). Observer will be called at these points as well.
      * @return True if integration succeeded, false if solver stopped early.
      */
-    template<typename Callable>
-    bool                advance_until(T time, Callable&& observer);
+    template<typename Callable, typename ArrayType = EmptyArr<T>>
+    bool                advance_until(const T& time, Callable&& observer, const ArrayType& extra_steps = EmptyArr<T>());
 
     /**
      * @brief Integrate until an objective function crosses zero (event detection).
@@ -288,10 +294,12 @@ public:
      * @param observer Callable function(t, q_ptr) that is called at each successfull step until the requested zero crossing of the objective function is reached
      * @return True if event was detected and solver positioned at crossing.
      */
-    template<typename ObjFun, typename Callable>
-    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = decltype(VoidFunc)(VoidFunc));
+    template<typename ObjFun, typename Callable = decltype(VoidFunc)>
+    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = VoidFunc);
 
-    bool                observe_until(T time, std::function<void(const T&, const T*)> observer);
+    bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer, View1D<T> extra_steps);
+
+    bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer);
 
     /**
      * @brief Advance the solver by a specified time interval (along the integration direction).

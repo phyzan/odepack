@@ -64,8 +64,6 @@ template<>
     template class LocalInterpolator<T, 0>; \
     template class StandardLocalInterpolator<T, 0>; \
     template class LinkedInterpolator<T, 0, Interpolator<T, 0>>; \
-    template class StepSequence<T>; \
-    template StepSequence<T> to_step_sequence<T>(const py::object& t_eval); \
     template std::vector<T> subvec<T>(const std::vector<T>& x, size_t start, size_t size); \
     template void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size); \
     template void coef_mat_interp<T>(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size); \

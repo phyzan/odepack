@@ -128,8 +128,14 @@ py::object PyODE::call_Jac(const py::object& t, const py::iterable& py_q) const{
 py::object PyODE::py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
-        auto* ptr = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
-        return py::cast(PyOdeResult(ptr, this->data.shape, this->scalar_type));
+        OdeResult<T>* result;
+        if (t_eval.is_none()){
+            result = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
+        }else{
+            std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
+            result = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), t_seq, to_Options(event_options), max_prints));
+        }
+        return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
 }
 
@@ -143,8 +149,14 @@ py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterab
 py::object PyODE::py_integrate_until(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
-        auto* ptr = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), to_step_sequence<T>(t_eval), to_Options(event_options), max_prints));
-        return py::cast(PyOdeResult(ptr, this->data.shape, this->scalar_type));
+        OdeResult<T>* result;
+        if (t_eval.is_none()){
+            result = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), to_Options(event_options), max_prints));
+        }else{
+            std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
+            result = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), t_seq, to_Options(event_options), max_prints));
+        }
+        return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
 }
 
@@ -260,7 +272,7 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
     auto clear = [&](){
         for (auto& pair : step_seq){
             call_dispatch(pair.first, [&]<typename T>(){
-                delete reinterpret_cast<StepSequence<T>*>(pair.second);
+                delete reinterpret_cast<std::vector<T>*>(pair.second);
             });
         }
     };
@@ -277,11 +289,10 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
             }
             array.push_back(pyode.ode);
             types.push_back(pyode.scalar_type);
-            if (step_seq.find(pyode.scalar_type) == step_seq.end()){
+            if ((!step_seq.contains(pyode.scalar_type)) && !t_eval.is_none()){
                 step_seq[pyode.scalar_type] = call_dispatch(pyode.scalar_type, [&]<typename T>() -> void* {
-                    return new StepSequence<T>(to_step_sequence<T>(t_eval));
+                    return new std::vector<T>(toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>()));
                 });
-
 
             }
         } catch (const py::cast_error&) {
@@ -299,12 +310,17 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
     Clock clock;
     clock.start();
 
+    const bool t_eval_is_none = t_eval.is_none();
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (size_t i=0; i<array.size(); i++){
 
         call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
             ODE<T>* ode = reinterpret_cast<ODE<T>*>(array[i]);
-            ode->integrate(T(interval), *reinterpret_cast<StepSequence<T>*>(step_seq[types[i]]), options);
+            if (t_eval_is_none){
+                ode->integrate(T(interval), options);
+            } else {
+                ode->integrate(T(interval), *reinterpret_cast<std::vector<T>*>(step_seq[types[i]]), options);
+            }
         });
 
         #pragma omp critical
@@ -324,7 +340,6 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
 #define DEFINE_ODE(T) \
     template class ODE<T, 0>; \
     template class EventCounter<T, 0>; \
-    template void integrate_all(const std::vector<ODE<T, 0>*>&, const T&, const StepSequence<T>&, const std::vector<EventOptions>&, int, bool); \
     template void ODE<T, 0>::_init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method); \
     template PyODE::PyODE(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events, Integrator method = Integrator::RK45); \
 

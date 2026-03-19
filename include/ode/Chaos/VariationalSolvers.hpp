@@ -90,7 +90,7 @@ public:
 
 private:
 
-     const NormalizationEvent<T>& _main_event()const;
+    const NormalizationEvent<T>& _main_event()const;
 
     void _register_event(size_t event) override;
 

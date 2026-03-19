@@ -54,15 +54,9 @@ public:
     template<typename RhsType, typename JacType>
     ODE(ODE_CONSTRUCTOR(T));
 
-    ODE(const ODE<T, N>& other);
+    DEFAULT_RULE_OF_FOUR(ODE)
 
-    ODE(ODE<T, N>&& other) noexcept;
-
-    ODE<T, N>& operator=(const ODE<T, N>& other);
-
-    ODE<T, N>& operator=(ODE<T, N>&& other) noexcept;
-
-    virtual ~ODE();
+    virtual ~ODE() = default;
 
     void                                        Rhs(T* out, const T& t, const T* q) const;
 
@@ -76,9 +70,13 @@ public:
 
     OdeSolution<T, N>                           rich_integrate(const T& interval, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
-    OdeResult<T, N>                             integrate(const T& interval, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
+    OdeResult<T, N>                             integrate(const T& interval, const std::vector<T>& t_array, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
-    OdeResult<T, N>                             integrate_until(const T& t_max, const StepSequence<T>& t_array = {}, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
+    OdeResult<T, N>                             integrate(const T& interval, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
+
+    OdeResult<T, N>                             integrate_until(const T& t, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
+
+    OdeResult<T, N>                             integrate_until(const T& t, const std::vector<T>& t_eval, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
     std::map<std::string, std::vector<size_t>>  event_map(size_t start_point=0) const;
 
@@ -112,34 +110,27 @@ protected:
 
     ODE() = default;
 
-    OdeRichSolver<T, N>* _solver = nullptr;
+    PolyWrapper<OdeRichSolver<T, N>> _solver;
     std::vector<T> _t_arr;
     std::vector<T> _q_data;
     std::vector<std::vector<size_t>> _Nevents;
     double _runtime = 0;
 
+    template<typename RhsType, typename JacType>
+    void                                        _init(ODE_CONSTRUCTOR(T));
 
     virtual void                                _register_state();
 
     virtual void                                _register_event(size_t i);
 
-    template<typename RhsType, typename JacType>
-    void                                        _init(ODE_CONSTRUCTOR(T));
-
 private:
 
-    void                                        _copy_data(const ODE<T, N>& other);
+    template<typename ArrayType>
+    OdeResult<T, N>                             priv_integrate_until(const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options={}, int max_prints = 0);
 
     std::vector<EventOptions>                   _validate_events(const std::vector<EventOptions>& options)const;
 
-    template< bool inclusive = true>
-    bool _save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew);
-
 };
-
-template<typename T, size_t N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress);
-
 
 } // namespace ode
 

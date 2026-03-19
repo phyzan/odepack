@@ -77,7 +77,7 @@ struct PySolver : DtypeDispatcher {
 
     py::object          advance_to_event(const py::object& event);
 
-    py::object          advance_until(const py::object& time, const py::object& observer);
+    py::object          advance_until(const py::object& time, const py::object& observer, const py::object& extra_steps);
 
     virtual py::object  copy() const = 0;
 

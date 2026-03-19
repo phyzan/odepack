@@ -2,6 +2,7 @@
 #define ODE_INT_IMPL_HPP
 
 #include "OdeInt.hpp"
+#include "Tools_impl.hpp"
 
 namespace ode{
 
@@ -39,17 +40,17 @@ bool EventCounter<T, N>::count_it(size_t i){
 }
 
 template<typename T, size_t N>
- bool EventCounter<T, N>::is_running()const{
+bool EventCounter<T, N>::is_running()const{
     return _is_running;
 }
 
 template<typename T, size_t N>
- bool EventCounter<T, N>::can_fit(size_t event)const{
+bool EventCounter<T, N>::can_fit(size_t event)const{
     return (_counter[event] != _options[event].max_events) && _is_running;
 }
 
 template<typename T, size_t N>
- size_t EventCounter<T, N>::total()const{
+size_t EventCounter<T, N>::total()const{
     return _total;
 }
 
@@ -58,42 +59,6 @@ template<typename T, size_t N>
 template<typename RhsType, typename JacType>
 ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
     _init(ARGS, events, method);
-}
-
-template<typename T, size_t N>
-ODE<T, N>::ODE(const ODE& other){
-    _copy_data(other);
-}
-
-template<typename T, size_t N>
-ODE<T, N>::ODE(ODE&& other) noexcept: _solver(other._solver), _t_arr(std::move(other._t_arr)), _q_data(std::move(other._q_data)), _Nevents(std::move(other._Nevents)), _runtime(other._runtime){
-    other._solver = nullptr;
-}
-
-template<typename T, size_t N>
-ODE<T, N>& ODE<T, N>::operator=(const ODE<T, N>& other){
-    if (&other == this) {return *this;}
-    _copy_data(other);
-    return *this;
-}
-
-template<typename T, size_t N>
-ODE<T, N>& ODE<T, N>::operator=(ODE<T, N>&& other) noexcept{
-    if (&other != this){
-        delete _solver;
-        _solver = other._solver;
-        _t_arr = std::move(other._t_arr);
-        _q_data = std::move(other._q_data);
-        _Nevents = std::move(other._Nevents);
-        _runtime = other._runtime;
-        other._solver = nullptr;
-    }
-    return *this;
-}
-
-template<typename T, size_t N>
-ODE<T, N>::~ODE(){
-    delete _solver;
 }
 
 template<typename T, size_t N>
@@ -122,96 +87,100 @@ size_t ODE<T, N>::Nsys() const{
 }
 
 template<typename T, size_t N>
-OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
+OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const std::vector<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
     if (interval < 0){
         throw std::runtime_error("Integration interval must be positive");
     }
-    return this->integrate_until(_solver->t()+interval*_solver->direction(), t_array, event_options, max_prints);
+    return this->priv_integrate_until(_solver->t()+interval*_solver->direction(), t_array, event_options, max_prints);
+}
+
+template<typename T, size_t N>
+OdeResult<T, N> ODE<T, N>::integrate(const T& interval, const std::vector<EventOptions>& event_options, int max_prints){
+    if (interval < 0){
+        throw std::runtime_error("Integration interval must be positive");
+    }
+    return this->priv_integrate_until(_solver->t()+interval*_solver->direction(), EmptyArr<T>{}, event_options, max_prints);
+}
+
+template<typename T, size_t N>
+OdeResult<T, N> ODE<T, N>::integrate_until(const T& t, const std::vector<EventOptions>& event_options, int max_prints){
+    return this->priv_integrate_until(t, EmptyArr<T>{}, event_options, max_prints);
+}
+
+template<typename T, size_t N>
+OdeResult<T, N> ODE<T, N>::integrate_until(const T& t, const std::vector<T>& t_eval, const std::vector<EventOptions>& event_options, int max_prints){
+    return this->priv_integrate_until(t, t_eval, event_options, max_prints);
 }
 
 template<typename T, size_t N>
 OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector<EventOptions>& event_options, int max_prints){
     _solver->start_interpolation();
-    OdeResult<T, N> res = this->integrate(interval, {}, event_options, max_prints);
+    OdeResult<T, N> res = this->integrate(interval, event_options, max_prints);
     OdeSolution<T, N> rich_res(std::move(res), *_solver->interpolator());
     _solver->stop_interpolation();
     return rich_res;
 }
 
 template<typename T, size_t N>
-OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int max_prints){
+template<typename ArrayType>
+OdeResult<T, N> ODE<T, N>::priv_integrate_until(const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options, int max_prints){
     if (_solver->is_dead()){
         return OdeResult<T, N>({}, {}, {}, _solver->diverges(), false, 0, _solver->status());
     }else if (t_max*_solver->direction() < _solver->t()*_solver->direction()){
         return OdeResult<T, N>({}, {}, {}, false, false, 0, "Cannot integrate in opposite direction"); //cannot integrate in opposite direction
     }
+    TimePoint TIME_START = Clock::now();
+    constexpr bool store_explicit_steps = !std::is_same_v<std::decay_t<ArrayType>, EmptyArr<T>>;
+    // ------------------------------ IMPLEMENTATION --------------------------------------
     _solver->resume();
-    TimePoint t1 = Clock::now();
-    const T t0 = _solver->t();
-    const int d = _solver->direction();
-    const bool save_all = t_array.size() < 0;
-    const bool save_some = t_array.data() != nullptr && t_array.size() > 0;
-    const size_t Nt = _t_arr.size();
-    long int frame_counter = 0;
-    int prints = 0;
-    size_t Nnew = 0;
-
-    T t_last = _solver->t();
-    T t_curr = t_last;
-    bool include_first = false;
-    if (save_all || (save_some && t_array[0] == t0)){
-        include_first = true;
-        Nnew = 1;
-        frame_counter = 1;
-    }
+    const T         t0 = _solver->t();
+    const bool      first_eval_t0 = (t_store.size() > 0 && t_store[0] == t0);
+    const bool      include_first = (!store_explicit_steps || first_eval_t0);
+    const size_t    t_start_idx = _t_arr.size() - include_first;
+    int             prints = 0;
+    size_t          n_points = include_first;
+    const char*     terminate_message = nullptr;
+    View1D<T>       t_eval(t_store.data() + first_eval_t0, t_store.size() - first_eval_t0);
 
     //check that all names in max_events are valid
     const std::vector<EventOptions> options = this->_validate_events(event_options);
+    EventCounter<T, N>              event_counter(options);
 
-    EventCounter<T, N> event_counter(options);
-    auto observer = [&](const T& t, const T* q) -> void {
-        t_last = t_curr;
-        t_curr = _solver->t();
-        if (_solver->at_event()){
-            //the .count_it(ev) in the line above might have stopped the solver.
-            //if the solver stopped for any other reason, that takes priority.
-            //only if it is still running but max events have been reached, the solver will display "max events reached".
-            while (frame_counter < t_array.size() && _save_t_value<false>(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
-            bool any_event = false;
-            bool tmax_event = (t == t_max);
-            if (tmax_event){
-                _solver->stop("t-goal");
-            }
-
-            // Manage events
-            for (const size_t& ev : _solver->event_col()){
-                if (event_counter.count_it(ev)){
-                    any_event = true;
-                    _register_event(ev);
-                }
-            }
-            if (_solver->is_running() && !event_counter.is_running()){
-                _solver->stop("Max events reached");
-            }
-            if (any_event || tmax_event){
-                _register_state();
-                Nnew++;
-            }
-            else if (tmax_event && (frame_counter < t_array.size())){
-                _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew);
-            }
-            else if (tmax_event && save_all){
-                Nnew++;
+    auto event_state_valid = [&]()LAMBDA_INLINE{
+        bool res = false;
+        for (const size_t& ev : _solver->event_col()){
+            if (event_counter.count_it(ev)){
+                res = true;
+                _register_event(ev);
             }
         }
-        else if (save_all){
+        return res;
+    };
+
+    // Since we pass an array of t_eval in the solver later, if step_ptr is not null,
+    // it is guaranteed to point to an element in t_eval.
+    auto observer = [&](const T& t, const T* q, const T* step_ptr) -> void {
+        const bool at_valid_event = _solver->at_event() && event_state_valid();
+
+        if constexpr (!store_explicit_steps) {
             _register_state();
-            Nnew++;
+            n_points++;
+        } else if (at_valid_event || step_ptr) {
+            _register_state();
+            n_points++;
         }
-        else if (save_some){
-            while (frame_counter < t_array.size() && _save_t_value(frame_counter, t_array, t_last, t_curr, d, Nnew)){}
+
+        if (at_valid_event && !event_counter.is_running()) {
+            terminate_message = "Max events reached";
         }
-        
+
+        if (_solver->t() == t_max){
+            terminate_message = "t-goal";
+        }
+
+        if (terminate_message && _solver->is_running()){
+            _solver->stop(terminate_message);
+        }
 
         // =========================== Manage console output ==========================
         if (max_prints > 0){
@@ -226,20 +195,16 @@ OdeResult<T, N> ODE<T, N>::integrate_until(const T& t_max, const StepSequence<T>
             }
 
         }
-
+        // ============================================================================
     };
 
-    _solver->observe_until(t_max, observer);
+    _solver->observe_until(t_max, observer, t_eval);
 
     if (max_prints > 0){
         std::cout << std::endl;
     }
-    if (_t_arr.back() != _solver->t()){
-        _register_state();
-    }
-    TimePoint t2 = Clock::now();
-    std::string message = _solver->t() == t_max ? "t-goal" : _solver->status();
-    OdeResult<T, N> res(subvec(_t_arr, Nt-include_first, Nnew), Array2D<T, 0, N>(_q_data.data()+(Nt-include_first)*_solver->Nsys(), Nnew, _solver->Nsys()), event_map(Nt-include_first), _solver->diverges(), !_solver->is_dead(), Clock::as_duration(t1, t2), message);
+    TimePoint TIME_END = Clock::now();
+    OdeResult<T, N> res(subvec(_t_arr, t_start_idx, n_points), Array2D<T, 0, N>(_q_data.data()+t_start_idx*_solver->Nsys(), n_points, _solver->Nsys()), event_map(t_start_idx), _solver->diverges(), !_solver->is_dead(), Clock::as_duration(TIME_START, TIME_END), _solver->status());
     _runtime += res.runtime();
     return res;
 }
@@ -309,7 +274,7 @@ double ODE<T, N>::runtime()const{
 
 template<typename T, size_t N>
 const OdeRichSolver<T, N>* ODE<T, N>::solver()const{
-    return _solver;
+    return _solver.ptr();
 }
 
 template<typename T, size_t N>
@@ -348,6 +313,14 @@ void ODE<T, N>::reset(){
 }
 
 template<typename T, size_t N>
+template<typename RhsType, typename JacType>
+void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
+    _solver.take_ownership(get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events).release());
+    _Nevents = std::vector<std::vector<size_t>>(events.size());
+    _register_state();
+}
+
+template<typename T, size_t N>
 void ODE<T, N>::_register_state(){
     _t_arr.push_back(_solver->t());
     _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
@@ -358,23 +331,6 @@ void ODE<T, N>::_register_event(size_t i){
     _Nevents[i].push_back(_t_arr.size());
 }
 
-template<typename T, size_t N>
-template<typename RhsType, typename JacType>
-void ODE<T, N>::_init(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
-    _Nevents = std::vector<std::vector<size_t>>(events.size());
-    _solver = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events).release();
-    _register_state();
-}
-
-template<typename T, size_t N>
-void ODE<T, N>::_copy_data(const ODE<T, N>& other){
-    delete _solver;
-    _solver = other._solver->clone();
-    _t_arr = other._t_arr;
-    _q_data = other._q_data;
-    _Nevents = other._Nevents;
-    _runtime = other._runtime;
-}
 
 template<typename T, size_t N>
 std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOptions>& options)const{
@@ -413,50 +369,7 @@ std::vector<EventOptions> ODE<T, N>::_validate_events(const std::vector<EventOpt
     return res;
 }
 
-template<typename T, size_t N>
-template< bool inclusive>
-bool ODE<T, N>::_save_t_value(long int& frame_counter, const StepSequence<T>& t_array, const T& t_last, const T& t_curr, int d, size_t& Nnew) {
-    T t_req = t_array[frame_counter];
 
-    // Comparison using the template parameter
-    bool in_range;
-    if constexpr(inclusive){
-        in_range = (t_last*d < t_req*d) && (t_req*d <= t_curr*d);
-    }
-    else{
-        in_range = (t_last*d < t_req*d) && (t_req*d < t_curr*d);
-    }
-    if (in_range) {
-        frame_counter++;
-        Nnew++;
-        size_t tmp = _q_data.size();
-        _t_arr.push_back(t_req);
-        _q_data.insert(_q_data.end(), _solver->vector().begin(), _solver->vector().end());
-        _solver->interp(_q_data.data()+tmp, t_req);
-        return true;
-    }
-    return false;
-}
-
-template<typename T, size_t N>
-void integrate_all(const std::vector<ODE<T, N>*>& list, const T& interval, const StepSequence<T>& t_array, const std::vector<EventOptions>& event_options, int threads, bool display_progress){
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    const int target = list.size();
-    Clock clock;
-    clock.start();
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (ODE<T, N>* ode : list){
-        ode->integrate(interval, t_array, event_options);
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
-    }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
-}
 
 } // namespace ode
 

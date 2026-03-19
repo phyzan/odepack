@@ -414,7 +414,7 @@ class OdeSolver:
         This requires events to be registered in the solver at initialization.
         """
 
-    def advance_until(self, t: float, observer: Callable = None)->bool:
+    def advance_until(self, t: float, observer: Callable = None, extra_steps: Iterable[float] = None)->bool:
         """
         Advance the solver until precisely reaching a specified time.
         If the target time t falls between steps, the solver will perform
@@ -429,6 +429,8 @@ class OdeSolver:
         t : float
             Target time to advance to.
         observer : Callable function that takes no arguments, that is called after each successful step until the target time is reached. This can be used to implement custom progress monitoring or logging during the advancement process. Default is None (no observer).
+        extra_steps : Iterable of float, optional
+            Additional time points at which to observe the solver's state. Default is None (no extra steps). They must be in a strictly ascending order, and all lie in the interval (self.t, t].
 
         Returns
         -------

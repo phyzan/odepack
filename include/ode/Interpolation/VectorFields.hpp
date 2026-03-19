@@ -14,8 +14,10 @@ struct VirtualVectorField {
     virtual int ndim() const = 0;
 
     virtual bool contains(const double* coords) const = 0;
+    
+    virtual OdeResult<double> streamline(const double* x0, double length, double rtol, double atol, double min_step, double max_step, double stepsize, int direction, Integrator method, bool normalized, const std::vector<double>& t_eval) const = 0;
 
-    virtual OdeResult<double> streamline(const double* x0, double length, double rtol, double atol, double min_step, double max_step, double stepsize, int direction, const StepSequence<double>& t_eval, Integrator method, bool normalized) const = 0;
+    virtual OdeResult<double> streamline(const double* x0, double length, double rtol, double atol, double min_step, double max_step, double stepsize, int direction, Integrator method, bool normalized) const = 0;
 
     virtual ODE<double, 0>* get_streamline_ode(const double* x0, double rtol, double atol, double min_step, double max_step, double stepsize, int direction, Integrator method, bool normalized) const = 0;
 
@@ -40,7 +42,9 @@ public:
 
     static void ode_func(T* out, const T& t, const T* q, const T* args, const void* ptr);
 
-    OdeResult<T> streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, const StepSequence<T>& t_eval, Integrator method, bool normalized) const;
+    OdeResult<T> streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized, const std::vector<double>& t_eval) const;
+
+    OdeResult<T> streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized) const;
 
     ODE<T, NDIM>*   get_streamline_ode(const T* x0, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized) const;
 

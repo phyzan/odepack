@@ -243,12 +243,3 @@ using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP 
 
 
 #endif // RICH_SOLVER_HPP
-
-
-/*
-TODO:
-
-Check interpolation is working properly with advance_until, events etc.
-simplify the code/logic in t_impl, vector_impl, (maybe using common code with lambdas)
-add advance_until(t, worker_lambda) in BaseSolver.
-*/

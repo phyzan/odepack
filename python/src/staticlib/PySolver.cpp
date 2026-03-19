@@ -253,9 +253,20 @@ py::object PySolver::advance_to_event(const py::object& event) {
     )
 }
 
-py::object PySolver::advance_until(const py::object& time, const py::object& observer) {
+py::object PySolver::advance_until(const py::object& time, const py::object& observer, const py::object& extra_steps) {
     return DISPATCH(py::object,
-        if (observer.is_none()){
+
+        std::vector<T> steps = {};
+        if (!extra_steps.is_none()){
+            //try to cast to iterable
+            try{
+                auto py_steps = extra_steps.cast<py::iterable>();
+                steps = toCPP_Array<T, std::vector<T>>(py_steps);
+            } catch (const py::cast_error&){
+                throw py::value_error("extra_steps parameter must be an iterable of time points to observe (or None)");
+            }
+        }
+        if (observer.is_none() && steps.size() == 0){
             return py::cast(cast<T>()->advance_until(time.cast<T>()));
         }
         py::function py_obs;
@@ -264,11 +275,15 @@ py::object PySolver::advance_until(const py::object& time, const py::object& obs
         } catch (const py::cast_error&){
             throw py::value_error("The observer parameter must be a function that takes no arguments");
         }
-        std::function<void(const T&, const T*)> obs = [py_obs](const T&, const T*){
+        std::function<void(const T&, const T*, const T*)> obs = [py_obs](const T&, const T*, const T*){
             py_obs();
         };
         OdeRichSolver<T>* solver = this->cast<T>();
-        return py::cast(solver->observe_until(time.cast<T>(), obs));
+        if (extra_steps.is_none()){
+            return py::cast(solver->observe_until(time.cast<T>(), obs));
+        }else{
+            return py::cast(solver->observe_until(time.cast<T>(), obs, View1D<T>(steps.data(), steps.size())));
+        }
     )
 }
 
