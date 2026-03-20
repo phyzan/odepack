@@ -101,7 +101,6 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
         py::array_t<T>& array = data.template get_array<T>();
         array.resize({static_cast<py::ssize_t>(_size)});
     }
-
     data.is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);
     if (!data.is_lowlevel){
         ode_rhs.obj = &data;

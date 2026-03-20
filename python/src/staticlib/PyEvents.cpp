@@ -7,14 +7,16 @@ namespace ode{
 //===========================================================================================
 
 PyEvent::PyEvent(std::string name, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs) : DtypeDispatcher(scalar_type), _name(std::move(name)), _hide_mask(hide_mask), _Nsys(Nsys), _Nargs(Nargs){
+    data.is_lowlevel = true;
     if (py::isinstance<py::capsule>(mask)){
         this->_mask = open_capsule<void*>(mask);
     }
     else if (py::isinstance<py::function>(mask)){
         data.mask = std::move(mask);
         this->_py_mask = true;
+        data.is_lowlevel = false;
     }
-    data.is_lowlevel = data.mask.is_none() && data.event.is_none();
+
 }
 
 py::str PyEvent::name() const{
@@ -55,7 +57,9 @@ PyPrecEvent::PyPrecEvent(std::string name, py::object when, int dir, py::object 
     }
     else if (py::isinstance<py::function>(when)){
         this->data.event = std::move(when);
+        this->data.is_lowlevel = false;
     }
+
 
 }
 
