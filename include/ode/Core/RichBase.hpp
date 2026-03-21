@@ -146,6 +146,9 @@ public:
      */
     bool                                    advance_to_event(int event = -1);
 
+    /// @brief Same as advance_to_event(int), but with an additional maximum time limit. If the time limit is reached before the event, the solver stops and returns false.
+    bool                                    advance_to_event(const T& tmax, int event = -1);
+
     /**
      * @brief Begin collecting dense output interpolation data.
      *

@@ -8,33 +8,33 @@
 namespace ode{
 
 //===========================================================================================
-//                                      PySolver
+//                                      PyConstSolver
 //===========================================================================================
 
-PySolver::PySolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
+PyConstSolver::PyConstSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
 
     DISPATCH(void,
         this->init_solver<T>(f, jac, t0, py_q0, rtol, atol, min_step, max_step, stepsize, dir, py_args, py_events, name);
     )
 }
 
-PySolver::PySolver(void* solver, PyStruct py_data, ScalarType scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
+PyConstSolver::PyConstSolver(void* solver, PyStruct py_data, ScalarType scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
     this->s = solver;
     set_pyobj(*this);
 }
 
-PySolver::PySolver(const PySolver& other) : DtypeDispatcher(other), data(other.data){
+PyConstSolver::PyConstSolver(const PyConstSolver& other) : DtypeDispatcher(other), data(other.data){
     DISPATCH(void, this->s = other.template cast<T>()->clone();)
     set_pyobj(other);
 }
 
-PySolver::PySolver(PySolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)){
+PyConstSolver::PyConstSolver(PyConstSolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)){
     other.s = nullptr;
     set_pyobj(other);
 }
 
 
-PySolver& PySolver::operator=(const PySolver& other){
+PyConstSolver& PyConstSolver::operator=(const PyConstSolver& other){
     if (&other != this){
         data = other.data;
         DISPATCH(void, delete cast<T>();)
@@ -45,7 +45,7 @@ PySolver& PySolver::operator=(const PySolver& other){
 }
 
 
-PySolver& PySolver::operator=(PySolver&& other) noexcept{
+PyConstSolver& PyConstSolver::operator=(PyConstSolver&& other) noexcept{
     if (&other != this){
         data = std::move(other.data);
         DISPATCH(void, delete cast<T>();)
@@ -56,94 +56,113 @@ PySolver& PySolver::operator=(PySolver&& other) noexcept{
     return *this;
 }
 
-PySolver::~PySolver(){
+PyConstSolver::~PyConstSolver(){
     DISPATCH(void, delete cast<T>();)
 }
 
-void PySolver::set_pyobj(const PySolver& other){
+void PyConstSolver::set_pyobj(const PyConstSolver& other){
     if (!data.is_lowlevel){
         DISPATCH(void, cast<T>()->set_obj(&data);)
     }
 }
 
-py::object PySolver::t() const{
+py::object PyConstSolver::t0() const{
+    return DISPATCH(py::object,
+        return py::cast(cast<T>()->ics().t());
+    )
+}
+
+py::object PyConstSolver::q0() const{
+    return DISPATCH(py::object,
+        const T* q0_ptr = cast<T>()->ics().vector();
+        return py::cast(View1D<T>(q0_ptr, cast<T>()->Nsys()));
+    )
+}
+
+int PyConstSolver::direction() const{
+    return DISPATCH(int,
+        return cast<T>()->direction();
+    )
+}
+
+py::object PyConstSolver::t() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->t());
     )
 }
 
-py::object PySolver::t_last() const{
+py::object PyConstSolver::t_last() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->t_last());
     )
 }
 
-py::object PySolver::t_old() const{
+py::object PyConstSolver::t_old() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->t_old());
     )
 }
 
-py::object PySolver::q() const{
+py::object PyConstSolver::q() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->vector());
     )
 }
 
-py::object PySolver::q_last() const{
+py::object PyConstSolver::q_last() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->vector_last());
     )
 }
 
-py::object PySolver::q_old() const{
+py::object PyConstSolver::q_old() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->vector_old());
     )
 }
 
-py::object PySolver::stepsize() const{
+py::object PyConstSolver::stepsize() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->stepsize());
     )
 }
 
-py::object PySolver::diverges() const{
+py::object PyConstSolver::diverges() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->diverges());
     )
 }
 
-py::object PySolver::is_dead() const{
+py::object PyConstSolver::is_dead() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->is_dead());
     )
 }
 
-py::object PySolver::Nsys() const{
+py::object PyConstSolver::Nsys() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->Nsys());
     )
 }
 
-py::object PySolver::n_evals_rhs() const{
+py::object PyConstSolver::n_evals_rhs() const{
     return DISPATCH(py::object,
         return py::cast(cast<T>()->n_evals_rhs());
     )
 }
 
-py::object PySolver::n_evals_jac() const{
+py::object PyConstSolver::n_evals_jac() const{
     return DISPATCH(py::object, return py::cast(cast<T>()->n_evals_jac()); )
 }
 
 
-void PySolver::show_state(int digits) const{
+void PyConstSolver::show_state(int digits) const{
     DISPATCH(void,
         return cast<T>()->show_state(digits);
     )
 }
 
-py::object PySolver::py_rhs(const py::object& t, const py::iterable& py_q) const{
+py::object PyConstSolver::py_rhs(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::object,
         size_t nsys = cast<T>()->Nsys();
         Array1D<T> tmp(2*nsys);
@@ -156,7 +175,7 @@ py::object PySolver::py_rhs(const py::object& t, const py::iterable& py_q) const
     )
 }
 
-py::object PySolver::py_jac(const py::object& t, const py::iterable& py_q) const{
+py::object PyConstSolver::py_jac(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::object,
         size_t nsys = cast<T>()->Nsys();
         Array1D<T> q(nsys);
@@ -175,7 +194,7 @@ py::object PySolver::py_jac(const py::object& t, const py::iterable& py_q) const
     )
 }
 
-py::tuple PySolver::timeit_rhs(const py::object& t, const py::iterable& py_q) const{
+py::tuple PyConstSolver::timeit_rhs(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::tuple,
         size_t nsys = cast<T>()->Nsys();
         Array1D<T> tmp(2*nsys);
@@ -192,7 +211,7 @@ py::tuple PySolver::timeit_rhs(const py::object& t, const py::iterable& py_q) co
 }
 
 
-py::tuple PySolver::timeit_jac(const py::object& t, const py::iterable& py_q) const{
+py::tuple PyConstSolver::timeit_jac(const py::object& t, const py::iterable& py_q) const{
     return DISPATCH(py::tuple,
         size_t nsys = cast<T>()->Nsys();
         Array1D<T> q(nsys);
@@ -213,6 +232,46 @@ py::tuple PySolver::timeit_jac(const py::object& t, const py::iterable& py_q) co
         return py::make_tuple(py::cast(duration.count()), py::cast(jac));
     )
 }
+
+
+py::str PyConstSolver::status() const{
+    return DISPATCH(py::str,
+        return py::cast(cast<T>()->status());
+    )
+}
+
+py::object PyConstSolver::copy() const{
+    return DISPATCH(py::object,
+        return py::cast(PySolver(this->cast<T>()->clone(), this->data, this->scalar_type));
+    )
+}
+
+bool PyConstSolver::py_at_event(py::object event) const{
+    return DISPATCH(bool,
+        if (cast<T>()->event_col().size() == 0){
+            throw py::value_error("This solver contains no events to check for");
+        }else if (event.is_none()){
+            return cast<T>()->at_event();
+        }
+        std::string name;
+        try {
+            name = event.cast<std::string>();
+        } catch (const py::cast_error&){
+            throw py::value_error("Event parameter must be a string name of an event in the solver");
+        }
+        int event_idx = cast<T>()->event_idx(name);
+        if (event_idx == -1){
+            throw py::value_error("No event with name '" + name + "' found in the solver");
+        }
+        return cast<T>()->at_event(event_idx);
+    )
+}
+
+//===========================================================================================
+//                                          PySolver
+//===========================================================================================
+
+PySolver::PySolver(const PyConstSolver& other) : PyConstSolver(other) {}
 
 py::object PySolver::advance() {
     return DISPATCH(py::object,
@@ -275,8 +334,10 @@ py::object PySolver::advance_until(const py::object& time, const py::object& obs
         } catch (const py::cast_error&){
             throw py::value_error("The observer parameter must be a function that takes no arguments");
         }
-        std::function<void(const T&, const T*, const T*)> obs = [py_obs](const T&, const T*, const T*){
-            py_obs();
+        std::function<bool(const T&, const T*, const T*)> obs = [py_obs, this](const T&, const T*, const T*) -> bool {
+            py::object result = py_obs(this);
+            if (result.is_none()) return true;
+            return result.cast<bool>();
         };
         OdeRichSolver<T>* solver = this->cast<T>();
         if (extra_steps.is_none()){
@@ -316,33 +377,6 @@ bool PySolver::resume() {
 }
 
 void PySolver::stop(const py::str& reason) { DISPATCH(void, cast<T>()->stop(reason.cast<std::string>()); ) } void PySolver::kill(const py::str& reason) { DISPATCH(void, cast<T>()->kill(reason.cast<std::string>()); ) }
-
-py::str PySolver::status() const{
-    return DISPATCH(py::str,
-        return py::cast(cast<T>()->status());
-    )
-}
-
-bool PySolver::py_at_event(py::object event) const{
-    return DISPATCH(bool,
-        if (cast<T>()->event_col().size() == 0){
-            throw py::value_error("This solver contains no events to check for");
-        }else if (event.is_none()){
-            return cast<T>()->at_event();
-        }
-        std::string name;
-        try {
-            name = event.cast<std::string>();
-        } catch (const py::cast_error&){
-            throw py::value_error("Event parameter must be a string name of an event in the solver");
-        }
-        int event_idx = cast<T>()->event_idx(name);
-        if (event_idx == -1){
-            throw py::value_error("No event with name '" + name + "' found in the solver");
-        }
-        return cast<T>()->at_event(event_idx);
-    )
-}
 
 //===========================================================================================
 //                                      Additional functions
@@ -395,6 +429,55 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
     std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 
 }
+
+void py_advance_all_to_event(py::object& list, const py::str& event, double tmax, int threads, bool display_progress){
+    // Separate lists for each numeric type
+    std::vector<void*> array;
+    std::vector<ScalarType> types;
+
+    // Iterate through the list and identify each PySolver type
+    for (const py::handle& item : list) {
+        try {
+            auto& pysolver = item.cast<PySolver&>();
+
+
+            if (!pysolver.data.is_lowlevel) {
+                throw py::value_error("All solvers in advance_all_to_event must use only compiled functions, and no pure python functions");
+            }
+            array.push_back(pysolver.s);
+            types.push_back(pysolver.scalar_type);
+        } catch (const py::cast_error&) {
+            // If cast failed, throw an error
+            throw py::value_error("List item is not a recognized PySolver object type.");
+        }
+    }
+
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = int(array.size());
+    Clock clock;
+    clock.start();
+
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (size_t i=0; i<array.size(); i++){
+
+        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+            auto* solver = reinterpret_cast<OdeRichSolver<T>*>(array[i]);
+            int event_idx = solver->event_idx(event.cast<std::string>());
+            solver->advance_to_event(T(tmax), event_idx);
+        });
+
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
+    }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+
+}
+
 
 } // namespace ode
 

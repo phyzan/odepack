@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Iterable
+from typing import Iterable, overload
 from .events import *
 from typing import Callable
 
@@ -90,26 +90,53 @@ class LowLevelFunction:
         ...
 
 
-class OdeSolver:
+class OdeSolverView:
     """
-    Base class for ODE solvers providing low-level step-by-step integration.
+    A read-only view of an OdeSolver.
 
-    OdeSolver is an iterator-like class that advances the solution of an ODE
-    one adaptive step at a time. It provides access to intermediate solution values,
-    solver diagnostics, and event handling. Use this class for fine-grained control
-    over the integration process.
+    OdeSolverView provides access to the current time, state vector, and other
+    diagnostics of an OdeSolver without allowing modification. This is useful for
+    safely inspecting the solver's state from outside the solver's methods.
 
-    This is an abstract base class. Use concrete implementations like RK23, RK45,
-    DOP853, or BDF.
+    This is an abstract base class and cannot be instantiated directly.
 
-    See Also
-    --------
-    RK23 : Explicit Runge-Kutta 2(3) method
-    RK45 : Explicit Runge-Kutta 4(5) method
-    DOP853 : Explicit Runge-Kutta 8(5,3) method
-    BDF : Implicit backward differentiation formula method
-    RK4 : Fixed-step classic Runge-Kutta 4th order method
     """
+
+    @property
+    def t0(self)->float:
+        """
+        The initial time of the solver.
+
+        Returns
+        -------
+        float
+            The starting value of the integration variable.
+        """
+        ...
+
+    @property
+    def q0(self)->np.ndarray:
+        """
+        The initial state vector.
+
+        Returns
+        -------
+        np.ndarray
+            The starting state vector of the integration.
+        """
+        ...
+
+    @property
+    def direction(self)->int:
+        """
+        The integration direction.
+
+        Returns
+        -------
+        int
+            The direction of integration (1 for forward, -1 for backward).
+        """
+        ...
 
     @property
     def t(self)->float:
@@ -377,6 +404,62 @@ class OdeSolver:
         """
         ...
 
+    def copy(self)->OdeSolver:
+        """
+        Create a deep copy of the solver in its current state.
+
+        Returns
+        -------
+        OdeSolver
+            A new solver object with identical internal state, history, and configuration.
+            Modifying the copy does not affect the original.
+        """
+        ...
+
+    @property
+    def scalar_type(self)->str:
+        """
+        The numerical precision type used for all computations.
+
+        Returns
+        -------
+        str
+            One of "double", "float", "long double", or "mpreal".
+        """
+        ...
+
+
+
+class OdeSolver(OdeSolverView):
+    """
+    Base class for ODE solvers providing low-level step-by-step integration, extending
+    the read-only interface of OdeSolverView with methods to advance the solution, handle events, and manage solver state.
+
+    OdeSolver is an iterator-like class that advances the solution of an ODE
+    one adaptive step at a time, without storing any solution history to preserve memory, but only
+    updates its internal state at each step. Additionally, no temporary memory allocations occur during
+    the entire lifetime of the solver, for maximum efficiency.
+    The solver provides access to intermediate solution values,
+    solver diagnostics, and event handling. Use this class for fine-grained control
+    over the integration process.
+
+    See Also
+    --------
+    RK23 : Explicit Runge-Kutta 2(3) method
+    RK45 : Explicit Runge-Kutta 4(5) method
+    DOP853 : Explicit Runge-Kutta 8(5,3) method
+    BDF : Implicit backward differentiation formula method
+    RK4 : Fixed-step classic Runge-Kutta 4th order method
+    """
+
+    @overload
+    def __init__(self, solver: OdeSolverView):
+        ...
+
+    @overload
+    def __init__(self, f: Callable, t0: float, q0: np.ndarray, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), events: Iterable[Event] = (), method = "RK45", scalar_type: str = "double"):
+        ...
+
     def advance(self)->bool:
         """
         Advance the solver by a single adaptive time step.
@@ -392,6 +475,7 @@ class OdeSolver:
             stopped by an event/user). When False, a diagnostic message is printed
             explaining why advancement failed.
         """
+        ...
 
     def advance_to_event(self, event: str = None)->bool:
         """
@@ -413,6 +497,7 @@ class OdeSolver:
         ----
         This requires events to be registered in the solver at initialization.
         """
+        ...
 
     def advance_until(self, t: float, observer: Callable = None, extra_steps: Iterable[float] = None)->bool:
         """
@@ -428,7 +513,7 @@ class OdeSolver:
         ----------
         t : float
             Target time to advance to.
-        observer : Callable function that takes no arguments, that is called after each successful step until the target time is reached. This can be used to implement custom progress monitoring or logging during the advancement process. Default is None (no observer).
+        observer : Callable function that takes a single argument (the solver instance), that is called after each successful step until the target time is reached. This can be used to implement custom progress monitoring or logging during the advancement process. Default is None (no observer).
         extra_steps : Iterable of float, optional
             Additional time points at which to observe the solver's state. Default is None (no extra steps). They must be in a strictly ascending order, and all lie in the interval (self.t, t].
 
@@ -439,6 +524,7 @@ class OdeSolver:
             False if advancement failed before reaching t. When False, a diagnostic
                 message is printed explaining the reason. Alternatively, check self.status.
         """
+        ...
 
     def timeit_step(self)->tuple[float, bool]:
         """
@@ -450,6 +536,7 @@ class OdeSolver:
             - Time in milliseconds for the advance() method to execute.
             - Whether the solver successfully advanced (same as advance() return value).
         """
+        ...
 
     def reset(self)->None:
         """
@@ -458,6 +545,7 @@ class OdeSolver:
         Restores the solver to (t0, q0) with all internal state reset.
         The solver is ready to begin integration again from the start.
         """
+        ...
 
     def resume(self)->bool:
         """
@@ -473,8 +561,9 @@ class OdeSolver:
             False if the solver is not in a stoppable state (e.g., dead).
             If False, call message to see the reason.
         """
+        ...
 
-    def stop(reason: str)->None:
+    def stop(self, reason: str)->None:
         """
         Stops the solver, preventing any further advancement unless resume() is called.
 
@@ -485,7 +574,7 @@ class OdeSolver:
         """
         ...
 
-    def kill(reason: str)->None:
+    def kill(self, reason: str)->None:
         """
         Immediately terminates the solver, marking it as dead.
         No further advancement is possible after this call, unless
@@ -497,6 +586,8 @@ class OdeSolver:
             Message to store as the solver's status.
         """
         ...
+
+
 
     def set_ics(self, t0: float, q0: np.ndarray, stepsize: float = 0., direction: int = 0)->bool:
         """
@@ -526,28 +617,10 @@ class OdeSolver:
             True if the initial conditions were successfully set.
             False if there was an error (e.g., nan/inf values).
         """
+        ...
 
-    def copy(self)->OdeSolver:
-        """
-        Create a deep copy of the solver in its current state.
 
-        Returns
-        -------
-        OdeSolver
-            A new solver object with identical internal state, history, and configuration.
-            Modifying the copy does not affect the original.
-        """
 
-    @property
-    def scalar_type(self)->str:
-        """
-        The numerical precision type used for all computations.
-
-        Returns
-        -------
-        str
-            One of "double", "float", "long double", or "mpreal".
-        """
 
 
 class RK23(OdeSolver):
@@ -951,6 +1024,11 @@ def advance_all(solvers: Iterable[OdeSolver], t_goal: float, threads=-1, display
     """
     ...
 
+def advance_all_to_event(solvers: Iterable[OdeSolver], event: str, tmax: float, threads=-1, display_progress = False)->None:
+    """
+    Similar to advance_all, but advances each solver until a specific event is located, or until tmax is reached.
+    """
+    ...
 
 def set_mpreal_prec(bits: int)->None:
     """

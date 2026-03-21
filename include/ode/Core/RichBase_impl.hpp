@@ -105,20 +105,17 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::is_interpolating() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event(int event) const{
     assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < _events.size())) && "Invalid event index passed to RichSolver::at_event");
-    T event_time;
-    if (event == -1 && _events.begin()){
-        // any event is accepted, and since we entered the loop, that means at least one event has been detected, so we can return true immediately without further checks.
-        return true;
-    }else if (const size_t* ev_idx = _events.begin()){
-        event_time = _events.event(*ev_idx).state()->t();
-        const T& base_time = Base::true_state_ptr()[0];
-        int d = this->direction();
-        if (base_time * d >= event_time * d){
+    if (const size_t* ev_idx = _events.begin()){
+        const T& event_time = _events.event(*ev_idx).state()->t();
+        const bool at_event_time = (this->t() == event_time);
+        if (at_event_time && event != -1){
             for (const size_t idx : _events){
                 if (idx == size_t(event)){
                     return true;
                 }
             }
+        } else {
+            return at_event_time;
         }
     }
     return false;
@@ -220,6 +217,24 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(int event
         }
     }while (!this->at_event(event));
     return true;
+}
+
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::advance_to_event(const T& tmax, int event){
+    assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < _events.size())) && "Invalid event index passed to advance_to_event");
+    if (_events.size() == 0){
+        return false;
+    }
+    bool success = false;
+    Base::advance_until(tmax, [&](const T& t, const T* state, const T* extra)LAMBDA_INLINE{
+        if (this->at_event(event)){
+            success = true;
+            return false; // stop advancing
+        }
+        return true; // continue advancing
+    });
+    return success;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>

@@ -68,9 +68,9 @@ public:
     // MODIFIERS
     virtual bool                advance() = 0;
     virtual bool                advance_by(T interval) = 0;
-    virtual bool                advance_until(T time) = 0;
-    virtual bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer) = 0;
-    virtual bool                observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer, View1D<T> extra_steps) = 0;
+    virtual bool                advance_until(const T& time) = 0;
+    virtual bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer) = 0;
+    virtual bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps) = 0;
     virtual void                reset() = 0;
     virtual bool                resume() = 0;
     virtual void                stop(const std::string& text = "") = 0;
@@ -107,6 +107,7 @@ public:
 
     // MODIFIERS
     virtual bool                            advance_to_event(int event = -1) = 0;
+    virtual bool                            advance_to_event(const T& tmax, int event = -1) = 0;
     virtual void                            start_interpolation() = 0;
     virtual void                            stop_interpolation() = 0;
 

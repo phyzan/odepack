@@ -123,13 +123,13 @@ public:
 
     State(const T* data, size_t Nsys);
 
-     const T& t() const;
+    const T& t() const;
 
-     const T& habs() const;
+    const T& habs() const;
 
-     const T* vector() const;
+    const T* vector() const;
 
-     size_t Nsys() const;
+    size_t Nsys() const;
 
 protected:
 

@@ -328,7 +328,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(T time){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& time){
     return this->advance_until(time, VoidFunc);
 }
 
@@ -357,7 +357,10 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& tim
     auto evolve = [&]() LAMBDA_INLINE -> bool {
         bool res;
         while ((res = (this->is_running() && this->advance())) && (time*d > this->t()*d)){
-            observer(this->t(), THIS->true_state_ptr()+2, nullptr);
+            if (!observer(this->t(), THIS->true_state_ptr()+2, nullptr)){
+                // the observer itself might have advanced the solver to the same target time, so its worth making this check.
+                return this->t() == time;
+            }
         }
 
         if (res){
@@ -468,7 +471,9 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
     //will enter this loop even once
     while (curr_dir == 0 && this->advance()){
         curr_dir = old_dir = get_sgn();
-        observer(this->t(), THIS->true_state_ptr()+2);
+        if (!observer(this->t(), THIS->true_state_ptr()+2)){
+            return false;
+        }
         if (curr_dir == 0 && dir == 0){
             // If a root is found while trying to find a step
             // where the objective function is non zero (required for bisection)
@@ -479,7 +484,10 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
 
     bool success;
     while ((success = (this->is_running() && this->advance())) && (old_dir = curr_dir, curr_dir = get_sgn(),  (!detected(old_dir, curr_dir)))){
-        observer(this->t(), THIS->true_state_ptr()+2);
+        if (!observer(this->t(), THIS->true_state_ptr()+2)){
+            // in case the observer itself advance the solver appropriately to detect the root, check if the current state satisfies the root condition
+            return abs(ObjFunLike(this->t(), THIS->true_state_ptr()+2)) <= tol;
+        }
     }
 
     if (success){
@@ -493,12 +501,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer, View1D<T> extra_steps){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps){
     return this->advance_until(time, observer, extra_steps);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<void(const T&, const T*, const T*)> observer){
+bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
     return this->advance_until(time, observer);
 }
 

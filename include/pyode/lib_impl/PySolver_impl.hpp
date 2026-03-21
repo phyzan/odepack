@@ -9,7 +9,7 @@
 namespace ode{
 
 template<typename T>
-void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
+void PyConstSolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
     OdeData<Func<T>, void> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
     std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
@@ -25,12 +25,12 @@ void PySolver::init_solver(py::object f, py::object jac, const py::object& t0, c
 }
 
 template<typename T>
-OdeRichSolver<T>* PySolver::cast(){
+OdeRichSolver<T>* PyConstSolver::cast(){
     return reinterpret_cast<OdeRichSolver<T>*>(this->s);
 }
 
 template<typename T>
-const OdeRichSolver<T>* PySolver::cast()const{
+const OdeRichSolver<T>* PyConstSolver::cast()const{
     return reinterpret_cast<const OdeRichSolver<T>*>(this->s);
 }
 

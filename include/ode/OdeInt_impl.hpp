@@ -159,7 +159,7 @@ OdeResult<T, N> ODE<T, N>::priv_integrate_until(const T& t_max, const ArrayType&
 
     // Since we pass an array of t_eval in the solver later, if step_ptr is not null,
     // it is guaranteed to point to an element in t_eval.
-    auto observer = [&](const T& t, const T* q, const T* step_ptr) -> void {
+    auto observer = [&](const T& t, const T* q, const T* step_ptr) -> bool {
         const bool at_valid_event = _solver->at_event() && event_state_valid();
 
         if constexpr (!store_explicit_steps) {
@@ -172,14 +172,7 @@ OdeResult<T, N> ODE<T, N>::priv_integrate_until(const T& t_max, const ArrayType&
 
         if (at_valid_event && !event_counter.is_running()) {
             terminate_message = "Max events reached";
-        }
-
-        if (_solver->t() == t_max){
-            terminate_message = "t-goal";
-        }
-
-        if (terminate_message && _solver->is_running()){
-            _solver->stop(terminate_message);
+            return false;
         }
 
         // =========================== Manage console output ==========================
@@ -196,15 +189,20 @@ OdeResult<T, N> ODE<T, N>::priv_integrate_until(const T& t_max, const ArrayType&
 
         }
         // ============================================================================
+        return true;
     };
 
-    _solver->observe_until(t_max, observer, t_eval);
+    if (_solver->observe_until(t_max, observer, t_eval)) {
+        terminate_message = "t-goal";
+    } else if (!terminate_message){
+        terminate_message = _solver->status().c_str();
+    }
 
     if (max_prints > 0){
         std::cout << std::endl;
     }
     TimePoint TIME_END = Clock::now();
-    OdeResult<T, N> res(subvec(_t_arr, t_start_idx, n_points), Array2D<T, 0, N>(_q_data.data()+t_start_idx*_solver->Nsys(), n_points, _solver->Nsys()), event_map(t_start_idx), _solver->diverges(), !_solver->is_dead(), Clock::as_duration(TIME_START, TIME_END), _solver->status());
+    OdeResult<T, N> res(subvec(_t_arr, t_start_idx, n_points), Array2D<T, 0, N>(_q_data.data()+t_start_idx*_solver->Nsys(), n_points, _solver->Nsys()), event_map(t_start_idx), _solver->diverges(), !_solver->is_dead(), Clock::as_duration(TIME_START, TIME_END), terminate_message);
     _runtime += res.runtime();
     return res;
 }

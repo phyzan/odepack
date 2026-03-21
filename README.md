@@ -52,7 +52,7 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 - **Forward & Backward Integration** - Integrate in either time direction
 - **Configurable Tolerances** - Set `rtol`, `atol`, `min_step`, `max_step`
 - **Variational Equations** - Built-in support for Lyapunov exponent calculations
-- **Parallel Integration** - OpenMP support for solving multiple ODE systems
+- **Parallel Integration** - OpenMP support for solving multiple ODE systems simultaneously via `advance_all` and `advance_all_to_event`
 - **Custom Solvers** - Extend the library with your own integration methods
 
 ### Event Detection
@@ -253,7 +253,9 @@ print("Expected state:", "[..., 1]")
 |--------|-------------|
 | `advance()` | Perform one adaptive integration step |
 | `advance_until(time)` | Integrate until the specified time |
-| `advance_until(func, tol, dir)` | Integrate until an event condition is met |
+| `advance_until(time, observer)` | Integrate until `time`, calling `observer(t, q, extra) -> bool` after each step; return `false` from observer to stop early |
+| `advance_to_event(event)` | Advance until a specific event (or any event if `event == -1`) is detected |
+| `advance_to_event(tmax, event)` | Same as above, but stops at `tmax` if the event is not reached; returns `false` if `tmax` was reached without the event |
 | `reset()` | Return to initial conditions |
 | `set_ics(t0, y0, stepsize, direction)` | Set new initial conditions |
 | `interp(t)` | Interpolate solution at arbitrary time within last step |
@@ -266,7 +268,9 @@ print("Expected state:", "[..., 1]")
 | `t()` | Current time |
 | `vector()` | Current state vector |
 | `stepsize()` | Current step size |
-| `at_event()` | If the solver state is currently at a detected event |
+| `at_event(event = -1)` | Returns `true` if the solver is positioned exactly at an event (`-1` checks any event) |
+
+> **Note:** The `observe_until` virtual method takes a `std::function<bool(const T&, const T*, const T*)>` observer. The observer must return `true` to continue integration or `false` to stop early.
 
 ## ODE Class
 
