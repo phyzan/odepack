@@ -384,98 +384,21 @@ void PySolver::stop(const py::str& reason) { DISPATCH(void, cast<T>()->stop(reas
 
 
 void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress){
-    // Separate lists for each numeric type
-    std::vector<void*> array;
-    std::vector<ScalarType> types;
-
-    // Iterate through the list and identify each PySolver type
-    for (const py::handle& item : list) {
-        try {
-            auto& pysolver = item.cast<PySolver&>();
-
-
-            if (!pysolver.data.is_lowlevel) {
-                throw py::value_error("All solvers in advance_all must use only compiled functions, and no pure python functions");
-            }
-            array.push_back(pysolver.s);
-            types.push_back(pysolver.scalar_type);
-        } catch (const py::cast_error&) {
-            // If cast failed, throw an error
-            throw py::value_error("List item is not a recognized PySolver object type.");
-        }
-    }
-
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    const int target = int(array.size());
-    Clock clock;
-    clock.start();
-
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (size_t i=0; i<array.size(); i++){
-
-        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
-            auto* solver = reinterpret_cast<OdeSolver<T>*>(array[i]);
-            solver->advance_until(T(t_goal));
-        });
-
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
-    }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+    py_advance_all_general(list, [&]<typename T>(OdeRichSolver<T>* solver){
+        solver->advance_until(T(t_goal));
+    }, threads, display_progress);
 
 }
 
 void py_advance_all_to_event(py::object& list, const py::str& event, double tmax, int threads, bool display_progress){
-    // Separate lists for each numeric type
-    std::vector<void*> array;
-    std::vector<ScalarType> types;
-
-    // Iterate through the list and identify each PySolver type
-    for (const py::handle& item : list) {
-        try {
-            auto& pysolver = item.cast<PySolver&>();
-
-
-            if (!pysolver.data.is_lowlevel) {
-                throw py::value_error("All solvers in advance_all_to_event must use only compiled functions, and no pure python functions");
-            }
-            array.push_back(pysolver.s);
-            types.push_back(pysolver.scalar_type);
-        } catch (const py::cast_error&) {
-            // If cast failed, throw an error
-            throw py::value_error("List item is not a recognized PySolver object type.");
+    auto event_name = event.cast<std::string>();
+    py_advance_all_general(list, [&]<typename T>(OdeRichSolver<T>* solver){
+        int event_idx = solver->event_idx(event_name);
+        if (event_idx == -1){
+            throw py::value_error("No event with name '" + event_name + "' found in one of the solvers");
         }
-    }
-
-    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
-    int tot = 0;
-    const int target = int(array.size());
-    Clock clock;
-    clock.start();
-
-    #pragma omp parallel for schedule(dynamic) num_threads(num)
-    for (size_t i=0; i<array.size(); i++){
-
-        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
-            auto* solver = reinterpret_cast<OdeRichSolver<T>*>(array[i]);
-            int event_idx = solver->event_idx(event.cast<std::string>());
-            solver->advance_to_event(T(tmax), event_idx);
-        });
-
-        #pragma omp critical
-        {
-            if (display_progress){
-                show_progress(++tot, target, clock);
-            }
-        }
-    }
-    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
-
+        solver->advance_to_event(T(tmax), event_idx);
+    }, threads, display_progress);
 }
 
 

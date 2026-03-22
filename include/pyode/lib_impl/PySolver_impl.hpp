@@ -5,6 +5,7 @@
 #include "../lib/PyTools.hpp"
 #include "../lib/PyEvents.hpp"
 #include "../pycast/pycast.hpp"
+#include <atomic>
 
 namespace ode{
 
@@ -106,6 +107,72 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
         ode_rhs.obj = &data;
     }
     return ode_rhs;
+}
+
+template<typename Callable>
+void py_advance_all_general(py::object& list, Callable&& func, int threads, bool display_progress){
+    // Separate lists for each numeric type
+    std::vector<void*> array;
+    std::vector<ScalarType> types;
+
+    // Iterate through the list and identify each PySolver type
+    for (const py::handle& item : list) {
+        try {
+            auto& pysolver = item.cast<PySolver&>();
+
+
+            if (!pysolver.data.is_lowlevel) {
+                throw py::value_error("All solvers in advance_all must use only compiled functions, and no pure python functions");
+            }
+            array.push_back(pysolver.s);
+            types.push_back(pysolver.scalar_type);
+        } catch (const py::cast_error&) {
+            // If cast failed, throw an error
+            throw py::value_error("List item is not a recognized PySolver object type.");
+        }
+    }
+
+    const int num = (threads <= 0) ? omp_get_max_threads() : threads;
+    int tot = 0;
+    const int target = int(array.size());
+    Clock clock;
+    clock.start();
+
+    std::exception_ptr thread_exception = nullptr;
+    std::atomic<bool> error_flag{false};
+
+    #pragma omp parallel for schedule(dynamic) num_threads(num)
+    for (size_t i=0; i<array.size(); i++){
+        if (error_flag.load()){ continue;}
+        try {
+            call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+                auto* solver = reinterpret_cast<OdeRichSolver<T>*>(array[i]);
+                func(solver);
+            });
+        } catch (...) {
+            #pragma omp critical
+            {
+                if (!error_flag.load()) {
+                    thread_exception = std::current_exception();
+                    error_flag.store(true);
+                }
+            }
+            continue;
+        }
+
+        #pragma omp critical
+        {
+            if (display_progress){
+                show_progress(++tot, target, clock);
+            }
+        }
+    }
+
+    if (thread_exception) {
+        std::rethrow_exception(thread_exception);
+    }
+    std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
+
 }
 
 }

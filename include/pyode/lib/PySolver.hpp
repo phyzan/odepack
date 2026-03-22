@@ -117,6 +117,10 @@ struct PySolver : public PyConstSolver {
 template<typename T>
 OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
+// func::template operator()<T>(OdeRichSolver<T>* solver)
+template<typename Callable>
+void py_advance_all_general(py::object& list, Callable&& func, int threads, bool display_progress);
+
 
 void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress);
 

@@ -345,8 +345,10 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& tim
     }
 
     int d = this->direction();
-    if (time*d <= this->t()*d) {
+    if (time == this->t()){
         return false;
+    } else if (time*d < this->t()*d) {
+        throw std::runtime_error("Cannot advance until time " + to_string(time) + " because it is in the opposite direction of integration. Current time is " + to_string(this->t()) + " and direction is " + to_string(d) + ".");
     }
 
     constexpr bool explicit_steps = !std::is_same_v<std::decay_t<ArrayType>, EmptyArr<T>>;
