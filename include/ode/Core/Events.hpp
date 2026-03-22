@@ -27,6 +27,40 @@ namespace ode {
 // DECLARATIONS
 // ============================================================================
 
+template<typename T>
+class EventInterp{
+
+public:
+
+    virtual ~EventInterp() = default;
+
+    virtual void operator()(T* out, const T& t) const = 0;
+};
+
+template<typename T, typename Callable>
+class UnaryInterp : public EventInterp<T>{
+
+public:
+
+    UnaryInterp(Callable&& func) : _func(std::forward<Callable>(func)) {}
+
+    inline void operator()(T* out, const T& t) const override{
+        _func(out, t);
+    }
+
+private:
+
+    Callable _func;
+
+};
+
+
+template<typename T, typename Callable>
+inline UnaryInterp<T, std::decay_t<Callable>> getEventInterp(Callable&& func){
+    return UnaryInterp<T, std::decay_t<Callable>>(std::forward<Callable>(func));
+}
+
+
 /**
  * @brief Abstract interface for ODE integration events.
  *
@@ -112,11 +146,10 @@ public:
      * @brief Attempt to locate when this event triggers between two states.
      * @param before State at the start of the interval.
      * @param after  State at the end of the interval.
-     * @param q      Interpolation function for intermediate states.
-     * @param obj    User object pointer passed to callbacks.
+     * @param interp Interpolation object for intermediate states.
      * @return True if event was detected in the interval.
      */
-    virtual bool locate(State<T> before, State<T> after, FuncLike<T> q, const void* obj) = 0;
+    virtual bool locate(State<T> before, State<T> after, const EventInterp<T>& interp) = 0;
 
     /// @brief Register the event (increment counter, apply mask, etc.).
     virtual bool register_it() = 0;
@@ -196,8 +229,12 @@ public:
     /// @brief Clear the located state.
     void                    deactivate();
 
+    /// @brief Attempt to locate event in an interval. obj_fun(T* out, T t) -> void fills the state vector at time t.
+    template<typename Callable>
+    bool                    locate_state(State<T> before, State<T> after, Callable&& obj_fun);
+
     /// @brief Attempt to locate event in an interval.
-    bool                    locate(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+    bool                    locate(State<T> before, State<T> after, const EventInterp<T>& interp);
 
     /// @brief Register the event after location.
     bool                    register_it();
@@ -227,11 +264,11 @@ protected:
      * @param[out] t      Output time of event trigger.
      * @param[in]  before State at interval start.
      * @param[in]  after  State at interval end.
-     * @param[in]  q      Interpolation function.
-     * @param[in]  obj    User object pointer.
+     * @param[in]  obj_fun Interpolation function (T* out, const T& t) -> void to compute state at intermediate times (for masked events).
      * @return True if event was found in interval.
      */
-    bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    template<typename Callable>
+    bool locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
     // ============= STATIC OVERRIDE (OPTIONAL) ================
 
@@ -311,7 +348,8 @@ public:
 protected:
 
     /// @brief Locate zero crossing using bisection.
-    bool locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    template<typename Callable>
+    bool locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
     ObjFun<T>           _when = nullptr;      ///< Objective function to monitor.
     int                 _sign_dir = 1;        ///< Required crossing direction.
@@ -368,7 +406,8 @@ protected:
     T           get_t(size_t n) const;
 
     /// @brief Locate next periodic trigger in interval.
-    bool        locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const;
+    template<typename Callable>
+    bool        locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
     /// @brief Update period counter on registration.
     void        register_impl();
@@ -519,8 +558,12 @@ public:
      *
      * Locates events, sorts by time, resolves conflicts, and prepares
      * results for iteration.
+        * @param before State at interval start.
+        * @param after  State at interval end.
+        * @param obj_fun Interpolation function (T* out, const T& t) -> void to compute state at intermediate times (for masked events).
      */
-    void                    detect_all_between(State<T> before, State<T> after, FuncLike<T> q, const void* obj);
+    template<typename Callable>
+    void                    detect_all_between(State<T> before, State<T> after, Callable&& obj_fun);
 
     /// @brief Get view of events at current iteration time.
     EventView<T>            event_view() const;

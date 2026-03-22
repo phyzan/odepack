@@ -23,14 +23,6 @@
 
 namespace ode{
 
-/**
- * @brief Internal interpolation function used for event detection callbacks.
- * @param[out] res Output array for interpolated state (size Nsys).
- * @param[in]  t   Time to interpolate at.
- * @param[in]  obj Pointer to the RichSolver instance.
- */
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void interp_func(T* res, const T& t, const void* obj);
 
 /**
  * @brief Extended ODE solver with event detection and dense output capabilities.
@@ -60,7 +52,6 @@ class RichSolver : public BaseSolver<Derived, T, N, SP, RhsType, JacType>{
     using Base = BaseSolver<Derived, T, N, SP, RhsType, JacType>;
 
     friend Base; // So that Base can access specific private methods for static override
-    friend void interp_func<Derived, T, N, SP, RhsType, JacType>(T*, const T&, const void*);
 
 public:
 

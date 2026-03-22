@@ -149,7 +149,9 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
         if (Base::adv_impl()){
             State<T> old_state = this->old_state();
             State<T> new_state = this->new_state();
-            _events.detect_all_between(old_state, new_state, interp_func<Derived, T, N, SP, RhsType, JacType>, this);
+            _events.detect_all_between(old_state, new_state, [this](T* out, const T& t){
+                this->interp_impl(out, t);
+            });
             if (_interp_data){
                 std::unique_ptr<Interpolator<T, N>> r = this->state_interpolator(0, -1);
                 if (const EventState<T>* ev = _events.canon_state()){
@@ -321,12 +323,6 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
 }
 
 // ============================================================================
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void interp_func(T* res, const T& t, const void* obj){
-    const auto* solver = reinterpret_cast<const RichSolver<Derived, T, N, SP, RhsType, JacType>*>(obj);
-    solver->interp_impl(res, t);
-}
 
 
 } // namespace ode

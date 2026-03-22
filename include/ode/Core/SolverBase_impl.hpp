@@ -3,6 +3,7 @@
 
 #include "SolverBase.hpp"
 #include "../Tools_impl.hpp"
+#include "Events_impl.hpp"
 
 #define NOW \
 std::chrono::high_resolution_clock::now()

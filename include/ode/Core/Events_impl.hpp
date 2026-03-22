@@ -19,42 +19,42 @@ EventBase<Derived, T>::EventBase(std::string name, Func<T> mask, bool hide_mask,
 }
 
 template<typename Derived, typename T>
- const std::string& EventBase<Derived, T>::name() const{
+const std::string& EventBase<Derived, T>::name() const{
     return _name;
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_masked() const{
+bool EventBase<Derived, T>::is_masked() const{
     return THIS->is_masked_impl();
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::hides_mask() const{
+bool EventBase<Derived, T>::hides_mask() const{
     return _hide_mask && this->is_masked();
 }
 
 template<typename Derived, typename T>
- void EventBase<Derived, T>::apply_mask(T* out, const T& t, const T* q) const{
+void EventBase<Derived, T>::apply_mask(T* out, const T& t, const T* q) const{
     return THIS->mask_impl(out, t, q);
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_pure_temporal() const{
+bool EventBase<Derived, T>::is_pure_temporal() const{
     return this->is_temporal() && !this->is_masked();
 }
 
 template<typename Derived, typename T>
- size_t EventBase<Derived, T>::Nsys() const{
+size_t EventBase<Derived, T>::Nsys() const{
     return _state.nsys();
 }
 
 template<typename Derived, typename T>
- size_t EventBase<Derived, T>::counter() const{
+size_t EventBase<Derived, T>::counter() const{
     return _counter;
 }
 
 template<typename Derived, typename T>
- const std::vector<T>& EventBase<Derived, T>::args() const{
+const std::vector<T>& EventBase<Derived, T>::args() const{
     return _args;
 }
 
@@ -64,27 +64,27 @@ Event<T>* EventBase<Derived, T>::clone() const{
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_temporal() const{
+bool EventBase<Derived, T>::is_temporal() const{
     return THIS->is_temporal_impl();
 }
 
 template<typename Derived, typename T>
- int EventBase<Derived, T>::direction() const{
+int EventBase<Derived, T>::direction() const{
     return this->_direction;
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_located() const{
+bool EventBase<Derived, T>::is_located() const{
     return _is_located;
 }
 
 template<typename Derived, typename T>
- const T& EventBase<Derived, T>::t_start() const{
+const T& EventBase<Derived, T>::t_start() const{
     return _start;
 }
 
 template<typename Derived, typename T>
- const EventState<T>* EventBase<Derived, T>::state() const{
+const EventState<T>* EventBase<Derived, T>::state() const{
     return &_state;
 }
 
@@ -95,7 +95,7 @@ void EventBase<Derived, T>::set_args(const T* args, size_t size){
 }
 
 template<typename Derived, typename T>
- void EventBase<Derived, T>::setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction){
+void EventBase<Derived, T>::setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction){
     // checks that it has not been already setup
     // no other modifiers can be called if setup has not been called yet
     assert(!this->_is_setup && "Setup takes place only once");
@@ -115,22 +115,28 @@ void EventBase<Derived, T>::deactivate(){
 }
 
 template<typename Derived, typename T>
-bool EventBase<Derived, T>::locate(State<T> before, State<T> after, FuncLike<T> q, const void* obj){
+template<typename Callable>
+bool EventBase<Derived, T>::locate_state(State<T> before, State<T> after, Callable&& obj_fun){
     assert(this->_is_setup && "Call setup() method before trying to locate an event");
     assert((sgn(before.t(), after.t()) == this->_direction) && "Invalid direction");
     T t;
     _state.triggered = false;
-    if (THIS->locate_impl(t, before, after, q, obj)){
+    if (THIS->locate_impl(t, before, after, obj_fun)){
         _state.set_t(t);
         _state.set_stepsize(after.habs());
         T* q_event = this->is_masked() ? _state.mut_exposed()+2 : _state.mut_true()+2;
-        q(q_event, t, obj); //q_event has been set
+        obj_fun(q_event, t); //q_event has been set
         _is_located = true;
         return true;
     }else {
         _is_located = false;
         return false;
     }
+}
+
+template<typename Derived, typename T>
+bool EventBase<Derived, T>::locate(State<T> before, State<T> after, const EventInterp<T>& interp){
+    return this->locate_state(before, after, interp);
 }
 
 template<typename Derived, typename T>
@@ -158,18 +164,19 @@ void EventBase<Derived, T>::reset(int direction){
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
+template<typename Callable>
+bool EventBase<Derived, T>::locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const{
     static_assert(false, "static override");
     return false;
 }
 
 template<typename Derived, typename T>
- void EventBase<Derived, T>::register_impl(){
+void EventBase<Derived, T>::register_impl(){
     _counter++;
 }
 
 template<typename Derived, typename T>
- void EventBase<Derived, T>::reset_impl(int direction){
+void EventBase<Derived, T>::reset_impl(int direction){
     _counter = 0;
     _state.choose_true = true;
     _state.triggered = false;
@@ -177,18 +184,18 @@ template<typename Derived, typename T>
 }
 
 template<typename Derived, typename T>
- void EventBase<Derived, T>::mask_impl(T* out, const T& t, const T* q) const{
+void EventBase<Derived, T>::mask_impl(T* out, const T& t, const T* q) const{
     assert(this->is_masked_impl() && "Default mask() implementation requires that mask != nullptr");
     this->_mask(out, t, q, _args.data(), _obj);
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_masked_impl() const{
+bool EventBase<Derived, T>::is_masked_impl() const{
     return _mask != nullptr;
 }
 
 template<typename Derived, typename T>
- bool EventBase<Derived, T>::is_temporal_impl() const{
+bool EventBase<Derived, T>::is_temporal_impl() const{
     return false;
 }
 
@@ -198,17 +205,18 @@ template<typename T, typename Derived>
 PreciseEvent<T, Derived>::PreciseEvent(std::string name, ObjFun<T> when, int dir, Func<T> mask, bool hide_mask, T event_tol, const void* obj) : Base(name, mask, hide_mask, obj), _when(when), _sign_dir(dir), _event_tol(event_tol) {}
 
 template<typename T, typename Derived>
- T PreciseEvent<T, Derived>::obj_fun(const T& t, const T* q) const{
+T PreciseEvent<T, Derived>::obj_fun(const T& t, const T* q) const{
     return _when(t, q, this->args().data(), this->_obj);
 }
 
 template<typename T, typename Derived>
- int PreciseEvent<T, Derived>::sign_change_dir() const{
+int PreciseEvent<T, Derived>::sign_change_dir() const{
     return _sign_dir;
 }
 
 template<typename T, typename Derived>
- bool PreciseEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
+template<typename Callable>
+bool PreciseEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const{
     T val1 = this->obj_fun(before.t(), before.vector());
     T val2 = this->obj_fun(after.t(), after.vector());
     int t_dir = this->direction();
@@ -216,12 +224,12 @@ template<typename T, typename Derived>
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && val1 != 0){
         T* vec = this->_q_aux.data();
 
-        auto obj_fun = [&](T t) LAMBDA_INLINE{
-            q(vec, t, obj); // interpolate the state vector at time t, and pass the value on vec
+        auto obj_fun_scalar = [&](T t) LAMBDA_INLINE{
+            obj_fun(vec, t); // interpolate the state vector at time t, and pass the value on vec
             return this->obj_fun(t, vec);
         };
 
-        t = bisect<T, RootPolicy::Right>(obj_fun, before.t(), after.t(), this->_event_tol);
+        t = bisect<T, RootPolicy::Right>(obj_fun_scalar, before.t(), after.t(), this->_event_tol);
         return true;
     }
     return false;
@@ -243,27 +251,28 @@ template<typename T, typename Derived>
 }
 
 template<typename T, typename Derived>
- T PeriodicEvent<T, Derived>::delta_t_abs() const{
+T PeriodicEvent<T, Derived>::delta_t_abs() const{
     return _n*_period;
 }
 
 template<typename T, typename Derived>
- T PeriodicEvent<T, Derived>::delta_t() const{
+T PeriodicEvent<T, Derived>::delta_t() const{
     return _n*_period*this->direction();
 }
 
 template<typename T, typename Derived>
- bool PeriodicEvent<T, Derived>::is_temporal_impl() const{
+bool PeriodicEvent<T, Derived>::is_temporal_impl() const{
     return true;
 }
 
 template<typename T, typename Derived>
- T PeriodicEvent<T, Derived>::get_t(size_t n) const{
+T PeriodicEvent<T, Derived>::get_t(size_t n) const{
     return this->t_start() + this->direction()*n*this->period();
 }
 
 template<typename T, typename Derived>
- bool PeriodicEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, FuncLike<T> q, const void* obj) const{
+template<typename Callable>
+bool PeriodicEvent<T, Derived>::locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const{
     _n_aux = _n;
     int d = this->direction();
 
@@ -278,13 +287,13 @@ template<typename T, typename Derived>
 }
 
 template<typename T, typename Derived>
- void PeriodicEvent<T, Derived>::register_impl(){
+void PeriodicEvent<T, Derived>::register_impl(){
     Base::register_impl();
     _n = _n_aux;
 }
 
 template<typename T, typename Derived>
- void PeriodicEvent<T, Derived>::reset_impl(int direction){
+void PeriodicEvent<T, Derived>::reset_impl(int direction){
     Base::reset_impl(direction);
     _n = _n_aux = 0;
 }
@@ -395,17 +404,17 @@ int EventCollection<T>::event_idx(const std::string& name) const{
 }
 
 template<typename T>
- size_t EventCollection<T>::size() const{
+size_t EventCollection<T>::size() const{
     return _events.size();
 }
 
 template<typename T>
- size_t EventCollection<T>::detection_size() const{
+size_t EventCollection<T>::detection_size() const{
     return _N_detect;
 }
 
 template<typename T>
- size_t EventCollection<T>::detection_times() const{
+size_t EventCollection<T>::detection_times() const{
     return _Nt;
 }
 
@@ -434,7 +443,8 @@ void EventCollection<T>::set_args(const T* args, size_t size){
 }
 
 template<typename T>
-void EventCollection<T>::detect_all_between(State<T> before, State<T> after, FuncLike<T> q, const void* obj){
+template<typename Callable>
+void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Callable&& obj_fun) {
     if (this->size() == 0){
         return;
     }
@@ -452,7 +462,8 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Fun
     _N_detect = 0;
     for (size_t i=0; i<this->size(); i++){
         Event<T>* event_obj = _events[i].ptr();
-        if (event_obj->locate(before, after, q, obj)){
+        auto event_interp = getEventInterp<T>(obj_fun);
+        if (event_obj->locate(before, after, event_interp)){
             long int j = (long int)(_N_detect)-1;
             while (j>=0 && _is_prioritized(i, _event_idx[j], dir)){
                 _event_idx[j+1] = _event_idx[j];
