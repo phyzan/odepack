@@ -1,7 +1,7 @@
 #ifndef ODEPACK_HPP
 #define ODEPACK_HPP
 
-
+#include "include/polybox/polybox.hpp"
 #include "ode/Tools_impl.hpp"
 #include "ode/SolverDispatcher_impl.hpp"
 #include "ode/OdeInt_impl.hpp"

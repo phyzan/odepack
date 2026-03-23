@@ -129,7 +129,7 @@ OdeSolution<T, N> ODE<T, N>::rich_integrate(const T& interval, const std::vector
     solver_->start_interpolation();
     OdeResult<T, N> res;
     this->integrate(&res, interval, event_options, std::forward<Callable>(observer), max_prints);
-    OdeSolution<T, N> rich_res(std::move(res), *solver_->interpolator());
+    OdeSolution<T, N> rich_res(std::move(res), solver_->interpolator());
     solver_->stop_interpolation();
     return rich_res;
 }
@@ -287,8 +287,8 @@ double ODE<T, N>::runtime()const{
 }
 
 template<typename T, size_t N>
-const OdeRichSolver<T, N>* ODE<T, N>::solver()const{
-    return solver_.ptr();
+const pbox::PolyWrapper<OdeRichSolver<T, N>>& ODE<T, N>::solver()const{
+    return solver_;
 }
 
 template<typename T, size_t N>
@@ -343,7 +343,7 @@ std::vector<EventOptions> ODE<T, N>::validate_events(const std::vector<EventOpti
     for (size_t i=0; i<options.size(); i++) {
         found = false;
         for (size_t j=0; j<Nevs; j++){
-            if (solver_->event_col().event(j).name() == options[i].name){
+            if (solver_->event_col().event(j)->name() == options[i].name){
                 found = true;
                 break;
             }
@@ -356,7 +356,7 @@ std::vector<EventOptions> ODE<T, N>::validate_events(const std::vector<EventOpti
     for (size_t i=0; i<Nevs; i++){
         found = false;
         for (const auto& option : options){
-            if (option.name == solver_->event_col().event(i).name()){
+            if (option.name == solver_->event_col().event(i)->name()){
                 found = true;
                 res[i] = option;
                 res[i].max_events = ndspan::max(option.max_events, -1);
@@ -364,7 +364,7 @@ std::vector<EventOptions> ODE<T, N>::validate_events(const std::vector<EventOpti
             }
         }
         if (!found){
-            res[i] = {solver_->event_col().event(i).name()};
+            res[i] = {solver_->event_col().event(i)->name()};
         }
     }
     return res;

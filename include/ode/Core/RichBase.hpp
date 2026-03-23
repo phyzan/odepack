@@ -92,7 +92,7 @@ public:
      *
      * @return Pointer to the interpolator, or nullptr if not interpolating.
      */
-    const Interpolator<T, N>*               interpolator() const;
+    const Interpolator<T, N>&               interpolator() const;
 
     /**
      * @brief Check if dense output interpolation is active.
@@ -205,11 +205,13 @@ private:
     /// @brief Check if the current state equals the new computed state.
     bool     equiv_states() const;
 
+    void reset_interpolator();
+
     /// @brief Collection of events being monitored.
     EventCollection<T>                      _events;
 
     /// @brief Linked chain of interpolators for dense output.
-    PolyWrapper<LinkedInterpolator<T, N>>   _cli;
+    LinkedInterpolator<T, N>                _cli;
 
     /// @brief Flag indicating if interpolation data is being collected.
     bool                                    _interp_data = false;

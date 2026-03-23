@@ -7,6 +7,7 @@
 #include <chrono>
 #include <omp.h>
 #include <cmath>
+#include "./polybox/polybox.hpp"
 #include "../ndspan/arrays.hpp"
 #ifdef MPREAL
 #include <mpreal.h>
@@ -46,71 +47,6 @@ using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 static constexpr auto VoidFunc = [](const auto&, const auto*, const void* = nullptr)LAMBDA_INLINE -> bool {return true;};
 
 enum class RootPolicy : std::uint8_t { Left, Middle, Right};
-
-template<typename Type>
-class PolyWrapper{
-
-    /*
-    Takes ownership of a pointer to a heap-allocated object.
-    Is constructed by passing the pointer, so make sure
-    noone else has ownership.
-
-    MUST:
-        Type has a clone() method that returns a new Type*,
-        so that it creates a perfect copy.
-    */
-
-public:
-    
-    explicit PolyWrapper(Type* object);
-
-    PolyWrapper() = default; ///default constructor creates a PolyWrapper that does not own any object. Its pointer is set to nullptr.
-
-    PolyWrapper(const PolyWrapper& other);
-
-    PolyWrapper(PolyWrapper&& other) noexcept;
-
-    PolyWrapper& operator=(const PolyWrapper& other);
-
-    PolyWrapper& operator=(PolyWrapper&& other) noexcept;
-
-    inline ~PolyWrapper(){ delete _ptr;}
-    
-    Type* operator->();
-
-    const Type* operator->() const;
-
-    bool operator==(const Type* other) const;
-
-    /// @brief Returns a const view of the managed pointer.
-    const Type* ptr() const;
-
-    /// @brief Returns a non-const view of the managed pointer. Do not delete the object, as the PolyWrapper still owns it.
-    Type* ptr();
-
-    /// @brief Creates and returns a new pointer to a copy of the managed object. The caller takes ownership of the returned pointer and is responsible for deleting it.
-    Type* new_ptr() const;
-
-    /// @brief Releases ownership of the managed pointer and returns it. After calling this function, the PolyWrapper no longer manages any object and will not delete anything in its destructor. The caller takes ownership of the returned pointer and is responsible for deleting it.
-    Type* release();
-
-    template<typename Base>
-    Base* cast();
-
-    /// @brief Takes ownership of a new pointer, deleting the old one if it exists.
-    void take_ownership(Type* ptr);
-
-    /// @brief Replaces the managed pointer with a new one without deleting the old one. Use with caution to avoid memory leaks.
-    void unsafe_replace(Type* ptr);
-
-    /// @brief Sets the managed pointer to nullptr without deleting the old object. Use with caution to avoid memory leaks.
-    void setNULL();
-    
-protected:
-
-    Type* _ptr = nullptr;
-};
-
 
 
 template<typename T>

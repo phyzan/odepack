@@ -13,8 +13,8 @@ const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::true_state_ptr() const
     int d = this->direction();
     T base_time = base_ptr[0]*d;
     if (const size_t* ev_idx = _events.begin()){
-        const Event<T>& event = _events.event(*ev_idx);
-        const T* derived_ptr = event.state()->get_exposed();
+        const AnyEvent<T>& event = _events.event(*ev_idx);
+        const T* derived_ptr = event->state()->get_exposed();
         T derived_time = derived_ptr[0]*d;
         if (base_time < derived_time){
             return base_ptr;
@@ -32,8 +32,8 @@ const T* RichSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state_ptr() 
     int d = this->direction();
     T base_time = base_ptr[0]*d;
     if (const size_t* ev_idx = _events.last_begin()){
-        const Event<T>& event = _events.event(*ev_idx);
-        const T* derived_ptr = event.state()->get_exposed();
+        const AnyEvent<T>& event = _events.event(*ev_idx);
+        const T* derived_ptr = event->state()->get_exposed();
         T derived_time = derived_ptr[0]*d;
         if (base_time > derived_time){
             return base_ptr;
@@ -56,8 +56,8 @@ View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector() cons
     int d = this->direction();
     T base_time = base_ptr[0]*d;
     if (const size_t* ev_idx = _events.begin()){
-        const Event<T>& event = _events.event(*ev_idx);
-        const T* derived_ptr = event.state()->get_true();
+        const AnyEvent<T>& event = _events.event(*ev_idx);
+        const T* derived_ptr = event->state()->get_true();
         T derived_time = derived_ptr[0]*d;
         if (base_time < derived_time){
             state_ptr = base_ptr;
@@ -73,10 +73,10 @@ View1D<T, N> RichSolver<Derived, T, N, SP, RhsType, JacType>::true_vector() cons
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 EventView<T> RichSolver<Derived, T, N, SP, RhsType, JacType>::current_events() const{
     if (const size_t* ev_idx = _events.begin()){
-        const Event<T>& event = _events.event(*ev_idx);
+        const AnyEvent<T>& event = _events.event(*ev_idx);
         int d = this->direction();
         const T& base_time = Base::true_state_ptr()[0];
-        const T& event_time = event.state()->t();
+        const T& event_time = event->state()->t();
         if (base_time * d < event_time * d){
             return EventView<T>(nullptr, nullptr, 0);
         }else{
@@ -93,8 +93,8 @@ const EventCollection<T>& RichSolver<Derived, T, N, SP, RhsType, JacType>::event
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const Interpolator<T, N>* RichSolver<Derived, T, N, SP, RhsType, JacType>::interpolator() const{
-    return _cli.ptr();
+const Interpolator<T, N>& RichSolver<Derived, T, N, SP, RhsType, JacType>::interpolator() const{
+    return _cli;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
@@ -106,7 +106,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 bool RichSolver<Derived, T, N, SP, RhsType, JacType>::at_event(int event) const{
     assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < _events.size())) && "Invalid event index passed to RichSolver::at_event");
     if (const size_t* ev_idx = _events.begin()){
-        const T& event_time = _events.event(*ev_idx).state()->t();
+        const T& event_time = _events.event(*ev_idx)->state()->t();
         const bool at_event_time = (this->t() == event_time);
         if (at_event_time && event != -1){
             for (const size_t idx : _events){
@@ -134,7 +134,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::show_state(int prec) const
 // PUBLIC MODIFIERS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-RichSolver<Derived, T, N, SP, RhsType, JacType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(events){
+RichSolver<Derived, T, N, SP, RhsType, JacType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events) : Base(ARGS), _events(events), _cli(t0, q0 ? q0 : Array1D<T, N>(nsys).data(), nsys){
     _events.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
 }
 
@@ -167,15 +167,15 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
         int d = this->direction();
         bool event_waiting = false;
         if (const size_t* ev_idx = _events.begin()){
-            const Event<T>& event = _events.event(*ev_idx);
-            const T& event_time = event.state()->t();
+            const AnyEvent<T>& event = _events.event(*ev_idx);
+            const T& event_time = event->state()->t();
             event_waiting = (base_time * d < event_time * d);
         }
 
         if (Base::adv_impl()){
             if (const size_t* idx_ptr = _events.begin()){
-                const Event<T>& event = _events.event(*idx_ptr);
-                const T& event_time = event.state()->t();
+                const AnyEvent<T>& event = _events.event(*idx_ptr);
+                const T& event_time = event->state()->t();
                 if (!event_waiting && base_time * d >= event_time * d){
                     _events.next_result();
                 }
@@ -193,14 +193,14 @@ bool RichSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
         if (_interp_data && this->requires_new_start()){
             if (!_events.canon_event()->hides_mask()){
                 auto r = std::unique_ptr<Interpolator<T, N>>(new LocalInterpolator<T, N>(this->t(), this->true_vector().data(), this->Nsys()));
-                _cli->adjust_end(this->t());
+                _cli.adjust_end(this->t());
                 this->add_interpolant(std::move(r));
             }
         }
     }
 
     if (_interp_data){
-        _cli->close_end();
+        _cli.close_end();
     }
 
     return true;
@@ -245,7 +245,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
         _interp_data = true;
 
         if (this->equiv_states()){
-            _cli.take_ownership(new LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys()));
+            this->reset_interpolator();
         }
         else{
             int bdr1 = 1;
@@ -255,7 +255,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
                 const T& base_time = Base::true_state_ptr()[0];
                 const T& t_event = _events.state(*ev_idx).get_true()[0];
                 if ((base_time * d < t_event * d) && _events.canon_event() && (t_event == _events.canon_state()->t()) && _events.canon_event()->hides_mask()){
-                    _cli.take_ownership(new LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys()));
+                    this->reset_interpolator();
                     bdr1 = -1;
                 }
             }
@@ -265,10 +265,10 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
             r->adjust_start(this->t());
 
             if (bdr1 == 1){
-                _cli.take_ownership(new LinkedInterpolator<T, N>(r.get()));
+                _cli = LinkedInterpolator<T, N>(r.get());
             }
             else{
-                _cli->expand_by_owning(std::move(r));
+                _cli.expand_by_owning(std::move(r));
             }
         }
 
@@ -277,7 +277,7 @@ void RichSolver<Derived, T, N, SP, RhsType, JacType>::start_interpolation(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void RichSolver<Derived, T, N, SP, RhsType, JacType>::stop_interpolation(){
-    _cli.take_ownership(nullptr);
+    this->reset_interpolator();
     _interp_data = false;
 }
 
@@ -292,7 +292,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 void RichSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){
     Base::re_adjust_impl(new_vector);
     if (_interp_data){
-        _cli->adjust_end(this->t());
+        _cli.adjust_end(this->t());
     }
 }
 
@@ -306,20 +306,25 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 void RichSolver<Derived, T, N, SP, RhsType, JacType>::add_interpolant(std::unique_ptr<Interpolator<T, N>>&& interpolant){
-    if (_cli->last_interpolant().interval().is_point() && interpolant->interval().start_bdr() == 0){
+    if (_cli.last_interpolant().interval().is_point() && interpolant->interval().start_bdr() == 0){
         interpolant->close_start();
     }
-    _cli->expand_by_owning(std::move(interpolant));
+    _cli.expand_by_owning(std::move(interpolant));
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- bool RichSolver<Derived, T, N, SP, RhsType, JacType>::requires_new_start() const{
+bool RichSolver<Derived, T, N, SP, RhsType, JacType>::requires_new_start() const{
     return _events.canon_event() && (_events.canon_state()->t() == this->t());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 bool RichSolver<Derived, T, N, SP, RhsType, JacType>::equiv_states() const{
     return this->t() == Base::t_new();
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+void RichSolver<Derived, T, N, SP, RhsType, JacType>::reset_interpolator(){
+    _cli = LinkedInterpolator<T, N>(this->t(), this->vector().data(), this->Nsys());
 }
 
 // ============================================================================

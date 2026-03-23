@@ -47,24 +47,26 @@ private:
 
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-class VariationalSolver : public PolyWrapper<OdeRichSolver<T, N>>{
-
-    using Base = PolyWrapper<OdeRichSolver<T, N>>;
+class VariationalSolver{
 
 public:
 
     VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, Integrator method = Integrator::RK45);
 
-    const NormalizationEvent<T>& main_event() const;
+    const NormalizationEvent<T>&    main_event() const;
 
-    const T&                     logksi() const;
+    const T&                        logksi() const;
 
-    T                            lyap() const;
+    T                               lyap() const;
 
-    T                            t_lyap() const;
+    T                               t_lyap() const;
 
-    T                            delta_s() const;
+    T                               delta_s() const;
 
+    OdeRichSolver<T, N>*            clone_solver() const;
+
+private:
+    pbox::PolyWrapper<OdeRichSolver<T, N>> solver_;
 };
 
 template<typename T, size_t N, typename RhsType, typename JacType>

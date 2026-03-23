@@ -458,6 +458,10 @@ protected:
 
 };
 
+/// @brief Type-erased event container.
+template<typename T>
+using AnyEvent = pbox::PolyWrapper<Event<T>>;
+
 /**
  * @brief Determine if an event should be discarded based on masking rules.
  *
@@ -469,11 +473,7 @@ protected:
  * @return True if event should be discarded.
  */
 template<typename T>
-bool discard_event(const Event<T>& event, const Event<T>& mark);
-
-/// @brief Type-erased event container.
-template<typename T>
-using AnyEvent = PolyWrapper<Event<T>>;
+bool discard_event(const AnyEvent<T>& event, const AnyEvent<T>& mark);
 
 /**
  * @brief View into a subset of detected events at a single time point.
@@ -494,7 +494,7 @@ public:
     EventView(const AnyEvent<T>* events, const size_t* detection, size_t size);
 
     /// @brief Access event by index within this view.
-    const Event<T>* operator[](size_t i) const;
+    const AnyEvent<T>& operator[](size_t i) const;
 
     /// @brief Get number of events in this view.
     size_t size() const;
@@ -527,7 +527,7 @@ public:
     ~EventCollection() = default;
 
     /// @brief Get event by index.
-    const Event<T>&         event(size_t i) const;
+    const AnyEvent<T>&      event(size_t i) const;
 
     /// @brief Get event state by index.
     const EventState<T>&    state(size_t i) const;
@@ -544,8 +544,8 @@ public:
     /// @brief Get number of distinct trigger times in last pass.
     size_t                  detection_times() const;
 
-    /// @brief Get the pointer to the first detected event in the next time group
-    const Event<T>*         get_next_event() const;
+    /// @brief Get the first detected event in the next time group. The returned object might wrap a null pointer if there are no more events.
+    const AnyEvent<T>&      get_next_event() const;
 
     /// @brief Initialize all events for use with solver.
     void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
@@ -587,13 +587,15 @@ public:
     void                    restart_iter();
 
     /// @brief Get the first masked event that determines the state transformation, if any.
-    const Event<T>*         canon_event() const;
+    const AnyEvent<T>&         canon_event() const;
 
     /// @brief Get the state of the first masked event, if any.
     const EventState<T>*    canon_state() const;
 
     /// @brief Reset all events to initial state.
     void                    reset(int direction = 0);
+
+    AnyEvent<T>&            event(size_t i);
 
 private:
 

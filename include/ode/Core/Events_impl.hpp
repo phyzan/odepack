@@ -344,11 +344,11 @@ ObjectOwningEvent<EventType, ObjType>* ObjectOwningEvent<EventType, ObjType>::cl
 // discard_event function
 
 template<typename T>
-bool discard_event(const Event<T>& event, const Event<T>& mark){
-    if (!mark.is_masked() || mark.hides_mask()){
-        return event.is_masked();
+bool discard_event(const AnyEvent<T>& event, const AnyEvent<T>& mark){
+    if (!mark->is_masked() || mark->hides_mask()){
+        return event->is_masked();
     }
-    return !event.is_pure_temporal(); //mark is masked and not hidden
+    return !event->is_pure_temporal(); //mark is masked and not hidden
 }
 
 // EventView implementations
@@ -357,8 +357,8 @@ template<typename T>
 EventView<T>::EventView(const AnyEvent<T>* events, const size_t* detection, size_t size) : Base(detection, size), event_data(events) {}
 
 template<typename T>
-const Event<T>* EventView<T>::operator[](size_t i) const{
-    return event_data[Base::operator[](i)].ptr();
+const AnyEvent<T>& EventView<T>::operator[](size_t i) const{
+    return event_data[Base::operator[](i)];
 }
 
 template<typename T>
@@ -385,8 +385,8 @@ EventCollection<T>::EventCollection(const Event<T>*const* events, size_t size) :
 }
 
 template<typename T>
-const Event<T>& EventCollection<T>::event(size_t i) const{
-    return *_events[i].ptr();
+const AnyEvent<T>& EventCollection<T>::event(size_t i) const{
+    return _events[i];
 }
 
 template<typename T>
@@ -419,12 +419,12 @@ size_t EventCollection<T>::detection_times() const{
 }
 
 template<typename T>
-const Event<T>* EventCollection<T>::get_next_event() const {
+const AnyEvent<T>& EventCollection<T>::get_next_event() const {
     if (_iter+1 < _Nt){
         size_t next_idx = *(_event_idx.data() + _event_idx_start[_iter+1]);
-        return _events[next_idx].ptr();
+        return _events[next_idx];
     }else{
-        return nullptr;
+        return AnyEvent<T>::Null;
     }
 }
 
@@ -461,7 +461,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Cal
     const int dir = sgn(before.t(), after.t());
     _N_detect = 0;
     for (size_t i=0; i<this->size(); i++){
-        Event<T>* event_obj = _events[i].ptr();
+        AnyEvent<T>& event_obj = _events[i];
         auto event_interp = getEventInterp<T>(obj_fun);
         if (event_obj->locate(before, after, event_interp)){
             long int j = (long int)(_N_detect)-1;
@@ -501,10 +501,10 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Cal
         if ((mark!=this->size()) && (state(_event_idx[i]).t() != state(_event_idx[mark]).t())){
             mark = this->size();
         }
-        if ((mark==this->size()) && !event(_event_idx[i]).is_pure_temporal()){
+        if ((mark==this->size()) && !event(_event_idx[i])->is_pure_temporal()){
             mark = i;
         }
-        else if (!event(_event_idx[i]).is_pure_temporal()){
+        else if (!event(_event_idx[i])->is_pure_temporal()){
             if (discard_event(event(_event_idx[i]), event(_event_idx[mark]))){
                 _events[_event_idx[i]]->deactivate();
                 for (size_t j=i; j<_N_detect-1; j++){
@@ -540,7 +540,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Cal
             _event_idx_start[_Nt] = i;
             _Nt++;
         }
-        if (event(_event_idx[i]).is_masked()){
+        if (event(_event_idx[i])->is_masked()){
             _canon_idx = _event_idx[i];
             i++;
             break;
@@ -567,7 +567,7 @@ void EventCollection<T>::detect_all_between(State<T> before, State<T> after, Cal
     size_t tmp = j;
     _event_idx_start[_Nt] = j;
     for (; j<_N_detect; j++){
-        const_cast<Event<T>&>(event(_event_idx[j])).deactivate();
+        event(_event_idx[j])->deactivate();
     }
 
     /*
@@ -631,13 +631,13 @@ void EventCollection<T>::restart_iter(){
 }
 
 template<typename T>
-const Event<T>* EventCollection<T>::canon_event() const{
-    return _canon_idx == this->size() ? nullptr : _events[_canon_idx].ptr();
+const AnyEvent<T>& EventCollection<T>::canon_event() const{
+    return _canon_idx == this->size() ? AnyEvent<T>::Null : _events[_canon_idx];
 }
 
 template<typename T>
 const EventState<T>* EventCollection<T>::canon_state() const{
-    if (const auto* event = this->canon_event()){
+    if (const AnyEvent<T>& event = this->canon_event()){
         return event->state();
     }else {
         return nullptr;
@@ -658,6 +658,11 @@ void EventCollection<T>::reset(int direction){
     _canon_idx = this->size();
     _iter = 0;
     _event_idx_start[this->size()] = 0;
+}
+
+template<typename T>
+AnyEvent<T>& EventCollection<T>::event(size_t i){
+    return _events[i];
 }
 
 template<typename T>

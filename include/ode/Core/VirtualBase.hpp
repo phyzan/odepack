@@ -100,7 +100,7 @@ public:
     virtual EventView<T>                    current_events() const = 0;
     virtual const EventCollection<T>&       event_col() const = 0;
     virtual int                             event_idx(const std::string& name) const = 0;
-    virtual const Interpolator<T, N>*       interpolator() const = 0;
+    virtual const Interpolator<T, N>&       interpolator() const = 0;
     virtual bool                            is_interpolating() const = 0;
     virtual bool                            at_event(int event = -1) const = 0;
     virtual OdeRichSolver<T, N>*            clone() const = 0;

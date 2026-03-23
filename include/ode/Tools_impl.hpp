@@ -5,104 +5,12 @@
 
 namespace ode{
 
-template<typename Type>
-PolyWrapper<Type>::PolyWrapper(Type* object) : _ptr(object) {}
-
-template<typename Type>
-PolyWrapper<Type>::PolyWrapper(const PolyWrapper& other)
-    : _ptr(other.new_ptr()) {}
-
-template<typename Type>
-PolyWrapper<Type>::PolyWrapper(PolyWrapper&& other) noexcept
-    : _ptr(other.release()) {}
-
-template<typename Type>
-PolyWrapper<Type>& PolyWrapper<Type>::operator=(const PolyWrapper& other){
-    if (&other != this){
-        delete _ptr;
-        _ptr = other.new_ptr();
-    }
-    return *this;
-}
-
-template<typename Type>
-PolyWrapper<Type>& PolyWrapper<Type>::operator=(PolyWrapper&& other) noexcept{
-    if (&other != this){
-        delete _ptr;
-        _ptr = other.release();
-    }
-    return *this;
-}
-
-template<typename Type>
-Type* PolyWrapper<Type>::operator->(){
-    assert(_ptr != nullptr && "pointer is null");
-    return _ptr;
-}
-
-template<typename Type>
-const Type* PolyWrapper<Type>::operator->() const{
-    assert(_ptr != nullptr && "pointer is null");
-    return _ptr;
-}
-
-template<typename Type>
-bool PolyWrapper<Type>::operator==(const Type* other) const{
-    return this->_ptr == other;
-}
-
-template<typename Type>
-const Type* PolyWrapper<Type>::ptr() const{
-    return _ptr;
-}
-
-template<typename Type>
-Type* PolyWrapper<Type>::ptr(){
-    return _ptr;
-}
-
-template<typename Type>
-Type* PolyWrapper<Type>::new_ptr() const{
-    return _ptr == nullptr ? nullptr : _ptr->clone();
-}
-
-template<typename Type>
-Type* PolyWrapper<Type>::release(){
-    Type* tmp = _ptr;
-    _ptr = nullptr;
-    return tmp;
-}
-
-template<typename Type>
-template<typename Base>
-Base* PolyWrapper<Type>::cast(){
-    return dynamic_cast<Base*>(this->_ptr);
-}
-
-template<typename Type>
-void PolyWrapper<Type>::take_ownership(Type* ptr){
-    delete _ptr;
-    _ptr = ptr;
-}
-
-template<typename Type>
-void PolyWrapper<Type>::unsafe_replace(Type* ptr){
-    _ptr = ptr;
-}
-
-template<typename Type>
-void PolyWrapper<Type>::setNULL(){
-    delete _ptr;
-    _ptr = nullptr;
-}
-
 //===========================================================================================
 //                                      State<T>
 //===========================================================================================
 
 template<typename T>
-State<T>::State(const T* data, size_t Nsys)
-    : _data(data), _nsys(Nsys) {}
+State<T>::State(const T* data, size_t Nsys) : _data(data), _nsys(Nsys) {}
 
 template<typename T>
 const T& State<T>::t() const{

@@ -63,18 +63,18 @@ bool NormalizationEvent<T, Derived>::is_masked_impl() const{
 
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, Integrator method) : Base() {
+VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, Integrator method) {
     Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
     normalized<T>(tmp.data(), nsys);
     NormalizationEvent<T> event("Normalization", period);
     nsys *= 2;
     const T* q0 = tmp.data();
-    this->_ptr = get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, {&event}).release();
+    this->solver_ = pbox::PolyWrapper<OdeRichSolver<T>>(get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, {&event}).release());
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
 const NormalizationEvent<T>& VariationalSolver<T, N, RhsType, JacType>::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(this->ptr()->event_col().event(0));
+    return *this->solver_->event_col().event(0).template cast<NormalizationEvent<T>>();
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
@@ -95,6 +95,11 @@ T VariationalSolver<T, N, RhsType, JacType>::t_lyap() const{
 template<typename T, size_t N, typename RhsType, typename JacType>
 T VariationalSolver<T, N, RhsType, JacType>::delta_s() const{
     return this->main_event().delta_s();
+}
+
+template<typename T, size_t N, typename RhsType, typename JacType>
+OdeRichSolver<T, N>* VariationalSolver<T, N, RhsType, JacType>::clone_solver() const{
+    return this->solver_->clone();
 }
 
 // VariationalODE implementations
@@ -159,7 +164,7 @@ void VariationalODE<T, N, RhsType, JacType>::reset(){
 
 template<typename T, size_t N, typename RhsType, typename JacType>
 const NormalizationEvent<T>& VariationalODE<T, N, RhsType, JacType>::main_event()const{
-    return static_cast<const NormalizationEvent<T>&>(this->solver()->event_col().event(_ind));
+    return *this->solver_->event_col().event(_ind).template cast<NormalizationEvent<T>>();
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>

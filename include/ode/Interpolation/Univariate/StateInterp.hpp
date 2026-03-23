@@ -275,31 +275,31 @@ public:
 
     //ACCESSORS
 
-    const Interval<T>&                      interval() const override;
+    const Interval<T>&      interval() const override;
 
-    size_t                                  size() const;
+    size_t                  size() const;
 
-    const Array1D<T, N>&                    q_start() const override;
+    const Array1D<T, N>&    q_start() const override;
 
-    const Array1D<T, N>&                    q_end() const override;
+    const Array1D<T, N>&    q_end() const override;
 
-    int                                     start_bdr() const override;
+    int                     start_bdr() const override;
 
-    int                                     end_bdr() const override;
+    int                     end_bdr() const override;
 
-     int                              dir() const override;
+    int                     dir() const override;
 
-     const T&                         t_start() const override;
+    const T&                t_start() const override;
 
-     const T&                         t_end() const override;
+    const T&                t_end() const override;
 
-     const INTERPOLATOR&              interpolant(size_t i) const;
+    const INTERPOLATOR&     interpolant(size_t i) const;
 
-     const INTERPOLATOR&              last_interpolant() const;
+    const INTERPOLATOR&     last_interpolant() const;
 
-    bool                                    is_out_of_bounds(const T& t) const override;
+    bool                    is_out_of_bounds(const T& t) const override;
 
-     bool                             can_link_with(const Interpolator<T, N>& interpolant) const override;
+    bool                    can_link_with(const Interpolator<T, N>& interpolant) const override;
 
     LinkedInterpolator<T, N, INTERPOLATOR>* clone() const override;
 
@@ -362,7 +362,8 @@ void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, co
 template<typename T>
 void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size);
 
-
+template<typename T, size_t N>
+using InterpObj = pbox::PolyWrapper<Interpolator<T, N>>;
 
 } // namespace ode
 

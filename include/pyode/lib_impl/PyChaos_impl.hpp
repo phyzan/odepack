@@ -10,7 +10,8 @@ namespace ode{
 
 template<typename T>
 const NormalizationEvent<T>& PyVarSolver::main_event() const{
-    return static_cast<const NormalizationEvent<T>&>(reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(0));
+    
+    return static_cast<const NormalizationEvent<T>&>(*reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(0).template cast<NormalizationEvent<T>>());
 }
 
 template<typename T>

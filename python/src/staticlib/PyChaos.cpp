@@ -21,7 +21,7 @@ PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::o
             throw py::value_error("Variational solvers require an even number of system size");
         }
 
-        this->s = VariationalSolver<T, 0, Func<T>, void>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, getIntegrator(method)).release();
+        this->s = VariationalSolver<T, 0, Func<T>, void>(ode_data, t0.cast<T>(), q0.data(), q0.size() / 2, period.cast<T>(), rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, getIntegrator(method)).clone_solver();
 
     )
 }

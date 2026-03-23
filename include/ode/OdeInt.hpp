@@ -101,7 +101,7 @@ public:
 
     double                      runtime() const;
 
-    const OdeRichSolver<T, N>*  solver() const;
+    const pbox::PolyWrapper<OdeRichSolver<T, N>>&  solver() const;
 
     void                        set_obj(const void* obj);
 
@@ -113,7 +113,7 @@ protected:
 
     ODE(size_t nsys);
 
-    PolyWrapper<OdeRichSolver<T, N>> solver_;
+    pbox::PolyWrapper<OdeRichSolver<T, N>> solver_;
     OrbitData<T> orbit_data_;
     EventData<T> event_data_;
     std::vector<size_t> cached_idx_;

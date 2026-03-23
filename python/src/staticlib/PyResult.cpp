@@ -133,7 +133,8 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 #define DEFINE_ODERESULT(T) \
     template class OdeResult<T, 0>; \
     template class OdeSolution<T, 0>; \
-    template class PolyWrapper<Interpolator<T, 0>>;
+    template struct OrbitData<T>; \
+    template class EventData<T>; \
 
 DEFINE_ODERESULT(float)
 DEFINE_ODERESULT(double)
