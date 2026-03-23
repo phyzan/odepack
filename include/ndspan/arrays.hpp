@@ -376,6 +376,10 @@ public:
         }
     }
 
+    INLINE const T& back() const{
+        return Base::back();
+    }
+
     template<INT_T... Idx>
     INLINE constexpr const T& operator()(Idx... idx) const {
         return Base::operator()(idx...);

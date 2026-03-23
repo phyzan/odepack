@@ -20,7 +20,7 @@ DtypeDispatcher::DtypeDispatcher(ScalarType dtype_) : scalar_type(dtype_) {}
 //===========================================================================================
 
 template<>
- std::vector<py::ssize_t> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
+std::vector<py::ssize_t> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape){
     std::vector<py::ssize_t> result;
     result.reserve(1 + shape.size()); // Pre-allocate memory for efficiency
     result.push_back(dim1);        // Add the first element
@@ -28,7 +28,7 @@ template<>
     return result;
 }
 
- std::vector<py::ssize_t> shape(const py::object& obj) {
+std::vector<py::ssize_t> shape(const py::object& obj) {
     py::array arr = py::array::ensure(obj);
     const ssize_t* shape_ptr = arr.shape();  // Pointer to shape data
     auto ndim = static_cast<size_t>(arr.ndim());  // Number of dimensions
@@ -36,16 +36,8 @@ template<>
     return res;
 }
 
- py::dict to_PyDict(const EventMap& _map){
-    py::dict py_dict;
-    for (const auto& [key, vec] : _map) {
-        py::array_t<size_t> np_array(static_cast<py::ssize_t>(vec.size()), vec.data()); // Create NumPy array
-        py_dict[key.c_str()] = np_array; // Assign to dictionary
-    }
-    return py_dict;
-}
 
- std::vector<EventOptions> to_Options(const py::iterable& d) {
+std::vector<EventOptions> to_Options(const py::iterable& d) {
     std::vector<EventOptions> result;
 
     for (const py::handle& item : d) {

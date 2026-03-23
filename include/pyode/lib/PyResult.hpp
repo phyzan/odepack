@@ -31,8 +31,6 @@ struct PyOdeResult : DtypeDispatcher{
 
     py::object                  q() const;
 
-    py::dict                    event_map() const;
-
     py::tuple                   event_data(const py::str& event) const;
 
     py::bool_                   diverges() const;

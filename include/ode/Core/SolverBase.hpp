@@ -70,8 +70,6 @@ class BaseSolver : public BaseInterface<T, N, SP>{
     static constexpr bool HAS_JAC = !RUNTIME_JAC_TYPE && !std::is_same_v<JacType, std::nullptr_t>;
     static_assert( !std::is_same_v<RhsType, std::nullptr_t> , "RHS function type cannot be nullptr");
 
-    static constexpr auto VoidFunc = [](const T&, const T*, const T* = nullptr)LAMBDA_INLINE{return true;};
-
 public:
 
     using Scalar = T;
@@ -296,6 +294,7 @@ public:
      * @return True if event was detected and solver positioned at crossing.
      */
     template<typename ObjFun, typename Callable = decltype(VoidFunc)>
+    requires std::invocable<ObjFun, const T&, const T*, const T*>
     bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = VoidFunc);
 
     bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps);

@@ -17,7 +17,7 @@ namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, ndspan::min, ndspan::max, std::complex;
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
@@ -39,11 +39,11 @@ using ObjFunLike = T(*)(const T&, const void*); // f(t, void) -> scalar
 template<typename T, size_t N>
 using JacMat = Array2D<T, N, N, Allocation::Heap, Layout::F>;
 
-using EventMap = std::map<std::string, std::vector<size_t>>;
-
 using VoidType = void(*)();
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
+
+static constexpr auto VoidFunc = [](const auto&, const auto*, const void* = nullptr)LAMBDA_INLINE -> bool {return true;};
 
 enum class RootPolicy : std::uint8_t { Left, Middle, Right};
 
@@ -236,7 +236,7 @@ struct EmptyArr{
 
     EmptyArr() = default;
 
-    inline int operator[](size_t) const{
+    inline T operator[](size_t) const{
         return 0;
     }
 
@@ -370,12 +370,6 @@ INLINE bool all_are_finite(const T* data, size_t n){
 
 template<typename T>
 bool allEqual(const T* a, const T* b, size_t n);
-
-template<typename T>
-std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event);
-
-template<typename T, size_t N>
-Array2D<T, 0, N> _q_event_data(const T* q, const EventMap& event_map, const std::string& event, size_t Nsys);
 
 template<typename T, RootPolicy RP, typename Callable>
 T bisect(Callable&& f, const T& a, const T& b, const T& atol);

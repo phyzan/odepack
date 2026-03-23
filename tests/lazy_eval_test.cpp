@@ -26,4 +26,6 @@ int main(){
     std::cout << "q: " << solver.vector()[0] << " " << solver.vector()[1] << std::endl;
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
     return 0;
+
+    // g++ -std=c++20 -O3 -DMPREAL tests/lazy_eval_test.cpp -o test -lmpfr -lgmp
 }

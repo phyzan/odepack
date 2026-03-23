@@ -42,7 +42,7 @@ class UnaryInterp : public EventInterp<T>{
 
 public:
 
-    UnaryInterp(Callable&& func) : _func(std::forward<Callable>(func)) {}
+    UnaryInterp(Callable func) : _func(std::move(func)) {}
 
     inline void operator()(T* out, const T& t) const override{
         _func(out, t);

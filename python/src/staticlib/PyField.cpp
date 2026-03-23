@@ -4,6 +4,7 @@
 #include "../../../include/pyode/lib/PyOde.hpp"
 #include "../../../include/pyode/lib/PyResult.hpp"
 #include "../../../include/pyode/lib/PyField.hpp"
+#include "../../../include/ode/OdeInt_impl.hpp"
 #include "../../../include/ode/Interpolation/VectorFields_impl.hpp"
 #include "../../../include/ode/Interpolation/NdInterpolator_impl.hpp"
 #include "../../../include/ode/Interpolation/Regular/RegularGridInterpolator_impl.hpp"

@@ -139,8 +139,6 @@ bool all_are_lowlevel(const py::iterable& events){
     template std::vector<Event<T>*> to_Events<T>(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args); \
     template class EventView<T>; \
     template class EventCollection<T>; \
-    template std::vector<T> _t_event_data<T>(const T* t, const EventMap& event_map, const std::string& event); \
-    template Array2D<T, 0, 0> _q_event_data<T, 0>(const T* q, const EventMap& event_map, const std::string& event, size_t Nsys);
 
 DEFINE_EVENTS(float)
 DEFINE_EVENTS(double)

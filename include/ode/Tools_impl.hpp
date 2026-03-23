@@ -290,28 +290,6 @@ bool allEqual(const T* a, const T* b, size_t n){
 }
 
 
-template<typename T>
-std::vector<T> _t_event_data(const T* t, const EventMap& event_map, const std::string& event){
-    const std::vector<size_t>& ind = event_map.at(event);
-    std::vector<T> data(ind.size());
-    for (size_t i=0; i<data.size(); i++){
-        data[i] = t[ind[i]];
-    }
-    return data;
-}
-
-template<typename T, size_t N>
-Array2D<T, 0, N> _q_event_data(const T* q, const EventMap& event_map, const std::string& event, size_t Nsys){
-    const std::vector<size_t>& ind = event_map.at(event);
-    Array2D<T, 0, N> data(ind.size(), Nsys);
-    for (size_t i=0; i<ind.size(); i++){
-        for (size_t j=0; j<Nsys; j++){
-            data(i, j) = q[ind[i]*Nsys+j];
-        }
-    }
-    return data;
-}
-
 //BISECTION USED FOR EVENTS IN ODES
 
 template<typename T, RootPolicy RP, typename Callable>

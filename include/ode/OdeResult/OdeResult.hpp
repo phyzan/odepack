@@ -1,6 +1,8 @@
 #ifndef ODE_RESULT_HPP
 #define ODE_RESULT_HPP
 
+#include <algorithm>
+
 #include "../Tools.hpp"
 #include "../Interpolation/Univariate/StateInterp.hpp"
 
@@ -13,12 +15,159 @@ namespace ode{
 
 //ODERESULT STRUCT TO ENCAPSULATE THE RESULT OF AN ODE INTEGRATION
 
+template<typename T>
+struct OrbitData{
+    std::vector<T> t;
+    std::vector<T> q; //flattened 2D array
+    size_t nsys;
+
+    size_t size() const{
+        return t.size();
+    }
+
+    View1D<T> t_view() const{
+        return View1D<T>(t.data(), t.size());
+    }
+
+    View2D<T, 0, 0> q_view() const{
+        return View2D<T, 0, 0>(q.data(), t.size(), nsys);
+    }
+
+    const T& get_q(size_t i, size_t j) const{
+        assert(i < t.size() && j < nsys && "Index out of range");
+        return q[i * nsys + j];
+    }
+
+    void clear_points(){
+        t = std::vector<T>();
+        q = std::vector<T>();
+    }
+
+    void add_point(const T& t_val, const T* q_val){
+        t.push_back(t_val);
+        try {
+            q.insert(q.end(), q_val, q_val + nsys);
+        } catch (...) {
+            t.pop_back();  // rollback
+            throw;
+        }
+    }
+};
+
+
+template<typename T>
+class EventData{
+
+public:
+
+    EventData(size_t nsys) : nsys_(nsys) {}
+
+    EventData() = default;
+
+    EventData(const EventData& other, const std::vector<size_t>& start_indices) : nsys_(other.nsys_), event_names_(other.event_names_) {
+        assert(start_indices.size() == other.size() && "Start indices size must match the number of events");
+        for (size_t i = 0; i < other.size(); ++i) {
+            size_t start_idx = start_indices[i];
+            assert(start_idx <= other.data(i).t.size() && "Start index must be within the bounds of the provided data");
+            OrbitData<T> data;
+            const OrbitData<T>& other_data = other.data(i);
+            data.t = std::vector<T>(other_data.t.begin() + start_idx, other_data.t.end());
+            data.q = std::vector<T>(other_data.q.begin() + start_idx * nsys_, other_data.q.end());
+            data.nsys = other_data.nsys;
+            event_data_.push_back(std::move(data));
+        }
+    }
+    DEFAULT_RULE_OF_FOUR(EventData)
+
+    size_t size() const{
+        return event_data_.size();
+    }
+
+    size_t nsys() const{
+        return nsys_;
+    }
+
+    const OrbitData<T>& data(size_t i) const{
+        assert(i < event_data_.size() && "Event index out of range");
+        return event_data_[i];
+    }
+
+    const OrbitData<T>& data(const std::string& name) const{
+        auto it = std::ranges::find(event_names_, name);
+        if (it == event_names_.end()){
+            throw std::runtime_error("Event name not found: " + name);
+        }
+        size_t index = std::distance(event_names_.begin(), it);
+        return this->data(index);
+    }
+
+    const std::string& name(size_t i) const{
+        assert(i < event_names_.size() && "Event index out of range");
+        return event_names_[i];
+    }
+
+    void allocate_event(const std::string& name){
+        // check that name is not empty and not already in the map
+        if (name.empty()){
+            throw std::runtime_error("Event name cannot be empty");
+        }
+        if (std::ranges::find(event_names_, name) != event_names_.end()){
+            throw std::runtime_error("Event name already exists");
+        }
+        event_data_.emplace_back(OrbitData<T>{.nsys = nsys_});
+
+        try {
+            event_names_.push_back(name);
+        } catch (...) {
+            event_data_.pop_back();  // rollback
+            throw;
+        }
+    }
+
+    void add_event(size_t event_idx, const T& t, const T* q){
+        if (event_idx >= event_names_.size()){
+            throw std::runtime_error("Event index out of range");
+        }
+        OrbitData<T>& data = event_data_[event_idx];
+        data.t.push_back(t);
+        try {
+            data.q.insert(data.q.end(), q, q + nsys_);
+        } catch (...) {
+            data.t.pop_back();  // rollback
+            throw;
+        }
+    }
+
+
+    void add_event(const std::string& name, const T& t, const T* q){
+        auto it = std::ranges::find(event_names_, name);
+        if (it == event_names_.end()){
+            throw std::runtime_error("Event name not found: " + name);
+        }
+        size_t index = std::distance(event_names_.begin(), it);
+        this->add_event(index, t, q);
+    }
+
+    void clear_points(){
+        for (auto& data : event_data_){
+            data = OrbitData<T>{.nsys = nsys_};
+        }
+    }
+
+private:
+
+    std::vector<OrbitData<T>> event_data_;
+    std::vector<std::string> event_names_;
+    size_t nsys_ = 0;
+};
+
+
 template<typename T, size_t N=0>
 class OdeResult{
 
 public:
 
-    OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message);
+    OdeResult(const OrbitData<T>& orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message);
 
     OdeResult() = default;
 
@@ -26,14 +175,13 @@ public:
 
     virtual ~OdeResult() = default;
 
-    const std::vector<T>& t() const;
+    View1D<T> t() const;
 
-    const Array2D<T, 0, N>& q() const;
+    View2D<T, 0, N> q() const;
 
-    template<std::integral INT1, std::integral INT2>
-    const T& q(INT1 i, INT2 j) const;
+    const T& q(size_t i, size_t j) const;
 
-    const EventMap& event_map() const;
+    const EventData<T>& event_data() const;
 
     bool diverges() const;
 
@@ -47,21 +195,16 @@ public:
 
     std::string event_log() const;
 
-    std::vector<T> t_filtered(const std::string& event) const;
-
-    Array2D<T, 0, N> q_filtered(const std::string& event) const;
-
     virtual OdeResult<T, N>* clone() const;
     
 private:
 
-    std::vector<T> _t;
-    Array2D<T, 0, N> _q;
-    EventMap _event_map;
-    bool _diverges = false;
-    bool _success = false;
-    double _runtime = 0;
-    std::string _message = "No integration performed";
+    OrbitData<T> orbit_data_;
+    EventData<T> event_data_;
+    bool diverges_ = false;
+    bool success_ = false;
+    double runtime_ = 0;
+    std::string message_ = "No integration performed";
 };
 
 
@@ -75,19 +218,9 @@ class OdeSolution : public OdeResult<T, N>{
 
 public:
 
-    OdeSolution(const std::vector<T>& t, const Array2D<T, 0, N>& q, const EventMap& event_map, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator);
-
-    OdeSolution(const OdeSolution& other);
-
-    OdeSolution(OdeSolution&& other) noexcept;
+    OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator);
 
     OdeSolution(OdeResult<T, N>&& other, const Interpolator<T, N>& interpolator);
-
-    OdeSolution& operator=(const OdeSolution& other);
-
-    OdeSolution& operator=(OdeSolution&& other) noexcept;
-
-    ~OdeSolution();
 
     Array1D<T, N> operator()(const T& t) const;
 
@@ -95,7 +228,7 @@ public:
 
 private:
 
-    Interpolator<T, N>* _interpolator;
+    PolyWrapper<Interpolator<T, N>> interpolator_;
 
 };
 

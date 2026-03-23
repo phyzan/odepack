@@ -178,20 +178,23 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
 #ifdef MPREAL
-    static_assert(std::is_arithmetic_v<T> || std::is_same_v<T, mpfr::mpreal>, "T must be numeric or mpreal");
+    static_assert(std::is_arithmetic_v<T> || std::is_convertible_v<T, mpfr::mpreal>, "T must be numeric or convertible to mpreal");
 #else
-    static_assert(std::is_arithmetic_v<T>, "T must be numeric or mpreal");
+    static_assert(std::is_arithmetic_v<T>, "T must be numeric");
 #endif
 
     if constexpr (std::is_integral_v<T>) {
-        // Integral types
         return std::to_string(value);
     } else if constexpr (std::is_floating_point_v<T>) {
-        // Floating-point types (double, float, long double)
         std::ostringstream out;
         out << std::setprecision(prec) << std::scientific << value;
         return out.str();
     }
+#ifdef MPREAL
+    else if constexpr (!std::is_arithmetic_v<T> && std::is_convertible_v<T, mpfr::mpreal>) {
+        return to_string(static_cast<mpfr::mpreal>(value), prec);
+    }
+#endif
 }
 
 #ifdef MPREAL
@@ -199,6 +202,7 @@ template<>
 inline std::string to_string(const mpfr::mpreal& value, int prec){
     return value.toString(prec);
 }
+
 #endif
 
 template<typename T>

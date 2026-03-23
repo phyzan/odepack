@@ -1,5 +1,5 @@
 #include "../../../include/pyode/lib_impl/PyResult_impl.hpp"
-
+#include "../../../include/ode/Tools_impl.hpp"
 
 namespace ode{
 
@@ -63,22 +63,15 @@ py::object PyOdeResult::q() const{
     )
 }
 
-py::dict PyOdeResult::event_map() const{
-    return DISPATCH(py::object,
-        EventMap result = reinterpret_cast<const OdeResult<T>*>(this->res)->event_map();
-        return to_PyDict(result);
-    )
-}
-
 py::tuple PyOdeResult::event_data(const py::str& event) const{
     return DISPATCH(py::object,
-        auto* r = reinterpret_cast<OdeResult<T>*>(this->res);
-        std::vector<T> t_data = r->t_filtered(event.cast<std::string>());
-        Array<T> t_res(t_data.data(), t_data.size());
-        Array2D<T, 0, 0> q_data = r->q_filtered(event.cast<std::string>());
-        auto shape = getShape<size_t>(py::ssize_t(t_res.size()), this->q0_shape);
-        Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
-        return py::make_tuple(py::cast(t_res), py::cast(q_res));
+        const auto* ode_res = reinterpret_cast<const OdeResult<T>*>(this->res);
+        const OrbitData<T>& event_data = ode_res->event_data().data(event.cast<std::string>()); //check if event exists
+        auto shape = getShape<size_t>(py::ssize_t(event_data.size()), this->q0_shape);
+        View1D<T> t_view = event_data.t_view();
+        View2D<T, 0, 0> q_view = event_data.q_view();
+        View<T> true_view(q_view.data(), shape.data(), shape.size());
+        return py::make_tuple(py::cast(t_view), py::cast(true_view));
     )
 }
 
@@ -139,7 +132,8 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 
 #define DEFINE_ODERESULT(T) \
     template class OdeResult<T, 0>; \
-    template class OdeSolution<T, 0>;
+    template class OdeSolution<T, 0>; \
+    template class PolyWrapper<Interpolator<T, 0>>;
 
 DEFINE_ODERESULT(float)
 DEFINE_ODERESULT(double)

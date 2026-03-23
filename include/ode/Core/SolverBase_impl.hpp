@@ -408,6 +408,7 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_by(T interval){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
 template<typename ObjFun, typename Callable>
+requires std::invocable<ObjFun, const T&, const T*, const T*>
 bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer){
 
     if (this->is_dead()){

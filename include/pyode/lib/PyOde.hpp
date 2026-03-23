@@ -62,8 +62,6 @@ public:
 
     py::object solver_copy() const;
 
-    py::dict event_map() const;
-
     py::object Nsys() const;
 
     py::object runtime() const;

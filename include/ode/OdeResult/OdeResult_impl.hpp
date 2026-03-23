@@ -10,9 +10,13 @@ namespace ode{
 //===========================================================================================
 
 template<typename T, size_t N>
-OdeResult<T, N>::OdeResult(const std::vector<T>& t, const Array2D<T, 0, N>& q, EventMap event_map, bool diverges, bool success, double runtime, std::string message) : _t(t), _q(q), _event_map(std::move(event_map)), _diverges(diverges), _success(success), _runtime(runtime), _message(std::move(message)) {}
-
-
+OdeResult<T, N>::OdeResult(const OrbitData<T>& orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message) : event_data_(std::move(event_data)), diverges_(diverges), success_(success), runtime_(runtime), message_(std::move(message)) {
+    assert(orb_idx_start <= orbit_data.t.size() && "Start index must be within the bounds of the provided data");
+    // Copy only the relevant portion of the data based on the provided start indices
+    orbit_data_.t = std::vector<T>(orbit_data.t.begin() + orb_idx_start, orbit_data.t.end());
+    orbit_data_.q = std::vector<T>(orbit_data.q.begin() + orb_idx_start * orbit_data.nsys, orbit_data.q.end());
+    orbit_data_.nsys = orbit_data.nsys;
+}
 
 template<typename T, size_t N>
 OdeResult<T, N>* OdeResult<T, N>::clone() const {
@@ -20,54 +24,54 @@ OdeResult<T, N>* OdeResult<T, N>::clone() const {
 }
 
 template<typename T, size_t N>
-const std::vector<T>& OdeResult<T, N>::t() const {
-    return _t;
+View1D<T> OdeResult<T, N>::t() const {
+    return View1D<T>{orbit_data_.t.data(), orbit_data_.t.size()};
 }
 
 template<typename T, size_t N>
-const Array2D<T, 0, N>& OdeResult<T, N>::q() const {
-    return _q;
+View2D<T, 0, N> OdeResult<T, N>::q() const {
+    return View2D<T, 0, N>{orbit_data_.q.data(), orbit_data_.t.size(), orbit_data_.nsys};
 }
 
 template<typename T, size_t N>
-template<std::integral INT1, std::integral INT2>
-const T& OdeResult<T, N>::q(INT1 i, INT2 j) const{
-    return _q(i, j);
+const T& OdeResult<T, N>::q(size_t i, size_t j) const{
+    assert(i < orbit_data_.t.size() && j < orbit_data_.nsys && "Index out of range");
+    return orbit_data_.q[i * orbit_data_.nsys + j];
 }
 
 template<typename T, size_t N>
-const EventMap& OdeResult<T, N>::event_map() const {
-    return _event_map;
+const EventData<T>& OdeResult<T, N>::event_data() const{
+    return event_data_;
 }
 
 template<typename T, size_t N>
 bool OdeResult<T, N>::diverges() const {
-    return _diverges;
+    return diverges_;
 }
 
 template<typename T, size_t N>
 bool OdeResult<T, N>::success() const {
-    return _success;
+    return success_;
 }
 
 template<typename T, size_t N>
 double OdeResult<T, N>::runtime() const {
-    return _runtime;
+    return runtime_;
 }
 
 template<typename T, size_t N>
 const std::string& OdeResult<T, N>::message() const {
-    return _message;
+    return message_;
 }
 
 template<typename T, size_t N>
 void OdeResult<T, N>::examine() const {
     std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n"
-              << "\tPoints           : " << _t.size() << "\n"
-              << "\tDiverges         : " << (_diverges ? "true" : "false") << "\n"
-              << "\tSuccess          : " << (_success ? "true" : "false") << "\n"
-              << "\tRuntime          : " << _runtime << "\n"
-              << "\tTermination cause: " << _message << "\n"
+              << "\tPoints           : " << orbit_data_.t.size() << "\n"
+              << "\tDiverges         : " << (diverges_ ? "true" : "false") << "\n"
+              << "\tSuccess          : " << (success_ ? "true" : "false") << "\n"
+              << "\tRuntime          : " << runtime_ << "\n"
+              << "\tTermination cause: " << message_ << "\n"
               << event_log();
 }
 
@@ -75,21 +79,13 @@ template<typename T, size_t N>
 std::string OdeResult<T, N>::event_log() const {
     std::string res;
     res += "\tEvents:\n\t----------\n";
-    for (const auto& [name, array] : _event_map) {
-        res += "\t    " + name + " : " + std::to_string(array.size()) + "\n";
+    for (size_t i=0; i<event_data_.size(); i++){
+        const OrbitData<T>& data = event_data_.data(i);
+        const std::string& name = event_data_.name(i);
+        res += "\t    " + name + " : " + std::to_string(data.t.size()) + "\n";
     }
     res += "\n\t----------\n";
     return res;
-}
-
-template<typename T, size_t N>
-std::vector<T> OdeResult<T, N>::t_filtered(const std::string& event) const {
-    return _t_event_data(this->_t.data(), this->_event_map, event);
-}
-
-template<typename T, size_t N>
-Array2D<T, 0, N> OdeResult<T, N>::q_filtered(const std::string& event) const {
-    return _q_event_data<T, N>(this->_q.data(), this->_event_map, event, _q.Ncols());
 }
 
 
@@ -100,47 +96,14 @@ Array2D<T, 0, N> OdeResult<T, N>::q_filtered(const std::string& event) const {
 
 
 template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(const std::vector<T>& t, const Array2D<T, 0, N>& q, const EventMap& event_map, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(t, q, event_map, diverges, success, runtime, message), _interpolator(interpolator.clone()) {}
+OdeSolution<T, N>::OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(orbit_data), std::move(event_data), orb_idx_start, diverges, success, runtime, std::move(message)), interpolator_(interpolator.clone()) {}
 
 template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(const OdeSolution& other) : OdeResult<T, N>(other), _interpolator(other._interpolator->clone()) {}
-
-template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(OdeSolution&& other) noexcept : OdeResult<T, N>(std::move(other)), _interpolator(other._interpolator){
-    other._interpolator = nullptr;
-}
-
-template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(OdeResult<T, N>&& other, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(other)), _interpolator(interpolator.clone()) {}
-
-template<typename T, size_t N>
-OdeSolution<T, N>& OdeSolution<T, N>::operator=(const OdeSolution& other){
-    if (&other != this){
-        delete _interpolator;
-        _interpolator = other._interpolator->clone();
-    }
-    return *this;
-}
-
-template<typename T, size_t N>
-OdeSolution<T, N>& OdeSolution<T, N>::operator=(OdeSolution&& other) noexcept{
-    if (&other != this){
-        delete _interpolator;
-        _interpolator = other._interpolator;
-        other._interpolator = nullptr;
-    }
-    return *this;
-}
-
-template<typename T, size_t N>
-OdeSolution<T, N>::~OdeSolution(){
-    delete _interpolator;
-    _interpolator = nullptr;
-}
+OdeSolution<T, N>::OdeSolution(OdeResult<T, N>&& other, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(other)), interpolator_(interpolator.clone()) {}
 
 template<typename T, size_t N>
 Array1D<T, N> OdeSolution<T, N>::operator()(const T& t) const{
-    return _interpolator->make_call(t);
+    return interpolator_->make_call(t);
 }
 
 template<typename T, size_t N>

@@ -83,7 +83,6 @@ class LowLevelODE:
     >>> event = PreciseEvent("crossing", lambda t, q: q[0] - 1)
     >>> ode = LowLevelODE(f, 0, np.array([1.0, 0.0]), events=[event])
     >>> result = ode.integrate(10.0)
-    >>> print(ode.event_map)
     """
 
     def __init__(self, f: Func, t0: float, q0: np.ndarray, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
@@ -309,27 +308,6 @@ class LowLevelODE:
         ...
 
     @property
-    def event_map(self)->dict[str, np.ndarray[int]]:
-        """
-        Indices of solution steps where each event occurred.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary mapping event names to arrays of step indices where events
-            occurred. Use these indices to index into self.t and self.q.
-
-        Examples
-        --------
-        >>> ode = LowLevelODE(f, 0, q0, events=[event1, event2])
-        >>> ode.integrate(10.0)
-        >>> idx_event1 = ode.event_map['event1']
-        >>> t_at_event1 = ode.t[idx_event1]
-        >>> q_at_event1 = ode.q[idx_event1]
-        """
-        ...
-
-    @property
     def scalar_type(self)->str:
         """
         The numerical precision type used.
@@ -355,8 +333,6 @@ class LowLevelODE:
     def event_data(self, event: str)->tuple[np.ndarray, np.ndarray]:
         """
         Get times and states at which a specific event occurred.
-
-        Convenience method combining event_map lookup with solution access.
 
         Parameters
         ----------

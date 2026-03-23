@@ -55,19 +55,6 @@ class OdeResult:
         ...
 
     @property
-    def event_map(self)->dict[str, np.ndarray[int]]:
-        """
-        Event occurrence indices in this segment.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary mapping event names to arrays of step indices where events
-            occurred within this segment.
-        """
-        ...
-
-    @property
     def diverges(self)->bool:
         """
         Check if the solution diverged during this segment.

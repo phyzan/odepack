@@ -128,12 +128,12 @@ py::object PyODE::call_Jac(const py::object& t, const py::iterable& py_q) const{
 py::object PyODE::py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
-        OdeResult<T>* result;
+        OdeResult<T>* result = new OdeResult<T>();
         if (t_eval.is_none()){
-            result = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
+            cast<T>()->integrate(result, py::cast<T>(interval), to_Options(event_options), VoidFunc, max_prints);
         }else{
             std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
-            result = new OdeResult<T>(cast<T>()->integrate(py::cast<T>(interval), t_seq, to_Options(event_options), max_prints));
+            cast<T>()->integrate(result, py::cast<T>(interval), t_seq, to_Options(event_options), VoidFunc, max_prints);
         }
         return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
@@ -141,7 +141,7 @@ py::object PyODE::py_integrate(const py::object& interval, const py::object& t_e
 
 py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
     return DISPATCH(py::object,
-        auto* ptr = new OdeSolution<T>(cast<T>()->rich_integrate(py::cast<T>(interval), to_Options(event_options), max_prints));
+        auto* ptr = new OdeSolution<T>(cast<T>()->rich_integrate(py::cast<T>(interval), to_Options(event_options), VoidFunc, max_prints));
         return py::cast(PyOdeSolution(ptr, this->data.shape, this->scalar_type));
     )
 }
@@ -149,12 +149,12 @@ py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterab
 py::object PyODE::py_integrate_until(const py::object& t, const py::object& t_eval, const py::iterable& event_options, int max_prints){
 
     return DISPATCH(py::object,
-        OdeResult<T>* result;
+        OdeResult<T>* result = new OdeResult<T>();
         if (t_eval.is_none()){
-            result = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), to_Options(event_options), max_prints));
+            cast<T>()->integrate_until(result, py::cast<T>(t), to_Options(event_options), VoidFunc, max_prints);
         }else{
             std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
-            result = new OdeResult<T>(cast<T>()->integrate_until(py::cast<T>(t), t_seq, to_Options(event_options), max_prints));
+            cast<T>()->integrate_until(result, py::cast<T>(t), t_seq, to_Options(event_options), VoidFunc, max_prints);
         }
         return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
@@ -178,11 +178,13 @@ py::object PyODE::q_array() const{
 
 py::tuple PyODE::event_data(const py::str& event) const{
     return DISPATCH(py::object,
-        std::vector<T> t_data = reinterpret_cast<const ODE<T>*>(ode)->t_filtered(event.cast<std::string>());
-        Array2D<T, 0, 0> q_data = reinterpret_cast<const ODE<T>*>(ode)->q_filtered(event.cast<std::string>());
-        auto shape = getShape<size_t>(py::ssize_t(t_data.size()), data.shape);
-        Array<T> q_res(q_data.release(), shape.data(), shape.size(), true);
-        return py::make_tuple(py::cast(Array<T>(t_data.data(), t_data.size())), py::cast(q_res));
+        const auto* orbit = reinterpret_cast<const ODE<T>*>(ode);
+        const OrbitData<T>& event_data = orbit->event_data(event.cast<std::string>()); //check if event exists
+        auto shape = getShape<size_t>(py::ssize_t(event_data.size()), data.shape);
+        View1D<T> t_view = event_data.t_view();
+        View2D<T, 0, 0> q_view = event_data.q_view();
+        View<T> true_view(q_view.data(), shape.data(), shape.size());
+        return py::make_tuple(py::cast(t_view), py::cast(true_view));
     )
 }
 
@@ -213,12 +215,6 @@ py::object PyODE::solver_copy() const{
     )
 }
 
-py::dict PyODE::event_map() const{
-    return DISPATCH(py::dict,
-        EventMap result = cast<T>()->event_map();
-        return to_PyDict(result);
-    )
-}
 
 py::object PyODE::Nsys() const{
     return DISPATCH(py::object,
@@ -317,9 +313,9 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
         call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
             ODE<T>* ode = reinterpret_cast<ODE<T>*>(array[i]);
             if (t_eval_is_none){
-                ode->integrate(T(interval), options);
+                ode->integrate(nullptr, T(interval), options);
             } else {
-                ode->integrate(T(interval), *reinterpret_cast<std::vector<T>*>(step_seq[types[i]]), options);
+                ode->integrate(nullptr, T(interval), *reinterpret_cast<std::vector<T>*>(step_seq[types[i]]), options);
             }
         });
 
@@ -340,7 +336,7 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
 #define DEFINE_ODE(T) \
     template class ODE<T, 0>; \
     template class EventCounter<T, 0>; \
-    template void ODE<T, 0>::_init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method); \
+    template void ODE<T, 0>::init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method); \
     template PyODE::PyODE(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events, Integrator method = Integrator::RK45); \
 
 DEFINE_ODE(float)

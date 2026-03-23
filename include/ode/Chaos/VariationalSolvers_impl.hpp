@@ -99,7 +99,7 @@ T VariationalSolver<T, N, RhsType, JacType>::delta_s() const{
 
 // VariationalODE implementations
 template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, Integrator method) : ODE<T, N>(){
+VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, Integrator method) : ODE<T, N>(2*nsys){
     for (size_t i=0; i<events.size(); i++){
         if (dynamic_cast<const NormalizationEvent<T>*>(events[i])){
             throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
@@ -112,7 +112,7 @@ VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType>
     events.insert(events.begin(), &extra_event);
     nsys *= 2;
     const T* q0 = tmp.data();
-    this->_init(ARGS, events, method);
+    this->init(ARGS, events, method);
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
@@ -158,15 +158,15 @@ void VariationalODE<T, N, RhsType, JacType>::reset(){
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-const NormalizationEvent<T>& VariationalODE<T, N, RhsType, JacType>::_main_event()const{
+const NormalizationEvent<T>& VariationalODE<T, N, RhsType, JacType>::main_event()const{
     return static_cast<const NormalizationEvent<T>&>(this->solver()->event_col().event(_ind));
 }
 
 template<typename T, size_t N, typename RhsType, typename JacType>
-void VariationalODE<T, N, RhsType, JacType>::_register_event(size_t event){
-    ODE<T, N>::_register_event(event);
+void VariationalODE<T, N, RhsType, JacType>::register_event(size_t event){
+    ODE<T, N>::register_event(event);
     if (event == _ind){
-        const NormalizationEvent<T>& ev = _main_event();
+        const NormalizationEvent<T>& ev = main_event();
         _t_lyap.push_back(ev.delta_t_abs());
         _lyap_array.push_back(ev.lyap());
         _delta_s_arr.push_back(ev.delta_s());

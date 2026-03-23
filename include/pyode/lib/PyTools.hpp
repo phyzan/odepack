@@ -85,8 +85,6 @@ Container toCPP_Array(const pybind11::iterable &obj);
 
 std::vector<EventOptions> to_Options(const py::iterable& d);
 
-py::dict to_PyDict(const EventMap& _map);
-
 template<typename Int>
 std::vector<Int> getShape(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape);
 

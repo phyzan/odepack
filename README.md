@@ -323,21 +323,21 @@ int main() {
 
     // Set a long integration interval to ensure we hit the event multiple times
     // The result stores all specified time steps, along with events encountered
-    OdeResult<double, 2> result = ode.integrate(1000000, {options});
+    OdeResult<double, 2> result;
+    ode.integrate(&result, 1000000, {options});
     std::cout << "Integration completed at t = " << result.t().back() << "\n";
     std::cout << "Integration completed in " << result.runtime() << " seconds.\n";
     std::cout << "Number of time points: " << result.t().size() << "\n";
-    std::cout << "Number of events detected: " << result.event_map().at("event").size() << "\n";
     std::cout << "Integration success: " << (result.success() ? "true" : "false") << "\n";
     std::cout << "Divergence detected: " << (result.diverges() ? "true" : "false") << "\n";
     std::cout << "Termination message: " << result.message() << "\n";
 
     // Extract the indices of the event occurrences
-    const std::vector<size_t>& event_data = result.event_map().at("event");
+    const OrbitData<double>& event_data = result.event_data().data("event");
 
-    for (size_t i : event_data) {
-        std::cout << "Event detected at t = " << result.t()[i] << "\n";
-        std::cout << "State vector at event: " << result.q(i, 0) << ", " << result.q(i, 1) << std::endl;
+    for (size_t i = 0; i < event_data.size(); i++) {
+        std::cout << "Event detected at t = " << event_data.t[i] << "\n";
+        std::cout << "State vector at event: " << event_data.get_q(i, 0) << ", " << event_data.get_q(i, 1) << std::endl;
     }
 
     return 0;

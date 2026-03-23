@@ -42,6 +42,10 @@ public:
         return THIS->data();
     }
 
+    INLINE const T& back() const{
+        return this->data()[this->size()-1];
+    }
+
     template<INT_T... Int>
     INLINE const T* ptr(Int... idx) const{
         return data()+this->offset(idx...);

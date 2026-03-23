@@ -90,9 +90,9 @@ public:
 
 private:
 
-    const NormalizationEvent<T>& _main_event()const;
+    const NormalizationEvent<T>& main_event()const;
 
-    void _register_event(size_t event) override;
+    void register_event(size_t event) override;
 
     size_t _ind = 0;
     std::vector<T> _t_lyap = {};
