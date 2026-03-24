@@ -3,6 +3,7 @@
 
 #include "../lib/PyEvents.hpp"
 #include "../../ode/Core/Events_impl.hpp"
+#include "../pycast/pycast.hpp"
 
 namespace ode{
 
