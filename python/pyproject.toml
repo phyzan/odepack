@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "A Python package for solving ordinary differential equations"
 requires-python = ">=3.8"
 dependencies = [
-    "numpy>=1.20.0"
+    "numpy>=1.20.0",
+    "pybind11",
+    "numiphy @ git+https://github.com/phyzan/numiphy.git"
 ]
 
 [project.optional-dependencies]
@@ -17,7 +19,6 @@ dev = [
 ]
 
 [tool.scikit-build]
-# Scikit-build-core settings
 cmake.source-dir = ".."
 cmake.build-type = "Release"
 wheel.packages = ["odepack"]

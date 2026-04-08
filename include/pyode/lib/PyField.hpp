@@ -115,7 +115,7 @@ struct PyRegVecField {
 
     // ============================= Python interface =============================
     
-    static CLS init_main(const py::array_t<double>& values, const py::args& py_grid);
+    static CLS init_main(const py::array_t<double>& values, const py::args& py_grid, const std::string& coord_type);
 
     static py::object py_streamplot_data(const CLS& self, double max_length, int density, double ds, double rtol, double atol, double min_step, const py::object& max_step, double stepsize, const py::str& method);
 

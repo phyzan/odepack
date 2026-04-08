@@ -38,9 +38,9 @@ public:
     // =================================================
 
 
-    static void ode_func_norm(T* out, const T& t, const T* q, const T* args, const void* ptr);
+    void OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const;
 
-    static void ode_func(T* out, const T& t, const T* q, const T* args, const void* ptr);
+    void OdeFunc(T* out, const T& t, const T* q, const T* args) const;
 
     OdeResult<T> streamline(const T* x0, T length, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized, const std::vector<double>& t_eval) const;
 

@@ -1,7 +1,7 @@
 #ifndef ODEPACK_HPP
 #define ODEPACK_HPP
 
-#include "include/polybox/polybox.hpp"
+#include "polybox/polybox.hpp"
 #include "ode/Tools_impl.hpp"
 #include "ode/SolverDispatcher_impl.hpp"
 #include "ode/OdeInt_impl.hpp"
@@ -10,8 +10,8 @@
 
 #include "ode/Core/SolverBase_impl.hpp"
 #include "ode/Core/RichBase_impl.hpp"
-#include "ode/Core/VirtualBase_impl.hpp"
 #include "ode/Core/Events_impl.hpp"
+#include "ode/Core/ObjectiveSolver.hpp"
 
 #include "ode/OdeResult/OdeResult_impl.hpp"
 

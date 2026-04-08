@@ -5,22 +5,29 @@
 
 namespace ode{
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived = void>
-class Euler : public BaseDispatcher<GetDerived<Euler<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+class Euler : public BaseDispatcher<GetDerived<Euler<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>{
 
 public:
 
     DEFAULT_RULE_OF_FOUR(Euler)
 
-    Euler(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T stepsize, int dir=1, const std::vector<T>& args = {}) requires (!is_rich<SP>);
+    Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir=1, const std::vector<T>& args = {}) requires (!is_rich<SP>);
 
-    Euler(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T stepsize, int dir=1, const std::vector<T>& args = {}, EVENTS events = {}) requires (is_rich<SP>);
+    Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir=1, const std::vector<T>& args = {}, EVENTS events = {}) requires (is_rich<SP>);
 
-    std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
+    auto local_interp() const;
+
+protected:
+
+    // Constructor signature that follows the main constructor patter.
+    Euler(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+
+    Euler(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
 private:
 
-    using Base = BaseDispatcher<GetDerived<Euler<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, SP, RhsType, JacType>;
+    using Base = BaseDispatcher<GetDerived<Euler<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
     friend Base::MainSolverType;
 
     StepResult  adapt_impl(T* res, const T* state);

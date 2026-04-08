@@ -46,7 +46,7 @@ struct DtypeDispatcher{
 
 struct PyFuncWrapper : DtypeDispatcher {
 
-    void* rhs; //Func<T>
+    void* rhs; //RhsFunc<T>
     size_t Nsys;
     std::vector<py::ssize_t> output_shape;
     size_t Nargs;
@@ -130,6 +130,9 @@ inline void arrcpy(T* dst, const void* src, size_t size){
     const T* data = static_cast<const T*>(src);
     arrcpy(dst, data, size);
 }
+
+template<typename T>
+using PyRhsFunc = void(*)(T*, const T&, const T*, const T*, const void*); // f(t, q, args) -> array
 
 template<typename T>
 void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj);

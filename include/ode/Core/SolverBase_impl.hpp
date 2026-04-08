@@ -3,7 +3,9 @@
 
 #include "SolverBase.hpp"
 #include "../Tools_impl.hpp"
+#include "../Interpolation/Univariate/StateInterp_impl.hpp"
 #include "Events_impl.hpp"
+#include "FinDiff.hpp"
 
 #define NOW \
 std::chrono::high_resolution_clock::now()
@@ -15,239 +17,214 @@ namespace ode{
 
 // ODE PROPERTIES
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Rhs(T* dq_dt, const T& t, const T* q) const{
-    if constexpr (std::is_pointer_v<RhsType>){
-        assert(_ode.rhs != nullptr && "RHS function pointer cannot be nullptr");
-    }
-    _ode.rhs(dq_dt, t, q, _args.data(), _ode.obj);
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::Rhs(T* dq_dt, const T& t, const T* q) const{
+    return _ode.Rhs(dq_dt, t, q, _args.data());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::rhs(T* dq_dt, const T& t, const T* q) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::rhs(T* dq_dt, const T& t, const T* q) const{
     THIS->Rhs(dq_dt, t, q);
     this->_n_evals_rhs++;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::Jac(T* jm, const T& t, const T* q, const T* dt) const{
-    if constexpr (HAS_JAC) {
-        this->jac_exact(jm, t, q);
-    } else if constexpr (RUNTIME_JAC_TYPE) {
-        if (_ode.jacobian != nullptr){
-            auto jac = reinterpret_cast<Func<T>>(_ode.jacobian);
-            jac(jm, t, q, _args.data(), _ode.obj);
-        }else{
-            this->jac_approx(jm, t, q, dt);
-        }
-    }    
-    else {
-        this->jac_approx(jm, t, q, dt);
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, const T* dt) const{
+    
+    if constexpr (JP == JacPolicy::Approx){
+        return this->jac_approx(jm, t, q, dt);
+    } else if constexpr (JP == JacPolicy::Autodiff){
+        FOR_LOOP(size_t, I, N,
+            _diff_worker[I+N] = DualType(q[I], autodiff::Variable<I>{});
+        );
+        _ode.Rhs(_diff_worker.data(), DualType(t), _diff_worker.data()+N, _args_worker.data());
+
+        const DualType* rhs = _diff_worker.data();
+        FOR_LOOP(size_t, I, N,
+            FOR_LOOP(size_t, J, N,
+                jm[I + J*N] = rhs[I].diff_value(J);
+            );
+        );
+        return;
+    } else {
+        return _ode.Jac(jm, t, q, _args.data());
     }
+
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
     THIS->Jac(jm, t, q, dt);
     this->_n_evals_jac++;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_approx(T* jm, const T& t, const T* q, const T* dt) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::jac_approx(T* out, const T& t, const T* q, const T* dt) const{
     const size_t n = this->Nsys();
-    const T EPS_SQRT = sqrt(std::numeric_limits<T>::epsilon());
-    const T threshold = this->atol();
 
     // ----------- Used only if N > 0 --------------
     static thread_local std::array<T, 4*N> work;
     // ---------------------------------------------
 
-    T* x1;
-    T* x2;
-    T* f1;
-    T* f2;
+    T* worker;
 
     if constexpr (N > 0){
-        x1 = work.data();
-        x2 = work.data() + n;
-        f1 = work.data() + 2*n;
-        f2 = work.data() + 3*n;
+        worker = work.data();
     } else{
         if (_cache_4.size() != 4*n){
             _cache_4.resize(4, n);
         }
-        x1 = _cache_4.data();
-        x2 = x1 + n;
-        f1 = x1 + 2*n;
-        f2 = x1 + 3*n;
+        worker = _cache_4.data();
     }
 
-    copy_array(x1, q, n);
-    copy_array(x2, q, n);
-
-    for (size_t i = 0; i < n; i++) {
-        // Compute step size: use provided dt or compute 
-        T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * ndspan::max<T>(threshold, abs(q[i]));
-
-        x1[i] = q[i] - h_i;
-        x2[i] = q[i] + h_i;
-        this->rhs(f1, t, x1);
-        this->rhs(f2, t, x2);
-        x1[i] = q[i];
-        x2[i] = q[i];
-
-        // Compute Jacobian column using central differences
-        T* col = jm + i * n;
-        T two_h = 2 * h_i;
-        for (size_t j = 0; j < n; j++) {
-            col[j] = (f2[j] - f1[j]) / two_h;
-        }
-    }
+    ode::jac_approx<T>([this](T* out, const T& t, const T* q){
+        THIS->Rhs(out, t, q);
+    }, out, worker, t, q, dt, this->atol(), n);
 }
 
 // PUBLIC ACCESSORS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t() const{
-    return THIS->true_state_ptr()[0];
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::t() const{
+    return this->true_state_ptr()[0];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector() const{
-    return View1D<T, N>(THIS->true_state_ptr()+2, this->Nsys());
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector() const{
+    return View1D<T, N>(this->true_state_ptr()+2, this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_last() const{
-    return View1D<T, N>(THIS->last_true_state_ptr()+2, this->Nsys());
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_last() const{
+    return View1D<T, N>(this->last_true_state_ptr()+2, this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_new() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_new() const{
     return View1D<T, N>(this->new_state_ptr()+2, this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-View1D<T, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::vector_old() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_old() const{
     return View1D<T, N>(this->old_state_ptr()+2, this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::stepsize() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::stepsize() const{
     return this->_state_data(_new_state_idx, 1);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-int BaseSolver<Derived, T, N, SP, RhsType, JacType>::direction() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+int BaseSolver<Derived, T, N, SP, OdeType>::direction() const{
     return _direction;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::rtol() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::rtol() const{
     return this->_scalar_data[rtol_idx];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::atol() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+ const T& BaseSolver<Derived, T, N, SP, OdeType>::atol() const{
     return this->_scalar_data[atol_idx];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::min_step() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::min_step() const{
     return this->_scalar_data[min_step_idx];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::max_step() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::max_step() const{
     return this->_scalar_data[max_step_idx];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const Array1D<T>& BaseSolver<Derived, T, N, SP, RhsType, JacType>::args() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const Array1D<T>& BaseSolver<Derived, T, N, SP, OdeType>::args() const{
     return _args;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::Nupdates() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+size_t BaseSolver<Derived, T, N, SP, OdeType>::Nupdates() const{
     return _Nupdates;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::is_running() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::is_running() const{
     return _is_running;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::is_dead() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::is_dead() const{
     return _is_dead;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::diverges() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::diverges() const{
     return _diverges;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const std::string& BaseSolver<Derived, T, N, SP, RhsType, JacType>::status() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const std::string& BaseSolver<Derived, T, N, SP, OdeType>::status() const{
     return _message;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::show_state(int prec) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::show_state(int prec) const{
     SolverState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->status()).show(prec);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::new_state() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+State<T> BaseSolver<Derived, T, N, SP, OdeType>::new_state() const{
     return State<T>(this->new_state_ptr(), this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::old_state() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+State<T> BaseSolver<Derived, T, N, SP, OdeType>::old_state() const{
     return State<T>(this->old_state_ptr(), this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::state() const{
-    return State<T>(THIS->true_state_ptr(), this->Nsys());
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+State<T> BaseSolver<Derived, T, N, SP, OdeType>::state() const{
+    return State<T>(this->true_state_ptr(), this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_state() const{
-    return State<T>(THIS->last_true_state_ptr(), this->Nsys());
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+State<T> BaseSolver<Derived, T, N, SP, OdeType>::last_state() const{
+    return State<T>(this->last_true_state_ptr(), this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-State<T> BaseSolver<Derived, T, N, SP, RhsType, JacType>::ics() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+State<T> BaseSolver<Derived, T, N, SP, OdeType>::ics() const{
     return State<T>(this->ics_ptr(), this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-Integrator BaseSolver<Derived, T, N, SP, RhsType, JacType>::method() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+Integrator BaseSolver<Derived, T, N, SP, OdeType>::method() const{
     return Derived::integrator;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp(T* result, const T& t) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::interp(T* result, const T& t) const{
     assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->interp_new_state_ptr()[0]*this->direction()) && "Out of bounds interpolation requested");
     if (this->t_old() == this->t_new()){
-        copy_array(result, this->new_state_ptr(), this->Nsys());
+        ndspan::copy_array(result, this->new_state_ptr(), this->Nsys());
     }
     return interp_impl(result, t);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::n_evals_rhs() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+size_t BaseSolver<Derived, T, N, SP, OdeType>::n_evals_rhs() const{
     return _n_evals_rhs;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-size_t BaseSolver<Derived, T, N, SP, RhsType, JacType>::n_evals_jac() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+size_t BaseSolver<Derived, T, N, SP, OdeType>::n_evals_jac() const{
     return _n_evals_jac;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+T BaseSolver<Derived, T, N, SP, OdeType>::auto_step(T t, const T* q) const{
     //returns absolute value of emperically determined first step.
     const int dir = _direction;
 
@@ -276,7 +253,7 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
     T* scale = y1+2*n;
     T* f0 = y1+3*n;
     for (size_t i=0; i<n; i++){
-        scale[i] = atol() + abs(q[i])*rtol();
+        scale[i] = atol() + abs<T>(q[i])*rtol();
     }
     this->rhs(f0, t, q);
     T d0 = rms_norm(q, scale, n);
@@ -304,20 +281,20 @@ T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step(T t, const T* q) co
     return ndspan::max<T>(ndspan::min_of_pack<T>(T(100*h0), h1, this->max_step()), this->min_step());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-T BaseSolver<Derived, T, N, SP, RhsType, JacType>::auto_step() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+T BaseSolver<Derived, T, N, SP, OdeType>::auto_step() const{
     return auto_step(this->t(), this->vector().data());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-BaseSolver<Derived, T, N, SP, RhsType, JacType>::Clone* BaseSolver<Derived, T, N, SP, RhsType, JacType>::clone() const {
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+BaseSolver<Derived, T, N, SP, OdeType>::Clone* BaseSolver<Derived, T, N, SP, OdeType>::clone() const {
     return new Derived(*THIS);
 }
 
 // PUBLIC MODIFIERS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::advance(){
     if (this->is_dead()){
         this->warn_dead();
         return false;
@@ -328,14 +305,70 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance(){
     return THIS->adv_impl();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& time){
-    return this->advance_until(time, VoidFunc);
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+template<OptionalObserver<T> Callable>
+pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interpolate_until(const T& time, const Callable& observer){
+    pbox::Box<LinkedInterpolator<T, N>> interp = pbox::make_box<LinkedInterpolator<T, N>>(this->t_old(), this->vector_old().data(), this->Nsys());
+    bool current_state_is_new = false;
+    if (!this->is_at_new_state()){
+        interp->expand_by_owning(this->state_interpolator(0, -1));
+    }else{
+        current_state_is_new = true;
+    }
+
+    const T t_start = this->t();
+    if (this->advance_until(time, [&](const T& t, const T* q, const T* t_ptr){
+        bool obs_res;
+        if constexpr (Observer<Callable, T>){
+            obs_res = observer(t, q, t_ptr);
+        } else{
+            obs_res = true;
+        }
+        if (obs_res){
+            if (this->is_at_new_state()){
+                if (current_state_is_new){
+                    interp->expand_by_owning(this->state_interpolator(0, -1));
+                }
+                interp->expand_by_owning(std::make_unique<LocalInterpolator<T, N>>(this->t(), this->vector().data(), this->Nsys()));
+                current_state_is_new = true;
+            } else if (current_state_is_new) {
+                interp->expand_by_owning(this->state_interpolator(0, -1));
+                current_state_is_new = false;
+            }
+            return true;
+        } else {
+            return false;
+        }
+
+    })){
+        if (t_start != interp->t_start()){
+            interp->adjust_start(t_start);
+        }
+        if (time != interp->t_end()){
+            interp->adjust_end(time);
+        }
+        interp->close_end();
+        return interp;
+    } else {
+        return pbox::Box<Interpolator<T, N>>();
+    }
+
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-template<typename Callable, typename ArrayType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& time, Callable&& observer, const ArrayType& extra_steps){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
+    return this->interpolate_until(time, observer);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time){
+    return this->advance_until(time, nullptr);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+template<OptionalObserver<T> Callable, typename ArrayType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const Callable& observer, const ArrayType& extra_steps){
 
     if (this->is_dead()){
         this->warn_dead();
@@ -359,20 +392,27 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& tim
     bool success;
     auto evolve = [&]() LAMBDA_INLINE -> bool {
         bool res;
-        while ((res = (this->is_running() && this->advance())) && (time*d > this->t()*d)){
-            if (!observer(this->t(), THIS->true_state_ptr()+2, nullptr)){
+        while ((res = (this->is_running() && THIS->adv_impl(time))) && (time != this->t())){
+            bool obs_res;
+            if constexpr (Observer<Callable, T>){
+                obs_res = observer(this->t(), this->true_state_ptr()+2, nullptr);
+            } else{
+                obs_res = true;
+            }
+            if (!obs_res){
                 // the observer itself might have advanced the solver to the same target time, so its worth making this check.
-                return this->t() == time;
+                return this->t() * d >= time * d;
             }
         }
 
         if (res){
-            this->move_state(time);
             const T* t_ptr = (!explicit_steps || (has_extra_steps && t_dual == time)) ? &t_dual : nullptr;
-            observer(this->t(), THIS->true_state_ptr()+2, t_ptr);
+            if constexpr (Observer<Callable, T>){
+                observer(this->t(), this->true_state_ptr()+2, t_ptr);
+            }            
             return true;
         }else{
-            return false;
+            return this->t() * d >= time * d;
         }
     };
 
@@ -383,12 +423,12 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& tim
     }else{
         auto validate_idx = [&](size_t idx) LAMBDA_INLINE{
             if (extra_steps[idx]*d <= this->t()*d){
-                throw std::runtime_error("Invalid extra step: " + to_string(extra_steps[idx]) + ". Extra steps must be in the same direction and between the current time and the target time.");
+                throw std::runtime_error("Invalid extra step: " + to_string(extra_steps[idx]) + ". Extra steps must be in the same direction and between the current time (" + to_string(this->t()) + ") and the target time (" + to_string(time) + ").");
             }
             return idx;
         };
         size_t idx = 0;
-        while (idx < extra_steps.size() && (success = (this->is_running() && this->advance_until(extra_steps[validate_idx(idx)], observer))) && (time*d > this->t()*d)){
+        while (idx < extra_steps.size() && (success = (this->is_running() && this->advance_until(extra_steps[validate_idx(idx)], observer))) && (time != this->t())){
             idx++;
         }
 
@@ -400,142 +440,40 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(const T& tim
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_by(T interval){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::advance_by(T interval){
     assert(interval >= 0 && "Interval must be non-negative in advance_by. Its sign is determined by the solver's direction of integration.");
     return this->advance_until(this->t() + interval*this->direction());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-template<typename ObjFun, typename Callable>
-requires std::invocable<ObjFun, const T&, const T*, const T*>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::advance_until(ObjFun&& obj_fun, T tol, int dir, Callable&& observer){
 
-    if (this->is_dead()){
-        this->warn_dead();
-        return false;
-    }else if (!this->is_running()) {
-        this->warn_paused();
-        return false;
-    }
-
-    /*
-    obj_fun : callable object with signature T obj_fun(const T& t, const T* q, const T* args, const void* obj)
-    tol     : tolerance for root finding
-    dir     : direction of root finding
-    observer: called at every advance call
-    worker: optional pointer to a preallocated array of size N to be used as temporary storage. Use this
-        if obj_fun is calling some of this solver's methods that may overwrite internal dummy arrays.
-    */
-    assert((dir == 1 || dir == -1 || dir == 0) && "Invalid sign direction");
-
-    
-
-    // ----------- Used only if N > 0 --------------
-    static thread_local std::array<T, N> work;
-    // ---------------------------------------------
-
-    T* worker;
-    
-    if constexpr (N > 0){
-        worker = work.data();
-    } else{
-        _cache_advun.resize(this->Nsys());
-        worker = _cache_advun.data();
-    }
-
-    int factor = dir == 0 ? 1 : this->direction()*dir;
-
-    auto ObjFunLike = [&](const T& t, const T* q) LAMBDA_INLINE {
-        return obj_fun(t, q, this->args().data(), this->_ode.obj);
-    };
-
-    auto TrueObjFun = [&](const T& t) LAMBDA_INLINE{
-        this->interp_impl(worker, t);
-        return ObjFunLike(t, worker);
-    };
-
-    auto get_sgn = [&]() LAMBDA_INLINE {
-        return factor*sgn(ObjFunLike(this->t(), THIS->true_state_ptr()+2));
-    };
-
-    auto detected = [&](int s1, int s2) LAMBDA_INLINE{
-        if (dir == 0){
-            return s1*s2 <= 0;
-        }else {
-            return s1 < s2;
-        }
-    };
-
-    int curr_dir = get_sgn();
-    int old_dir = curr_dir;
-
-    //iterate to the first step where obj_fun != 0
-    //It is a very rare edge case that the code
-    //will enter this loop even once
-    while (curr_dir == 0 && this->advance()){
-        curr_dir = old_dir = get_sgn();
-        if (!observer(this->t(), THIS->true_state_ptr()+2)){
-            return false;
-        }
-        if (curr_dir == 0 && dir == 0){
-            // If a root is found while trying to find a step
-            // where the objective function is non zero (required for bisection)
-            // then if the sign direction does not matter, this is success
-            return true;
-        }
-    }
-
-    bool success;
-    while ((success = (this->is_running() && this->advance())) && (old_dir = curr_dir, curr_dir = get_sgn(),  (!detected(old_dir, curr_dir)))){
-        if (!observer(this->t(), THIS->true_state_ptr()+2)){
-            // in case the observer itself advance the solver appropriately to detect the root, check if the current state satisfies the root condition
-            return abs(ObjFunLike(this->t(), THIS->true_state_ptr()+2)) <= tol;
-        }
-    }
-
-    if (success){
-        T time = bisect<T, RootPolicy::Right>(TrueObjFun, this->t_last(), this->t(), tol);
-        this->move_state(time);
-        observer(this->t(), THIS->true_state_ptr()+2);
-        return true;
-    }else{
-        return false;
-    }
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps){
     return this->advance_until(time, observer, extra_steps);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
     return this->advance_until(time, observer);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::reset(){
-    THIS->reset_impl();
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename Setter>
-auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::apply_ics_setter(T t0, Setter&& func, T stepsize){
+auto BaseSolver<Derived, T, N, SP, OdeType>::apply_ics_setter(T t0, Setter&& func, T stepsize){
     T* ics = const_cast<T*>(this->ics_ptr());
     return priv_apply_ics_setter(ics, t0, std::forward<Setter>(func), stepsize);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename Setter>
-auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::restart_from_modified_state(T t0, Setter&& func, T stepsize){
+auto BaseSolver<Derived, T, N, SP, OdeType>::restart_from_modified_state(T t0, Setter&& func, T stepsize){
     T* ics = const_cast<T*>(this->ics_ptr());
-    copy_array(ics+2, this->vector().data(), this->Nsys());
+    ndspan::copy_array(ics+2, this->vector().data(), this->Nsys());
     return priv_apply_ics_setter(ics, t0, std::forward<Setter>(func), stepsize);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0, T stepsize, int direction){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsize, int direction){
 
     assert((direction == 1 || direction == -1 || direction == 0) && "Direction must be 1, -1, or 0");
     direction = (direction == 0) ? _direction : direction; // if 0, keep existing direction;
@@ -553,8 +491,8 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0,
         T* ics = const_cast<T*>(this->ics_ptr());
         ics[0] = t0;
         ics[1] = stepsize;
-        copy_array(ics+2, y0, this->Nsys());
-        this->reset();
+        ndspan::copy_array(ics+2, y0, this->Nsys());
+        THIS->Reset();
         return true;
     }else {
 #ifndef NO_ODE_WARN
@@ -564,8 +502,8 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_ics(T t0, const T* y0,
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::stop(const std::string& text){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::stop(const std::string& text){
     if (!this->is_running()){
         return;
     }
@@ -573,8 +511,8 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::stop(const std::string& te
     this->set_message((text == "") ? "Stopped by user" : text);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::kill(const std::string& text){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::kill(const std::string& text){
     if (this->is_dead()){
         return;
     }
@@ -583,8 +521,8 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::kill(const std::string& te
     _message = (text == "") ? "Killed by user" : text;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::resume(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::resume(){
     if (this->is_dead()){
         this->warn_dead();
         return false;
@@ -595,53 +533,39 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::resume(){
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_obj(const void* obj){
-    assert(obj != this && "Cannot set obj equal to the pointer of the solver, as that may cause UB when the solver is copied/moved");
-    _ode.obj = obj;
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_args(const T* new_args){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::set_args(const T* new_args){
     THIS->set_args_impl(new_args);
 }
 
 //====================== STATIC OVERRIDES =====================================
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- std::unique_ptr<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, RhsType, JacType>::state_interpolator(int bdr1, int bdr2) const{
-    return THIS->state_interpolator(bdr1, bdr2);
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+std::unique_ptr<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::state_interpolator(int bdr1, int bdr2) const{
+    auto interp = this->local_interp();
+    const T* s1 = this->old_state_ptr();
+    const T* s2 = this->interp_new_state_ptr();
+    return std::make_unique<CustomLocalInterpolator<T, N, decltype(interp)>>(std::move(interp), s1[0], s2[0], s1+2, s2+2, this->Nsys(), bdr1, bdr2);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-StepResult BaseSolver<Derived, T, N, SP, RhsType, JacType>::adapt_impl(T* state, const T* old_state){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+StepResult BaseSolver<Derived, T, N, SP, OdeType>::adapt_impl(T* state, const T* old_state){
     return THIS->adapt_impl(state, old_state);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_impl(T* result, const T& t) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::interp_impl(T* result, const T& t) const{
     THIS->interp_impl(result, t);
 }
 
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_exact(T* jm, const T& t, const T* q) const{
-    if constexpr (RUNTIME_JAC_TYPE) {
-        auto jac = reinterpret_cast<Func<T>>(_ode.jacobian);
-        assert(jac != nullptr && "Jacobian function pointer is null");
-        jac(jm, t, q, _args.data(), _ode.obj);
-    } else if constexpr (HAS_JAC) {
-        if constexpr (std::is_pointer_v<JacType>){
-            assert(_ode.jacobian != nullptr && "Explicitly passed Jacobian function pointer cannot be nullptr");
-        }
-        _ode.jacobian(jm, t, q, _args.data(), _ode.obj);
-    } else {
-        throw std::runtime_error("Jacobian function not provided for this solver.");
-    }
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
+    return THIS->local_interp();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::reset_impl(){
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
     _Nupdates = 0;
     _new_state_idx = 1;
     _old_state_idx = 2;
@@ -657,71 +581,107 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsTy
     _n_evals_jac = 0;
     _use_new_state = true;
     for (int i=1; i<6; i++){
-        copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
+        ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_args_impl(const T* new_args){
-    copy_array(_args.data(), new_args, _args.size());
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::set_args_impl(const T* new_args){
+    ndspan::copy_array(_args.data(), new_args, _args.size());
+    if constexpr (JP == JacPolicy::Autodiff){
+        for (size_t i=0; i<_args.size(); i++){
+            _args_worker[i] = DualType(new_args[i]);
+        }
+    }
 }
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust_impl(const T* new_vector){}
 
 //=============================================================================
 
 // OVERRIDEN IN RICH SOLVER
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::true_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::true_state_ptr() const{
     return this->_state_data.ptr(this->_true_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::last_true_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::last_true_state_ptr() const{
     return this->_state_data.ptr(this->_last_true_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::adv_impl(){
-    if (_true_state_idx == _new_state_idx){
-        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr()); //The --about to be -- old state is the current new state, so we pass that
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+template<typename... Args>
+bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
+
+    const int d = this->direction();
+    if constexpr (sizeof...(Args) > 0){
+        T time_floor = minimum_time(args...);
+        if (this->is_at_new_state() && (time_floor*d <= t_new()*d)){
+            return false;
+        } else if (this->is_at_new_state()){
+            StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
+            if (validate_it(result, this->aux_state_ptr())){
+                register_states();
+                T new_floor;
+                if (THIS->RequestTimeFloor(new_floor)){
+                    assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested, with additional requests");
+                    time_floor = minimum_time(new_floor, time_floor);
+                }
+                
+                if (time_floor*d < t_new()*d){
+                    this->move_state(time_floor);
+                }
+                return true;
+            }else{
+                return false;
+            }
+        } else if (time_floor*d < t_new()*d){
+            this->move_state(time_floor);
+            return true;
+        } else {
+            this->move_state(t_new());
+            return true;
+        }
+    } else if (this->is_at_new_state()){
+        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
         if (validate_it(result, this->aux_state_ptr())){
             register_states();
-            this->_Nupdates++;
+            T new_floor;
+            if (THIS->RequestTimeFloor(new_floor) && new_floor*d < t_new()*d){
+                assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested without additional requests.");
+                this->move_state(new_floor);
+            }
             return true;
-        }else{
+        } else {
             return false;
         }
-    }
-    else{
-        _last_true_state_idx = _true_state_idx;
-        _true_state_idx = _new_state_idx;
+    } else {
+        this->move_state(t_new());
         return true;
     }
+
 }
 
 // HELPER METHODS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::ics_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::ics_ptr() const{
     return this->_state_data.data();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::new_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::new_state_ptr() const{
     return this->_state_data.ptr(this->_new_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::old_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::old_state_ptr() const{
     return this->_state_data.ptr(this->_old_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_new_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::interp_new_state_ptr() const{
     if (this->_use_new_state){
         return this->new_state_ptr();
     }else{
@@ -729,59 +689,58 @@ const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::interp_new_state_ptr()
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_new() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::t_new() const{
     return this->_state_data(this->_new_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_old() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::t_old() const{
     return this->_state_data(this->_old_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-const T& BaseSolver<Derived, T, N, SP, RhsType, JacType>::t_last() const{
-    return THIS->last_true_state_ptr()[0];
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T& BaseSolver<Derived, T, N, SP, OdeType>::t_last() const{
+    return this->last_true_state_ptr()[0];
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_message(const std::string& text){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::set_message(const std::string& text){
     _message = text;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::warn_paused() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::warn_paused() const{
 #ifndef NO_ODE_WARN
     std::cerr << "\n" << "Solver has paused integrating. Resume before advancing." << std::endl;
 #endif
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::warn_dead() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
 #ifndef NO_ODE_WARN
-    std::cerr << "\n" << "Solver has permanently stop integrating. Termination cause:\n\t" << _message << std::endl;
+    std::cerr << "\n" << "Solver has permanently stopped integrating. Termination cause:\n\t" << _message << std::endl;
 #endif
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::re_adjust(const T* new_vector){
-    THIS->re_adjust_impl(new_vector);
-    copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->Nsys()+2); //store the re-adjusted new state for interpolation
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
+    ndspan::copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->Nsys()+2); //store the re-adjusted new state for interpolation
     T* state = const_cast<T*>(this->new_state_ptr());
     state[0] = this->t();
     state[1] = this->stepsize();
-    copy_array(state+2, new_vector, this->Nsys());
+    ndspan::copy_array(state+2, new_vector, this->Nsys());
     _true_state_idx = _new_state_idx;
     _use_new_state = false;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics(T t0, const T* q0) const {
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics(T t0, const T* q0) const {
     return THIS->validate_ics_impl(t0, q0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics_impl(T t0, const T* q0) const {
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0) const {
 
     if (!all_are_finite(q0, this->Nsys()) || !isfinite(t0)){
         return false;
@@ -804,13 +763,13 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_ics_impl(T t0, co
     return all_are_finite(worker, this->Nsys());
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::is_at_new_state() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::is_at_new_state() const{
     return _true_state_idx == _new_state_idx;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac_view(T* j) const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* j) const{
     //returns a high level view of the jacobian matrix, so that its elements
     //can be accessed using matrix(i, j). This function simply simplifies
     //the process of constructing the correct object that can safely view the jacobian matrix
@@ -824,8 +783,8 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, RhsType, JacType>::jac
 
 // PROTECTED CONSTRUCTOR
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _args_worker(JP==JacPolicy::Autodiff ? args.size() : 0), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
@@ -837,34 +796,40 @@ BaseSolver<Derived, T, N, SP, RhsType, JacType>::BaseSolver(SOLVER_CONSTRUCTOR(T
     if (q0 == nullptr){
         this->kill("Initial conditions not set (nullptr provided)");
     }else if (this->validate_ics_impl(t0, q0)){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : T(abs(stepsize)));
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
-        copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
+        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
         for (int i=1; i<5; i++){
-            copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
+            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }
     }else {
         this->kill("Initial conditions contain nan or inf, or ode(ics) does");
+    }
+
+    if constexpr (JP == JacPolicy::Autodiff){
+        for (size_t i=0; i<_args.size(); i++){
+            _args_worker[i] = DualType(_args[i]);
+        }
     }
 }
 
 
 // PRIVATE METHODS
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- const T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::aux_state_ptr() const{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+const T* BaseSolver<Derived, T, N, SP, OdeType>::aux_state_ptr() const{
     return _state_data.ptr(_aux_state_idx, 0);
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
- T* BaseSolver<Derived, T, N, SP, RhsType, JacType>::aux_state_ptr(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+T* BaseSolver<Derived, T, N, SP, OdeType>::aux_state_ptr(){
     return _state_data.ptr(_aux_state_idx, 0);
 }
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::register_states(){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::register_states(){
     if (_old_state_idx == _last_true_state_idx){
         _old_state_idx = _new_state_idx;
         _new_state_idx = _true_state_idx = _aux_state_idx;
@@ -879,10 +844,11 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::register_states(){
         _old_state_idx = _last_true_state_idx;
     }
     _use_new_state = true;
+    _Nupdates++;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(StepResult result, const T* state){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, const T* state){
     bool success = true;
     switch (result){
         case StepResult::Success:
@@ -916,15 +882,14 @@ bool BaseSolver<Derived, T, N, SP, RhsType, JacType>::validate_it(StepResult res
         //but since the step failed, the current interpolation interval is no longer valid.
         _use_new_state = false;
         T* d = _state_data.ptr(5, 0);
-        copy_array(d, this->old_state_ptr(), this->Nsys()+2);
+        ndspan::copy_array(d, this->old_state_ptr(), this->Nsys()+2);
     }
 
     return success;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::update_state(const T& time){
-    //explicitly "this" (not THIS),  not any derived class's
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::update_state(const T& time){
     const T& time_now = this->true_state_ptr()[0];
     const T& time_last = this->last_true_state_ptr()[0];
     assert( (time*this->direction() > time_last*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in update_state");
@@ -948,39 +913,59 @@ void BaseSolver<Derived, T, N, SP, RhsType, JacType>::update_state(const T& time
 }
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::move_state(const T& time){
-    assert( (time*this->direction() > this->t_last()*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in move_state");
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::move_state(const T& time){
+    const int d = this->direction();
+    assert( (time*d > this->t_last()*d && time*d <= this->t_new()*d) && "Out of bounds time requested in move_state");
 
 
-    if ((time*this->direction() < this->t_new()*this->direction())) {
-        if (this->true_state_ptr()[0] == this->t_new()) {
-            int idx = _last_true_state_idx == _aux_state_idx ? _aux2_state_idx : _aux_state_idx;
-            T* ptr = _state_data.ptr(idx, 0);
-            set_state(time, ptr);
-            _true_state_idx = idx;
+
+    if ((time*d < this->t_new()*d)) {
+        if (_true_state_idx == _new_state_idx) {
+            if (_last_true_state_idx == _aux_state_idx){
+                T* ptr = _state_data.ptr(_aux2_state_idx, 0);
+                set_state(time, ptr);
+                _true_state_idx = _aux2_state_idx;
+                _aux2_state_idx = _old_state_idx;
+            } else {
+                T* ptr = _state_data.ptr(_aux_state_idx, 0);
+                set_state(time, ptr);
+                _true_state_idx = _aux_state_idx;
+                _aux_state_idx = _aux2_state_idx;
+                _aux2_state_idx = _old_state_idx;
+            }
         }else{
-            T* ptr = const_cast<T*>(this->true_state_ptr()); // using this->, not THIS-> for this case
-            set_state(time, ptr);
+            if (_last_true_state_idx == _aux_state_idx){
+                T* ptr = _state_data.ptr(_last_true_state_idx, 0);
+                set_state(time, ptr);
+                _last_true_state_idx = _true_state_idx;
+                _true_state_idx = _aux_state_idx;
+                _aux_state_idx = _last_true_state_idx;
+            } else {
+                T* ptr = _state_data.ptr(_aux_state_idx, 0);
+                set_state(time, ptr);
+                _last_true_state_idx = _true_state_idx;
+                _true_state_idx = _aux_state_idx;
+            }
         }
     }else if (_true_state_idx != _new_state_idx){
         // update the true state to the new state, because time is exactly at t_new
-        _aux_state_idx = _true_state_idx;
+        _last_true_state_idx = _true_state_idx;
         _true_state_idx = _new_state_idx;
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-void BaseSolver<Derived, T, N, SP, RhsType, JacType>::set_state(const T& time, T* state){
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+void BaseSolver<Derived, T, N, SP, OdeType>::set_state(const T& time, T* state){
     state[0] = time;
     state[1] = this->stepsize();
     interp(state+2, time);
 }
 
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename Setter>
-auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize){
+auto BaseSolver<Derived, T, N, SP, OdeType>::priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize){
     ics[0] = t0;
     if constexpr (std::is_void_v<std::invoke_result_t<Setter, T*>>){
         func(ics+2);
@@ -991,7 +976,7 @@ auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::priv_apply_ics_setter(T* i
             stepsize = this->auto_step(t0, ics+2);
         }
         ics[1] = stepsize;
-        this->reset();
+        THIS->Reset();
     } else {
         auto res = func(ics+2);
         assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
@@ -1001,11 +986,11 @@ auto BaseSolver<Derived, T, N, SP, RhsType, JacType>::priv_apply_ics_setter(T* i
             stepsize = this->auto_step(t0, ics+2);
         }
         ics[1] = stepsize;
-        this->reset();
+        THIS->Reset();
         return res;
     }
 }
-    
+
 
 } // namespace ode
 

@@ -47,7 +47,7 @@ NdInterpolator<Derived, T, NDIM, AS_VIRTUAL>::NdInterpolator(const ArrayType& va
             }
         }
     } else {
-        copy_array(field_.data(), values_ptr, field_.size());
+        ndspan::copy_array(field_.data(), values_ptr, field_.size());
     }
 
     if (field_.ndim() == 1){

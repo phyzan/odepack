@@ -12,33 +12,33 @@ template<size_t NDIM>
 DelaunayTri<NDIM>::DelaunayTri(const double* points, size_t n_points, size_t ndim) : points_(points, n_points, ndim) {
     compute_delaunay();
 
-    int ND = this->ndim();
-    v0_.resize(nsimplices(), ND);
-    invT_.resize(nsimplices(), ND, ND);
+    int nd = this->ndim();
+    v0_.resize(nsimplices(), nd);
+    invT_.resize(nsimplices(), nd, nd);
 
     constexpr Allocation Alloc = (NDIM == 0 ? Allocation::Heap : Allocation::Stack);
-    Array2D<double, NDIM, NDIM, Alloc> A(ND, ND);
+    Array2D<double, NDIM, NDIM, Alloc> A(nd, nd);
 
-    Array1D<double, NDIM, Alloc> work(ND);
-    Array1D<size_t, NDIM, Alloc> pivot(ND);
+    Array1D<double, NDIM, Alloc> work(nd);
+    Array1D<size_t, NDIM, Alloc> pivot(nd);
 
     for (int s = 0; s < nsimplices(); ++s) {
         const int* v = get_simplex(s);
 
         // v0
-        for (int i = 0; i < ND; ++i){
-            v0_(s, i) = points_(v[ND], i);
+        for (int i = 0; i < nd; ++i){
+            v0_(s, i) = points_(v[nd], i);
         }
         // build edge matrix
 
-        for (int i = 0; i < ND; ++i){
-            for (int j = 0; j < ND; ++j){
+        for (int i = 0; i < nd; ++i){
+            for (int j = 0; j < nd; ++j){
                 A(i, j) = points_(v[j], i) - v0_(s, i);
             }
         }
 
         // invert A ONCE (reuse your existing solver here)
-        inv_mat_row_major(invT_.ptr(s, 0, 0), A.data(), ND, work.data(), pivot.data());
+        inv_mat_row_major(invT_.ptr(s, 0, 0), A.data(), nd, work.data(), pivot.data());
 
     }
 
@@ -195,31 +195,31 @@ bool DelaunayTri<NDIM>::compute_barycentric(double* out, int simplex_idx, const 
     const double* v0 = v0_.ptr(simplex_idx, 0);
     const double* T  = invT_.ptr(simplex_idx, 0, 0);
 
-    int ND = ndim();
+    int nd = ndim();
 
     constexpr Allocation Alloc = (NDIM == 0 ? Allocation::Heap : Allocation::Stack);
-    Array1D<double, NDIM, Alloc> y(ND);
-    for (int i = 0; i < ND; ++i){
+    Array1D<double, NDIM, Alloc> y(nd);
+    for (int i = 0; i < nd; ++i){
         y[i] = point[i] - v0[i];
     }
 
     // bary[1..NDIM]
-    for (int i = 0; i < ND; ++i) {
+    for (int i = 0; i < nd; ++i) {
         double sum = 0.0;
-        for (int j = 0; j < ND; ++j){
-            sum += T[i * ND + j] * y[j];
+        for (int j = 0; j < nd; ++j){
+            sum += T[i * nd + j] * y[j];
         }
         out[i] = sum;
     }
 
     // bary[0]
     double sumb = 1.0;
-    for (int i = 0; i < ND; ++i){
+    for (int i = 0; i < nd; ++i){
         sumb -= out[i];
     }
-    out[ND] = sumb;
+    out[nd] = sumb;
 
-    return all_are_finite(out, ND + 1);
+    return all_are_finite(out, nd + 1);
 
 };
 
@@ -281,7 +281,7 @@ double DelaunayTri<NDIM>::volume(int simplex_idx) const {
                 + d[2]*(d[3]*d[7] - d[4]*d[6]);
         } else {
             double* worker = mat_cache().data();
-            copy_array(worker, d, nd*nd);
+            ndspan::copy_array(worker, d, nd*nd);
             det = detLU_row_major(worker, nd);
         }
     }
@@ -293,7 +293,7 @@ double DelaunayTri<NDIM>::volume(int simplex_idx) const {
         fact *= i;
     }
 
-    return 1.0 / (abs(det) * fact);
+    return 1.0 / (std::abs(det) * fact);
 }
 
 template<size_t NDIM>
@@ -402,7 +402,7 @@ void DelaunayTri<NDIM>::compute_delaunay_nd() {
 
     // Second pass: extract neighbors
     neighbors_.resize(num_simplices, n + 1);
-    neighbors_.set(-1); // default to -1 (no neighbor)
+    neighbors_.fill(-1); // default to -1 (no neighbor)
 
     for (int s = 0; s < num_simplices; ++s) {
         facetT* f = facet_list[s];
@@ -466,19 +466,19 @@ Array2D<double, NDIM, NDIM>& DelaunayTri<NDIM>::mat_cache() const {
 template<size_t NDIM>
 void DelaunayTri<NDIM>::set_state(const View2D<double, 0, NDIM>& points, const View2D<int, 0, DIM_SPX>& simplices, const View2D<int, 0, DIM_SPX>& neighbors, const View2D<double, 0, NDIM>& v0, const View3D<double, 0, NDIM, NDIM>& invT){
     points_.resize(points.shape(), points.ndim());
-    copy_array(points_.data(), points.data(), points.size());
+    ndspan::copy_array(points_.data(), points.data(), points.size());
 
     simplices_.resize(simplices.shape(), simplices.ndim());
-    copy_array(simplices_.data(), simplices.data(), simplices.size());
+    ndspan::copy_array(simplices_.data(), simplices.data(), simplices.size());
 
     neighbors_.resize(neighbors.shape(), neighbors.ndim());
-    copy_array(neighbors_.data(), neighbors.data(), neighbors.size());
+    ndspan::copy_array(neighbors_.data(), neighbors.data(), neighbors.size());
 
     v0_.resize(v0.shape(), v0.ndim());
-    copy_array(v0_.data(), v0.data(), v0.size());
+    ndspan::copy_array(v0_.data(), v0.data(), v0.size());
     
     invT_.resize(invT.shape(), invT.ndim());
-    copy_array(invT_.data(), invT.data(), invT.size());
+    ndspan::copy_array(invT_.data(), invT.data(), invT.size());
 }
 
 

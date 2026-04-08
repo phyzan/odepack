@@ -12,17 +12,16 @@ namespace ode{
 template<typename T>
 void PyConstSolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
     std::vector<T> args;
-    OdeData<Func<T>, void> ode_data = init_ode_data<T>(this->data, args, f, py_q0, jac, py_args, py_events);
-    std::vector<Event<T>*> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
-    std::vector<const Event<T>*> evs(safe_events.size());
-    for (size_t i=0; i<evs.size(); i++){
-        evs[i] = safe_events[i];
-    }
-    auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
-    this->s = get_virtual_solver<T, 0>(getIntegrator(name), ode_data, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs).release();
-    for (size_t i=0; i<evs.size(); i++){
-        delete safe_events[i];
-    }
+    init_ode_data<T, false>([&](const auto& ode_obj){
+        std::vector<std::unique_ptr<Event<T>>> safe_events = to_Events<T>(py_events, this->data.shape, py_args);
+        std::vector<const Event<T>*> evs(safe_events.size());
+        for (size_t i=0; i<evs.size(); i++){
+            evs[i] = safe_events[i].get();
+        }
+        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        this->s = get_virtual_solver<T, 0>(getIntegrator(name), ode_obj, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs).release();
+
+    }, this->data, args, f, py_q0, jac, py_args, py_events);
 }
 
 template<typename T>
@@ -36,8 +35,9 @@ const OdeRichSolver<T>* PyConstSolver::cast()const{
 }
 
 
-template<typename T>
-OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
+template<typename T, bool FORCE_JAC, typename Callable>
+void init_ode_data(Callable&& action, PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events){
+    // passes a copy of the final form of data to the OdeData object. As a result, the referenced data object should not be modified for the entire lifetime of the solver constructed with its copy.
     std::string scalar_type = get_scalar_type<T>();
     data.shape = shape(q0);
     data.py_args = py::tuple(py_args);
@@ -46,12 +46,13 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
     bool f_is_compiled = py::isinstance<PyFuncWrapper>(f) || py::isinstance<py::capsule>(f);
     bool jac_is_compiled = !jacobian.is_none() && (py::isinstance<PyFuncWrapper>(jacobian) || py::isinstance<py::capsule>(jacobian));
     args = (f_is_compiled || jac_is_compiled ? toCPP_Array<T, std::vector<T>>(py_args) : std::vector<T>{});
-    OdeData<Func<T>, void> ode_rhs = {nullptr, nullptr, nullptr};
+    PyRhsFunc<T> rhs = nullptr;
+    PyRhsFunc<T> jac = nullptr;
     if (f_is_compiled){
         if (py::isinstance<PyFuncWrapper>(f)){
             //safe approach
             auto& _f = f.cast<PyFuncWrapper&>();
-            ode_rhs.rhs = reinterpret_cast<Func<T>>(_f.rhs);
+            rhs = reinterpret_cast<PyRhsFunc<T>>(_f.rhs);
             if (_f.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size");
             }
@@ -60,32 +61,38 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
             }
         }
         else{
-            ode_rhs.rhs = open_capsule<Func<T>>(f.cast<py::capsule>());
+            rhs = open_capsule<PyRhsFunc<T>>(f.cast<py::capsule>());
         }
     }
     else{
         data.rhs = f;
-        ode_rhs.rhs = py_rhs;
+        rhs = py_rhs;
     }
     if (jac_is_compiled){
         if (py::isinstance<PyFuncWrapper>(jacobian)){
             //safe approach
             auto& _j = jacobian.cast<PyFuncWrapper&>();
-            ode_rhs.jacobian = (VoidType)_j.rhs;
+            jac = reinterpret_cast<PyRhsFunc<T>>(_j.rhs);
             if (_j.Nsys != _size){
                 throw py::value_error("The array size of the initial conditions differs from the ode system size that applied in the provided jacobian");
-            }
-            else if (_j.Nargs != args.size()){
+            } else if (_j.Nargs != args.size()){
                 throw py::value_error("The array size of the given extra args differs from the number of args specified for the provided jacobian");
             }
         }
         else{
-            ode_rhs.jacobian = (VoidType)open_capsule<Func<T>>(jacobian.cast<py::capsule>());
+            jac = reinterpret_cast<PyRhsFunc<T>>(open_capsule<PyRhsFunc<T>>(jacobian.cast<py::capsule>()));
         }
     }else if (!jacobian.is_none()){
         data.jac = jacobian;
-        ode_rhs.jacobian = (VoidType)py_jac<T>;
+        jac = reinterpret_cast<PyRhsFunc<T>>(py_jac<T>);
     }
+    
+    if constexpr (FORCE_JAC){
+        if (jac == nullptr){
+            throw py::value_error("No jacobian was provided, but the solver requires one");
+        }
+    }
+
     for (py::handle ev : events){
         if (!py::isinstance<PyEvent>(ev)) {
             throw py::value_error("All objects in 'events' iterable argument must be instances of the Event class. Instance of type '" + std::string(py::str(py::type::of(ev))) + "' was found.");
@@ -103,10 +110,29 @@ OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const
         array.resize({static_cast<py::ssize_t>(_size)});
     }
     data.is_lowlevel = f_is_compiled && (jac_is_compiled || jacobian.is_none()) && all_are_lowlevel(events);
-    if (!data.is_lowlevel){
-        ode_rhs.obj = &data;
+
+    if constexpr (FORCE_JAC){
+        // pass a jacobian whose type is not nullptr at compile time
+        action(OdeData{.Rhs = [rhs, pydata=data](T* res, const T& t, const T* q, const T* args){
+            rhs(res, t, q, args, &pydata);
+        }, .Jac = [jac, pydata=data](T* res, const T& t, const T* q, const T* args){
+            jac(res, t, q, args, &pydata);
+        }});
+    } else if (jac == nullptr){
+        // pass a jacobian whose type is std::nullptr_t at compile time, forcing the solver to use finite differences for jacobian approximation
+        action(OdeData{.Rhs = [rhs, pydata=data](T* res, const T& t, const T* q, const T* args){
+            rhs(res, t, q, args, &pydata);
+        }, .Jac = nullptr});
+    } else {
+        action(OdeData{.Rhs = [rhs, pydata=data](T* res, const T& t, const T* q, const T* args){
+            rhs(res, t, q, args, &pydata);
+        }, .Jac = [jac, pydata=data](T* res, const T& t, const T* q, const T* args){
+            jac(res, t, q, args, &pydata);
+        }});
     }
-    return ode_rhs;
+
+
+
 }
 
 template<typename Callable>

@@ -49,7 +49,7 @@ py::class_<PyRegScalarField, PyScalarField, RegularGridInterpolator<double, 0, t
 
 py::class_<RegularVectorField<double, 0, true>, VirtualVectorField, RegularGridInterpolator<double, 0, true>>(m, "RegularGridVectorField")
     .def(py::init(&PyRegVecField::init_main),
-        py::arg("values"))
+        py::arg("values"), py::arg("coordinates") = "cartesian")
     .def("component", &PyRegVecField::component,
         py::arg("i"))
     .def("streamplot_data", &PyRegVecField::py_streamplot_data,

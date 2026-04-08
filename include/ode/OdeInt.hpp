@@ -51,7 +51,7 @@ class ODE{
 
 public:
 
-    template<typename RhsType, typename JacType>
+    template<hasRhsFunc<T> OdeType>
     ODE(ODE_CONSTRUCTOR(T));
 
     DEFAULT_RULE_OF_FOUR(ODE)
@@ -68,20 +68,20 @@ public:
 
     size_t                      Nsys() const;
 
-    template<typename Callable = decltype(VoidFunc)>
-    OdeSolution<T, N>           rich_integrate(const T& interval, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    bool                        rich_integrate(OdeSolution<T, N>& out, const T& interval, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);
 
-    template<typename Callable = decltype(VoidFunc)>
-    bool                        integrate(OdeResult<T, N>* out, const T& interval, const std::vector<T>& t_array, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    bool                        integrate(OdeResult<T, N>* out, const T& interval, const std::vector<T>& t_array, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);
 
-    template<typename Callable = decltype(VoidFunc)>
-    bool                        integrate(OdeResult<T, N>* out, const T& interval, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    bool                        integrate(OdeResult<T, N>* out, const T& interval, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);
 
-    template<typename Callable = decltype(VoidFunc)>
-    bool                        integrate_until(OdeResult<T, N>* out, const T& t, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    bool                        integrate_until(OdeResult<T, N>* out, const T& t, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);
 
-    template<typename Callable = decltype(VoidFunc)>
-    bool                        integrate_until(OdeResult<T, N>* out, const T& t, const std::vector<T>& t_eval, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    bool                        integrate_until(OdeResult<T, N>* out, const T& t, const std::vector<T>& t_eval, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);
 
     bool                        diverges() const;
 
@@ -101,9 +101,7 @@ public:
 
     double                      runtime() const;
 
-    const pbox::PolyWrapper<OdeRichSolver<T, N>>&  solver() const;
-
-    void                        set_obj(const void* obj);
+    const OdeRichSolver<T, N>*  solver() const;
 
     virtual void                clear();
 
@@ -113,13 +111,13 @@ protected:
 
     ODE(size_t nsys);
 
-    pbox::PolyWrapper<OdeRichSolver<T, N>> solver_;
+    pbox::owner<OdeRichSolver<T, N>> solver_;
     OrbitData<T> orbit_data_;
     EventData<T> event_data_;
     std::vector<size_t> cached_idx_;
     double _runtime = 0;
 
-    template<typename RhsType, typename JacType>
+    template<hasRhsFunc<T> OdeType>
     void                                        init(ODE_CONSTRUCTOR(T));
 
     virtual void                                register_state();
@@ -128,8 +126,8 @@ protected:
 
 private:
 
-    template<typename ArrayType, typename Callable = decltype(VoidFunc)>
-    bool                                        priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options={}, Callable&& observer = decltype(VoidFunc)(), int max_prints = 0);
+    template<typename ArrayType, OptionalObserver<T> Callable = std::nullptr_t>
+    bool                                        priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0, bool interpolate = false);
 
     std::vector<EventOptions>                   validate_events(const std::vector<EventOptions>& options)const;
 

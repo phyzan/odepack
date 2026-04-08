@@ -2,6 +2,7 @@
 
 #include "ndview.hpp"
 
+
 namespace ndspan{
 
 
@@ -14,7 +15,7 @@ class AbstractArray : public AbstractMutView<Derived, L, T, DIMS...>{
 protected:
 
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
-    inline static constexpr size_t ND = sizeof...(DIMS);
+    inline static constexpr size_t RANK = sizeof...(DIMS);
 
     using Base::Base;
 
@@ -29,7 +30,7 @@ protected:
 
     void _copy_from(const T* data){
         if (this->size() > 0){
-            copy_array(this->data(), data, this->size());
+            ndspan::copy_array(this->data(), data, this->size());
         }
     }
 
@@ -45,7 +46,7 @@ class DynamicArray : public AbstractArray<DynamicArray<T, L, DIMS...>, T, L, DIM
 public:
 
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
-    inline static constexpr size_t ND = sizeof...(DIMS);
+    inline static constexpr size_t RANK = sizeof...(DIMS);
 
     DynamicArray() : Base() {
         _data = (N > 0 ? new T[N] : nullptr);
@@ -57,18 +58,18 @@ public:
 
     template<INT_T... Args>
     explicit DynamicArray(Args... shape) : Base(shape...) {
-        if (this->size() > 0){
+        if (this->size() > 0 && this->size() <= static_cast<size_t>(PTRDIFF_MAX)){
             _data = new T[this->size()];
         }
     }
 
     template<INT_T Int>
     explicit DynamicArray(const T* data, const Int* shape, size_t ndim) : Base(shape, ndim){
-        if (this->size() > 0){
+        if (this->size() > 0 && this->size() <= static_cast<size_t>(PTRDIFF_MAX)){
             _data = new T[this->size()];
         }
         if (data != nullptr){
-            copy_array<T>(this->data(), data, this->size());
+            ndspan::copy_array<T>(this->data(), data, this->size());
         }
     }
 
@@ -76,9 +77,9 @@ public:
     explicit DynamicArray(T* data, const Int* shape, size_t ndim, bool own_it) : Base(shape, ndim){
         if (own_it){
             _data = data;
-        }else if (this->size() > 0){
+        }else if (this->size() > 0 && this->size() <= static_cast<size_t>(PTRDIFF_MAX)){
             _data = new T[this->size()];
-            copy_array<T>(this->data(), data, this->size());
+            ndspan::copy_array<T>(this->data(), data, this->size());
         }
     }
 
@@ -87,13 +88,13 @@ public:
         this->_copy_from(data);
     }
 
-    DynamicArray(std::initializer_list<T> array) requires (ND<2 && (N == 0)) : DynamicArray(array.begin(), array.size()) {}
+    DynamicArray(std::initializer_list<T> array) requires (RANK<2 && (N == 0)) : DynamicArray(array.begin(), array.size()) {}
 
     DynamicArray(std::initializer_list<T> array) requires (N>0) : DynamicArray(array.begin(), (_validate_size<DIMS...>(array.size()), DIMS)...) {}
 
     //COPY CONSTRUCTOR
-    DynamicArray(const DynamicArray& other) : Base(static_cast<const Base&>(other)), _data((other.size() > 0) ? new T[other.size()] : nullptr) {
-        copy_array(this->data(), other.data(), this->size());
+    DynamicArray(const DynamicArray& other) : Base(static_cast<const Base&>(other)), _data((other.size() > 0 && other.size() <= static_cast<size_t>(PTRDIFF_MAX)) ? new T[other.size()] : nullptr) {
+        ndspan::copy_array(this->data(), other.data(), this->size());
     }
 
     //MOVE CONSTRUCTOR
@@ -104,10 +105,10 @@ public:
         if (&other != this){
             if (this->size() != other.size()){
                 delete[] _data;
-                _data = other.size() > 0 ? new T[other.size()] : nullptr;                
+                _data = (other.size() > 0 && other.size() <= static_cast<size_t>(PTRDIFF_MAX)) ? new T[other.size()] : nullptr;
             }
             Base::operator=(other);
-            copy_array(this->data(), other.data(), this->size());
+            ndspan::copy_array(this->data(), other.data(), this->size());
         }
         return *this;
     }
@@ -142,7 +143,7 @@ public:
         size_t total_size = prod(newsize, ndim);
         if (total_size != current_size){
             delete[] _data;
-            if (total_size == 0){
+            if (total_size == 0 || total_size > static_cast<size_t>(PTRDIFF_MAX)){
                 _data = nullptr;
             }
             else{
@@ -158,7 +159,7 @@ public:
         size_t total_size = (newsize * ... * 1);
         if (total_size != current_size){
             delete[] _data;
-            if (total_size == 0){
+            if (total_size == 0 || total_size > static_cast<size_t>(PTRDIFF_MAX)){
                 _data = nullptr;
             }
             else{
@@ -170,7 +171,7 @@ public:
     T* release(){
         T* res = _data;
         _data = nullptr;
-        _reset_base_to_zero(std::make_index_sequence<Base::ND>());
+        _reset_base_to_zero(std::make_index_sequence<Base::RANK>());
         return res;
     }
 
@@ -197,7 +198,7 @@ class StackArray : public AbstractArray<StackArray<T, L, DIMS...>, T, L, DIMS...
 public:
 
     inline static constexpr size_t N = (sizeof...(DIMS) == 0 ? 0 : (DIMS * ... * 1));
-    inline static constexpr size_t ND = sizeof...(DIMS);
+    inline static constexpr size_t RANK = sizeof...(DIMS);
 
     static_assert(N>0, "StackArray requires only positive template dimensions");
 
@@ -206,36 +207,36 @@ public:
     StackArray() = default;
 
     constexpr explicit StackArray(const T* data) : Base(){
-        copy_array<T, N>(this->data(), data, this->size());
+        ndspan::copy_array<T, N>(this->data(), data, this->size());
     }
 
     template<INT_T... Args>
     constexpr explicit StackArray(const T* data, Args... shape) : StackArray(shape...){
-        copy_array<T, N>(this->data(), data, this->size());
+        ndspan::copy_array<T, N>(this->data(), data, this->size());
     }
 
     template<INT_T Int>
     constexpr explicit StackArray(const T* data, const Int* shape, size_t ndim) : StackArray(shape, ndim){
-        copy_array<T, N>(this->data(), data, this->size());
+        ndspan::copy_array<T, N>(this->data(), data, this->size());
     }
 
     constexpr StackArray(std::initializer_list<T> array) : StackArray(array.begin(), (_validate_size<DIMS...>(array.size()), DIMS)...) {}
 
     //COPY CONSTRUCTORS
     constexpr StackArray(const StackArray& other) : Base(static_cast<const Base&>(other)) {
-        copy_array<T, N>(this->data(), other.data(), this->size());
+        ndspan::copy_array<T, N>(this->data(), other.data(), this->size());
     }
 
     //MOVE CONSTRUCTORS
     constexpr StackArray(StackArray&& other) noexcept : Base(static_cast<Base&&>(std::move(other))) {
-        copy_array<T, N>(this->data(), other.data(), this->size());
+        ndspan::copy_array<T, N>(this->data(), other.data(), this->size());
     }
 
     //ASSIGNMENT OPERATORS
     StackArray& operator=(const StackArray& other) {
         if (&other != this){
             Base::operator=(other);
-            copy_array<T, N>(this->data(), other.data(), this->size());
+            ndspan::copy_array<T, N>(this->data(), other.data(), this->size());
         }
         return *this;
     }
@@ -244,7 +245,7 @@ public:
     StackArray& operator=(StackArray&& other) noexcept {
         if (&other != this){
             Base::operator=(std::move(other));
-            copy_array<T, N>(this->data(), other.data(), this->size());
+            ndspan::copy_array<T, N>(this->data(), other.data(), this->size());
         }
         return *this;
     }
@@ -288,7 +289,7 @@ struct ArrayAllocMap<Allocation::Auto, L, T, DIMS...> {
 
 
 
-template <typename T, Allocation Alloc = Allocation::Heap, Layout L = Layout::C, size_t... DIMS>
+template <typename T, Allocation Alloc = Allocation::Auto, Layout L = Layout::C, size_t... DIMS>
 class Array : public ArrayAllocMap<Alloc, L, T, DIMS...>::type{
 
     using Base = ArrayAllocMap<Alloc, L, T, DIMS...>::type;
@@ -366,9 +367,9 @@ public:
     INLINE View<T, L, DIMS...> view() const{
         if constexpr (Base::N > 0){
             return View<T, L, DIMS...>(this->data());
-        }else if (Base::ND > 0) {
+        }else if (Base::RANK > 0) {
             const size_t* s = this->shape();
-            return EXPAND(size_t, Base::ND, I,
+            return EXPAND(size_t, Base::RANK, I,
                 View<T, L, DIMS...>(this->data(), s[I]...);
             );
         }else {
@@ -454,8 +455,8 @@ public:
         return Base::ptr(idx...);
     }
 
-    INLINE Array& set(const T& value){
-        Base::set(value);
+    INLINE Array& fill(const T& value){
+        Base::fill(value);
         return *this;
     }
 
@@ -464,7 +465,7 @@ public:
 
 
 
-template <typename T, size_t NDIM, Layout L = Layout::C>
+template <typename T, size_t Rank, Layout L = Layout::C>
 struct HelperNdArray
 {
     template <Allocation Alloc, std::size_t... Is>
@@ -473,23 +474,23 @@ struct HelperNdArray
     template <std::size_t... Is>
     static View<T, L, (static_cast<void>(Is), 0)...> make_view(std::index_sequence<Is...>);
 
-    template<Allocation Alloc = Allocation::Heap>
-    using type = decltype(make<Alloc>(std::make_index_sequence<NDIM>{}));
+    template<Allocation Alloc>
+    using type = decltype(make<Alloc>(std::make_index_sequence<Rank>{}));
 
-    using ViewType = decltype(make_view(std::make_index_sequence<NDIM>{}));
+    using ViewType = decltype(make_view(std::make_index_sequence<Rank>{}));
 };
 
-template <typename T, size_t NDIM, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
-using NdArray = HelperNdArray<T, NDIM, L>::template type<Alloc>;
+template <typename T, size_t Rank, Allocation Alloc = Allocation::Auto, Layout L = Layout::C>
+using NdArray = HelperNdArray<T, Rank, L>::template type<Alloc>;
 
-template <typename T, size_t NDIM, Layout L = Layout::C>
-using NdView = HelperNdArray<T, NDIM, L>::ViewType;
+template <typename T, size_t Rank, Layout L = Layout::C>
+using NdView = HelperNdArray<T, Rank, L>::ViewType;
 
 
-template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Heap>
+template <typename T, size_t SIZE=0, Allocation Alloc = Allocation::Auto>
 using Array1D = Array<T, Alloc, Layout::C, SIZE>;
 
-template<typename T, size_t Nr = 0, size_t Nc = 0, Allocation Alloc = Allocation::Heap, Layout L = Layout::C>
+template<typename T, size_t Nr = 0, size_t Nc = 0, Allocation Alloc = Allocation::Auto, Layout L = Layout::C>
 class Array2D : public Array<T, Alloc, L, Nr, Nc>{
 
     using Base = Array<T, Alloc, L, Nr, Nc>;
@@ -535,7 +536,8 @@ public:
 };
 
 
-template <typename T, size_t M=0, size_t N=0, size_t K=0, Allocation Alloc = Allocation::Heap>
+template <typename T, size_t M=0, size_t N=0, size_t K=0, Allocation Alloc = Allocation::Auto>
 using Array3D = Array<T, Alloc, Layout::C, M, N, K>;
+
 
 } // namespace ndspan

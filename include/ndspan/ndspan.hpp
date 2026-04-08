@@ -8,9 +8,9 @@ template<typename Derived, size_t... DIMS>
 class AbstractNdSpan{
 
 protected:
-    inline static constexpr size_t ND = sizeof...(DIMS);
-    inline static constexpr size_t N = (ND == 0 ? 0 : (DIMS * ... * 1));
-    inline static constexpr std::array<size_t, ND> SHAPE = {DIMS...};
+    inline static constexpr size_t RANK = sizeof...(DIMS);
+    inline static constexpr size_t N = (RANK == 0 ? 0 : (DIMS * ... * 1));
+    inline static constexpr std::array<size_t, RANK> SHAPE = {DIMS...};
 
     using CLS = AbstractNdSpan<Derived, DIMS...>;
 
@@ -162,10 +162,10 @@ protected:
     template<INT_T... Idx>
     INLINE constexpr void _dim_check(Idx... idx) const {
         //dimension check
-        if constexpr (ND > 0){
-            static_assert(sizeof...(idx) == ND, "Incorrect number of indices");
+        if constexpr (RANK > 0){
+            static_assert(sizeof...(idx) == RANK, "Incorrect number of indices");
         }
-        else if constexpr (ND == 0){
+        else if constexpr (RANK == 0){
             assert(sizeof...(idx) == this->ndim() && "Incorrect number of indices");
         }
     }
@@ -210,7 +210,7 @@ public:
     }
 
     inline constexpr size_t ndim() const {
-        return Base::ND;
+        return Base::RANK;
     }
 
     inline constexpr const size_t* shape() const {
@@ -252,10 +252,10 @@ class SemiStaticNdSpan : public AbstractNdSpan<Derived, DIMS...>{
 
 protected:
 
-    inline static constexpr size_t ND = sizeof...(DIMS);
+    inline static constexpr size_t RANK = sizeof...(DIMS);
     inline static constexpr size_t N = (DIMS * ...);
 
-    static_assert(N==0 && ND>0, "Use SemiStaticNdSpan for a static number of dims of dynamic length");
+    static_assert(N==0 && RANK>0, "Use SemiStaticNdSpan for a static number of dims of dynamic length");
 
     SemiStaticNdSpan() = default;
 
@@ -275,12 +275,12 @@ public:
 
     template<INT_T... Args>
     void constexpr resize(Args... shape){
-        //ND > 0, but some template dims are zero
-        static_assert((sizeof...(shape) == ND), "Constructor must be called with as many dims as the number of template dims");
+        //RANK > 0, but some template dims are zero
+        static_assert((sizeof...(shape) == RANK), "Constructor must be called with as many dims as the number of template dims");
 
         _data[0] = size_t((shape*...));
-        EXPAND(size_t, ND, I,
-            assert(((shape >= 0 && (Base::ND==0 || ((Base::SHAPE[I] > 0 ? shape == Base::SHAPE[I] : true)))) && ...) && "Runtime dims do not match template dims");
+        EXPAND(size_t, RANK, I,
+            assert(((shape >= 0 && (Base::RANK==0 || ((Base::SHAPE[I] > 0 ? shape == Base::SHAPE[I] : true)))) && ...) && "Runtime dims do not match template dims");
             ((_data[I+1] = size_t(shape)), ...);
         );
     }
@@ -289,10 +289,10 @@ public:
     void resize(const Int* shape, size_t ndim){
         assert(Base::_is_valid_shape(shape, ndim) && "Invalid dims");
         //TODO make sure non of these are zero at runtime, and they are equal to the template parameter
-        assert(ndim == Base::ND && "SemiStaticNdSpan::resize invalid shape");
+        assert(ndim == Base::RANK && "SemiStaticNdSpan::resize invalid shape");
 
         _data[0] = prod(shape, ndim);
-        copy_array(_data+1, shape, ndim);
+        ndspan::copy_array(_data+1, shape, ndim);
     }
 
     template<INT_T... Args>
@@ -312,7 +312,7 @@ public:
     }
 
     INLINE constexpr size_t ndim() const{
-        return ND;
+        return RANK;
     }
 
     INLINE const size_t* shape() const {
@@ -323,7 +323,7 @@ public:
 
 private:
 
-    size_t _data[ND+1] = {N, DIMS...};
+    size_t _data[RANK+1] = {N, DIMS...};
 
 
 };
@@ -335,7 +335,7 @@ class SemiStaticSpan1D : public AbstractNdSpan<SemiStaticSpan1D, 0>{
 
 public:
 
-    inline static constexpr size_t ND = 1;
+    inline static constexpr size_t RANK = 1;
     inline static constexpr size_t N = 0;
 
     SemiStaticSpan1D() = default;
@@ -382,7 +382,7 @@ public:
     }
 
     INLINE constexpr size_t ndim() const{
-        return ND;
+        return RANK;
     }
 
     INLINE const size_t* shape() const {
@@ -424,7 +424,7 @@ class DynamicNdSpan : public AbstractNdSpan<Derived>{
 
 protected:
 
-    static constexpr size_t ND = 0;
+    static constexpr size_t RANK = 0;
     static constexpr size_t N = 0;
     
 
@@ -452,7 +452,7 @@ protected:
             _data = new size_t[2+other.ndim()];
             ptr()[0] = other.ndim();
             ptr()[1] = other.size();
-            copy_array(ptr()+2, other.shape(), this->ndim());
+            ndspan::copy_array(ptr()+2, other.shape(), this->ndim());
         }
     }
 
@@ -476,7 +476,7 @@ protected:
                 }
             }
             if (other.ndim() > 0){
-                copy_array(ptr()+2, other.shape(), other.ndim());
+                ndspan::copy_array(ptr()+2, other.shape(), other.ndim());
             }
         }
         return *this;
@@ -545,7 +545,7 @@ public:
             }
             ptr()[1] = prod(shape, ndim);
 
-            copy_array(ptr()+2, shape, ndim);
+            ndspan::copy_array(ptr()+2, shape, ndim);
         }
     }
 

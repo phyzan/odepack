@@ -159,45 +159,45 @@ public:
 
     //ACCESSORS
 
-     const Interval<T>&       interval() const override;
+    const Interval<T>&          interval() const override;
 
-     const Array1D<T, N>&     q_start() const override;
+    const Array1D<T, N>&        q_start() const override;
 
-     const Array1D<T, N>&     q_end() const override;
+    const Array1D<T, N>&        q_end() const override;
 
-    virtual size_t                  order() const;
+    virtual size_t              order() const;
 
-     int                      start_bdr() const override;
+    int                         start_bdr() const override;
 
-     int                      end_bdr() const override;
+    int                         end_bdr() const override;
 
-     int                      dir() const override;
+    int                         dir() const override;
 
-     const T&                 t_start() const override;
+    const T&                    t_start() const override;
 
-     const T&                 t_end() const override;
+    const T&                    t_end() const override;
 
-     bool                     is_out_of_bounds(const T& t) const override;
+    bool                        is_out_of_bounds(const T& t) const override;
 
-     bool                     can_link_with(const Interpolator<T, N>& other) const override;
+    bool                        can_link_with(const Interpolator<T, N>& other) const override;
 
-    LocalInterpolator<T, N>*        clone() const override;
+    LocalInterpolator<T, N>*    clone() const override;
 
     //MODIFIERS
 
-    void                            adjust_start(const T& t_start) override;
+    void    adjust_start(const T& t_start) override;
 
-    void                            adjust_end(const T& t_end) override;
+    void    adjust_end(const T& t_end) override;
 
-    void                            link_with(Interpolator<T, N>& other) override;
+    void    link_with(Interpolator<T, N>& other) override;
 
-    void                            link_after(Interpolator<T, N>& other) override;
+    void    link_after(Interpolator<T, N>& other) override;
 
-     void                     close_end() override;
+    void    close_end() override;
 
-     void                     close_start() override;
+    void    close_start() override;
 
-     void                     open_end() override;
+    void    open_end() override;
 
 protected:
 
@@ -219,36 +219,34 @@ private:
 
 
 
+template<typename T, size_t N, typename Callable>
+class CustomLocalInterpolator : public LocalInterpolator<T, N>{
 
-
-template<typename T, size_t N>
-class StandardLocalInterpolator final: public LocalInterpolator<T, N>{
-    
 public:
 
-    StandardLocalInterpolator() = delete;
+    CustomLocalInterpolator() = delete;
 
-    StandardLocalInterpolator(const T& t, const T* q, size_t size);
+    template<typename U>
+    CustomLocalInterpolator(U&& callable, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
 
-    StandardLocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
-
-    DEFAULT_RULE_OF_FOUR(StandardLocalInterpolator);
-
-    size_t order() const override;
-
-    StandardLocalInterpolator<T, N>* clone() const override;
-
-protected:
-
-    Array2D<T, N, 0> _coef_mat; //number of columns is equal to the interpolation order
-    size_t _order = 0;
-
-private:
+    DEFAULT_RULE_OF_FOUR(CustomLocalInterpolator);
 
     void _call_impl(T* result, const T& t) const override;
 
+private:
+
+    Callable _callable;
 
 };
+
+template<typename T, size_t N, typename Callable>
+template<typename U>
+CustomLocalInterpolator<T, N, Callable>::CustomLocalInterpolator(U&& callable, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr) : LocalInterpolator<T, N>(t1, t2, y1, y2, size, left_bdr, right_bdr), _callable(std::forward<U>(callable)) {}
+
+template<typename T, size_t N, typename Callable>
+void CustomLocalInterpolator<T, N, Callable>::_call_impl(T* result, const T& t) const{
+    _callable(result, t);
+}
 
 
 
@@ -306,45 +304,45 @@ public:
 
     //MODIFIERS
 
-    void                                    link_with(Interpolator<T, N>& interpolant) override;
+    void    link_with(Interpolator<T, N>& interpolant) override;
 
-    void                                    link_after(Interpolator<T, N>& interpolant) override;
+    void    link_after(Interpolator<T, N>& interpolant) override;
 
-     void                             adjust_start(const T& t_new) override;
+    void    adjust_start(const T& t_new) override;
 
-     void                             adjust_end(const T& t_new) override;
+    void    adjust_end(const T& t_new) override;
 
-    void                                    expand(const INTERPOLATOR& interpolant);
+    void    expand(const INTERPOLATOR& interpolant);
 
-    void                                    expand_by_owning(std::unique_ptr<Interpolator<T, N>>&& interpolant) requires _is_void;
+    void    expand_by_owning(std::unique_ptr<Interpolator<T, N>> interpolant) requires _is_void;
 
-     void                             open_end() override;
+    void    open_end() override;
 
-     void                             close_end() override;
+    void    close_end() override;
 
-     void                             close_start() override;
+    void    close_start() override;
 
 private:
 
-    size_t                              _search_index(const T& t) const;
+    size_t              _search_index(const T& t) const;
 
-     bool                         _can_replace_last_with(const Interpolator<T, N>& other) const;
+    bool                _can_replace_last_with(const Interpolator<T, N>& other) const;
 
-    void                                _call_impl(T* result, const T& t) const override;
+    void                _call_impl(T* result, const T& t) const override;
 
-           INTERPOLATOR&          _get(size_t i);
+    INTERPOLATOR&       _get(size_t i);
 
-     const INTERPOLATOR&          _get(size_t i) const;
+    const INTERPOLATOR& _get(size_t i) const;
 
-           INTERPOLATOR&          _get_last();
+    INTERPOLATOR&       _get_last();
 
-     const INTERPOLATOR&          _get_last() const;
+    const INTERPOLATOR& _get_last() const;
     
-           INTERPOLATOR&          _get_safe(size_t i);
+    INTERPOLATOR&       _get_safe(size_t i);
 
-     const INTERPOLATOR&          _get_safe(size_t i) const;
+    const INTERPOLATOR& _get_safe(size_t i) const;
 
-     void                         _throw_invalid_interpolant(const Interpolator<T, N>& interpolant) const;
+    void                _throw_invalid_interpolant(const Interpolator<T, N>& interpolant) const;
 
     std::vector<INTERPOLATOR> _interpolants = {};
     std::vector<std::unique_ptr<Interpolator<T, N>>> _interp_ptrs = {};
@@ -363,7 +361,7 @@ template<typename T>
 void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size);
 
 template<typename T, size_t N>
-using InterpObj = pbox::PolyWrapper<Interpolator<T, N>>;
+using InterpObj = pbox::owner<Interpolator<T, N>>;
 
 } // namespace ode
 

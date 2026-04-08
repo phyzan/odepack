@@ -32,9 +32,9 @@ class NdSpan : public std::conditional_t<(sizeof...(DIMS)==1 && (DIMS*...*1)==0)
 
 protected:
 
-    inline static constexpr size_t ND = Base::ND;
+    inline static constexpr size_t RANK = Base::RANK;
     inline static constexpr size_t N = Base::N;
-    inline static constexpr std::array<size_t, ND> SHAPE = Base::SHAPE;
+    inline static constexpr std::array<size_t, RANK> SHAPE = Base::SHAPE;
 
 public:
 

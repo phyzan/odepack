@@ -8,6 +8,12 @@
 namespace ode {
 
 
+enum class CoordType : uint8_t {
+    Cartesian,
+    Polar,
+    Spherical
+};
+
 
 template<typename T, int NDIM, bool AS_VIRTUAL = false>
 class RegularGridInterpolator : public NdInterpolator<RegularGridInterpolator<T, NDIM, AS_VIRTUAL>, T, NDIM, AS_VIRTUAL>{
@@ -52,17 +58,20 @@ class RegularVectorField : public RegularGridInterpolator<T, NDIM, AS_VIRTUAL>, 
 
 public:
 
+    // overriden to support different coordinate systems (Cartesian, Polar, Spherical)
+    void OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const;
+
     // grid[i].data(), grid[i].size() : grid points along axis i
     template<typename ValuesContainer, typename AxisViewContainer>
-    RegularVectorField(const ValuesContainer& values, const AxisViewContainer& grid, bool coord_axis_first);
+    RegularVectorField(const ValuesContainer& values, const AxisViewContainer& grid, CoordType coord_type, bool coord_axis_first);
 
     std::vector<Array2D<T, NDIM, 0>>    streamplot_data(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method) const;
 
 
     // ============ Explicit overrides for VectorField ==============
-    bool interp(T* out, const T* coords) const;
-    int ndim() const;
-    bool contains(const T* coords) const;
+    bool    interp(T* out, const T* coords) const;
+    int     ndim() const;
+    bool    contains(const T* coords) const;
     // ==============================================================
 
 
@@ -70,6 +79,8 @@ private:
 
     template<size_t... I>
     std::vector<Array2D<T, NDIM, 0>>    streamplot_data_core(T max_length, T ds, size_t density, T rtol, T atol, T min_step, T max_step, T stepsize, Integrator method, std::index_sequence<I...>) const;
+
+    CoordType coord_type_;
 
 }; // RegularVectorField
 

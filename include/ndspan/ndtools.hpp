@@ -15,7 +15,9 @@
 #include <mpreal.h>
 #endif
 
-#define THIS static_cast<copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>*>(this)
+#define THIS static_cast<std::conditional_t<std::is_void_v<Derived>, \
+    std::remove_reference_t<decltype(*this)>, \
+    copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>>*>(this)
 #define CONST_CAST(TYPE, FUNC) const_cast<TYPE>(static_cast<const CLS*>(this)->FUNC);
 #define INLINE __attribute__((always_inline)) inline
 #define LAMBDA_INLINE __attribute__((always_inline, flatten))
@@ -152,7 +154,7 @@ INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
 
 template<typename T, size_t N>
 INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
-    assert((size == N) && "Size must match array template size in copy_array");
+    assert((size == N) && "Size must match array template size in ndspan::copy_array");
     if (size==0) {return;}
     std::copy(src, src+size, dest);
 }
@@ -177,24 +179,14 @@ INLINE bool equal_arrays(const T* a, const T* b, size_t size){
 
 template<typename T>
 std::string to_string(const T& value, int prec = 3) {
-#ifdef MPREAL
-    static_assert(std::is_arithmetic_v<T> || std::is_convertible_v<T, mpfr::mpreal>, "T must be numeric or convertible to mpreal");
-#else
-    static_assert(std::is_arithmetic_v<T>, "T must be numeric");
-#endif
 
     if constexpr (std::is_integral_v<T>) {
         return std::to_string(value);
-    } else if constexpr (std::is_floating_point_v<T>) {
+    } else {
         std::ostringstream out;
         out << std::setprecision(prec) << std::scientific << value;
         return out.str();
     }
-#ifdef MPREAL
-    else if constexpr (!std::is_arithmetic_v<T> && std::is_convertible_v<T, mpfr::mpreal>) {
-        return to_string(static_cast<mpfr::mpreal>(value), prec);
-    }
-#endif
 }
 
 #ifdef MPREAL
@@ -212,12 +204,12 @@ INLINE T abs(const T& x){
 
 template<typename T>
 inline constexpr T max(const T& a, const T& b) {
-    return a > b ? a : b;
+    return std::max<T>(a, b);
 }
 
 template<typename T>
 inline constexpr T min(const T& a, const T& b) {
-    return a < b ? a : b;
+    return std::min<T>(a, b);
 }
 
 template<typename T>

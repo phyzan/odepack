@@ -82,7 +82,15 @@ bool RegularGridInterpolator<T, NDIM, AS_VIRTUAL>::interp(T* out, const T* coord
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
 template<typename ValuesContainer, typename AxisViewContainer>
-RegularVectorField<T, NDIM, AS_VIRTUAL>::RegularVectorField(const ValuesContainer& values, const AxisViewContainer& grid, bool coord_axis_first) : InterpBase(values, grid, coord_axis_first), VFBase() {}
+RegularVectorField<T, NDIM, AS_VIRTUAL>::RegularVectorField(const ValuesContainer& values, const AxisViewContainer& grid, CoordType coord_type, bool coord_axis_first) : InterpBase(values, grid, coord_axis_first), VFBase(), coord_type_(coord_type) {
+    if (this->ndim() < 2){
+        throw std::invalid_argument("Vectorfields require ndim >= 2");
+    } else if (this->ndim() > 3 && coord_type != CoordType::Cartesian){
+        throw std::invalid_argument("Non-Cartesian coordinate systems are only supported for 2D and 3D vector fields");
+    } else if (coord_type == CoordType::Spherical && this->ndim() != 3){
+        throw std::invalid_argument("Spherical coordinates are only supported for 3D vector fields");
+    }
+}
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
 bool RegularVectorField<T, NDIM, AS_VIRTUAL>::interp(T* out, const T* coords) const{
@@ -97,6 +105,40 @@ int RegularVectorField<T, NDIM, AS_VIRTUAL>::ndim() const{
 template<typename T, int NDIM, bool AS_VIRTUAL>
 bool RegularVectorField<T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
     return InterpBase::contains(coords);
+}
+
+template<typename T, int NDIM, bool AS_VIRTUAL>
+void RegularVectorField<T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const{
+    
+    if (coord_type_ == CoordType::Cartesian){
+        VFBase::OdeFuncNorm(out, t, q, args);
+        return;
+    }
+    
+    size_t nd = this->ndim();
+    if (!this->interp(out, q)){
+        std::fill(out, out + nd, 0);
+        return;
+    }
+
+    // Normalize by physical norm first (physical components form a Euclidean vector)
+    T norm = 0;
+    for (size_t i = 0; i < nd; i++) {
+        norm += out[i] * out[i];
+    }
+    norm = sqrt(norm);
+    for (size_t i = 0; i < nd; i++) {
+        out[i] /= norm;
+    }
+
+    // Then convert normalized physical components to coordinate velocities
+    if (coord_type_ == CoordType::Polar){
+        out[1] /= q[0]; // dphi/dt = vphi_hat / r
+    } else {
+        assert(coord_type_ == CoordType::Spherical && "Unsupported coordinate type");
+        out[1] /= q[0]; // dtheta/dt = vtheta_hat / r
+        out[2] /= q[0] * sin(q[1]); // dphi/dt = vphi_hat / (r*sin(theta))
+    }
 }
 
 
@@ -115,7 +157,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     assert(density > 1 && "Density must be greater than 1");
     std::vector<T> args{};
     std::vector<const Event<T>*> events{};
-    std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData<Func<T>, void>{.rhs=VFBase::ode_func_norm, .obj=this}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, stepsize, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
+    std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ this->OdeFuncNorm(out, t, q, args); }}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, stepsize, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
     OdeRichSolver<T, NDIM>* solver = unique_solver.get();
 
     const auto& X = this->grid().data();
@@ -133,9 +175,23 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
     NdArray<bool, NDIM> is_full(nullptr, N.data(), this->ndim());
     Array1D<std::vector<int>, NDIM, InterpBase::ALLOC> reached(this->ndim()); // reached[axis] = vector of reached indices along that axis
-    is_full.set(false);
+    is_full.fill(false);
 
-    T min_length = 0.2 * (*std::min_element(L.begin(), L.end())); // minimum length of streamline to be kept, as a fraction of the minimum grid length
+    // Compute physical extents for each axis (angular extents scaled by representative radii)
+    Array1D<T, NDIM, InterpBase::ALLOC> L_phys(this->ndim());
+    for (int axis=0; axis<this->ndim(); axis++){
+        L_phys[axis] = L[axis];
+    }
+    if (coord_type_ == CoordType::Polar){
+        T r_mid = X[0][0] + L[0] / 2;
+        L_phys[1] = r_mid * L[1];
+    } else if (coord_type_ == CoordType::Spherical){
+        T r_mid = X[0][0] + L[0] / 2;
+        T theta_mid = X[1][0] + L[1] / 2;
+        L_phys[1] = r_mid * L[1];
+        L_phys[2] = r_mid * sin(theta_mid) * L[2];
+    }
+    T min_length = 0.2 * (*std::min_element(L_phys.begin(), L_phys.end())); // minimum physical length of streamline to be kept
 
     Array1D<int, NDIM, InterpBase::ALLOC> i_start(this->ndim());
     Array1D<int, NDIM, InterpBase::ALLOC> i_curr(this->ndim());
@@ -194,27 +250,27 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
             if constexpr (NDIM > 0){
                 ((x[I][n_steps*dir] = q_new[I]), ...);
                 if (((i_curr[I] != i_start[I]) || ...) && InBounds(i_curr)){
-                    if(!is_full(i_curr[I]...)){
-                        is_full(i_curr[I]...) = true;
-                        (reached[I].push_back(i_curr[I]), ...);
-                        ((i_start[I] = i_curr[I]), ...);
-                    }else {
-                        break;
+                    if(is_full(i_curr[I]...)){
+                        break;  // Stop if cell already occupied (like Python line 193)
                     }
+                    // Mark cell and record it (like Python lines 186-189)
+                    is_full(i_curr[I]...) = true;
+                    (reached[I].push_back(i_curr[I]), ...);
+                    ((i_start[I] = i_curr[I]), ...);
                 }
             }else{
                 for (int axis=0; axis<this->ndim(); axis++){
                     x[axis][n_steps*dir] = q_new[axis];
                 }
                 if ((!allEqual(i_start.data(), i_curr.data(), this->ndim())) && InBounds(i_curr)){
-                    if(!is_full.getElem(i_curr.data())){
-                        is_full.getElem(i_curr.data()) = true;
-                        for (int axis=0; axis<this->ndim(); axis++){
-                            reached[axis].push_back(i_curr[axis]);
-                            i_start[axis] = i_curr[axis];
-                        }
-                    }else {
-                        break;
+                    if(is_full.getElem(i_curr.data())){
+                        break;  // Stop if cell already occupied
+                    }
+                    // Mark cell and record it
+                    is_full.getElem(i_curr.data()) = true;
+                    for (int axis=0; axis<this->ndim(); axis++){
+                        reached[axis].push_back(i_curr[axis]);
+                        i_start[axis] = i_curr[axis];
                     }
                 }
             }
@@ -267,14 +323,14 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         Array2D<T, NDIM, 0> true_line(this->ndim(), n_steps_tot);
         if (s_total > min_length && n_steps_tot > 1){
             if constexpr (NDIM > 0){
-                ((copy_array(true_line.ptr(I, 0), x_line[I], n_steps_tot)), ...);
+                ((ndspan::copy_array(true_line.ptr(I, 0), x_line[I], n_steps_tot)), ...);
             }else{
                 for (int axis=0; axis<this->ndim(); axis++){
-                    copy_array(true_line.ptr(axis, 0), x_line[axis], n_steps_tot);
+                    ndspan::copy_array(true_line.ptr(axis, 0), x_line[axis], n_steps_tot);
                 }
             }
 
-            //mark the initial point
+            // Cells were already marked during integration - just mark the initial point
             GetIdx(i_start, x0);
             if (InBounds(i_start)){
                 if constexpr (NDIM > 0){
@@ -282,11 +338,10 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
                 }else{
                     is_full.getElem(i_start.data()) = true;
                 }
-                
             }
             success = true;
         }else{
-            // unmark the points we marked during this integration attempt
+            // Failed streamline - unmark all cells marked during integration
             int r_size = reached[0].size();
             for (int k = 0; k < r_size; k++){
                 if constexpr (NDIM > 0){
@@ -355,7 +410,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     for (int shell = 0; shell < max_shells; shell++) {
         // Iterate over all grid points within the current shell's bounding box
         Array1D<int, NDIM, InterpBase::ALLOC> idx(this->ndim());
-        std::fill(idx.begin(), idx.end(), shell);
+        idx.fill(shell);
         while (true) {
             // Only process points that are exactly on this shell boundary
             if (shell_level(idx) == shell) {
@@ -375,6 +430,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
             if (d == this->ndim()) {break;} // All combinations exhausted
         }
     }
+
     return streamlines;
 }
 

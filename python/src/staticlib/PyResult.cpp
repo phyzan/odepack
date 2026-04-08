@@ -1,5 +1,5 @@
-#include "../../../include/pyode/lib_impl/PyResult_impl.hpp"
-#include "../../../include/ode/Tools_impl.hpp"
+#include "../../../include/pyodepack.hpp"
+
 
 namespace ode{
 
@@ -130,19 +130,5 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 //===========================================================================================
 
 
-#define DEFINE_ODERESULT(T) \
-    template class OdeResult<T, 0>; \
-    template class OdeSolution<T, 0>; \
-    template struct OrbitData<T>; \
-    template class EventData<T>; \
-
-DEFINE_ODERESULT(float)
-DEFINE_ODERESULT(double)
-DEFINE_ODERESULT(long double)
-#ifdef MPREAL
-DEFINE_ODERESULT(mpfr::mpreal)
-#endif
-
-#undef DEFINE_ODERESULT
 
 } // namespace ode

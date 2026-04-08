@@ -11,9 +11,14 @@ namespace ode {
 // template<typename T, size_t Nstages>
 // T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size);
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
-class RungeKuttaMainBase : public BaseDispatcher<Derived, T, N, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class RungeKuttaMainBase : public BaseDispatcher<Derived, T, N, SP, OdeType>{
 
+public:
+
+    void        Reset();
+
+    void        ReAdjust(const T* new_vector);
     
 protected:
 
@@ -24,13 +29,9 @@ protected:
 
     StepResult  adapt_impl(T* res, const T* state);
 
-    void        reset_impl();
-
-    void        re_adjust_impl(const T* new_vector);
-
     // =========================================================
-    using Base = BaseDispatcher<Derived, T, N, SP, RhsType, JacType>;
-    using RKBase = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
+    using Base = BaseDispatcher<Derived, T, N, SP, OdeType>;
+    using RKBase = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
 
     using Atype = Array2D<T, Nstages, Nstages, Allocation::Stack>;
     using Btype = Array1D<T, Nstages, Allocation::Stack>;
@@ -60,11 +61,11 @@ protected:
 };
 
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
-class RungeKuttaBaseStatic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class RungeKuttaBaseStatic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>{
 
 protected:
-    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
+    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
     using Base::Base;
 
     static constexpr typename Base::Atype Am_ = Derived::Amatrix();
@@ -72,11 +73,11 @@ protected:
     static constexpr typename Base::Ctype Cm_ = Derived::Cmatrix();
 };
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
-class RungeKuttaBaseDynamic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class RungeKuttaBaseDynamic : public RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>{
 
 protected:
-    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, RhsType, JacType>;
+    using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
     using Base::Base;
 
     typename Base::Atype Am_ = Derived::Amatrix();
@@ -84,18 +85,18 @@ protected:
     typename Base::Ctype Cm_ = Derived::Cmatrix();
 };
 
-template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, size_t K_ROWS, SolverPolicy SP, typename RhsType, typename JacType>
-using DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, RungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, K_ROWS, SP, RhsType, JacType>, RungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, K_ROWS, SP, RhsType, JacType>>;
+template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
+using DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, RungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, K_ROWS, SP, OdeType>, RungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, K_ROWS, SP, OdeType>>;
 
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-class StandardRungeKuttaBase : public DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class StandardRungeKuttaBase : public DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, OdeType>{
 
 protected:
-    using Base = DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, RhsType, JacType>;
+    using Base = DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, OdeType>;
     friend Base;
     friend Base::Base;
-    friend BaseSolver<Derived, T, N, SP, RhsType, JacType>; // So that Base can access specific private methods for static override
+    friend BaseSolver<Derived, T, N, SP, OdeType>; // So that Base can access specific private methods for static override
 
     using Etype = Array1D<T, Nstages+1, Allocation::Stack>;
 
@@ -106,11 +107,11 @@ protected:
     DEFAULT_RULE_OF_FOUR(StandardRungeKuttaBase)
     // ================ STATIC OVERRIDES ========================
 
-    std::unique_ptr<Interpolator<T, N>>  state_interpolator(int bdr1, int bdr2) const;
+    auto    local_interp() const;
 
-    void                                 interp_impl(T* result, const T& t) const;
+    void    interp_impl(T* result, const T& t) const;
 
-    void                                 set_coef_matrix_impl() const;
+    void    set_coef_matrix_impl() const;
 
     // ==========================================================
 
@@ -118,12 +119,12 @@ protected:
 
 };
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-class StandardRungeKuttaBaseStatic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class StandardRungeKuttaBaseStatic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>{
 
     
 protected:
-    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
+    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>;
     using Base::Base;
     friend Base;
     friend Base::Base;
@@ -133,12 +134,12 @@ protected:
 
 };
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-class StandardRungeKuttaBaseDynamic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>{
+template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class StandardRungeKuttaBaseDynamic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>{
 
 
 protected:
-    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, RhsType, JacType>;
+    using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>;
     using Base::Base;
     friend Base;
     friend Base::Base;
@@ -148,12 +149,12 @@ protected:
 
 };
 
-template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, SolverPolicy SP, typename RhsType, typename JacType>
-using STANDARD_DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, StandardRungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>, StandardRungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, SP, RhsType, JacType>>;
+template<typename Derived, typename T, size_t N, size_t Nstates, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
+using STANDARD_DOPRI_DISPATCHER = std::conditional_t<std::is_arithmetic_v<T>, StandardRungeKuttaBaseStatic<Derived, T, N, Nstates, Norder, SP, OdeType>, StandardRungeKuttaBaseDynamic<Derived, T, N, Nstates, Norder, SP, OdeType>>;
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
-class RK45 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 6, 5, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+class RK45 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, OdeType, Derived>, Derived>, T, N, 6, 5, SP, OdeType>{
 
 public:
 
@@ -168,7 +169,7 @@ public:
 
 protected:
 
-    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 6, 5, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, OdeType, Derived>, Derived>, T, N, 6, 5, SP, OdeType>;
     using Ptype = Array2D<T, Nstages+1, 4, Allocation::Stack>;
     
     friend Base;
@@ -202,8 +203,8 @@ private:
 
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
-class RK23 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 3, 3, SP, RhsType, JacType> {
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+class RK23 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, OdeType, Derived>, Derived>, T, N, 3, 3, SP, OdeType> {
 
 public:
 
@@ -218,7 +219,7 @@ public:
 
 protected:
 
-    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 3, 3, SP, RhsType, JacType>;
+    using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, OdeType, Derived>, Derived>, T, N, 3, 3, SP, OdeType>;
     using Ptype = Array2D<T, Nstages+1, 3, Allocation::Stack>;
     friend Base;
     friend Base::Base;

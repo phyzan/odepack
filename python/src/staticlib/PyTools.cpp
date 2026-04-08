@@ -1,7 +1,33 @@
-#include "../../../include/pyode/lib_impl/PyTools_impl.hpp"
-#include "../../../include/ode/Interpolation//Univariate/StateInterp_impl.hpp"
+#include "../../../include/pyodepack.hpp"
 
 namespace ode{
+
+
+
+
+PyFuncWrapper::PyFuncWrapper(const py::capsule& obj, py::ssize_t Nsys, const py::array_t<py::ssize_t>& output_shape, py::ssize_t Nargs, const std::string& scalar_type) : DtypeDispatcher(scalar_type), rhs(open_capsule<void*>(obj)), Nsys(static_cast<size_t>(Nsys)), output_shape(static_cast<size_t>(output_shape.size())), Nargs(static_cast<size_t>(Nargs)) {
+    auto output_shape_c = py::array_t<py::ssize_t, py::array::c_style | py::array::forcecast>(output_shape);
+    ndspan::copy_array(this->output_shape.data(), output_shape_c.data(), this->output_shape.size());
+    long s = 1;
+    for (long i : this->output_shape){
+        s *= i;
+    }
+    this->output_size = size_t(s);
+}
+
+py::object PyFuncWrapper::call(const py::object& t, const py::iterable& py_q, const py::args& py_args) const{
+
+    return DISPATCH(py::object,
+        auto q = toCPP_Array<T, Array1D<T>>(py_q);
+        if (static_cast<size_t>(q.size()) != Nsys || py_args.size() != Nargs){
+            throw py::value_error("Invalid array sizes in ode function call");
+        }
+        auto args = toCPP_Array<T, std::vector<T>>(py_args);
+        Array<T> res(nullptr, output_shape.data(), output_shape.size());
+        reinterpret_cast<RhsFunc<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data());
+        return py::cast(res);
+    )
+}
 
 //===========================================================================================
 //                                      DtypeDispatcher
@@ -49,48 +75,6 @@ std::vector<EventOptions> to_Options(const py::iterable& d) {
 }
 
 
-// Explicit instantiations for Python callback helpers.
-#define DEFINE_PYTOOLS(T) \
-    template class Interval<T>; \
-    template class Interpolator<T, 0>; \
-    template class LocalInterpolator<T, 0>; \
-    template class StandardLocalInterpolator<T, 0>; \
-    template class LinkedInterpolator<T, 0, Interpolator<T, 0>>; \
-    template std::vector<T> subvec<T>(const std::vector<T>& x, size_t start, size_t size); \
-    template void lin_interp(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, size_t size); \
-    template void coef_mat_interp<T>(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size); \
-    template void inv_mat_row_major(T *out, const T *mat, size_t N, T *work, size_t *pivot); \
-    template T detLU_row_major(T* mat, size_t N); \
-    template bool all_are_finite(const T *data, size_t n); \
-    
-#define DEFINE_BUILTIN_SCALAR_ONLY(T) \
-    template void py_rhs<T>(T* res, const T& t, const T* q, const T*, const void* obj); \
-    template void py_jac<T>(T* res, const T& t, const T* q, const T*, const void* obj); \
-    template void py_mask<T>(T* res, const T& t, const T* q, const T*, const void* obj); \
-    template T py_event<T>(const T& t, const T* q, const T*, const void* obj); \
-    template const py::array_t<T>& PyStruct::get_array<T>() const; \
-    template py::array_t<T>& PyStruct::get_array<T>(); \
-
-template bool allEqual(const int *a, const int *b, size_t n);
-template std::vector<size_t> getShape<size_t>(const py::ssize_t& dim1, const std::vector<py::ssize_t>& shape);
-
-DEFINE_PYTOOLS(float)
-DEFINE_PYTOOLS(double)
-DEFINE_PYTOOLS(long double)
-#ifdef MPREAL
-DEFINE_PYTOOLS(mpfr::mpreal)
-#endif
-
-DEFINE_BUILTIN_SCALAR_ONLY(float)
-DEFINE_BUILTIN_SCALAR_ONLY(double)
-DEFINE_BUILTIN_SCALAR_ONLY(long double)
-
-
-
-#undef DEFINE_BUILTIN_SCALAR_ONLY
-
-
-#undef DEFINE_PYTOOLS
 
 
 } // namespace ode

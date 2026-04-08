@@ -45,7 +45,7 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
     for (size_t i=0; i<nt; i++){
         py::object item = py_array.attr("flat")[py::int_(i)];
         T t_value = py::cast<T>(item);
-        copy_array(res.data()+i*nsys, solution->operator()(t_value).data(), nsys);
+        ndspan::copy_array(res.data()+i*nsys, solution->operator()(t_value).data(), nsys);
     }
     return py::cast(res);
 }

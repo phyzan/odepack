@@ -1,5 +1,5 @@
-#ifndef PYODEPACK_DECL_HPP
-#define PYODEPACK_HPP
+#ifndef PYODEPACKDECL_HPP
+#define PYODEPACKDECL_HPP
 
 #include "pyode/lib/PySolver.hpp"
 #include "pyode/lib/PySubSolver.hpp"
@@ -9,4 +9,4 @@
 #include "pyode/lib/PyEvents.hpp"
 #include "pyode/lib/PyChaos.hpp"
 
-#endif // PYODEPACK_DECL_HPP
+#endif // PYODEPACKDECL_HPP

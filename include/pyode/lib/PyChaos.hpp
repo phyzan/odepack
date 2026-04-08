@@ -9,14 +9,11 @@ namespace ode{
 
 struct PyVarSolver : public PySolver{
 
-    PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const std::string& method, const std::string& scalar_type);
+    PyVarSolver(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& py_q0, const py::iterable& py_delta_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const std::string& method, const std::string& scalar_type);
 
     PyVarSolver(void* solver, PyStruct py_data, ScalarType scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyVarSolver)
-
-    template<typename T>
-    const NormalizationEvent<T>& main_event() const;
 
     py::object py_logksi() const;
 
@@ -28,21 +25,27 @@ struct PyVarSolver : public PySolver{
 
     py::object copy() const override;
 
+    template<typename T>
+    ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast();
+
+    template<typename T>
+    const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast() const;
+
 };
 
 class PyVarODE : public PyODE{
 
 public:
 
-    PyVarODE(const py::object& f, const py::object& t0, const py::iterable& q0, const py::object& period, const py::object& jac, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type);
+    PyVarODE(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0, const py::iterable& delta_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type);
 
     DEFAULT_RULE_OF_FOUR(PyVarODE);
 
     template<typename T>
-    VariationalODE<T, 0, Func<T>, Func<T>>& varode();
+    VariationalODE<T, 0>& varode();
 
     template<typename T>
-    const VariationalODE<T, 0, Func<T>, Func<T>>& varode() const;
+    const VariationalODE<T, 0>& varode() const;
 
     py::object py_t_lyap() const;
 

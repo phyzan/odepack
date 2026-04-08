@@ -31,9 +31,9 @@ public:
 
 protected:
 
-    inline static constexpr std::array<size_t, Base::ND> STRIDES = [](){
-        std::array<size_t, Base::ND> s{};
-        set_strides(s, Base::SHAPE, Base::ND);
+    inline static constexpr std::array<size_t, Base::RANK> STRIDES = [](){
+        std::array<size_t, Base::RANK> s{};
+        set_strides(s, Base::SHAPE, Base::RANK);
         return s;
         }();
 
@@ -52,14 +52,14 @@ class StridedStaticNdSpan : public StridedDerivedNdSpan<Derived, DIMS...>{
 
 public:
 
-    using Base::N, Base::ND;
+    using Base::N, Base::RANK;
     using Base::Base;
 
     DEFAULT_RULE_OF_FOUR(StridedStaticNdSpan)
     
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
-        return Base::_static_offset_impl(std::make_index_sequence<Base::ND>(), idx...);
+        return Base::_static_offset_impl(std::make_index_sequence<Base::RANK>(), idx...);
     }
 
     template<INT_T Idx>
@@ -85,10 +85,10 @@ class StridedSemiStaticNdSpan : public StridedDerivedNdSpan<Derived, DIMS...>{
 
 protected:
 
-    inline static constexpr size_t ND = Base::ND;
+    inline static constexpr size_t RANK = Base::RANK;
     inline static constexpr size_t N = Base::N;
 
-    static_assert(N==0 && ND>0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
+    static_assert(N==0 && RANK>0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
 
     StridedSemiStaticNdSpan() = default;
 
@@ -125,7 +125,7 @@ public:
 
     template<INT_T... Idx>
     INLINE constexpr size_t offset_impl(Idx... idx) const noexcept{
-        return EXPAND(size_t, ND, I,
+        return EXPAND(size_t, RANK, I,
             return ((idx * _fixed_strides[I]) + ...);
         );
     }
@@ -145,7 +145,7 @@ private:
         Derived::set_strides(_fixed_strides, this->shape(), this->ndim());
     }
     
-    size_t _fixed_strides[ND];
+    size_t _fixed_strides[RANK];
 
 };
 
@@ -160,7 +160,7 @@ class StridedSemiStaticNdSpan<Derived, N> : public StridedDerivedNdSpan<Derived,
 
 protected:
 
-    inline static constexpr size_t ND = 1;
+    inline static constexpr size_t RANK = 1;
 
     static_assert(N==0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
 
@@ -183,7 +183,7 @@ class StridedSemiStaticNdSpan<Derived, R, C> : public StridedDerivedNdSpan<Deriv
 
 protected:
 
-    inline static constexpr size_t ND = 2;
+    inline static constexpr size_t RANK = 2;
     inline static constexpr size_t N = R*C;
 
     static_assert(N==0, "StridedSemiStaticNdSpan is for static number of dims of dynamic size");
@@ -205,7 +205,7 @@ class StridedDynamicNdSpan : public StridedDerivedNdSpan<Derived>{
 
     using Base = StridedDerivedNdSpan<Derived>;
 public:
-    inline static constexpr size_t ND = 0;
+    inline static constexpr size_t RANK = 0;
     inline static constexpr size_t N = 0;
 
 protected:
@@ -227,7 +227,7 @@ protected:
     //COPY CONSTRUCTOR
     StridedDynamicNdSpan(const StridedDynamicNdSpan& other) : Base(static_cast<const Base&>(other)){
         _dyn_strides = other.ndim() > 0 ? new size_t[other.ndim()] : nullptr;
-        copy_array(_dyn_strides, other._dyn_strides, this->ndim());
+        ndspan::copy_array(_dyn_strides, other._dyn_strides, this->ndim());
     }
 
     //MOVE CONSTRUCTOR
@@ -249,7 +249,7 @@ protected:
                     _dyn_strides = nullptr;
                 }
             }
-            copy_array(_dyn_strides, other._dyn_strides, this->ndim());
+            ndspan::copy_array(_dyn_strides, other._dyn_strides, this->ndim());
         }
         return *this;
     }

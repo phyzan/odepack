@@ -5,14 +5,15 @@
 
 namespace ode{
 
+
 class PyEvent : public DtypeDispatcher{
 
 public:
 
     PyEvent(std::string name, py::object mask, bool hide_mask, const std::string& scalar_type, size_t Nsys, size_t Nargs);
 
-    template<typename T>
-    Func<T>             mask() const;
+    template<typename T> //only use when _mask is not nullptr
+    auto                mask() const;
 
     py::str             name() const;
 
@@ -86,7 +87,7 @@ private:
 };
 
 template<typename T>
-std::vector<Event<T>*> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args);
+std::vector<std::unique_ptr<Event<T>>> to_Events(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args);
 
 bool all_are_lowlevel(const py::iterable& events);
 

@@ -16,7 +16,7 @@ void LUResult<T, N>::lu_factor(const JacMat<T, N>& A_input){
     JacMat<T, N>& A = LU;
 
     // Copy input to output
-    copy_array(A.data(), A_input.data(), A_input.size());
+    ndspan::copy_array(A.data(), A_input.data(), A_input.size());
 
     // Initialize pivot array as identity
     for (size_t i = 0; i < n; ++i) {
@@ -26,10 +26,10 @@ void LUResult<T, N>::lu_factor(const JacMat<T, N>& A_input){
     for (size_t k = 0; k < n - 1; ++k) {
         // Find pivot row
         size_t p = k;
-        T max_val = abs(A(k, k));
+        T max_val = abs<T>(A(k, k));
         for (size_t i = k + 1; i < n; ++i) {
-            if (abs(A(i, k)) > max_val) {
-                max_val = abs(A(i, k));
+            if (abs<T>(A(i, k)) > max_val) {
+                max_val = abs<T>(A(i, k));
                 p = i;
             }
         }
@@ -145,35 +145,10 @@ void bdf_interp(T* result, const T& t, const T& t2, const T& h, const T* D, size
     }
 }
 
-template<typename T, size_t N>
-BDFInterpolator<T, N>::BDFInterpolator(const T& t, const T* q, size_t nsys) : LocalInterpolator<T, N>(t, q, nsys) {}
 
-template<typename T, size_t N>
-BDFInterpolator<T, N>::BDFInterpolator(const Array2D<T, 0, N>& D, size_t order, const T* state1, const T* state2, size_t nsys, int bdr1, int bdr2) : LocalInterpolator<T, N>(state1[0], state2[0], state1+2, state2+2, nsys, bdr1, bdr2), _order(order), _D(order+1, D.Ncols()) {
-    int dir = sgn(state1[0], state2[0]);
-    _t2 = state2[0];
-    _h = state2[1]*dir;
-    copy_array(_D.data(), D.data(), _D.size()); //keeping the first (order+1) rows
-}
-
-template<typename T, size_t N>
-size_t BDFInterpolator<T, N>::order() const {
-    return _order;
-}
-
-template<typename T, size_t N>
-BDFInterpolator<T, N>* BDFInterpolator<T, N>::clone() const {
-    return new BDFInterpolator<T, N>(*this);
-}
-
-template<typename T, size_t N>
-void BDFInterpolator<T, N>::_call_impl(T* result, const T& t) const {
-    bdf_interp(result, t, _t2, _h, _D.data(), _order, this->array_size());
-}
-
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 template<typename... Type>
-BDF<T, N, SP, RhsType, JacType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, std::forward<Type>(extras)...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _U((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _RU((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
+BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, std::forward<Type>(extras)...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _U((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _RU((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();
@@ -192,11 +167,14 @@ BDF<T, N, SP, RhsType, JacType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&.
     }
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::re_adjust_impl(const T* new_vector) {
-    Base::re_adjust_impl(new_vector);
-    copy_array(_D[2].data(), _D[_idx_D].data(), this->Nsys());
-    copy_array(_D[0].data(), new_vector, this->Nsys());
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector) {
+    Base::ReAdjust(new_vector);
+    ndspan::copy_array(_D[2].data(), _D[_idx_D].data(), this->Nsys());
+    _D[0].fill(0);
+    _D[1].fill(0);
+    ndspan::copy_array(_D[0].data(), new_vector, this->Nsys());
     this->rhs(_D[0].data()+this->Nsys(), this->t(), new_vector);
     for (size_t i=0; i<this->Nsys(); i++){
         _D[0][i+this->Nsys()] *= this->stepsize() * this->direction();
@@ -209,8 +187,8 @@ void BDF<T, N, SP, RhsType, JacType, Derived>::re_adjust_impl(const T* new_vecto
     interp_idx = 2;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-bool BDF<T, N, SP, RhsType, JacType, Derived>::validate_ics_impl(T t0, const T* q0) const{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+bool BDF<T, N, SP, OdeType, Derived>::validate_ics_impl(T t0, const T* q0) const{
 
     // use _B as it is a dummy variable
     if (Base::validate_ics_impl(t0, q0)){
@@ -222,14 +200,14 @@ bool BDF<T, N, SP, RhsType, JacType, Derived>::validate_ics_impl(T t0, const T* 
 }
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::reset_impl(){
-    Base::reset_impl();
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::Reset(){
+    Base::Reset();
     this->_reset_impl_alone();
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::_reset_impl_alone(){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::_reset_impl_alone(){
     T t0 = this->ics().t();
     T h0 = this->ics().habs() * this->direction();
     const T* q0 = this->ics().vector();
@@ -251,8 +229,8 @@ void BDF<T, N, SP, RhsType, JacType, Derived>::_reset_impl_alone(){
     interp_idx = 0;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T* state){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     const T& h_min = this->min_step();
     const T& max_step = this->max_step();
     const T& atol = this->atol();
@@ -266,7 +244,7 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
     T& habs = res[1];
     T* y_new = res+2;
 
-    copy_array(y_new, state+2, nsys);
+    ndspan::copy_array(y_new, state+2, nsys);
 
     T safety, max_factor, factor, c;
     int delta_order;
@@ -287,7 +265,6 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
         habs = stepsize;
     }
 
-
     while(!step_accepted){
 
         // Checks go at the top so that continue statements inside the loop will still trigger them.
@@ -301,13 +278,13 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
         }else if (habs < this->MIN_STEP){
             return StepResult::TINY_STEP_ERROR;
         }
-
+        
         t_new = t + habs * this->direction();
 
         _set_prediction(_ypred.data());
         #pragma omp simd
         for (size_t i=0; i<nsys; i++){
-            _scale[i] = atol + rtol * abs(_ypred[i]);
+            _scale[i] = atol + rtol * abs<T>(_ypred[i]);
         }
         _set_psi(_psi.data());
 
@@ -355,7 +332,7 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
         safety = T(9)/10 * T(2 * NEWTON_MAXITER + 1)/(2 * NEWTON_MAXITER + conv_result.n_iter);
         #pragma omp simd
         for (size_t i=0; i<nsys; i++){
-            _scale[i] = atol + rtol * abs(y_new[i]);
+            _scale[i] = atol + rtol * abs<T>(y_new[i]);
             _error[i] = BDF_COEFS.ERR_CONST[_order] * _d[i];
         }
         _error_norms[1] = rms_norm(_error.data(), _scale.data(), nsys);
@@ -421,8 +398,8 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
     }
 
     _order += delta_order;
-
-    factor = ndspan::min<T>(this->MAX_FACTOR, safety * max_factor);
+    T candidate_factor = safety * max_factor;
+    factor = std::min<T>(this->MAX_FACTOR, candidate_factor);
     habs *= factor;
     _change_D(factor);
     _valid_LU = false;
@@ -430,21 +407,23 @@ StepResult BDF<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T*
     return StepResult::Success;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
- std::unique_ptr<Interpolator<T, N>> BDF<T, N, SP, RhsType, JacType, Derived>::state_interpolator(int bdr1, int bdr2) const{
-    return std::unique_ptr<Interpolator<T, N>>(new BDFInterpolator<T, N>(_D[interp_idx], _order, this->old_state_ptr(), this->interp_new_state_ptr(), this->Nsys(), bdr1, bdr2));
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+auto BDF<T, N, SP, OdeType, Derived>::local_interp() const{
+    return [D=_D[interp_idx], order=_order, t2=this->interp_new_state_ptr()[0], n=this->Nsys(), h = this->stepsize()*this->direction()](T* out, const T& t){
+        bdf_interp<T>(out, t, t2, h, D.data(), order, n);
+    };
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
- void BDF<T, N, SP, RhsType, JacType, Derived>::interp_impl(T* result, const T& t) const{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+ void BDF<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     bdf_interp<T>(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->Nsys());
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-NewtConv BDF<T, N, SP, RhsType, JacType, Derived>::_solve_bdf_system(T* y, const T* y_pred, Array1D<T, N>& d, const T& t_new, const T& c, const Array1D<T, N>& psi, const LUResult<T, N>& LU, const Array1D<T, N>& scale){
-    d.set(0);
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+NewtConv BDF<T, N, SP, OdeType, Derived>::_solve_bdf_system(T* y, const T* y_pred, Array1D<T, N>& d, const T& t_new, const T& c, const Array1D<T, N>& psi, const LUResult<T, N>& LU, const Array1D<T, N>& scale){
+    d.fill(0);
     size_t n = this->Nsys();
-    copy_array(y, y_pred, n);
+    ndspan::copy_array(y, y_pred, n);
     T dy_norm = 0;
     T dy_norm_old = 0;
     T rate = 0;
@@ -494,8 +473,8 @@ NewtConv BDF<T, N, SP, RhsType, JacType, Derived>::_solve_bdf_system(T* y, const
 
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::_change_D(const T& factor){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::_change_D(const T& factor){
     T* R = _R.data();
     T* U = _U.data();
     T* RU = _RU.data();
@@ -535,8 +514,8 @@ void BDF<T, N, SP, RhsType, JacType, Derived>::_change_D(const T& factor){
     _n_eq_steps = 0;
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::_set_prediction(T* y){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::_set_prediction(T* y){
     size_t n=this->Nsys();
     T* D = _D[_idx_D].data();
 
@@ -552,8 +531,8 @@ void BDF<T, N, SP, RhsType, JacType, Derived>::_set_prediction(T* y){
     }
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-void BDF<T, N, SP, RhsType, JacType, Derived>::_set_psi(T* psi){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void BDF<T, N, SP, OdeType, Derived>::_set_psi(T* psi){
     size_t n = this->Nsys();
     const T* D = _D[_idx_D].data();
     const T* g = BDF_COEFS.GAMMA.data();
@@ -571,8 +550,8 @@ void BDF<T, N, SP, RhsType, JacType, Derived>::_set_psi(T* psi){
     }
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-bool BDF<T, N, SP, RhsType, JacType, Derived>::_resize_step(T& factor, const T& min_step, const T& max_step){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+bool BDF<T, N, SP, OdeType, Derived>::_resize_step(T& factor, const T& min_step, const T& max_step){
     //factor should be positive
     bool res = resize_step(factor, min_step, max_step); //automatically changes factor if needed
     _change_D(factor);

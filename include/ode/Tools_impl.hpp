@@ -46,71 +46,6 @@ T* MutState<T>::vector(){
     return const_cast<T*>(this->_data) + 2;
 }
 
-//===========================================================================================
-//                                      EventState<T>
-//===========================================================================================
-
-template<typename T>
-const T& EventState<T>::t() const{
-    return data[0];
-}
-
-template<typename T>
-const T* EventState<T>::get_true() const{
-    return data.data();
-}
-
-template<typename T>
-const T* EventState<T>::get_exposed() const{
-    return choose_true ? data.data() : data.data() + Nsys + 2;
-}
-
-template<typename T>
-T* EventState<T>::mut_true(){
-    return data.data();
-}
-
-template<typename T>
-T* EventState<T>::mut_exposed(){
-    return data.data() + Nsys + 2;
-}
-
-template<typename T>
-void EventState<T>::set_t(T t){
-    data[0] = data[Nsys + 2] = t;
-}
-
-template<typename T>
-void EventState<T>::set_stepsize(T habs){
-    data[1] = data[Nsys + 3] = habs;
-}
-
-template<typename T>
-void EventState<T>::set_true_vector(const T* vec){
-    copy_array(data.data() + 2, vec, Nsys);
-}
-
-template<typename T>
-void EventState<T>::set_exposed_vector(const T* vec){
-    copy_array(data.data() + Nsys + 4, vec, Nsys);
-}
-
-template<typename T>
-void EventState<T>::resize(size_t nsys){
-    data.resize(nsys * 2 + 4);
-    Nsys = nsys;
-}
-
-template<typename T>
-size_t EventState<T>::nsys() const{
-    return Nsys;
-}
-
-template<typename T>
-bool EventState<T>::is_valid() const{
-    return triggered;
-}
-
 
 //===========================================================================================
 //                                      Additional Tools
@@ -213,6 +148,7 @@ T bisect(Callable&& f, const T& a, const T& b, const T& atol){
     while (err > atol){
         c = (_a+_b)/2;
         if (c == _a || c == _b){
+            // reached machine precision limit, return the best guess so far
             break;
         }
         fm = f(c);
@@ -222,7 +158,7 @@ T bisect(Callable&& f, const T& a, const T& b, const T& atol){
         else{
             _b = c;
         }
-        err = abs(fm);
+        err = abs<T>(fm);
     }
 
     if constexpr (RP == RootPolicy::Left) {
@@ -255,9 +191,9 @@ void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot) {
 
     for (size_t i = 0; i < N; ++i) {
         size_t max_row = i;
-        T max_val = abs(lu[i*N + i]);
+        T max_val = abs<T>(lu[i*N + i]);
         for (size_t j = i + 1; j < N; ++j) {
-            T val = abs(lu[j*N + i]);
+            T val = abs<T>(lu[j*N + i]);
             if (val > max_val) { max_val = val; max_row = j; }
         }
         // assert(max_val != 0 && "Matrix is singular");
@@ -315,9 +251,9 @@ T detLU_row_major(T* mat, size_t N) {
     for (size_t i = 0; i < N; ++i) {
         // Partial pivoting
         size_t pivot = i;
-        T max_val = abs(mat[i * N + i]);
+        T max_val = abs<T>(mat[i * N + i]);
         for (size_t j = i + 1; j < N; ++j) {
-            T val = abs(mat[j * N + i]);
+            T val = abs<T>(mat[j * N + i]);
             if (val > max_val) {
                 pivot = j;
                 max_val = val;
@@ -354,7 +290,7 @@ T detLU_row_major(T* mat, size_t N) {
 
 template<typename T>
 T choose_step(const T& habs, const T& hmin, const T& hmax) {
-    return ndspan::max<T>(ndspan::min<T>(habs, hmax), hmin);
+    return std::max<T>(std::min<T>(habs, hmax), hmin);
 }
 
 } // namespace ode

@@ -2,6 +2,7 @@
 
 # Helper function to configure Python extension modules
 function(configure_py_module target_name)
+    target_compile_options(${target_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
     if(MPREAL)
         target_compile_definitions(${target_name} PRIVATE MPREAL)
     endif()

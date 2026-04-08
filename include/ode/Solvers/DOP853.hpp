@@ -48,37 +48,9 @@ template<typename T>
 void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size);
 
 
-template<typename T, size_t N>
-class DOP853LocalInterpolator final: public LocalInterpolator<T, N>{
 
-public:
-
-    DOP853LocalInterpolator() = delete;
-
-    DOP853LocalInterpolator(const T& t, const T* q, size_t nsys);
-
-    DOP853LocalInterpolator(const Array2D<T, N, 0>& coef_mat, T t1, T t2, const T* y1, const T* y2, size_t nsys, int left_bdr, int right_bdr);
-
-    DEFAULT_RULE_OF_FOUR(DOP853LocalInterpolator);
-
-    size_t order() const override;
-
-    DOP853LocalInterpolator<T, N>* clone() const override;
-
-protected:
-
-    Array2D<T, N, 0> _coef_mat;
-    size_t _order = 0;
-
-private:
-
-    void _call_impl(T* result, const T& t) const override;
-
-};
-
-
-template<typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>, typename Derived = void>
-class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 12, 8, 16, SP, RhsType, JacType>{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, 12, 8, 16, SP, OdeType>{
 
 public:
 
@@ -86,11 +58,11 @@ public:
 
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
 
-    std::unique_ptr<Interpolator<T, N>> state_interpolator(int bdr1, int bdr2) const;
+    auto    local_interp() const;
 
 protected:
 
-    using Base = RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, RhsType, JacType, Derived>, Derived>, T, N, 12, 8, 16, SP, RhsType, JacType>;
+    using Base = RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, 12, 8, 16, SP, OdeType>;
     friend Base;
     friend Base::Base;
     friend Base::MainSolverType; // So that Base can access specific private methods for static override

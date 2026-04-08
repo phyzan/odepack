@@ -243,8 +243,6 @@ std::string OdeResult<T, N>::event_log() const {
 template<typename T, size_t N>
 OdeSolution<T, N>::OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(orbit_data), std::move(event_data), orb_idx_start, diverges, success, runtime, std::move(message)), interpolator_(interpolator.clone()) {}
 
-template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(OdeResult<T, N>&& other, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(other)), interpolator_(interpolator.clone()) {}
 
 template<typename T, size_t N>
 Array1D<T, N> OdeSolution<T, N>::operator()(const T& t) const{

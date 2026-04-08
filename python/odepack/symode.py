@@ -1082,9 +1082,6 @@ class OdeSystem:
         which returns VariationalLowLevelODE (high-level with history), this returns
         the underlying VariationalSolver that maintains only current state.
 
-        All events defined in the OdeSystem are ignored. The solver only includes
-        the automatic normalization event required for Lyapunov exponent calculation.
-
         The variational system integrates 2*Nsys equations: the first Nsys equations
         are the original system, and the last Nsys are the linearized perturbation
         equations. The perturbation is automatically normalized at initialization and
@@ -1188,8 +1185,10 @@ class OdeSystem:
             raise ValueError("Renormalization period must be positive")
         if len(args) != len(self.args):
             raise ValueError(f"The provided number of args must be {len(self.args), not {len(args)}}")
+        
+        events = self.true_compiled_events(scalar_type=scalar_type, variational=False) if compiled else self.true_py_events
 
-        return VariationalSolver(f=f, jac=jac, t0=t0, q0=q0, period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, method=method, scalar_type=scalar_type)
+        return VariationalSolver(f=f, jac=jac, t0=t0, q0=q0[:self.Nsys], delta_q0=q0[self.Nsys:], period=period, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, events=events, method=method, scalar_type=scalar_type)
 
     def lowlevel_odefunc(self, scalar_type='double'):
         """Get the compiled ODE right-hand side function.
@@ -1496,8 +1495,8 @@ class OdeSystem:
         LowLevelODE or VariationalLowLevelODE
             Solver instance
         """
-        variational = period is not None
-        factor = 1 if not variational else 2
+        variational = False#period is not None
+        factor = 1 if period is None else 2
         if len(q0) != self.Nsys*factor:
             raise ValueError(f"The size of the initial conditions provided is {len(q0)} instead of {factor*self.Nsys}")
         elif len(args) != self.Nargs:
@@ -1514,10 +1513,12 @@ class OdeSystem:
             f = self._odefunc if not variational else self._var_odefunc
             jac = self._jac if not variational else self._var_jac
         kwargs = dict(t0=t0, q0=q0, rtol=rtol, atol=atol, min_step=min_step, max_step=max_step, stepsize=stepsize, direction=direction, args=args, events=events, method=method)
-        if not variational:
+        if period is None:
             getter = LowLevelODE
         else:
             kwargs['period'] = period
+            kwargs['q0'] = q0[:self.Nsys]
+            kwargs['delta_q0'] = q0[self.Nsys:]
             getter = VariationalLowLevelODE
         return getter(f=f, jac=jac, scalar_type=scalar_type, **kwargs)
 

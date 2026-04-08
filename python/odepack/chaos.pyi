@@ -120,9 +120,10 @@ class VariationalSolver(OdeSolver):
     >>> # Get compiled variational functions
     >>> f_ptr, jac_ptr = system._pointers(scalar_type='double', variational=True)[:2]
     >>> # Initial state: [x0, v0, dx, dv]
-    >>> q0 = np.array([1.0, 0.0, 1.0, 0.0])
+    >>> q0 = np.array([1.0, 0.0])
+    >>> delta_q0 = np.array([1.0, 0.0])
     >>> solver = VariationalSolver(
-    ...     f=f_ptr, jac=jac_ptr, t0=0, q0=q0, period=1.0,
+    ...     f=f_ptr, jac=jac_ptr, t0=0, q0=q0, delta_q0=delta_q0, period=1.0,
     ...     method="RK45", scalar_type="double"
     ... )
     >>> # Step through integration
@@ -138,7 +139,7 @@ class VariationalSolver(OdeSolver):
     OdeSolver : Base class for step-by-step ODE integration
     """
 
-    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, period: float, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, delta_q0: np.ndarray, period: float, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
         ...
 
     @property
@@ -213,7 +214,7 @@ class VariationalLowLevelODE(LowLevelODE):
     Parameters
     ----------
     f : callable
-        Right-hand side: f(t, q, *args) -> array. q has even length.
+        Right-hand side: f(t, q, *args) -> array for the original system (NOT including the variational equations)
 
     t0 : float
         Initial time.
@@ -228,9 +229,8 @@ class VariationalLowLevelODE(LowLevelODE):
         renormalized at regular intervals to prevent numerical overflow/underflow.
 
     jac : callable, optional
-        Jacobian (required for BDF). jac(t, q, *args) -> matrix.
-        The Jacobian should have shape (n_primary, n_primary) and be computed
-        based on the primary state portion.
+        Jacobian matrix function: jac(t, q, *args) -> matrix. Required for for the variational equations.
+        The Jacobian should have shape (Nsys, Nsys) for the original system (not augmented).
 
     rtol, atol : float, optional
         Relative and absolute tolerance for adaptive step control.
@@ -273,13 +273,14 @@ class VariationalLowLevelODE(LowLevelODE):
     >>> system = OdeSystem(ode_sys=[v, -x], t=t, q=[x, v])
     >>> # Initial conditions: [x0, v0, dx, dv]
     >>> # Second half (dx, dv) is variational direction (auto-normalized)
-    >>> q0 = np.array([1.0, 0.0, 1.0, 0.0])
-    >>> ode = system.get_variational(t0=0, q0=q0, period=1.0, compiled=True)
+    >>> q0 = np.array([1.0, 0.0])
+    >>> delta_q0 = np.array([1.0, 0.0])
+    >>> ode = system.get_variational(t0=0, q0=q0, delta_q0=delta_q0, period=1.0, compiled=True)
     >>> ode.integrate(100.0)
     >>> lyap_exp = ode.lyap[-1]  # Final Lyapunov exponent estimate
     """
 
-    def __init__(self, f : Callable[[float, np.ndarray, *tuple[Any, ...]], np.ndarray], t0: float, q0: np.ndarray, period: float, *, jac: Callable = None, rtol=1e-6, atol=1e-12, min_step=0., max_step=None, stepsize=0., direction=1, args=(), events: Iterable[Event]=(), method="RK45", scalar_type: str = "double"):
+    def __init__(self, f: Func, jac: Func, t0: float, q0: np.ndarray, delta_q0: np.ndarray, period: float, *, rtol = 1e-6, atol = 1e-12, min_step = 0., max_step = None, stepsize = 0., direction=1, args: Iterable = (), method: str = "RK45", scalar_type: str = "double"):
         ...
 
     @property

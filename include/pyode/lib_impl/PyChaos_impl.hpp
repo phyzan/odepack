@@ -8,20 +8,26 @@
 
 namespace ode{
 
+
 template<typename T>
-const NormalizationEvent<T>& PyVarSolver::main_event() const{
-    
-    return static_cast<const NormalizationEvent<T>&>(*reinterpret_cast<const OdeRichSolver<T>*>(this->s)->event_col().event(0).template cast<NormalizationEvent<T>>());
+VariationalODE<T, 0>& PyVarODE::varode(){
+    return *static_cast<VariationalODE<T, 0>*>(this->ode);
 }
 
 template<typename T>
-VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode(){
-    return *static_cast<VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
+const VariationalODE<T, 0>& PyVarODE::varode() const {
+    return *static_cast<const VariationalODE<T, 0>*>(this->ode);
+}
+
+
+template<typename T>
+ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast(){
+    return static_cast<ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
 }
 
 template<typename T>
-const VariationalODE<T, 0, Func<T>, Func<T>>& PyVarODE::varode() const {
-    return *static_cast<const VariationalODE<T, 0, Func<T>, Func<T>>*>(this->ode);
+const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast() const {
+    return static_cast<const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
 }
 
 } // namespace ode

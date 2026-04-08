@@ -6,184 +6,46 @@
 namespace ode{
 
 
-// NormalizationEvent implementations
-template<typename T, typename Derived>
-NormalizationEvent<T, Derived>::NormalizationEvent(const std::string& name, T period) : Base(name, period, nullptr, true, nullptr) {}
 
-template<typename T, typename Derived>
-const T& NormalizationEvent<T, Derived>::logksi() const{
-    return _logksi;
-}
+template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+template<typename... Args>
+VariationalSolver<Solver, T, N, SP, OdeType, Derived>::VariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, Args&&... extra) : Base(ode, t0,
+    !q0 || !delta_q0 ? nullptr : [&]() -> Array1D<T, 2*N> {
+        Array1D<T, 2*N> tmp(2*nsys);
+        ndspan::copy_array(tmp.data(), q0, nsys);
+        ndspan::copy_array(tmp.data()+nsys, delta_q0, nsys);
+        normalized(tmp.data(), tmp.data(), nsys);
+        return tmp;
+    }().data(),
+    2*nsys, rtol, atol, min_step, max_step, stepsize, dir, args, std::forward<Args>(extra)...), jm(nsys, nsys), tmp_state_(2*nsys), autodiff_args(JP == JacPolicy::Autodiff ? args.size() : 0), period_(period), t_next_(t0+period*dir), t_last_(t0) {
 
-template<typename T, typename Derived>
-T NormalizationEvent<T, Derived>::lyap() const{
-    return _logksi/(this->delta_t_abs());
-}
-
-template<typename T, typename Derived>
-T NormalizationEvent<T, Derived>::delta_s() const{
-    return _delta_s;
-}
-
-template<typename T, typename Derived>
-size_t NormalizationEvent<T, Derived>::Nsys_main() const{
-    return this->Nsys()/2;
-}
-
-template<typename T, typename Derived>
-void NormalizationEvent<T, Derived>::register_impl(){
-    //call Base::register_impl() first
-    Base::register_impl();
-    _delta_s = log(norm(this->state()->get_exposed()+2+Nsys_main(), Nsys_main()));
-    _logksi += _delta_s;
-}
-
-template<typename T, typename Derived>
-void NormalizationEvent<T, Derived>::reset_impl(int direction){
-    //call Base::reset_impl() first
-    Base::reset_impl(direction);
-    _logksi = 0;
-    _delta_s = 0;
-}
-
-template<typename T, typename Derived>
-void NormalizationEvent<T, Derived>::mask_impl(T* out, const T& t, const T* q) const{
-    size_t nsys = this->Nsys_main();
-    T N = norm(q+nsys, nsys);
-    for (size_t i=0; i<nsys; i++){
-        out[i] = q[i];
-        out[i+nsys] = q[i+nsys]/N;
+    if (period <= 0){
+        throw std::runtime_error("The renormalization period must be positive");
     }
-}
 
-template<typename T, typename Derived>
-bool NormalizationEvent<T, Derived>::is_masked_impl() const{
-    return true;
-}
-
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalSolver<T, N, RhsType, JacType>::VariationalSolver(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, Integrator method) {
-    Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
-    normalized<T>(tmp.data(), nsys);
-    NormalizationEvent<T> event("Normalization", period);
-    nsys *= 2;
-    const T* q0 = tmp.data();
-    this->solver_ = pbox::PolyWrapper<OdeRichSolver<T>>(get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, {&event}).release());
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-const NormalizationEvent<T>& VariationalSolver<T, N, RhsType, JacType>::main_event() const{
-    return *this->solver_->event_col().event(0).template cast<NormalizationEvent<T>>();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-const T& VariationalSolver<T, N, RhsType, JacType>::logksi() const{
-    return this->main_event().logksi();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-T VariationalSolver<T, N, RhsType, JacType>::lyap() const{
-    return this->main_event().lyap();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-T VariationalSolver<T, N, RhsType, JacType>::t_lyap() const{
-    return this->main_event().delta_t_abs();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-T VariationalSolver<T, N, RhsType, JacType>::delta_s() const{
-    return this->main_event().delta_s();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-OdeRichSolver<T, N>* VariationalSolver<T, N, RhsType, JacType>::clone_solver() const{
-    return this->solver_->clone();
-}
-
-// VariationalODE implementations
-template<typename T, size_t N, typename RhsType, typename JacType>
-VariationalODE<T, N, RhsType, JacType>::VariationalODE(OdeData<RhsType, JacType> ode, T t0, const T* q0_, size_t nsys, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, std::vector<const Event<T>*> events, Integrator method) : ODE<T, N>(2*nsys){
-    for (size_t i=0; i<events.size(); i++){
-        if (dynamic_cast<const NormalizationEvent<T>*>(events[i])){
-            throw std::runtime_error("Initializing a VariationalOdeSolver requires that no normalization events are passed in the constructor");
+    if constexpr (is_rich<SP>){
+        //make sure there are no masked events, as they would interfere with the renormalization times.
+        for (size_t i=0; i<this->event_col().size(); i++){
+            if (this->event_col().event(i).is_masked()){
+                throw std::runtime_error("VariationalSolver does not support masked events, as they would interfere with the renormalization times.");
+            }
         }
     }
+    ndspan::copy_array(tmp_state_.data(), this->ics().vector(), 2*nsys);
 
-    Array1D<T, N, Allocation::Auto> tmp(q0_, 2*nsys);
-    normalized<T>(tmp.data(), nsys);
-    NormalizationEvent<T> extra_event("Normalization", period);
-    events.insert(events.begin(), &extra_event);
-    nsys *= 2;
-    const T* q0 = tmp.data();
-    this->init(ARGS, events, method);
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-ODE<T, N>* VariationalODE<T, N, RhsType, JacType>::clone() const{
-    return new VariationalODE<T, N, RhsType, JacType>(*this);
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
- const std::vector<T>& VariationalODE<T, N, RhsType, JacType>::t_lyap() const{
-    return _t_lyap;
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-const std::vector<T>& VariationalODE<T, N, RhsType, JacType>::lyap() const{
-    return _lyap_array;
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-const std::vector<T>& VariationalODE<T, N, RhsType, JacType>::kicks() const{
-    return _delta_s_arr;
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-void VariationalODE<T, N, RhsType, JacType>::clear(){
-    ODE<T, N>::clear();
-    _t_lyap.clear();
-    _t_lyap.shrink_to_fit();
-    _lyap_array.clear();
-    _lyap_array.shrink_to_fit();
-    _delta_s_arr.clear();
-    _delta_s_arr.shrink_to_fit();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-void VariationalODE<T, N, RhsType, JacType>::reset(){
-    ODE<T, N>::reset();
-    _t_lyap.clear();
-    _t_lyap.shrink_to_fit();
-    _lyap_array.clear();
-    _lyap_array.shrink_to_fit();
-    _delta_s_arr.clear();
-    _delta_s_arr.shrink_to_fit();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-const NormalizationEvent<T>& VariationalODE<T, N, RhsType, JacType>::main_event()const{
-    return *this->solver_->event_col().event(_ind).template cast<NormalizationEvent<T>>();
-}
-
-template<typename T, size_t N, typename RhsType, typename JacType>
-void VariationalODE<T, N, RhsType, JacType>::register_event(size_t event){
-    ODE<T, N>::register_event(event);
-    if (event == _ind){
-        const NormalizationEvent<T>& ev = main_event();
-        _t_lyap.push_back(ev.delta_t_abs());
-        _lyap_array.push_back(ev.lyap());
-        _delta_s_arr.push_back(ev.delta_s());
+    if constexpr (JP == JacPolicy::Autodiff){
+        for (size_t i=0; i<args.size(); i++){
+            autodiff_args[i] = VarDualType(args[i]);
+        }
     }
 }
 
 
 template<typename T>
-void normalized(T* q, size_t nsys){
-    T N = norm(q+nsys, nsys);
+void normalized(T* out, const T* src, size_t nsys){
+    T N = norm(src+nsys, nsys);
     for (size_t i=0; i<nsys; i++){
-        q[i+nsys] /= N;
+        out[i+nsys] /= N;
     }
 }
 

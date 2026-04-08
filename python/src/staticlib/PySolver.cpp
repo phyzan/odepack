@@ -1,9 +1,4 @@
-#include "../../../include/pyode/lib_impl/PySolver_impl.hpp"
-#include "../../../include/ode/SolverDispatcher_impl.hpp"
-#include "../../../include/ode/Solvers/Solvers_impl.hpp"
-#include "../../../include/ode/Core/SolverBase_impl.hpp"
-#include "../../../include/ode/SolverState_impl.hpp"
-#include "../../../include/ode/Core/RichBase_impl.hpp"
+#include "../../../include/pyodepack.hpp"
 
 namespace ode{
 
@@ -20,17 +15,14 @@ PyConstSolver::PyConstSolver(const py::object& f, const py::object& jac, const p
 
 PyConstSolver::PyConstSolver(void* solver, PyStruct py_data, ScalarType scalar_type) : DtypeDispatcher(scalar_type), data(std::move(py_data)){
     this->s = solver;
-    set_pyobj(*this);
 }
 
 PyConstSolver::PyConstSolver(const PyConstSolver& other) : DtypeDispatcher(other), data(other.data){
     DISPATCH(void, this->s = other.template cast<T>()->clone();)
-    set_pyobj(other);
 }
 
 PyConstSolver::PyConstSolver(PyConstSolver&& other) noexcept : DtypeDispatcher(std::move(other)), s(other.s), data(std::move(other.data)){
     other.s = nullptr;
-    set_pyobj(other);
 }
 
 
@@ -39,7 +31,6 @@ PyConstSolver& PyConstSolver::operator=(const PyConstSolver& other){
         data = other.data;
         DISPATCH(void, delete cast<T>();)
         DISPATCH(void, this->s = other.template cast<T>()->clone();)
-        set_pyobj(other);
     }
     return *this;
 }
@@ -50,7 +41,6 @@ PyConstSolver& PyConstSolver::operator=(PyConstSolver&& other) noexcept{
         data = std::move(other.data);
         DISPATCH(void, delete cast<T>();)
         this->s = other.s;
-        set_pyobj(other);
         other.s = nullptr;
     }
     return *this;
@@ -58,12 +48,6 @@ PyConstSolver& PyConstSolver::operator=(PyConstSolver&& other) noexcept{
 
 PyConstSolver::~PyConstSolver(){
     DISPATCH(void, delete cast<T>();)
-}
-
-void PyConstSolver::set_pyobj(const PyConstSolver& other){
-    if (!data.is_lowlevel){
-        DISPATCH(void, cast<T>()->set_obj(&data);)
-    }
 }
 
 py::object PyConstSolver::t0() const{
@@ -246,24 +230,12 @@ py::object PyConstSolver::copy() const{
     )
 }
 
-bool PyConstSolver::py_at_event(py::object event) const{
+bool PyConstSolver::py_at_event() const{
     return DISPATCH(bool,
         if (cast<T>()->event_col().size() == 0){
             throw py::value_error("This solver contains no events to check for");
-        }else if (event.is_none()){
-            return cast<T>()->at_event();
         }
-        std::string name;
-        try {
-            name = event.cast<std::string>();
-        } catch (const py::cast_error&){
-            throw py::value_error("Event parameter must be a string name of an event in the solver");
-        }
-        int event_idx = cast<T>()->event_idx(name);
-        if (event_idx == -1){
-            throw py::value_error("No event with name '" + name + "' found in the solver");
-        }
-        return cast<T>()->at_event(event_idx);
+        return cast<T>()->at_event();
     )
 }
 
@@ -350,7 +322,7 @@ py::object PySolver::advance_until(const py::object& time, const py::object& obs
 
 void PySolver::reset() {
     DISPATCH(void,
-        return cast<T>()->reset();
+        return cast<T>()->Reset();
     )
 }
 
@@ -401,28 +373,5 @@ void py_advance_all_to_event(py::object& list, const py::str& event, double tmax
     }, threads, display_progress);
 }
 
-
-} // namespace ode
-
-// Explicit instantiations for virtual solver factory.
-namespace ode{
-
-#define ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(T) \
-    template std::unique_ptr<OdeRichSolver<T, 0>> \
-    get_virtual_solver<T, 0, Func<T>, void>(Integrator name, \
-        OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, \
-        T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, \
-        const std::vector<const Event<T>*>& events); \
-    template struct SolverState<T, 0>; \
-    template struct SolverRichState<T, 0>; \
-
-ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(float)
-ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(double)
-ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(long double)
-#ifdef MPREAL
-ODEPACK_INSTANTIATE_VIRTUAL_SOLVER(mpfr::mpreal)
-#endif
-
-#undef ODEPACK_INSTANTIATE_VIRTUAL_SOLVER
 
 } // namespace ode

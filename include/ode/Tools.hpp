@@ -7,18 +7,21 @@
 #include <chrono>
 #include <omp.h>
 #include <cmath>
-#include "./polybox/polybox.hpp"
-#include "../ndspan/arrays.hpp"
+#include <autodiff/autodiff.hpp>
+#include "../polybox/polybox.hpp"
+
 #ifdef MPREAL
 #include <mpreal.h>
 #endif
+
+#include "../ndspan/arrays.hpp"
 
 
 namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, ndspan::min, ndspan::max, std::complex;
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::to_string, ndspan::abs;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array, ndspan::to_string, ndspan::abs;
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
@@ -26,28 +29,82 @@ using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, deri
 // USEFUL ALIASES
 
 template<typename T>
-using Func = void(*)(T*, const T&, const T*, const T*, const void*); // f(t, q, args, void) -> array
+using RhsFunc = void(*)(T*, const T&, const T*, const T*); // f(t, q, args) -> array
 
 template<typename T>
-using FuncLike = void(*)(T*, const T&, const void*); // f(t, void) -> array
+using ObjFun = T(*)(const T&, const T*, const T*); // f(t, q, args) -> scalar
 
-template<typename T>
-using ObjFun = T(*)(const T&, const T*, const T*, const void*); // f(t, q, args, void) -> scalar
+template<typename F, typename T>
+concept isRhsFunc = 
+requires(F f, T* out, T t, const T* q, const T* args){
+    { f(out, t, q, args) } -> std::same_as<void>;
+    { f(out, std::as_const(t), q, args) } -> std::same_as<void>;
+};
 
-template<typename T>
-using ObjFunLike = T(*)(const T&, const void*); // f(t, void) -> scalar
+template<typename F, typename T>
+concept OptionalRhsFunc = std::same_as<F, std::nullptr_t> || isRhsFunc<F, T>;
+
+template<typename F, typename T>
+concept isObjFun =
+requires(F f, T t, const T* q, const T* args){
+    { f(t, q, args) } -> std::convertible_to<T>;
+    { f(std::as_const(t), q, args) } -> std::convertible_to<T>;
+};
+
+
+template<typename F, typename T>
+concept Observer =
+requires(F f, T t, const T* q, const T* t_ptr){
+    { f(t, q, t_ptr) } -> std::convertible_to<bool>;
+    { f(std::as_const(t), q, t_ptr) } -> std::convertible_to<bool>;
+};
+
+template<typename F, typename T>
+concept OptionalObserver = std::is_same_v<F, std::nullptr_t> || Observer<F, T>;
+
+template<typename F, typename T>
+concept StateInterp = requires(F f, T* out, T t){
+    { f(out, t) } -> std::same_as<void>;
+    { f(out, std::as_const(t)) } -> std::same_as<void>;
+};
+
+
+
 
 template<typename T, size_t N>
-using JacMat = Array2D<T, N, N, Allocation::Heap, Layout::F>;
+using JacMat = Array2D<T, N, N, Allocation::Auto, Layout::F>;
 
 using VoidType = void(*)();
 
 using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-static constexpr auto VoidFunc = [](const auto&, const auto*, const void* = nullptr)LAMBDA_INLINE -> bool {return true;};
-
 enum class RootPolicy : std::uint8_t { Left, Middle, Right};
 
+template<typename T>
+bool allEqual(const T* a, const T* b, size_t n);
+
+template<typename T, RootPolicy RP, typename Callable>
+T bisect(Callable&& f, const T& a, const T& b, const T& atol);
+
+template<typename T>
+void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot);
+
+template<typename T>
+T choose_step(const T& habs, const T& hmin, const T& hmax);
+
+template<typename T>
+T detLU_row_major(T* mat, size_t N);
+
+template<typename T>
+inline int sgn(const T& x){
+    return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
+}
+
+template<typename T>
+inline int sgn(const T& t1, const T& t2){
+    //same as sgn(t2-t1), but avoids roundoff error
+    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
+}
 
 template<typename T>
 class State{
@@ -83,50 +140,14 @@ class MutState : State<T>{
 };
 
 
-template<typename T>
-class EventState{
-
-    Array1D<T> data;
-    size_t Nsys = 0;
-
-public:
-
-    EventState() = default;
-
-    const T& t() const;
-
-    const T* get_true() const;
-
-    const T* get_exposed() const;
-
-    T* mut_true();
-
-    T* mut_exposed();
-
-    void set_t(T t);
-
-    void set_stepsize(T habs);
-
-    void set_true_vector(const T* vec);
-
-    void set_exposed_vector(const T* vec);
-
-    void resize(size_t nsys);
-
-    size_t nsys() const;
-
-    bool is_valid() const;
-    
-    bool choose_true = true; //if true, then exposed_vector may contain garbage values. Do not read its values. if false, then true_vector contains the true state vector, and exposed_vector contains the exposed state vector.
-    bool triggered = false;
-};
-
-
 template<typename RHS, typename JAC = std::nullptr_t>
 struct OdeData {
-    RHS rhs;
-    JAC jacobian = nullptr;
-    const void* obj = nullptr;
+
+    using RhsType = RHS;
+    using JacType = JAC;
+
+    RHS Rhs;
+    JAC Jac = nullptr;
 
     /*
     IMPORTANT
@@ -150,13 +171,63 @@ struct OdeData {
     */
 };
 
-template<typename RHS>
-struct OdeData<RHS, void> {
 
-    RHS rhs;
-    VoidType jacobian = [](){}; //will be cast to Func<T> and will be checked for nullptr at runtime
-    const void* obj = nullptr;
+// Check if F has a callable Rhs (static or non-static, non-template)
+template<typename F, typename T>
+concept hasRhsFunc =
+    requires(F f, T* out, T t, const T* q, const T* args) {
+        { f.Rhs(out, t, q, args) } -> std::same_as<void>;
+        { f.Rhs(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    };
+
+// Check if F has a callable Jac (static or non-static, non-template)
+template<typename F, typename T>
+concept hasJacFunc =
+    requires(F f, T* out, T t, const T* q, const T* args) {
+        { f.Jac(out, t, q, args) } -> std::same_as<void>;
+        { f.Jac(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    };
+
+// Check if F has a callable templated Rhs (static or non-static)
+template<typename F, typename T>
+concept hasTemplateRhs =
+    requires(F f, T* out, T t, const T* q, const T* args) {
+        { f.template Rhs<T>(out, t, q, args) } -> std::same_as<void>;
+        { f.template Rhs<T>(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    };
+
+// Check if F has a callable templated Jac (static or non-static)
+template<typename F, typename T>
+concept hasTemplateJac =
+    requires(F f, T* out, T t, const T* q, const T* args) {
+        { f.template Jac<T>(out, t, q, args) } -> std::same_as<void>;
+        { f.template Jac<T>(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    };
+
+template<typename F, typename T>
+concept hasRhsOnly = hasRhsFunc<F, T> && !hasJacFunc<F, T>;
+
+template<typename F, typename T>
+concept hasRhsAndJac = hasRhsFunc<F, T> && hasJacFunc<F, T>;
+
+
+enum class JacPolicy : std::uint8_t{
+    Approx,
+    Exact,
+    Autodiff,
 };
+
+
+template<typename T, hasRhsFunc<T> F>
+constexpr JacPolicy getJacPolicy(){
+    if constexpr (hasTemplateRhs<F, T> && !hasJacFunc<F, T>){
+        return JacPolicy::Autodiff;
+    } else if (hasJacFunc<F, T>){
+        return JacPolicy::Exact;
+    } else {
+        return JacPolicy::Approx;
+    }
+}
 
 
 enum class StepResult : std::uint8_t {
@@ -173,7 +244,7 @@ struct EmptyArr{
     EmptyArr() = default;
 
     inline T operator[](size_t) const{
-        return 0;
+        return T(0);
     }
 
     inline size_t size() const{
@@ -184,6 +255,7 @@ struct EmptyArr{
         return nullptr;
     }
 };
+
 
 class Clock{
 
@@ -245,10 +317,9 @@ template<typename T>
 bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
 
 template <typename T>
-requires (std::is_arithmetic_v<T>)
 inline bool isfinite(const T& value) {
 #ifndef NO_NAN_CHECK
-    if constexpr (std::is_floating_point_v<T>) {
+    if constexpr (!std::is_integral_v<T>) {
         #ifdef __FAST_MATH__
         // When -ffast-math is enabled, std::isfinite may not work correctly
         // Use range check instead: value is finite if it's within representable range
@@ -278,16 +349,6 @@ T inf_norm(const T* x, size_t size);
 template<typename T>
 T norm(const T* x, size_t size);
 
-template<typename T>
-inline int sgn(const T& x){
-    return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
-}
-
-template<typename T>
-inline int sgn(const T& t1, const T& t2){
-    //same as sgn(t2-t1), but avoids roundoff error
-    return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
-}
 
 template<typename T>
 std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
@@ -304,17 +365,7 @@ INLINE bool all_are_finite(const T* data, size_t n){
     return true;
 }
 
-template<typename T>
-bool allEqual(const T* a, const T* b, size_t n);
 
-template<typename T, RootPolicy RP, typename Callable>
-T bisect(Callable&& f, const T& a, const T& b, const T& atol);
-
-template<typename T>
-void inv_mat_row_major(T* out, const T* mat, size_t N, T* work, size_t* pivot);
-
-template<typename T>
-T detLU_row_major(T* mat, size_t N);
 
 inline void show_progress(int n, int target, const Clock& clock){
     std::cout << "\033[2K\rProgress: " << std::setprecision(2) << n*100./target << "%" <<   " : " << n << "/" << target << "  Time elapsed : " << clock.message() << "      Estimated duration: " << Clock::format_duration(target*clock.seconds()/n) << std::flush;
@@ -326,8 +377,6 @@ inline void print(Arg... x){
     std::cout << "\n";
 }
 
-template<typename T>
-T choose_step(const T& habs, const T& hmin, const T& hmax);
 
 } // namespace ode
 

@@ -20,7 +20,7 @@ struct SolverState{
 
     SolverState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, std::string message);
 
-    void show(const int& precision = 15) const;
+    void show(int precision = 15) const;
 
 };
 
@@ -28,11 +28,11 @@ struct SolverState{
 template<typename T, size_t N>
 struct SolverRichState : public SolverState<T, N>{
 
-    std::vector<std::string> event_names;
+    std::string event_name;
 
-    SolverRichState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, const std::string& message, const EventView<T>& events);
+    SolverRichState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, std::string message, const Event<T>* event);
 
-    void show(const int& precision = 15) const;
+    void show(int precision = 15) const;
 
 };
 

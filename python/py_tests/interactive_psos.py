@@ -97,7 +97,7 @@ def on_click(mouse_event : MouseEvent):
     trajectory_y.append(y)
 
     # Check if we're at an event
-    if solver.at_event("crossing"):
+    if solver.at_event:
         event_x.append(x)
         event_y.append(y)
         print(f"Event detected at t={solver.t:.6f}, (x, y) = ({x:.6f}, {y:.6f})")

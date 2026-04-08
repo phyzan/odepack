@@ -11,7 +11,7 @@
  *
  * Class hierarchy:
  * - Event<T>: Abstract interface for all events
- * - EventBase<Derived, T>: CRTP base with common implementation
+ * - EventBase<Derived, ...>: CRTP base with common implementation
  *   - PreciseEvent<T>: Zero-crossing detection with bisection
  *   - PeriodicEvent<T>: Fixed-interval temporal events
  * - ObjectOwningEvent<EventType, ObjType>: Wrapper owning user data
@@ -22,6 +22,10 @@
 #include "../Tools.hpp"
 
 namespace ode {
+
+    using pbox::owner;
+
+    using ndspan::copy_array;
 
 // ============================================================================
 // DECLARATIONS
@@ -44,7 +48,7 @@ public:
 
     UnaryInterp(Callable func) : _func(std::move(func)) {}
 
-    inline void operator()(T* out, const T& t) const override{
+    void operator()(T* out, const T& t) const override{
         _func(out, t);
     }
 
@@ -96,9 +100,6 @@ public:
      */
     virtual void                    apply_mask(T* out, const T& t, const T* q) const = 0;
 
-    /// @brief Check if event is temporal (time-based) and has no mask.
-    virtual bool                    is_pure_temporal() const = 0;
-
     /// @brief Get the number of times this event has been triggered.
     virtual size_t                  counter() const = 0;
 
@@ -108,18 +109,8 @@ public:
     /// @brief Create a dynamically allocated copy of this event.
     virtual Event<T>*               clone() const = 0;
 
-    /// @brief Check if this is a temporal (time-based) event.
-    virtual bool                    is_temporal() const = 0;
-
     /// @brief Get the integration direction (+1 forward, -1 backward).
     virtual int                     direction() const = 0;
-
-    /// @brief Check if the event was located in the last detection pass.
-    virtual bool                    is_located() const = 0;
-
-    /// @brief Get the event state containing trigger time and state vector.
-    virtual const EventState<T>*    state() const = 0;
-
     // MODIFIERS
 
     /**
@@ -139,9 +130,6 @@ public:
      */
     virtual void set_args(const T* args, size_t size) = 0;
 
-    /// @brief Mark this event as not located (clear detection state).
-    virtual void deactivate() = 0;
-
     /**
      * @brief Attempt to locate when this event triggers between two states.
      * @param before State at the start of the interval.
@@ -149,10 +137,14 @@ public:
      * @param interp Interpolation object for intermediate states.
      * @return True if event was detected in the interval.
      */
-    virtual bool locate(State<T> before, State<T> after, const EventInterp<T>& interp) = 0;
+    virtual bool locate(T& out, State<T> before, State<T> after, const EventInterp<T>& interp) = 0;
 
-    /// @brief Register the event (increment counter, apply mask, etc.).
-    virtual bool register_it() = 0;
+    /// @brief If the last locate() call returned true.
+    virtual bool is_located() const = 0;
+
+    /// @brief Register the event after it has been located. If the last locate() returned True, this finalizes
+    /// the event detection and returns true. Otherwise returns false and nothing happens.
+    virtual bool lock() = 0;
 
     /// @brief Reset the event to its initial state.
     virtual void reset(int direction = 0) = 0;
@@ -169,27 +161,24 @@ public:
  * @tparam Derived The derived event class (CRTP pattern).
  * @tparam T       Scalar type for computations.
  */
-template<typename Derived, typename T>
+template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc = std::nullptr_t>
 class EventBase : public Event<T>{
 
 public:
 
-    // ACCESSORS
+    // ------------------------------ ACCESSORS -----------------------------------
 
     /// @brief Get the event name.
     const std::string&      name() const;
 
     /// @brief Check if this event has a mask function.
-    bool                    is_masked() const;
+    constexpr bool          is_masked() const;
 
     /// @brief Check if the masked state is hidden (showing original instead).
     bool                    hides_mask() const;
 
     /// @brief Apply the mask transformation to a state.
     void                    apply_mask(T* out, const T& t, const T* q) const;
-
-    /// @brief Check if event is temporal with no mask.
-    bool                    is_pure_temporal() const;
 
     /// @brief Get the ODE system size.
     size_t                  Nsys() const;
@@ -203,9 +192,6 @@ public:
     /// @brief Clone this event.
     Event<T>*               clone() const;
 
-    /// @brief Check if this is a temporal event.
-    bool                    is_temporal() const;
-
     /// @brief Get the integration direction.
     int                     direction() const;
 
@@ -215,10 +201,7 @@ public:
     /// @brief Get the integration start time.
     const T&                t_start() const;
 
-    /// @brief Get the event state.
-    const EventState<T>*    state() const;
-
-    // MODIFIERS
+    // ------------------------------ MODIFIERS -----------------------------------
 
     /// @brief Update event arguments.
     void                    set_args(const T* args, size_t size);
@@ -226,25 +209,22 @@ public:
     /// @brief Initialize event for use with solver.
     void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
 
-    /// @brief Clear the located state.
-    void                    deactivate();
-
     /// @brief Attempt to locate event in an interval. obj_fun(T* out, T t) -> void fills the state vector at time t.
-    template<typename Callable>
-    bool                    locate_state(State<T> before, State<T> after, Callable&& obj_fun);
+    template<StateInterp<T> Callable>
+    bool                    locate_state(T& out, State<T> before, State<T> after, Callable&& obj_fun);
 
     /// @brief Attempt to locate event in an interval.
-    bool                    locate(State<T> before, State<T> after, const EventInterp<T>& interp);
+    bool                    locate(T& out, State<T> before, State<T> after, const EventInterp<T>& interp);
 
     /// @brief Register the event after location.
-    bool                    register_it();
+    bool                    lock();
 
     /// @brief Reset to initial state.
     void                    reset(int direction = 0);
 
 protected:
 
-    using Main = EventBase<Derived, T>;
+    using Main = EventBase<Derived, T, MaskFunc>;
 
     /**
      * @brief Construct an event with optional mask.
@@ -253,7 +233,7 @@ protected:
      * @param hide_mask If true, hide the masked state and show original.
      * @param obj       Optional user object pointer for callbacks.
      */
-    EventBase(std::string name, Func<T> mask, bool hide_mask, const void* obj = nullptr);
+    EventBase(std::string name, MaskFunc mask, bool hide_mask);
 
     DEFAULT_RULE_OF_FOUR(EventBase);
 
@@ -267,7 +247,7 @@ protected:
      * @param[in]  obj_fun Interpolation function (T* out, const T& t) -> void to compute state at intermediate times (for masked events).
      * @return True if event was found in interval.
      */
-    template<typename Callable>
+    template<StateInterp<T> Callable>
     bool locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
     // ============= STATIC OVERRIDE (OPTIONAL) ================
@@ -278,30 +258,22 @@ protected:
     /// @brief Called on reset. Override to reset derived state.
     void reset_impl(int direction);
 
-    /// @brief Apply mask to state. Override for custom mask behavior.
-    void mask_impl(T* out, const T& t, const T* q) const;
-
-    /// @brief Check if masked. Override to customize mask detection.
-    bool is_masked_impl() const;
-
     /// @brief Check if temporal. Override to mark as temporal event.
     bool is_temporal_impl() const;
     //==========================================================
 
 private:
     std::string             _name;
-    std::vector<T>          _args = {};
-    EventState<T>           _state;
-    T                       _start = inf<T>();
+    std::vector<T>          _args;
+    T                       _start;
 protected:
     /// @brief Auxiliary array for intermediate calculations.
-    mutable Array1D<T>      _q_aux;
+    mutable Array1D<T>      worker;
     /// @brief User object pointer passed to callbacks.
-    const void*             _obj = nullptr;
 private:
+    MaskFunc                _mask;
     size_t                  _counter = 0;
-    Func<T>                 _mask = nullptr;
-    int                     _direction;
+    int                     _direction = 0; //+1 forward, -1 backward
     bool                    _hide_mask = false;
     bool                    _is_setup = false;
     bool                    _is_located = false;
@@ -319,10 +291,10 @@ private:
  * @tparam T       Scalar type for computations.
  * @tparam Derived Optional derived class for further CRTP extension.
  */
-template<typename T, typename Derived = void>
-class PreciseEvent : public EventBase<GetDerived<PreciseEvent<T, Derived>, Derived>, T>{
+template<typename T, isObjFun<T> Target, OptionalRhsFunc<T> MaskFunc = std::nullptr_t, typename Derived = void>
+class PreciseEvent : public EventBase<GetDerived<PreciseEvent<T, Target, MaskFunc, Derived>, Derived>, T, MaskFunc>{
 
-    using Base = EventBase<GetDerived<PreciseEvent<T, Derived>, Derived>, T>;
+    using Base = EventBase<GetDerived<PreciseEvent<T, Target, MaskFunc, Derived>, Derived>, T, MaskFunc>;
     friend Base;
 
 public:
@@ -337,7 +309,7 @@ public:
      * @param event_tol Tolerance for bisection root finding.
      * @param obj       Optional user object pointer for callbacks.
      */
-    PreciseEvent(std::string name, ObjFun<T> when, int dir=0, Func<T> mask=nullptr, bool hide_mask=false, T event_tol=1e-12, const void* obj = nullptr);
+    PreciseEvent(std::string name, Target when, T event_tol=1e-20, int dir=0, MaskFunc mask=nullptr, bool hide_mask=false);
 
     /// @brief Evaluate the objective function at given time and state.
     T    obj_fun(const T& t, const T* q) const;
@@ -348,12 +320,12 @@ public:
 protected:
 
     /// @brief Locate zero crossing using bisection.
-    template<typename Callable>
+    template<StateInterp<T> Callable>
     bool locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
-    ObjFun<T>           _when = nullptr;      ///< Objective function to monitor.
-    int                 _sign_dir = 1;        ///< Required crossing direction.
-    T                   _event_tol;           ///< Bisection tolerance.
+    Target  target = nullptr;      ///< Objective function to monitor.
+    int     crossing_dir = 1;        ///< Required crossing direction.
+    T       ftol;           ///< Bisection tolerance.
 
 };
 
@@ -367,10 +339,10 @@ protected:
  * @tparam T       Scalar type for computations.
  * @tparam Derived Optional derived class for further CRTP extension.
  */
-template<typename T, typename Derived = void>
-class PeriodicEvent : public EventBase<GetDerived<PeriodicEvent<T, Derived>, Derived>, T>{
+template<typename T, OptionalRhsFunc<T> MaskFunc = std::nullptr_t, typename Derived = void>
+class PeriodicEvent : public EventBase<GetDerived<PeriodicEvent<T, MaskFunc, Derived>, Derived>, T, MaskFunc>{
 
-    using Base = EventBase<GetDerived<PeriodicEvent<T, Derived>, Derived>, T>;
+    using Base = EventBase<GetDerived<PeriodicEvent<T, MaskFunc, Derived>, Derived>, T, MaskFunc>;
     friend Base;
 
 public:
@@ -381,21 +353,11 @@ public:
      * @param period    Time interval between triggers.
      * @param mask      Optional mask function to transform state at trigger.
      * @param hide_mask If true, hide the masked state and show original.
-     * @param obj       Optional user object pointer for callbacks.
-     */
-    PeriodicEvent(std::string name, T period, Func<T> mask=nullptr, bool hide_mask=false, const void* obj = nullptr);
+     */ 
+    PeriodicEvent(std::string name, T period, MaskFunc mask=nullptr, bool hide_mask=false);
 
     /// @brief Get the period (time between triggers).
     const T&    period() const;
-
-    /// @brief Get the number of periods elapsed since start.
-    size_t      np() const;
-
-    /// @brief Get the absolute time elapsed (n * period).
-    T           delta_t_abs() const;
-
-    /// @brief Get the signed time elapsed (n * period * direction).
-    T           delta_t() const;
 
 protected:
 
@@ -406,7 +368,7 @@ protected:
     T           get_t(size_t n) const;
 
     /// @brief Locate next periodic trigger in interval.
-    template<typename Callable>
+    template<StateInterp<T> Callable>
     bool        locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const;
 
     /// @brief Update period counter on registration.
@@ -424,95 +386,14 @@ private:
 };
 
 
-/**
- * @brief Wrapper that owns the user object passed to event callbacks.
- *
- * Normally events store a pointer to user data, requiring the user to
- * manage lifetime. This wrapper owns a copy of the user object, ensuring
- * it stays valid as long as the event exists.
- *
- * @tparam EventType The base event type to wrap.
- * @tparam ObjType   The user object type to own.
- */
-template<typename EventType, typename ObjType>
-class ObjectOwningEvent : public EventType{
-
-public:
-
-    /**
-     * @brief Construct owning event with user object.
-     * @param obj  User object to copy and own.
-     * @param args Arguments forwarded to EventType constructor.
-     */
-    template<typename... Args>
-    ObjectOwningEvent(const ObjType& obj, Args&&... args);
-    ObjectOwningEvent(const ObjectOwningEvent& other);
-    ObjectOwningEvent(ObjectOwningEvent&& other) noexcept;
-    ObjectOwningEvent& operator=(const ObjectOwningEvent& other);
-    ObjectOwningEvent& operator=(ObjectOwningEvent&& other) noexcept;
-    ObjectOwningEvent<EventType, ObjType>* clone() const override;
-
-protected:
-
-    ObjType _object;  ///< Owned copy of user object.
-
-};
-
-/// @brief Type-erased event container.
 template<typename T>
-using AnyEvent = pbox::PolyWrapper<Event<T>>;
-
-/**
- * @brief Determine if an event should be discarded based on masking rules.
- *
- * When multiple events occur at the same time, this determines which to keep.
- * The 'mark' event is the first non-pure-temporal event at that time.
- *
- * @param event The event to potentially discard.
- * @param mark  The reference event determining the rules.
- * @return True if event should be discarded.
- */
-template<typename T>
-bool discard_event(const AnyEvent<T>& event, const AnyEvent<T>& mark);
-
-/**
- * @brief View into a subset of detected events at a single time point.
- *
- * Provides indexed access to events that triggered at the same time
- * during a detection pass.
- *
- * @tparam T Scalar type for computations.
- */
-template<typename T>
-class EventView : private View1D<size_t>{
-
-    using Base = View1D<size_t>;
-
-public:
-
-    /// @brief Construct a view over detected events.
-    EventView(const AnyEvent<T>* events, const size_t* detection, size_t size);
-
-    /// @brief Access event by index within this view.
-    const AnyEvent<T>& operator[](size_t i) const;
-
-    /// @brief Get number of events in this view.
-    size_t size() const;
-
-    const AnyEvent<T>* event_data;  ///< Pointer to event storage.
-
+struct MaskedState{
+    Array1D<T> masked_vector;
+    T time;
+    size_t idx; //index of event that produced this masked state
 };
 
 
-/**
- * @brief Container managing multiple events during ODE integration.
- *
- * Handles event detection, sorting by time, conflict resolution for
- * simultaneous events, and iteration over detection results. Events
- * are cloned on construction so the collection owns its events.
- *
- * @tparam T Scalar type for computations.
- */
 template<typename T>
 class EventCollection{
 
@@ -526,26 +407,41 @@ public:
     DEFAULT_RULE_OF_FOUR(EventCollection)
     ~EventCollection() = default;
 
-    /// @brief Get event by index.
-    const AnyEvent<T>&      event(size_t i) const;
+    // ------------------------ ACCESSORS ----------------------------
 
-    /// @brief Get event state by index.
-    const EventState<T>&    state(size_t i) const;
+    /// @brief Get event by index.
+    const Event<T>&         event(size_t event_idx) const;
+
+    T                       get_time(size_t detection_idx) const{
+        assert(detection_idx < detections && "Out of bounds detection_idx requested in get_time");
+        return event_times[detection_order[detection_idx]];
+    }
+
+    const Event<T>*         get_event(size_t detection_idx) const{
+        if (detection_idx >= detections){
+            return nullptr;
+        }else{
+            return events[detection_order[detection_idx]].get();
+        }
+    }
+
+    bool                    is_located(size_t event_idx) const{
+        return located[event_idx];
+    }
 
     /// @brief Get the index of the event with the given name, or -1 if not found.
-    int                     event_idx(const std::string& name) const;
+    size_t                  event_idx(const std::string& name) const;
+
+    size_t                  get_event_idx(size_t detection_idx) const{
+        assert(detection_idx < detections && "Detection index out of bounds in get_event_idx");
+        return detection_order[detection_idx];
+    }
 
     /// @brief Get total number of events.
     size_t                  size() const;
 
     /// @brief Get number of events detected in last pass.
     size_t                  detection_size() const;
-
-    /// @brief Get number of distinct trigger times in last pass.
-    size_t                  detection_times() const;
-
-    /// @brief Get the first detected event in the next time group. The returned object might wrap a null pointer if there are no more events.
-    const AnyEvent<T>&      get_next_event() const;
 
     /// @brief Initialize all events for use with solver.
     void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
@@ -562,57 +458,40 @@ public:
         * @param after  State at interval end.
         * @param obj_fun Interpolation function (T* out, const T& t) -> void to compute state at intermediate times (for masked events).
      */
-    template<typename Callable>
-    void                    detect_all_between(State<T> before, State<T> after, Callable&& obj_fun);
+    template<StateInterp<T> Callable>
+    bool                    detect_all_between(State<T> before, State<T> after, Callable&& obj_fun);
 
-    /// @brief Get view of events at current iteration time.
-    EventView<T>            event_view() const;
-
-    /// @brief Get iterator to start of current time group indices.
-    const size_t*           begin() const;
-
-    /// @brief Get iterator to end of current time group indices.
-    const size_t*           end() const;
-
-    /// @brief Advance to next time group.
-    bool                    next_result();
-
-    /// @brief Get iterator to start of events at the previous time group (nullptr if no previous group).
-    const size_t*           last_begin() const;
-
-    /// @brief Get iterator to end of events at the previous time group (nullptr if no previous group).
-    const size_t*           last_end() const;
-
-    /// @brief Reset iteration to first time group.
-    void                    restart_iter();
-
-    /// @brief Get the first masked event that determines the state transformation, if any.
-    const AnyEvent<T>&         canon_event() const;
-
-    /// @brief Get the state of the first masked event, if any.
-    const EventState<T>*    canon_state() const;
+    const MaskedState<T>*   masked_state() const{
+        return has_masked_state ? &masked_data : nullptr;
+    }
 
     /// @brief Reset all events to initial state.
     void                    reset(int direction = 0);
 
-    AnyEvent<T>&            event(size_t i);
-
 private:
-
-    bool _is_prioritized(size_t i, size_t j, int dir);
-
-    std::unordered_map<std::string, int> name_map_;  ///< Map from event names to indices for quick lookup.
-    Array1D<AnyEvent<T>>    _events;
-    Array1D<size_t>         _event_idx;
-    Array1D<size_t>         _event_idx_start;
-
-    size_t                  _canon_idx;
-    size_t                  _N_detect=0;
-    size_t                  _Nt=0;
-    size_t                  _iter=0;
-
+    std::unordered_map<std::string, size_t> idx_of_name;    // Map from event names to indices for quick lookup.
+    Array1D<owner<Event<T>>>                events;
+    Array1D<T>                              event_times;    // Detection time of each event. If located[i] is false, this value is invalid.
+    Array1D<T>                              worker;       // Auxiliary array for intermediate calculations during detection.
+    Array1D<size_t>                         detection_order;  // Indices of events sorted by detection time after detect_all_between() is called.
+    Array1D<bool>                           located;
+    MaskedState<T>                          masked_data;
+    size_t                                  detections = 0;
+    bool                                    has_masked_state = false;
 };
 
+
+template<typename T>
+struct EventState{
+    const Event<T>* event = nullptr; // Pointer to the event that triggered, or nullptr if no event is active
+    size_t idx = 0; //index of the event in the event collection. garbage if the event is not active
+    bool is_masked = false;
+    bool active = false; //true if the solver is currently at this event
+
+    operator bool() const{
+        return active;
+    }
+};
 
 } // namespace ode
 

@@ -3,21 +3,21 @@
 
 using namespace ode;
 template<typename T>
-void f(T* out, const T& t, const T* y, const T* args, const void*){
+void f(T* out, const T& t, const T* y, const T* args){
     out[0] = y[1];
     out[1] = -y[0];
 }
 
 int main(){
     using A = mpfr::mpreal;
-    using T = lazy::LazyType<A>; //set T = A for performance comparison.
+    using T = A; //set T = A for performance comparison.
 
     // mpfr::mpreal::set_default_prec(256);
     lazy::set_default_mpreal_prec(256);
     auto y0 = std::vector<T>{1, -3};
 
     auto solver = getSolver<RK45, T, 2, SolverPolicy::Static>(
-        OdeData{.rhs=f<T>}, 0, y0.data(), 2, 1e-40, 1e-40
+        OdeData{.Rhs=f<T>}, 0, y0.data(), 2, 1e-40, 1e-40
     );
 
     auto t_start = std::chrono::high_resolution_clock::now();

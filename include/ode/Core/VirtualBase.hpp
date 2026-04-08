@@ -71,11 +71,11 @@ public:
     virtual bool                advance_until(const T& time) = 0;
     virtual bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer) = 0;
     virtual bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps) = 0;
-    virtual void                reset() = 0;
+    virtual pbox::Box<Interpolator<T, N>>  interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer = [](const auto&, const auto*, const auto*){return true;}) = 0;
+    virtual void                Reset() = 0;
     virtual bool                resume() = 0;
     virtual void                stop(const std::string& text = "") = 0;
     virtual void                kill(const std::string& text = "") = 0;
-    virtual void                set_obj(const void* obj) = 0;
     virtual void                set_args(const T* new_args) = 0;
     virtual bool                set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0) = 0;
 
@@ -96,20 +96,15 @@ public:
     using UniqueClone = std::unique_ptr<OdeRichSolver<T, N>>;
 
     // ACCESSORS
-    virtual View1D<T, N>                    true_vector() const = 0;
-    virtual EventView<T>                    current_events() const = 0;
     virtual const EventCollection<T>&       event_col() const = 0;
     virtual int                             event_idx(const std::string& name) const = 0;
-    virtual const Interpolator<T, N>&       interpolator() const = 0;
-    virtual bool                            is_interpolating() const = 0;
-    virtual bool                            at_event(int event = -1) const = 0;
+    virtual bool                            at_event() const = 0;
+    virtual EventState<T>                   current_event() const = 0;
     virtual OdeRichSolver<T, N>*            clone() const = 0;
 
     // MODIFIERS
     virtual bool                            advance_to_event(int event = -1) = 0;
     virtual bool                            advance_to_event(const T& tmax, int event = -1) = 0;
-    virtual void                            start_interpolation() = 0;
-    virtual void                            stop_interpolation() = 0;
 
 protected:
 
@@ -118,10 +113,7 @@ protected:
     DEFAULT_RULE_OF_FOUR(OdeRichSolver);
 };
 
-
-
-template<typename T, size_t N>
-void advance_all(const std::vector<OdeSolver<T, N>*>& solvers, T t_goal, int threads, bool display_progress);
+enum class UtilPolicy : std::uint8_t{ Virtual, RichVirtual};
 
 enum class SolverPolicy : std::uint8_t{ Static, RichStatic, Virtual, RichVirtual};
 
@@ -143,6 +135,13 @@ using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<
 
 template<SolverPolicy SP>
 constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
+
+/// @brief Traits struct mapping a solver type to its virtual base interface.
+/// Specialize this before the solver class definition to override the default.
+template<typename Derived, typename T, size_t N, SolverPolicy SP>
+struct SolverVirtualTypeTraits {
+    using type = BaseInterface<T, N, SP>;
+};
 
 
 

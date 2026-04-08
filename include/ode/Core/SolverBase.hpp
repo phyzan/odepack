@@ -21,12 +21,11 @@
 #include "VirtualBase.hpp"
 #include "../SolverState.hpp"
 
+#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}
+#define MAIN_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
-#define MAIN_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
-
-#define SOLVER_CONSTRUCTOR(T) OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
+#define SOLVER_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
 
 #define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, Integrator method = Integrator::RK45
 
@@ -45,7 +44,7 @@ namespace ode{
  *                 - static constexpr const char* name
  *                 - static constexpr bool IS_IMPLICIT
  *                 - static constexpr int ERR_EST_ORDER
- *                 - adapt_impl(), interp_impl(), state_interpolator()
+ *                 - adapt_impl(), interp_impl(), local_interp()
  * @tparam T       Scalar type for computations (e.g., double, float).
  * @tparam N       System size at compile time. Use 0 for runtime-sized systems.
  * @tparam SP      Solver policy controlling behavior (see SolverPolicy enum).
@@ -60,19 +59,20 @@ Integrator getIntegrator(const std::string& name);
 
 Integrator getIntegrator(const char* name);
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType>
-class BaseSolver : public BaseInterface<T, N, SP>{
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class BaseSolver : public SolverVirtualTypeTraits<Derived, T, N, SP>::type {
 
-    using Base = BaseInterface<T, N, SP>;
     using Clone = SolverCloneType<Derived, T, N, SP>;
-
-    static constexpr bool RUNTIME_JAC_TYPE = std::is_same_v<JacType, void>;
-    static constexpr bool HAS_JAC = !RUNTIME_JAC_TYPE && !std::is_same_v<JacType, std::nullptr_t>;
-    static_assert( !std::is_same_v<RhsType, std::nullptr_t> , "RHS function type cannot be nullptr");
 
 public:
 
+    // Autodiff is only enabled when the size of the ODE system is known at compile time.
+    static constexpr JacPolicy JP = (getJacPolicy<T, OdeType>() == JacPolicy::Autodiff && N == 0) ? JacPolicy::Exact : getJacPolicy<T, OdeType>();
+    
+
     using Scalar = T;
+    using Base = typename SolverVirtualTypeTraits<Derived, T, N, SP>::type;
+    using DualType = autodiff::AutoDiff<T, 1, N>;
     static constexpr size_t NSYS = N;
     static constexpr SolverPolicy Policy = SP;
     
@@ -91,7 +91,7 @@ public:
 
     /**
      * @brief Compute the Jacobian matrix of the ODE system.
-     *
+     * 
      * Uses the exact Jacobian if provided, otherwise falls back to
      * finite difference approximation via jac_approx().
      *
@@ -106,12 +106,12 @@ public:
 
     /**
      * @brief Approximate the Jacobian using central finite differences.
-     * @param[out] j  Output array for Jacobian in column-major order (size Nsys x Nsys).
+     * @param[out] out  Output array for Jacobian in column-major order (size Nsys x Nsys).
      * @param[in]  t  Current time.
      * @param[in]  q  Current state vector (size Nsys).
      * @param[in]  dt Step sizes for each component (size Nsys). If nullptr, computed automatically.
     */
-    void                 jac_approx(T* j, const T& t, const T* q, const T* dt) const;
+    void                 jac_approx(T* out, const T& t, const T* q, const T* dt) const;
 
     /**
      * @brief Get a matrix view of a Jacobian array.
@@ -280,26 +280,31 @@ public:
      * @param extra_steps Optional array of additional time points to observe (must be in the same direction and within the integration range). Observer will be called at these points as well.
      * @return True if integration succeeded reaching the target time, false if solver stopped early.
      */
-    template<typename Callable, typename ArrayType = EmptyArr<T>>
-    bool                advance_until(const T& time, Callable&& observer, const ArrayType& extra_steps = EmptyArr<T>());
+    template<OptionalObserver<T> Callable, typename ArrayType = EmptyArr<T>>
+    bool                advance_until(const T& time, const Callable& observer, const ArrayType& extra_steps = EmptyArr<T>());
 
     /**
      * @brief Integrate until an objective function crosses zero (event detection).
      *
-     * @tparam Callable Function type with signature: T(const T& t, const T* q, const T* args, const void* obj)
+     * @tparam Callable Function type with signature: T(const T& t, const T* q, const T* args)
      * @param obj_fun  Objective function to monitor for zero crossing.
      * @param tol      Tolerance for root finding (bisection).
      * @param dir      Direction of crossing: +1 (increasing), -1 (decreasing), 0 (any).
      * @param observer Callable function(t, q_ptr) -> bool (see advance_until above) that is called at each successfull step until the requested zero crossing of the objective function is reached
      * @return True if event was detected and solver positioned at crossing.
      */
-    template<typename ObjFun, typename Callable = decltype(VoidFunc)>
-    requires std::invocable<ObjFun, const T&, const T*, const T*>
-    bool                advance_until(ObjFun&& obj_fun, T tol, int dir=0, Callable&& observer = VoidFunc);
+    template<isObjFun<T> Target, OptionalObserver<T> Callable = std::nullptr_t>
+    bool                advance_until(Target&& obj_fun, T ftol, int dir=0, const Callable& observer = nullptr);
 
     bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps);
 
     bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer);
+
+    /// @brief observer(t, q_ptr, t_ptr) -> bool
+    template<OptionalObserver<T> Callable = std::nullptr_t>
+    pbox::Box<Interpolator<T, N>>   interpolate_until(const T& time, const Callable& observer = nullptr);
+
+    pbox::Box<Interpolator<T, N>>  interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer = [](const auto&, const auto*, const auto*){return true;});
 
     /**
      * @brief Advance the solver by a specified time interval (along the integration direction).
@@ -310,9 +315,6 @@ public:
      *      and use interpolation to end exactly at the target time.
     */
     bool                advance_by(T interval);
-
-    /// @brief Reset the solver to its initial conditions.
-    void                reset();
 
     /**
      * @brief Set new initial conditions via a setter function.
@@ -358,17 +360,19 @@ public:
     bool                resume();
 
     /**
-     * @brief Set the user object pointer passed to ODE callbacks.
-     * @param obj Pointer to user data (must not be this solver instance).
-     */
-    void                set_obj(const void* obj);
-
-    /**
      * @brief Update the additional arguments passed to the ODE function.
      * @param new_args Pointer to new argument values (must match original size).
      */
     void                set_args(const T* new_args);
 
+    /**
+     * @brief Create an interpolator for dense output between two boundaries.
+     * @param bdr1 First boundary index.
+     * @param bdr2 Second boundary index.
+     * @return Unique pointer to an interpolator object.
+     * @note Must be implemented by derived class.
+     */
+    VirtualInterp<T, N>     state_interpolator(int bdr1, int bdr2) const;
 
 protected:
 
@@ -384,15 +388,6 @@ protected:
     static constexpr int            ERR_EST_ORDER = Derived::ERR_EST_ORDER;
 
     /**
-     * @brief Create an interpolator for dense output between two boundaries.
-     * @param bdr1 First boundary index.
-     * @param bdr2 Second boundary index.
-     * @return Unique pointer to an interpolator object.
-     * @note Must be implemented by derived class.
-     */
-    VirtualInterp<T, N>     state_interpolator(int bdr1, int bdr2) const;
-
-    /**
      * @brief Perform one adaptive integration step.
      * @param[out] state Output array for the new state [t, h, q...] (size Nsys+2).
      * @note Must be implemented by derived class.
@@ -406,17 +401,22 @@ protected:
      * @note Must be implemented by derived class.
      */
     void                    interp_impl(T* result, const T& t) const;
+
+    auto                    local_interp() const;
     // ================================================================================
 
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
     // Derived classes MAY override these methods. Call base implementation first.
 
+    constexpr bool    RequestTimeFloor(T& out) {
+        return false;
+    }
 
     /// @brief Reset implementation hook. Derived should call base first.
-     void                 reset_impl();
+    void    Reset();
 
     /// @brief Args update implementation hook. Derived should call base first.
-     void                 set_args_impl(const T* new_args);
+    void    set_args_impl(const T* new_args);
 
     /**
     @brief Re-adjustment hook right before new_state modification. Derived should call base first.
@@ -425,7 +425,7 @@ protected:
     @note Nothing has changed yet when this is called; it's a chance to update any internal data before the state is modified. The new state will be set to (t(), stepsize(), new_vector),
     where t() is the true current time, which might lie between old_state and new_state (e.g. if an event occurred).
     */
-     void                 re_adjust_impl(const T* new_vector);
+    void    ReAdjust(const T* new_vector);
 
     /**
      * @brief Validate initial conditions implementation.
@@ -434,11 +434,13 @@ protected:
      * @return True if ICs are valid.
      * @note Derived should call base first, then add additional checks.
      */
-     bool                 validate_ics_impl(T t0, const T* q0) const;
+    bool    validate_ics_impl(T t0, const T* q0) const;
     // ================================================================================
 
 
     // =========================== HELPER METHODS =====================================
+
+    inline const OdeType& ode() const {return _ode;}
 
     /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
     void        rhs(T* dq_dt, const T& t, const T* q) const;
@@ -457,7 +459,7 @@ protected:
 
     /// @brief Get pointer to the correct new state for interpolation
     const T*    interp_new_state_ptr() const;
-    
+
     /// @brief Print a warning that the solver is paused.
     void        warn_paused() const;
 
@@ -467,17 +469,17 @@ protected:
     /// @brief Set the solver status message.
     void        set_message(const std::string& text);
 
-    /**
-    @brief Trigger re-adjustment right before state changes.
-    @param new_vector New state vector values (size Nsys).
-
-    @note The current state will be set to (t(), stepsize(), new_vector),
-    where t() is the true current time, which might lie between old_state and new_state (e.g. if an event occurred). After that, any interpolation algorithms can only be valid in the interval [t_old, t), and the dense state vector output will reflect that with a discontinuity at t().
-    */
-    void        re_adjust(const T* new_vector);
-
     /// @brief Check if the current true state matches the new state.
     bool        is_at_new_state() const;
+
+    template<typename U, typename... Args>
+    T    minimum_time(const U& item, const Args&... args) const{
+        if constexpr (sizeof...(Args) > 0){
+            return minimum_time_helper(item, args...);
+        } else {
+            return item;
+        }
+    }
 
     // ================================================================================
 
@@ -488,8 +490,9 @@ protected:
     /// @brief Get pointer to the previous "true" state.
     const T*    last_true_state_ptr() const;
 
-    /// @brief Advance implementation (overridden in RichSolver).
-    bool        adv_impl();
+    /// @brief Advance implementation. If t_lim is nullptr, advance normally. Otherwise, if the implementation yields a time beyond t_lim, it should only cache the step information (e.g. counters, or event or state register etc) since the solver is "not to go there yet" and only apply them once adv_impl is called with t_lim beyond the implementation's predicted step.
+    template<typename... Args>
+    bool        adv_impl(Args&&... args);
     // ================================================================================
 
     DEFAULT_RULE_OF_FOUR(BaseSolver)
@@ -515,26 +518,47 @@ protected:
 
 private:
 
-    void                    jac_exact(T* j, const T& t, const T* q) const;
     const T*                aux_state_ptr() const;
     T*                      aux_state_ptr();
     void                    register_states();
     bool                    validate_it(StepResult result, const T* state);
     void                    update_state(const T& time);
-    void                    move_state(const T& time);
     void                    set_state(const T& time, T* state);
+
+    template<typename A, typename B, typename... Args>
+    const T&    minimum_time_helper(const A& a, const B& b, Args&&... args) const{
+        if constexpr (sizeof...(args) > 0){
+            return minimum_time_helper(min_of(a, b), args...);
+        }else{
+            return min_of(a, b);
+        }
+    }
+
+    template<typename A, typename B>
+    const T& min_of(const A& a, const B& b) const{
+        if (this->direction() == 1){
+            return (a < b ? a : b);
+        }else{
+            return (a > b ? a : b);
+        }
+    }
+
+    /// @brief Only use inside adv_impl (so that if the state here is updated, all derived classes are aware). Move the current state to a new time between the current time and the most recently adapted state. This is a lowlevel operation, so use carefully or the intended bahavior might break.
+    void                    move_state(const T& time);
 
     template<typename Setter>
     auto                    priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize);
 
 
-    Array2D<T, 6, (N>0 ? N+2 : 0), Allocation::Auto>    _state_data;
-    Array1D<T, 4, Allocation::Stack>                    _scalar_data;
+    Array2D<T, 6, (N>0 ? N+2 : 0)>                      _state_data;
+    Array1D<T, 4>                                       _scalar_data;
     mutable Array2D<T, 4, 0>                            _cache_4; // initially empty
     mutable Array1D<T, 0>                               _cache_advun; // initially empty
     mutable Array1D<T, 0>                               _cache_ics; // initially empty
     Array1D<T>                                          _args;
-    OdeData<RhsType, JacType>                           _ode;
+    mutable Array1D<DualType, JP==JacPolicy::Autodiff ? 2*N : 0>           _diff_worker;
+    Array1D<DualType>                                   _args_worker;
+    OdeType                                             _ode;
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;
     mutable size_t                                      _n_evals_rhs = 0;
@@ -561,6 +585,9 @@ private:
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
+
+#define SolverTemplate template<typename T, size_t, SolverPolicy, hasRhsFunc<T>, typename>
+
 
 } // namespace ode
 

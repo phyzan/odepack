@@ -296,14 +296,10 @@ class OdeSolverView:
         """
         ...
 
-    def at_event(self, event: str = None)->bool:
+    @property
+    def at_event(self)->bool:
         """
         Check if a specific event is located at the current step.
-
-        Parameters
-        ----------
-        event : str
-            Name of the event to check. If None (default), checks if any event at all is located at the current step.
 
         Returns
         -------

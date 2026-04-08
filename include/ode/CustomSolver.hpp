@@ -7,12 +7,12 @@
 
 namespace ode {
 
-//e.g. <MyDerivedClass, RK45, T, N, SP, RhsType, JacType>
-template<typename Derived, template<typename, size_t, SolverPolicy, typename, typename, typename> typename Solver, typename T, size_t N, SolverPolicy SP, typename RhsType = Func<T>, typename JacType = Func<T>>
-class CustomSolver : public Solver<T, N, SP, RhsType, JacType, Derived>{
+//e.g. <MyDerivedClass, RK45, T, N, SP, OdeType>
+template<typename Derived, template<typename, size_t, SolverPolicy, typename, typename> typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+class CustomSolver : public Solver<T, N, SP, OdeType, Derived>{
 
 protected:
-    using Base = Solver<T, N, SP, RhsType, JacType, Derived>;
+    using Base = Solver<T, N, SP, OdeType, Derived>;
 
 public:
 

@@ -1,4 +1,4 @@
-#include "../../../include/pyode/lib_impl/PyEvents_impl.hpp"
+#include "../../../include/pyodepack.hpp"
 
 namespace ode{
 
@@ -132,21 +132,5 @@ bool all_are_lowlevel(const py::iterable& events){
 //                                EXPLICIT TEMPLATE INSTANTIATIONS
 //===========================================================================================
 
-
-#define DEFINE_EVENTS(T) \
-    template void* PyPrecEvent::get_new_event<T>(); \
-    template void* PyPerEvent::get_new_event<T>(); \
-    template std::vector<Event<T>*> to_Events<T>(const py::iterable& events, const std::vector<py::ssize_t>& shape, const py::iterable& args); \
-    template class EventView<T>; \
-    template class EventCollection<T>; \
-
-DEFINE_EVENTS(float)
-DEFINE_EVENTS(double)
-DEFINE_EVENTS(long double)
-#ifdef MPREAL
-DEFINE_EVENTS(mpfr::mpreal)
-#endif
-
-#undef DEFINE_EVENTS
 
 } // namespace ode

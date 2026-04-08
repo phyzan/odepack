@@ -52,7 +52,7 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 - **Forward & Backward Integration** - Integrate in either time direction
 - **Configurable Tolerances** - Set `rtol`, `atol`, `min_step`, `max_step`
 - **Variational Equations** - Built-in support for Lyapunov exponent calculations
-- **Parallel Integration** - OpenMP support for solving multiple ODE systems simultaneously via `advance_all` and `advance_all_to_event`
+- **Parallel Integration** - OpenMP support for solving multiple ODE systems in Python simultaneously via `advance_all` and `advance_all_to_event`
 - **Custom Solvers** - Extend the library with your own integration methods
 
 ### Event Detection
@@ -68,6 +68,17 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 
 ### Prerequisites
+
+The Jacobian computation can optionally be performed using automatic differentation. As this is hardcoded into the library,
+compilation requires that the header-only C++ autodiff library `autodiff` is installed. To install it, run the following command:
+
+```bash
+git clone https://github.com/phyzan/autodiff.git
+cd autodiff
+sudo make install
+cd ..
+rm -rf autodiff
+```
 
 The library contains modules for interpolating sampled fields using the Q-Hull headers.
 To exploit this functionality, install Q-Hull by running the following command.
@@ -90,11 +101,8 @@ sudo apt install libmpfrc++-dev
 git clone https://github.com/phyzan/odepack.git
 cd odepack
 sudo make install
-```
-
-This installs headers to `/usr/local/include`. To use a custom location:
-```bash
-sudo make install PREFIX=/path/to/install
+cd ..
+rm -rf odepack
 ```
 
 To uninstall:
@@ -161,15 +169,15 @@ int main() {
     std::array<double, 2> y0 = {3.0, 0.0};
 
     // Define the y' = 1 crossing
-    PreciseEvent<double> event(
+    PreciseEvent event(
         "event",
-        [](const double& t, const double* y, const double* args, const void* ptr){
+        [](const double& t, const double* y, const double* args){
             return y[1] - 1.0;
-        });
+        }, 1e-12);
 
 
     // General signature for ODE function
-    auto df_dt = [&](double* dy_dt, const double& t, const double* y, const double* args, const void* ptr) {
+    auto df_dt = [&](double* dy_dt, const double& t, const double* y, const double* args) {
         //2D oscillator: y'' + y = 0  => y1' = y2, y2' = -y1
         dy_dt[0] = y[1];
         dy_dt[1] = -y[0];
@@ -182,7 +190,7 @@ int main() {
 
     // Create solver
     auto solver = getSolver<RK45, double, 2, SP>(
-        OdeData{.rhs=df_dt},   // ODE function
+        OdeData{.Rhs=df_dt},   // ODE function
         t,                 // Initial time
         y0.data(),
         2,             // ODE system size
@@ -281,7 +289,7 @@ print("Expected state:", "[..., 1]")
 
 using namespace ode;
 
-void df_dt(double* dy_dt, const double& t, const double* y, const double* args, const void* obj) {
+void df_dt(double* dy_dt, const double& t, const double* y, const double* args) {
     //2D oscillator: y'' + y = 0
     dy_dt[0] = y[1];
     dy_dt[1] = -y[0];
@@ -294,15 +302,15 @@ int main() {
     std::array<double, 2> y0 = {3.0, 0.0};
 
     // y' = 1 crossing
-    PreciseEvent<double> event(
+    PreciseEvent event(
         "event",
-        [](const double& t, const double* y, const double* args, const void*){
+        [](const double& t, const double* y, const double* args){
             return y[1]-1;
-        });
+        }, 1e-12);
 
     // Create ode
     ODE<double, 2> ode(
-        OdeData{.rhs=df_dt},   // ODE function
+        OdeData{.Rhs=df_dt},   // ODE function
         t0,                 // Initial time
         y0.data(),
         2,             // ODE system size
@@ -353,16 +361,15 @@ ODEPACK features an event detection system that handles integration events, with
 ### Zero-Crossing Events
 
 ```cpp
-#include <odepack/Core/Events.hpp>
-
 // Detect when y[0] crosses zero
-PreciseEvent<double> event(
+    PreciseEvent evesnt(
     "event",
-    [](const double& t, const double* y, const double* args, const void*) -> double {
+    [](const double& t, const double* y, const double* args) -> double {
         return y[1]-1;
     }, //crossing at y[1] = 1
+    1e-12,
     1, //only cross when the sign change is from negative to positive
-    [](double* y_new, const double& t, const double* y, const double* args, const void* obj) -> void {
+    [](double* y_new, const double& t, const double* y, const double* args) -> void {
         y_new[0] = 1;
         y_new[1] = -2.5;
     } // change the ODE state vector when the event is encountered    
@@ -456,7 +463,7 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 | **CRTP** | `BaseSolver<Derived, ...>` enables static dispatch without virtual overhead |
 | **Policy Pattern** | `SolverPolicy` enum for compile-time feature selection |
 | **Factory Pattern** | `getSolver()` and `get_virtual_solver()` for solver instantiation |
-| **Polymorphic Wrapper** | `PolyWrapper<T>` for type-erased ownership of interpolators & events |
+| **Polymorphic Wrapper** | `owner<T>` for type-erased ownership of interpolators & events |
 
 ---
 
@@ -471,9 +478,13 @@ odepack/
 │   │   │   ├── SolverBase.hpp       # CRTP base solver
 │   │   │   ├── RichBase.hpp         # Event-aware solver extension
 │   │   │   ├── Events.hpp           # Event detection system
+│   │   │   ├── Dispatcher.hpp       # Solver dispatching utilities
+│   │   │   ├── FinDiff.hpp          # Finite difference utilities
+│   │   │   ├── ObjectiveSolver.hpp  # Objective-based solver interface
 │   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Solvers/                 # Concrete solver implementations
+│   │   │   ├── Solvers.hpp          # Common solver includes
 │   │   │   ├── Euler.hpp            # Simple Euler method (1st order)
 │   │   │   ├── RungeKutta.hpp       # Generic Runge-Kutta framework
 │   │   │   ├── DOPRI.hpp            # Runge-Kutta RK23, RK45 (adaptive)
@@ -482,20 +493,31 @@ odepack/
 │   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Interpolation/           # Dense output & interpolation
-│   │   │   ├── Interpolators.hpp    # Base interpolator interface
-│   │   │   ├── GridInterp.hpp       # Grid interpolation utilities
-│   │   │   ├── LinearNdInterpolator.hpp  # N-dimensional linear interpolation
-│   │   │   ├── SampledVectorfields.hpp   # Sampled vector field interpolation
+│   │   │   ├── NdInterpolator.hpp   # N-dimensional interpolator base
+│   │   │   ├── VectorFields.hpp     # Sampled vector field interpolation
+│   │   │   ├── Regular/             # Regular grid interpolation
+│   │   │   │   ├── Grids.hpp        # Grid data structures
+│   │   │   │   └── RegularGridInterpolator.hpp
+│   │   │   ├── Scattered/           # Scattered data interpolation
+│   │   │   │   ├── Delaunay.hpp     # Delaunay triangulation
+│   │   │   │   └── ScatteredNdInterpolator.hpp
+│   │   │   ├── Univariate/          # 1D interpolation
+│   │   │   │   └── StateInterp.hpp  # State interpolation for solvers
 │   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
 │   │   ├── Chaos/                   # Dynamical systems analysis
 │   │   │   ├── VariationalSolvers.hpp    # Lyapunov exponent computation
 │   │   │   └── *_impl.hpp           # Implementation files
 │   │   │
+│   │   ├── OdeResult/               # Integration result storage
+│   │   │   ├── OdeResult.hpp        # Result container
+│   │   │   └── OdeResult_impl.hpp   # Implementation
+│   │   │
 │   │   ├── OdeInt.hpp               # High-level ODE wrapper
+│   │   ├── CustomSolver.hpp         # Custom solver extension point
 │   │   ├── SolverDispatcher.hpp     # Factory for solver instantiation
 │   │   ├── SolverState.hpp          # Solver state & status reporting
-│   │   └── Tools.hpp                # Utilities (PolyWrapper, etc.)
+│   │   └── Tools.hpp                # Utilities (owner, etc.)
 │   │
 │   ├── ndspan/                      # Multi-dimensional array library
 │   │   ├── layouts/                 # Layout implementations
@@ -504,27 +526,54 @@ odepack/
 │   │   ├── ndspan.hpp
 │   │   ├── arrays.hpp
 │   │   ├── ndview.hpp
-│   │   ├── iterators.hpp
-│   │   └── ...
+│   │   ├── ndtools.hpp
+│   │   └── layoutmap.hpp
 │   │
 │   ├── pyode/                       # Python binding utilities
-│   │   ├── pyode.hpp                # Main Python ODE interface
-│   │   ├── pytools.hpp              # Python utility functions
-│   │   ├── ode_caster.hpp           # Type casters for pybind11
-│   │   └── *_impl.hpp               # Implementation files
+│   │   ├── lib/                     # Core binding modules
+│   │   │   ├── PyOde.hpp            # Main Python ODE interface
+│   │   │   ├── PySolver.hpp         # Solver bindings
+│   │   │   ├── PyEvents.hpp         # Event system bindings
+│   │   │   ├── PyResult.hpp         # Result container bindings
+│   │   │   ├── PyInterp.hpp         # Interpolation bindings
+│   │   │   ├── PyField.hpp          # Vector field bindings
+│   │   │   ├── PyChaos.hpp          # Chaos analysis bindings
+│   │   │   ├── PyTools.hpp          # Utility bindings
+│   │   │   └── PySubSolver.hpp      # Sub-solver bindings
+│   │   ├── lib_impl/                # Implementation files
+│   │   │   └── *_impl.hpp
+│   │   └── pycast/                  # Type casters for pybind11
+│   │       └── pycast.hpp
+│   │
+│   ├── mcmc/                        # Markov Chain Monte Carlo utilities
+│   │   ├── mcmc.hpp
+│   │   └── tools.hpp
+│   │
+│   ├── polybox/                     # Polynomial box utilities
+│   │   └── polybox.hpp
 │   │
 │   ├── odepack.hpp                  # Main C++ include (all headers)
+│   ├── odepackDecl.hpp              # Forward declarations
 │   ├── ndspan.hpp                   # Main ndspan include
-│   ├── pyodepack.hpp                # Header-only declaration include for pyode
-│   └── pyodepack_impl.hpp           # Template implementations for pyode
+│   ├── pyodepack.hpp                # Python binding include
+│   └── pyodepackDecl.hpp            # Python binding declarations
 │
 ├── python/
 │   ├── src/                         # Python bindings (pybind11)
+│   │   ├── bindings/                # C++ binding implementations
+│   │   └── staticlib/               # Static library sources
 │   ├── odepack/                     # Python package
+│   │   ├── __init__.py              # Package initialization
+│   │   ├── symode.py                # Symbolic ODE interface
+│   │   ├── interpolate.py           # Interpolation utilities
+│   │   └── *.pyi                    # Type stubs for IDE support
 │   └── py_tests/                    # Python tests
 │
 ├── tests/                           # C++ tests
 ├── cmake/                           # CMake configuration files
+├── ODEPACK_Python_Tutorial.ipynb    # Jupyter notebook tutorial
+├── CMakeLists.txt                   # Main CMake configuration
+├── Makefile                         # Build automation
 ├── LICENSE
 └── README.md
 ```
@@ -535,13 +584,17 @@ odepack/
 |-----------|-------------|
 | **ode/Core/** | Base classes, virtual interfaces, event system, and solver policies |
 | **ode/Solvers/** | Concrete integrator implementations (Euler, RK23, RK45, DOP853, BDF) |
-| **ode/Interpolation/** | Dense output providers, grid interpolation, and scattered data interpolation |
+| **ode/Interpolation/** | Dense output providers with Regular, Scattered, and Univariate sub-modules |
 | **ode/Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
+| **ode/OdeResult/** | Result container for storing integration trajectories and event data |
 | **ode/OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
+| **ode/CustomSolver.hpp** | Extension point for user-defined solvers |
 | **ode/SolverDispatcher.hpp** | Factory functions for solver instantiation |
-| **ode/Tools.hpp** | Utilities including `PolyWrapper` for polymorphic type ownership |
+| **ode/Tools.hpp** | Utilities including `owner` for polymorphic type ownership |
 | **ndspan/** | Multi-dimensional array views and utilities |
-| **pyode/** | Python binding utilities and type casters for pybind11 integration |
+| **pyode/** | Python binding utilities organized into lib/, lib_impl/, and pycast/ |
+| **mcmc/** | Markov Chain Monte Carlo sampling utilities |
+| **polybox/** | Polynomial box utilities |
 
 ---
 
@@ -557,14 +610,14 @@ using namespace ode;
 using mpfr::mpreal;
 
 template<typename T>
-void df_dt(T* dy_dt, const T& t, const T* y, const T* args, const void* ptr) {
+void df_dt(T* dy_dt, const T& t, const T* y, const T* args) {
     //2D oscillator: y'' + y = 0
     dy_dt[0] = y[1];
     dy_dt[1] = -y[0];
 }
 
 template<typename T>
-T crossing(const T& t, const T* y, const T* args, const void* ptr) {
+T crossing(const T& t, const T* y, const T* args) {
     return y[1] - 1;
 }
 
@@ -574,7 +627,7 @@ int main() {
     std::array<mpreal, 2> y0 = {3, 0};
 
     // Define the y' = 1 crossing
-    PreciseEvent<mpreal> event("event", crossing<mpreal>);
+    PreciseEvent event("event", crossing<mpreal>, mpreal("1e-12"));
 
     constexpr SolverPolicy SP = SolverPolicy::RichStatic;
 
@@ -588,7 +641,7 @@ int main() {
     constexpr size_t nsys = 2;
     int dir = 1;
     auto solver = getSolver<RK45, mpreal, nsys, SP>(
-        OdeData{.rhs=df_dt<mpreal>},
+        OdeData{.Rhs=df_dt<mpreal>},
         t,
         y0.data(),
         nsys,

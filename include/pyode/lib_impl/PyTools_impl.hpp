@@ -90,36 +90,13 @@ py::array_t<T>& PyStruct::get_array() {
 //===========================================================================================
 
 
-PyFuncWrapper::PyFuncWrapper(const py::capsule& obj, py::ssize_t Nsys, const py::array_t<py::ssize_t>& output_shape, py::ssize_t Nargs, const std::string& scalar_type) : DtypeDispatcher(scalar_type), rhs(open_capsule<void*>(obj)), Nsys(static_cast<size_t>(Nsys)), output_shape(static_cast<size_t>(output_shape.size())), Nargs(static_cast<size_t>(Nargs)) {
-    copy_array(this->output_shape.data(), output_shape.data(), this->output_shape.size());
-    long s = 1;
-    for (long i : this->output_shape){
-        s *= i;
-    }
-    this->output_size = size_t(s);
-}
-
-py::object PyFuncWrapper::call(const py::object& t, const py::iterable& py_q, const py::args& py_args) const{
-
-    return DISPATCH(py::object,
-        auto q = toCPP_Array<T, Array1D<T>>(py_q);
-        if (static_cast<size_t>(q.size()) != Nsys || py_args.size() != Nargs){
-            throw py::value_error("Invalid array sizes in ode function call");
-        }
-        auto args = toCPP_Array<T, std::vector<T>>(py_args);
-        Array<T> res(nullptr, output_shape.data(), output_shape.size());
-        reinterpret_cast<Func<T>>(this->rhs)(res.data(), py::cast<T>(t), q.data(), args.data(), nullptr);
-        return py::cast(res);
-    )
-}
-
 template<typename T>
 void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
     assert(obj != nullptr && "RHS function pointer is null");
     PyStruct& p = *const_cast<PyStruct*>(reinterpret_cast<const PyStruct*>(obj));
     py::array_t<T>& arr = p.get_array<T>();
     std::memcpy(arr.mutable_data(), q, arr.size() * sizeof(T));
-    py::array_t<T> pyres = p.rhs(t, arr, *p.py_args);
+    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.rhs(t, arr, *p.py_args);
     arrcpy(res, pyres.data(), pyres.size());
 }
 
@@ -128,7 +105,7 @@ void py_jac(T* res, const T& t, const T* q, const T*, const void* obj){
     assert(obj != nullptr && "Jacobian function pointer is null");
     //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::array_t<T> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
+    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
     arrcpy(res, pyres.data(), pyres.size());
 }
 
@@ -137,7 +114,7 @@ void py_mask(T* res, const T& t, const T* q, const T*, const void* obj){
     //args should always be the same as p.py_args
     assert(obj != nullptr && "Mask function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::array_t<T> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
+    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
     arrcpy(res, pyres.data(), pyres.size());
 }
 

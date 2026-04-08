@@ -1,8 +1,4 @@
-#include "../../../include/pyode/lib_impl/PyOde_impl.hpp"
-#include "../../../include/pyode/lib/PySolver.hpp"
-#include "../../../include/pyode/lib/PySubSolver.hpp"
-#include "../../../include/pyode/lib/PyEvents.hpp"
-#include "../../../include/pyode/lib/PyResult.hpp"
+#include "../../../include/pyodepack.hpp"
 
 
 namespace ode{
@@ -15,19 +11,17 @@ namespace ode{
 PyODE::PyODE(const py::object& f, const py::object& t0, const py::iterable& py_q0, const py::object& jacobian, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : DtypeDispatcher(scalar_type){
     DISPATCH(void,
         std::vector<T> args;
-        OdeData<Func<T>, void> ode_rhs = init_ode_data<T>(data,args, f, py_q0, jacobian, py_args, events);
-        std::vector<Event<T>*> safe_events = to_Events<T>(events, shape(py_q0), py_args);
-        std::vector<const Event<T>*> evs(safe_events.size());
-        for (size_t i=0; i<evs.size(); i++){
-            evs[i] = safe_events[i];
-        }
-        auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
+        init_ode_data<T, false>([&](const auto& ode_obj){
+            std::vector<std::unique_ptr<Event<T>>> safe_events = to_Events<T>(events, shape(py_q0), py_args);
+            std::vector<const Event<T>*> evs(safe_events.size());
+            for (size_t i=0; i<evs.size(); i++){
+                evs[i] = safe_events[i].get();
+            }
+            auto q0 = toCPP_Array<T, Array1D<T>>(py_q0);
 
-        this->ode = new ODE<T, 0>(ode_rhs, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
-        //clean up
-        for (size_t i=0; i<evs.size(); i++){
-            delete safe_events[i];
-        }
+            this->ode = new ODE<T, 0>(ode_obj, py::cast<T>(t0), q0.data(), q0.size(), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
+        }, data,args, f, py_q0, jacobian, py_args, events);
+
     )
 }
 
@@ -51,12 +45,10 @@ PyODE::PyODE(const std::string& scalar_type) : DtypeDispatcher(scalar_type){}
 
 PyODE::PyODE(const PyODE& other) : DtypeDispatcher(other.scalar_type), data(other.data){
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
-    set_pyobj(other);
 }
 
 PyODE::PyODE(PyODE&& other) noexcept : DtypeDispatcher(std::move(other)), ode(other.ode), data(std::move(other.data)){
     other.ode = nullptr;
-    set_pyobj(other);
 }
 
 PyODE& PyODE::operator=(const PyODE& other){
@@ -66,7 +58,6 @@ PyODE& PyODE::operator=(const PyODE& other){
     DISPATCH(void, delete cast<T>();)
     DISPATCH(void, this->ode = other.template cast<T>()->clone();)
     data = other.data;
-    set_pyobj(other);
     return *this;
 }
 
@@ -78,18 +69,11 @@ PyODE& PyODE::operator=(PyODE&& other) noexcept {
     this->ode = other.ode;
     other.ode = nullptr;
     data = std::move(other.data);
-    set_pyobj(other);
     return *this;
 }
 
 PyODE::~PyODE(){
     DISPATCH(void, delete cast<T>();)
-}
-
-void PyODE::set_pyobj(const PyODE& other){
-    if (!data.is_lowlevel){
-        DISPATCH(void, cast<T>()->set_obj(&data);)
-    }
 }
 
 py::object PyODE::call_Rhs(const py::object& t, const py::iterable& py_q) const{
@@ -130,10 +114,10 @@ py::object PyODE::py_integrate(const py::object& interval, const py::object& t_e
     return DISPATCH(py::object,
         OdeResult<T>* result = new OdeResult<T>();
         if (t_eval.is_none()){
-            cast<T>()->integrate(result, py::cast<T>(interval), to_Options(event_options), VoidFunc, max_prints);
+            cast<T>()->integrate(result, py::cast<T>(interval), to_Options(event_options), nullptr, max_prints);
         }else{
             std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
-            cast<T>()->integrate(result, py::cast<T>(interval), t_seq, to_Options(event_options), VoidFunc, max_prints);
+            cast<T>()->integrate(result, py::cast<T>(interval), t_seq, to_Options(event_options), nullptr, max_prints);
         }
         return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
@@ -141,8 +125,9 @@ py::object PyODE::py_integrate(const py::object& interval, const py::object& t_e
 
 py::object PyODE::py_rich_integrate(const py::object& interval, const py::iterable& event_options, int max_prints){
     return DISPATCH(py::object,
-        auto* ptr = new OdeSolution<T>(cast<T>()->rich_integrate(py::cast<T>(interval), to_Options(event_options), VoidFunc, max_prints));
-        return py::cast(PyOdeSolution(ptr, this->data.shape, this->scalar_type));
+        auto* res = new OdeSolution<T>();
+        cast<T>()->rich_integrate(*res, py::cast<T>(interval), to_Options(event_options), nullptr, max_prints);
+        return py::cast(PyOdeSolution(res, this->data.shape, this->scalar_type));
     )
 }
 
@@ -151,10 +136,10 @@ py::object PyODE::py_integrate_until(const py::object& t, const py::object& t_ev
     return DISPATCH(py::object,
         OdeResult<T>* result = new OdeResult<T>();
         if (t_eval.is_none()){
-            cast<T>()->integrate_until(result, py::cast<T>(t), to_Options(event_options), VoidFunc, max_prints);
+            cast<T>()->integrate_until(result, py::cast<T>(t), to_Options(event_options), nullptr, max_prints);
         }else{
             std::vector<T> t_seq = toCPP_Array<T, std::vector<T>>(t_eval.cast<py::iterable>());
-            cast<T>()->integrate_until(result, py::cast<T>(t), t_seq, to_Options(event_options), VoidFunc, max_prints);
+            cast<T>()->integrate_until(result, py::cast<T>(t), t_seq, to_Options(event_options), nullptr, max_prints);
         }
         return py::cast(PyOdeResult(result, this->data.shape, this->scalar_type));
     )
@@ -332,20 +317,5 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
     std::cout << std::endl << "Parallel integration completed in: " << clock.message() << std::endl;
 }
 
-
-#define DEFINE_ODE(T) \
-    template class ODE<T, 0>; \
-    template class EventCounter<T, 0>; \
-    template void ODE<T, 0>::init<Func<T>, void>(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method); \
-    template PyODE::PyODE(OdeData<Func<T>, void> ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, const std::vector<const Event<T>*>& events, Integrator method = Integrator::RK45); \
-
-DEFINE_ODE(float)
-DEFINE_ODE(double)
-DEFINE_ODE(long double)
-#ifdef MPREAL
-DEFINE_ODE(mpfr::mpreal)
-#endif
-
-#undef DEFINE_ODE
 
 } // namespace ode

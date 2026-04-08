@@ -2,7 +2,7 @@
 #define PY_SOLVER_HPP
 
 
-#include "PyTools.hpp"
+#include "../lib/PyTools.hpp"
 #include "../../ode/Core/VirtualBase.hpp"
 
 namespace ode{
@@ -24,8 +24,6 @@ struct PyConstSolver : DtypeDispatcher {
     PyConstSolver& operator=(PyConstSolver&& other) noexcept;
 
     virtual ~PyConstSolver();
-
-    void set_pyobj(const PyConstSolver& other);
 
     template<typename T>
     OdeRichSolver<T>* cast();
@@ -76,7 +74,7 @@ struct PyConstSolver : DtypeDispatcher {
 
     py::tuple           timeit_jac(const py::object& t, const py::iterable& py_q) const;
 
-    bool                py_at_event(py::object event) const;
+    bool                py_at_event() const;
 
     py::str             status() const;    
 
@@ -114,8 +112,8 @@ struct PySolver : public PyConstSolver {
     void                kill(const py::str& reason);   
 };
 
-template<typename T>
-OdeData<Func<T>, void> init_ode_data(PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
+template<typename T, bool FORCE_JAC, typename Callable>
+void init_ode_data(Callable&& action, PyStruct& data, std::vector<T>& args, const py::object& f, const py::iterable& q0, const py::object& jacobian, const py::iterable& py_args, const py::iterable& events);
 
 // func::template operator()<T>(OdeRichSolver<T>* solver)
 template<typename Callable>

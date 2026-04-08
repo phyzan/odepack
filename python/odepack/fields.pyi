@@ -28,7 +28,7 @@ class SampledVectorField:
 
     def __init__(self, values: Iterable[np.ndarray], *grid: np.ndarray):
         '''
-        Initialize a ND vector field on a regular grid.
+        Initialize a ndim-vector field on a regular grid.
 
         Parameters
         ----------
@@ -136,7 +136,7 @@ class RegularGridScalarField(SampledScalarField, RegularGridInterpolator):
 
 class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
 
-    def __init__(self, values: Iterable[np.ndarray], *grid: np.ndarray):
+    def __init__(self, values: Iterable[np.ndarray], *grid: np.ndarray, coordinates: str = "cartesian"):
         '''
         Initialize a vector field on a regular grid.
 
@@ -147,6 +147,8 @@ class RegularGridVectorField(SampledVectorField, RegularGridInterpolator):
             For example, for a 3D vector field, values should be an iterable containing three arrays: (vx, vy, vz), where each array has shape (nx, ny, nz) corresponding to the grid dimensions.
         *grid : np.ndarray
             Coordinates of the grid points for each dimension. The number of grid arrays should match the number of dimensions, and the length of each grid array should match the corresponding dimension of the values arrays.
+        coordinates : str, optional
+            Coordinate system of the grid and vector field. Must be one of "cartesian", "polar", or "spherical". This determines how the vector field components are interpreted when computing streamlines. Default is "cartesian".
 
         Notes
         -----

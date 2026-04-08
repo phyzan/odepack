@@ -1,9 +1,10 @@
-#ifndef POLYWRAPPER_HPP
-#define POLYWRAPPER_HPP
+#ifndef POLYBOX_HPP
+#define POLYBOX_HPP
 
 #include <utility>
 #include <cassert>
 #include <type_traits>
+
 #define FORCE_INLINE __attribute__((always_inline)) inline
 
 namespace pbox {
@@ -12,7 +13,7 @@ template<typename T>
 class Box;
 
 ///////////////////////////////////////////////////////////////////////////////
-// PolyWrapper<Type>
+// owner<Type>
 //
 // A cloneable polymorphic value wrapper. Owns a heap-allocated object and
 // provides value semantics through a required clone() method.
@@ -23,41 +24,42 @@ class Box;
 // Ownership:
 //   - Copy: deep copy via clone()
 //   - Move: transfers ownership, source becomes null
-//   - Can release ownership to a Box<Type>
+//   - Can move ownership to a Box<Type>
 //
 ///////////////////////////////////////////////////////////////////////////////
 template<typename Type>
-class PolyWrapper {
+class owner {
     static_assert(std::is_same_v<Type, std::decay_t<Type>>, "Type cannot be a reference");
     static_assert(!std::is_pointer_v<Type>, "Type cannot be a pointer");
 
 public:
 
-    static PolyWrapper<Type> Null; // Represents a null wrapper
     // Takes ownership of a raw pointer
-    FORCE_INLINE explicit PolyWrapper(Type* object) : ptr(object) {}
+    FORCE_INLINE explicit owner(Type* object) : ptr(object) {}
 
     // Constructs Type in-place with forwarded arguments
     // template<typename... Args>
-    // explicit PolyWrapper(Args&&... args) : ptr(new Type(std::forward<Args>(args)...)) {}
+    // explicit owner(Args&&... args) : ptr(new Type(std::forward<Args>(args)...)) {}
 
     // Default constructs to null
-    constexpr PolyWrapper() = default;
+    constexpr owner() = default;
 
-    FORCE_INLINE ~PolyWrapper() { delete ptr; }
+    FORCE_INLINE ~owner() { delete ptr; }
 
     // Deep copy via clone()
-    FORCE_INLINE explicit PolyWrapper(const PolyWrapper& other) : ptr(other.ptr ? other.ptr->clone() : nullptr) {}
+    FORCE_INLINE explicit owner(const owner& other) : ptr(other.ptr ? other.ptr->clone() : nullptr) {}
 
-    FORCE_INLINE PolyWrapper(Box<Type>&& box) : ptr(box.release()) {}
+    template<typename U>
+    requires (std::is_convertible_v<U*, Type*>)
+    FORCE_INLINE owner(Box<U> box) : ptr(box.release()) {}
 
     // Move: transfers ownership
-    FORCE_INLINE PolyWrapper(PolyWrapper&& other) noexcept : ptr(other.ptr) {
+    FORCE_INLINE owner(owner&& other) noexcept : ptr(other.ptr) {
         other.ptr = nullptr;
     }
 
     // Copy assignment: deep copy via clone()
-    FORCE_INLINE PolyWrapper& operator=(const PolyWrapper& other) {
+    FORCE_INLINE owner& operator=(const owner& other) {
         if (&other != this) {
             delete ptr;
             ptr = other.ptr ? other.ptr->clone() : nullptr;
@@ -66,7 +68,7 @@ public:
     }
 
     // Move assignment: transfers ownership
-    FORCE_INLINE PolyWrapper& operator=(PolyWrapper&& other) noexcept {
+    FORCE_INLINE owner& operator=(owner&& other) noexcept {
         if (&other != this) {
             delete ptr;
             ptr = other.ptr;
@@ -76,7 +78,7 @@ public:
     }
 
     // Take ownership from a Box
-    FORCE_INLINE PolyWrapper& operator=(Box<Type>&& box) {
+    FORCE_INLINE owner& operator=(Box<Type>&& box) {
         delete ptr;
         ptr = box.ptr;
         box.ptr = nullptr;
@@ -85,16 +87,16 @@ public:
 
     // Member access (asserts non-null in debug)
     FORCE_INLINE Type* operator->() {
-        assert(ptr != nullptr && "dereferencing null PolyWrapper");
+        assert(ptr != nullptr && "dereferencing null owner");
         return ptr;
     }
 
     FORCE_INLINE const Type* operator->() const {
-        assert(ptr != nullptr && "dereferencing null PolyWrapper");
+        assert(ptr != nullptr && "dereferencing null owner");
         return ptr;
     }
 
-    PolyWrapper& take_ownership(Type* obj){
+    owner& steal(Type* obj){
         assert(obj != ptr && "Attempted to reassign the same pointer");
         delete ptr;
         ptr = obj;
@@ -105,7 +107,7 @@ public:
     // For polymorphic types: uses dynamic_cast, returns null Box on failure.
     // For non-polymorphic types: uses static_cast, always transfers.
     template<typename Derived>
-    FORCE_INLINE Box<Derived> release_cast() {
+    FORCE_INLINE Box<Derived> move_cast() {
         Type* tmp = ptr;
         if constexpr (std::is_polymorphic_v<Type>) {
             if (Derived* derived = dynamic_cast<Derived*>(tmp)) {
@@ -125,15 +127,21 @@ public:
         return static_cast<const Derived*>(ptr);
     }
 
-    FORCE_INLINE operator bool() const {
-        return ptr != nullptr;
+    FORCE_INLINE const Type* get() const {
+        return ptr;
     }
 
-    // Release ownership to a Box
-    FORCE_INLINE Box<Type> release() {
+    // Move ownership to a Box
+    FORCE_INLINE Box<Type> move() {
         Box<Type> box(ptr);
         ptr = nullptr;
         return box;
+    }
+
+    Type* release() {
+        Type* temp = ptr;
+        ptr = nullptr;
+        return temp;
     }
 
 protected:
@@ -148,8 +156,8 @@ protected:
 //
 // Ownership:
 //   - Move-only (no copy)
-//   - Can only be created by PolyWrapper via release() or cast()
-//   - Can be moved back into a PolyWrapper
+//   - Can only be created by owner via move() or cast(), or make_box()
+//   - Can be moved back into a owner
 //
 ///////////////////////////////////////////////////////////////////////////////
 template<typename T>
@@ -163,6 +171,12 @@ public:
 
     // Move constructor: transfers ownership
     FORCE_INLINE Box(Box&& other) noexcept : ptr(other.ptr) {
+        other.ptr = nullptr;
+    }
+
+    template<typename U>
+    requires (std::is_convertible_v<U*, T*>)
+    Box(Box<U>&& other) noexcept : ptr(other.ptr) {
         other.ptr = nullptr;
     }
 
@@ -188,14 +202,25 @@ public:
         return ptr;
     }
 
-private:
-    template<typename U>
-    friend class PolyWrapper;
+    FORCE_INLINE operator bool() const {
+        return ptr != nullptr;
+    }
 
-    // Private: only PolyWrapper can construct
+private:
+
+    template<typename U>
+    friend class owner;
+
+    template<typename U>
+    friend class Box;
+
+    template<typename U, typename... Args>
+    friend Box<U> make_box(Args&&... args);
+
+    // Private: only owner can construct
     FORCE_INLINE explicit Box(T* object) : ptr(object) {}
 
-    // Private: only PolyWrapper can release
+    // Private: only owner can move
     FORCE_INLINE T* release() {
         T* temp = ptr;
         ptr = nullptr;
@@ -207,13 +232,10 @@ private:
 
 
 template<typename Type, typename... Args>
-FORCE_INLINE PolyWrapper<Type> make(Args&&... args) {
-    return PolyWrapper<Type>(new Type(std::forward<Args>(args)...));
+FORCE_INLINE Box<Type> make_box(Args&&... args) {
+    return Box<Type>(new Type(std::forward<Args>(args)...));
 }
-
-template<typename Type>
-PolyWrapper<Type> PolyWrapper<Type>::Null = PolyWrapper<Type>();
 
 } // namespace pbox
 
-#endif // POLYWRAPPER_HPP
+#endif // POLYBOX_HPP

@@ -1,15 +1,4 @@
-#ifndef PY_FIELD_IMPL_HPP
-#define PY_FIELD_IMPL_HPP
-
-#include "../../../include/pyode/lib/PyOde.hpp"
-#include "../../../include/pyode/lib/PyResult.hpp"
-#include "../../../include/pyode/lib/PyField.hpp"
-#include "../../../include/ode/OdeInt_impl.hpp"
-#include "../../../include/ode/Interpolation/VectorFields_impl.hpp"
-#include "../../../include/ode/Interpolation/NdInterpolator_impl.hpp"
-#include "../../../include/ode/Interpolation/Regular/RegularGridInterpolator_impl.hpp"
-#include "../../../include/ode/Interpolation/Scattered/ScatteredNdInterpolator_impl.hpp"
-#include "../../../include/pyode/pycast/pycast.hpp"
+#include "../../../include/pyodepack.hpp"
 
 
 
@@ -17,8 +6,6 @@ namespace ode{
 
 //Explicit instanciation
 
-template class RegularVectorField<double, 0, true>;
-template class ScatteredVectorField<0, true>;
 
 // ============================================================================================
 //                                      PyScalarField
@@ -84,17 +71,18 @@ py::object PyVecField::py_streamline(const CLS& self, const py::array_t<double>&
         throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(self.ndim()));
     }
 
-    check_coords(self, q0.data());
+    auto q0_c = py::array_t<double, py::array::c_style | py::array::forcecast>(q0);
+    check_coords(self, q0_c.data());
 
     
     try{
         double max_step_val = (max_step.is_none() ? inf<double>() : max_step.cast<double>());
         OdeResult<double>* result;
         if (t_eval.is_none()){
-            result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized));
+            result = new OdeResult<double>(self.streamline(q0_c.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized));
         }else{
             std::vector<double> t_seq = toCPP_Array<double, std::vector<double>>(t_eval.cast<py::iterable>());
-            result = new OdeResult<double>(self.streamline(q0.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized, t_seq));
+            result = new OdeResult<double>(self.streamline(q0_c.data(), length, rtol, atol, min_step, max_step_val, stepsize, direction, getIntegrator(method), normalized, t_seq));
         }
         PyOdeResult py_res(result, {self.ndim()}, ScalarType::Double);
         return py::cast(py_res);
@@ -110,8 +98,9 @@ py::object PyVecField::py_streamline_ode(const CLS& self, const py::array_t<doub
         throw py::value_error("Initial conditions must be a 1D array of length " + std::to_string(self.ndim()));
     }
 
-    check_coords(self, q0.data());
-    ODE<double>* ode = self.get_streamline_ode(q0.data(), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, direction, getIntegrator(method), normalized);
+    auto q0_c = py::array_t<double, py::array::c_style | py::array::forcecast>(q0);
+    check_coords(self, q0_c.data());
+    ODE<double>* ode = self.get_streamline_ode(q0_c.data(), rtol, atol, min_step, max_step.is_none() ? inf<double>() : max_step.cast<double>(), stepsize, direction, getIntegrator(method), normalized);
 
     return py::cast(PyODE(ode, ScalarType::Double));
 
@@ -131,14 +120,25 @@ void PyRegVecField::parse_values(const py::array_t<double>& values, const py::ar
 }
 
 
-PyRegVecField::CLS PyRegVecField::init_main(const py::array_t<double>& values, const py::args& py_grid){
+PyRegVecField::CLS PyRegVecField::init_main(const py::array_t<double>& values, const py::args& py_grid, const std::string& coord_type){
     parse_values(values, py_grid);
     auto grid = RGBase::parse_args(values, py_grid, false);
-    const double* v_data = values.data();
+    auto values_c = py::array_t<double, py::array::c_style | py::array::forcecast>(values);
+    const double* v_data = values_c.data();
     // values shape right not is (ndim, ...), where (...) has a product of n_points.
     // We need to reshape to (ndim, n_points)
-    View2D<double> v_view(v_data, values.shape(0), values.size() / values.shape(0));
-    return {v_view, grid, false};
+    View2D<double> v_view(v_data, values_c.shape(0), values_c.size() / values_c.shape(0));
+    CoordType coord_type_enum;
+    if (coord_type == "cartesian"){
+        coord_type_enum = CoordType::Cartesian;
+    } else if (coord_type == "polar"){
+        coord_type_enum = CoordType::Polar;
+    } else if (coord_type == "spherical"){
+        coord_type_enum = CoordType::Spherical;
+    }else{
+        throw py::value_error("Invalid coordinate type. Must be one of 'cartesian', 'polar', or 'spherical'");
+    }
+    return {v_view, grid, coord_type_enum, false};
 }
 
 
@@ -184,8 +184,9 @@ py::object PyRegVecField::component(const CLS& self, int i){
 PyScatVecField::CLS PyScatVecField::init(const py::array_t<double>& x, const py::array_t<double>& values){
     parse_values(values);
     SCBase::parse_args(x, values, false);
-    const int ndim = (x.ndim() == 1) ? 1 : int(x.shape(1));
-    const double* x_data = x.data();
+    auto x_c = py::array_t<double, py::array::c_style | py::array::forcecast>(x);
+    const int ndim = (x_c.ndim() == 1) ? 1 : int(x_c.shape(1));
+    const double* x_data = x_c.data();
     return {x_data, values, ndim, false};
 }
 
@@ -204,4 +205,3 @@ void PyScatVecField::parse_values( const py::array_t<double>& values){
 
 } // namespace ode
 
-#endif // PY_FIELD_IMPL_HPP

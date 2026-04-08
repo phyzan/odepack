@@ -6,21 +6,27 @@
 namespace ode{
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-Euler<T, N, SP, RhsType, JacType, Derived>::Euler(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args) requires (!is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args) {}
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args) requires (!is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args) {}
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-Euler<T, N, SP, RhsType, JacType, Derived>::Euler(OdeData<RhsType, JacType> ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args, EVENTS events) requires (is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args, events) {}
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args, EVENTS events) requires (is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args, events) {}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Euler<T, N, SP, OdeType, Derived>::Euler(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>) : Euler(ode, t0, q0, nsys, stepsize, dir, args) {}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Euler<T, N, SP, OdeType, Derived>::Euler(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Euler(ode, t0, q0, nsys, stepsize, dir, args, events) {}
 
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
- void Euler<T, N, SP, RhsType, JacType, Derived>::interp_impl(T* result, const T& t) const{
-    return lin_interp(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys());
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void Euler<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
+    return lin_interp(result, t, this->t_old(), this->t_new(), this->old_state_ptr()+2, this->interp_new_state_ptr()+2, this->Nsys());
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-StepResult Euler<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const T* state){
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+StepResult Euler<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     T& t_new = res[0];
     T& habs = res[1];
     T* vec = res+2;
@@ -41,10 +47,13 @@ StepResult Euler<T, N, SP, RhsType, JacType, Derived>::adapt_impl(T* res, const 
     }
 }
 
-template<typename T, size_t N, SolverPolicy SP, typename RhsType, typename JacType, typename Derived>
-std::unique_ptr<Interpolator<T, N>> Euler<T, N, SP, RhsType, JacType, Derived>::state_interpolator(int bdr1, int bdr2) const{
-    return std::make_unique<LocalInterpolator<T, N>>(this->t_old(), this->t_new(), this->old_state_ptr()+2, this->new_state_ptr()+2, this->Nsys(), bdr1, bdr2);
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+auto Euler<T, N, SP, OdeType, Derived>::local_interp() const{
+    return [t1=this->t_old(), t2=this->t_new(), y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(this->interp_new_state_ptr()+2, this->Nsys()), n=this->Nsys()](T* out, const T& t){
+        lin_interp(out, t, t1, t2, y1.data(), y2.data(), n);
+    };
 }
+
 
 } // namespace ode
 

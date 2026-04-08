@@ -7,14 +7,14 @@ using namespace ode;
 using mpfr::mpreal;
 
 template<typename T>
-void df_dt(T* dy_dt, const T& t, const T* y, const T* args, const void* ptr) {
+void df_dt(T* dy_dt, const T& t, const T* y, const T* args) {
     //2D oscillator: y'' + y = 0
     dy_dt[0] = y[1];
     dy_dt[1] = -y[0];
 }
 
 template<typename T>
-T crossing(const T& t, const T* y, const T* args, const void* ptr) {
+T crossing(const T& t, const T* y, const T* args) {
     return y[1] - 1;
 }
 
@@ -24,7 +24,7 @@ void oscillator_test(){
     std::array<Scalar, 2> y0 = {3, 0};
 
     // Define the y' = 1 crossing
-    PreciseEvent<Scalar> event("event", crossing<Scalar>);
+    PreciseEvent event("event", crossing<Scalar>, Scalar(0));
 
     constexpr SolverPolicy SP = SolverPolicy::RichStatic;
 
@@ -38,7 +38,7 @@ void oscillator_test(){
     constexpr size_t nsys = 2;
     int dir = 1;
     auto solver = getSolver<Solver, Scalar, nsys, SP>(
-        OdeData{.rhs=df_dt<Scalar>},
+        OdeData{.Rhs=df_dt<Scalar>},
         t,
         y0.data(),
         nsys,
@@ -73,7 +73,7 @@ void lambda_test(){
 
 
     // Define the y' = 1 crossing
-    PreciseEvent<Scalar> event("event", crossing<Scalar>);
+    PreciseEvent event("event", crossing<Scalar>, Scalar(0));
 
     constexpr SolverPolicy SP = SolverPolicy::RichStatic;
 
@@ -89,13 +89,13 @@ void lambda_test(){
 
     Scalar omega = 1;
 
-    auto ode_rhs = [&](Scalar* dy_dt, const Scalar& t, const Scalar* y, const Scalar* args, const void* ptr) {
+    auto ode_rhs = [&](Scalar* dy_dt, const Scalar& t, const Scalar* y, const Scalar* args) {
         dy_dt[0] = y[1];
         dy_dt[1] = - omega*omega*y[0];
     };
 
     auto solver = getSolver<Solver, Scalar, nsys, SP>(
-        OdeData{.rhs=ode_rhs},
+        OdeData{.Rhs=ode_rhs},
         t,
         y0.data(),
         nsys,

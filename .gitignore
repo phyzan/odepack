@@ -19,9 +19,8 @@ cmake_install.cmake
 *.dylib
 
 # IDE
-.vscode/
+# .vscode/
 .idea/
-.clangd
 
 # Python
 *.egg-info/
