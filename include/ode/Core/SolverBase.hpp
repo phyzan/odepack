@@ -283,19 +283,6 @@ public:
     template<OptionalObserver<T> Callable, typename ArrayType = EmptyArr<T>>
     bool                advance_until(const T& time, const Callable& observer, const ArrayType& extra_steps = EmptyArr<T>());
 
-    /**
-     * @brief Integrate until an objective function crosses zero (event detection).
-     *
-     * @tparam Callable Function type with signature: T(const T& t, const T* q, const T* args)
-     * @param obj_fun  Objective function to monitor for zero crossing.
-     * @param tol      Tolerance for root finding (bisection).
-     * @param dir      Direction of crossing: +1 (increasing), -1 (decreasing), 0 (any).
-     * @param observer Callable function(t, q_ptr) -> bool (see advance_until above) that is called at each successfull step until the requested zero crossing of the objective function is reached
-     * @return True if event was detected and solver positioned at crossing.
-     */
-    template<isObjFun<T> Target, OptionalObserver<T> Callable = std::nullptr_t>
-    bool                advance_until(Target&& obj_fun, T ftol, int dir=0, const Callable& observer = nullptr);
-
     bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps);
 
     bool                observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer);

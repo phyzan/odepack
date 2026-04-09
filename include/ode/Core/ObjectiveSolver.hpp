@@ -11,6 +11,10 @@ struct ObjFunData{
     Callable func;
     T ftol = 0; // tolerance for root finding (0 means machine precision)
     int dir = 0; // 0 means any direction, 1 means increasing, -1 means decreasing
+
+    inline T operator()(const T& t, const T* q) const {
+        return func(t, q);
+    }
 };
 
 
