@@ -96,31 +96,42 @@ void py_rhs(T* res, const T& t, const T* q, const T*, const void* obj){
     PyStruct& p = *const_cast<PyStruct*>(reinterpret_cast<const PyStruct*>(obj));
     py::array_t<T>& arr = p.get_array<T>();
     std::memcpy(arr.mutable_data(), q, arr.size() * sizeof(T));
-    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.rhs(t, arr, *p.py_args);
-    arrcpy(res, pyres.data(), pyres.size());
+    py::array_t<T> pyres = p.rhs(t, arr, *p.py_args);
+    auto r = pyres.template unchecked<1>();
+    for (py::ssize_t i = 0; i < r.shape(0); i++) {
+        res[i] = r(i);
+    }
 }
 
 template<typename T>
 void py_jac(T* res, const T& t, const T* q, const T*, const void* obj){
     assert(obj != nullptr && "Jacobian function pointer is null");
-    //args should always be the same as p.py_args
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
-    arrcpy(res, pyres.data(), pyres.size());
+    py::array_t<T> pyres = p.jac(t, py::array_t<T>(p.shape, q), *p.py_args);
+    // Transpose from row-major (Python) to column-major (solver expects)
+    // Using unchecked accessor to handle any memory layout
+    auto r = pyres.template unchecked<2>();
+    py::ssize_t n = r.shape(0);
+    for (py::ssize_t i = 0; i < n; i++) {
+        for (py::ssize_t j = 0; j < n; j++) {
+            res[i + j*n] = r(i, j);
+        }
+    }
 }
 
 template<typename T>
 void py_mask(T* res, const T& t, const T* q, const T*, const void* obj){
-    //args should always be the same as p.py_args
     assert(obj != nullptr && "Mask function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
-    py::array_t<T, py::array::c_style | py::array::forcecast> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
-    arrcpy(res, pyres.data(), pyres.size());
+    py::array_t<T> pyres = p.mask(t, py::array_t<T>(p.shape, q), *p.py_args);
+    auto r = pyres.template unchecked<1>();
+    for (py::ssize_t i = 0; i < r.shape(0); i++) {
+        res[i] = r(i);
+    }
 }
 
 template<typename T>
 T py_event(const T& t, const T* q, const T*, const void* obj){
-    //args should always be the same as p.py_args
     assert(obj != nullptr && "Event function pointer is null");
     const PyStruct& p = *reinterpret_cast<const PyStruct*>(obj);
     return p.event(t, py::array_t<T>(p.shape, q), *p.py_args).template cast<T>();

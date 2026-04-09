@@ -86,6 +86,7 @@ protected:
     void            interp_impl(T* result, const T& t) const;
     void            ReAdjust(const T* new_vector);
     bool            validate_ics_impl(T t0, const T* q0) const;
+    bool            ValidateIt(const T& t0, const T* q0, const T& stepsize);
 
 private:
     template<typename... Type>

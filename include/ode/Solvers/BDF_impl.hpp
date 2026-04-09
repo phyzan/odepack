@@ -158,15 +158,23 @@ BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
     }
     _newton_tol = ndspan::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, ndspan::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));
 
-    if (!this->is_dead() && q0 != nullptr){
+    if constexpr (std::is_same_v<Derived, void>){
+        this->ValidateIt(t0, q0, stepsize);
+    }
+}
+
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+bool BDF<T, N, SP, OdeType, Derived>::ValidateIt(const T& t0, const T* q0, const T& stepsize){
+    if (Base::ValidateIt(t0, q0, stepsize)){
         if (this->validate_ics_impl(t0, q0)){
             this->_reset_impl_alone();
         }else{
             this->kill("Initial Jacobian contains nan or inf");
         }
     }
+    return false;
 }
-
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void BDF<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector) {

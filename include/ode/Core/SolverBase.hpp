@@ -403,6 +403,7 @@ protected:
     void                    interp_impl(T* result, const T& t) const;
 
     auto                    local_interp() const;
+
     // ================================================================================
 
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
@@ -435,6 +436,10 @@ protected:
      * @note Derived should call base first, then add additional checks.
      */
     bool    validate_ics_impl(T t0, const T* q0) const;
+
+    // Call at initialization in derived constructors to validate ICs.
+    // Must be explicitly callled by derived classes, so that the derived class has been fully instanticated, avoiding potential UB or segfaults (ValidateIt() calls Rhs which, if defined in derived classes, might not be safe to call before the derived class constructor runs).
+    bool                    ValidateIt(const T& t0, const T* q0, const T& stepsize);
     // ================================================================================
 
 
@@ -522,7 +527,6 @@ private:
     T*                      aux_state_ptr();
     void                    register_states();
     bool                    validate_it(StepResult result, const T* state);
-    void                    update_state(const T& time);
     void                    set_state(const T& time, T* state);
 
     template<typename A, typename B, typename... Args>

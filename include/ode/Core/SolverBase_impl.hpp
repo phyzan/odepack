@@ -47,7 +47,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
         );
         return;
     } else {
-        return _ode.Jac(jm, t, q, _args.data());
+        _ode.Jac(jm, t, q, _args.data());
     }
 
 }
@@ -563,6 +563,23 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
     return THIS->local_interp();
 }
 
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool BaseSolver<Derived, T, N, SP, OdeType>::ValidateIt(const T& t0, const T* q0, const T& stepsize){
+    if (q0 != nullptr && this->validate_ics_impl(t0, q0)){
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
+        _state_data(0, 0) = t0;
+        _state_data(0, 1) = habs;
+        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
+        for (int i=1; i<6; i++){  // Initialize all buffers including buffer 5 (interpolation)
+            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
+        }
+        return true;
+    }else if (q0 != nullptr){
+        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
+    }
+    return false;
+}
+
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
@@ -613,7 +630,6 @@ const T* BaseSolver<Derived, T, N, SP, OdeType>::last_true_state_ptr() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename... Args>
 bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
-
     const int d = this->direction();
     if constexpr (sizeof...(Args) > 0){
         T time_floor = minimum_time(args...);
@@ -726,11 +742,19 @@ void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
     ndspan::copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->Nsys()+2); //store the re-adjusted new state for interpolation
-    T* state = const_cast<T*>(this->new_state_ptr());
+    T* state = const_cast<T*>(this->true_state_ptr());
     state[0] = this->t();
     state[1] = this->stepsize();
     ndspan::copy_array(state+2, new_vector, this->Nsys());
-    _true_state_idx = _new_state_idx;
+    if (_true_state_idx != _new_state_idx){
+        if (_last_true_state_idx == _aux_state_idx){
+            _aux_state_idx = _new_state_idx;
+            _new_state_idx = _true_state_idx;
+        } else {
+            _aux2_state_idx = _new_state_idx;
+            _new_state_idx = _true_state_idx;
+        }
+    }
     _use_new_state = false;
 }
 
@@ -795,16 +819,6 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
     }
     if (q0 == nullptr){
         this->kill("Initial conditions not set (nullptr provided)");
-    }else if (this->validate_ics_impl(t0, q0)){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
-        _state_data(0, 0) = t0;
-        _state_data(0, 1) = habs;
-        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
-        for (int i=1; i<5; i++){
-            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
-        }
-    }else {
-        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
     }
 
     if constexpr (JP == JacPolicy::Autodiff){
@@ -888,30 +902,6 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, cons
     return success;
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::update_state(const T& time){
-    const T& time_now = this->true_state_ptr()[0];
-    const T& time_last = this->last_true_state_ptr()[0];
-    assert( (time*this->direction() > time_last*this->direction() && time*this->direction() <= this->t_new()*this->direction()) && "Out of bounds time requested in update_state");
-    if ((time*this->direction() < this->t_new()*this->direction())) {
-        T* ptr = this->aux_state_ptr();
-        set_state(time, ptr);
-        if (time_now != this->t_new()) {
-            _last_true_state_idx = _true_state_idx;
-            _true_state_idx = _aux_state_idx;
-            _aux_state_idx = _aux2_state_idx = _last_true_state_idx;
-        }else {
-            _true_state_idx = _aux_state_idx;
-            _aux_state_idx = _aux2_state_idx;
-        }
-    }else if (_true_state_idx != _new_state_idx){
-        // update the true state to the new state, because time is exactly at t_new
-        _last_true_state_idx = _true_state_idx;
-        _true_state_idx = _new_state_idx;
-    }
-
-}
-
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::move_state(const T& time){
@@ -925,28 +915,23 @@ void BaseSolver<Derived, T, N, SP, OdeType>::move_state(const T& time){
             if (_last_true_state_idx == _aux_state_idx){
                 T* ptr = _state_data.ptr(_aux2_state_idx, 0);
                 set_state(time, ptr);
+                _last_true_state_idx = _new_state_idx;
                 _true_state_idx = _aux2_state_idx;
                 _aux2_state_idx = _old_state_idx;
             } else {
                 T* ptr = _state_data.ptr(_aux_state_idx, 0);
                 set_state(time, ptr);
+                _last_true_state_idx = _new_state_idx;
                 _true_state_idx = _aux_state_idx;
                 _aux_state_idx = _aux2_state_idx;
                 _aux2_state_idx = _old_state_idx;
             }
         }else{
-            if (_last_true_state_idx == _aux_state_idx){
-                T* ptr = _state_data.ptr(_last_true_state_idx, 0);
-                set_state(time, ptr);
-                _last_true_state_idx = _true_state_idx;
-                _true_state_idx = _aux_state_idx;
-                _aux_state_idx = _last_true_state_idx;
-            } else {
-                T* ptr = _state_data.ptr(_aux_state_idx, 0);
-                set_state(time, ptr);
-                _last_true_state_idx = _true_state_idx;
-                _true_state_idx = _aux_state_idx;
-            }
+            T* ptr = _state_data.ptr(_aux_state_idx, 0);
+            set_state(time, ptr);
+            _last_true_state_idx = _true_state_idx;
+            _true_state_idx = _aux_state_idx;
+            _aux_state_idx = _last_true_state_idx;
         }
     }else if (_true_state_idx != _new_state_idx){
         // update the true state to the new state, because time is exactly at t_new

@@ -1175,9 +1175,9 @@ class OdeSystem:
         VariationalLowLevelODE : High-level wrapper with history accumulation
         """
         if compiled:
-            f, jac = self._pointers(scalar_type=scalar_type, variational=True)[:2]
+            f, jac = self._pointers(scalar_type=scalar_type, variational=False)[:2]
         else:
-            f, jac = self._var_odefunc, self._var_jac
+            f, jac = self._odefunc, self._jac
 
         if len(q0) != 2*self.Nsys:
             raise ValueError(f"Invalid length of initial state vector : {len(q0)} instead of {2*self.Nsys}")

@@ -196,8 +196,8 @@ protected:
         }
 
         const int d = this->direction();
-        const bool result = Base::adv_impl(t_next_, std::forward<Args>(args)...);
-        if (result && (this->t() == t_next_)){
+        const bool success = Base::adv_impl(t_next_, std::forward<Args>(args)...);
+        if (success && (this->t() == t_next_)){
             const size_t nsys = this->Nsys()/2;
             t_last_ = t_next_;
             t_next_ = this->ics_ptr()[0] + (++np + 1)*period_*d;
@@ -207,16 +207,27 @@ protected:
             normalized(tmp_state_.data(), tmp_state_.data(), nsys);
             flagged = true;
             return true;
-        }else if (result){
+        }else if (success){
             return true;
         }else{
             return false;
         }
     }
 
+    // q0 is the full vector
+    bool ValidateIt(const T& t0, const T* q0, const T& stepsize) {
+        // Initialize tmp_state_ from the now-valid ics
+        if (Base::ValidateIt(t0, q0, stepsize)){
+            ndspan::copy_array(tmp_state_.data(), this->ics().vector(), this->Nsys());
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 private:
     
-    mutable Array2D<T, N, N> jm; // jacobian matrix for the original system
+    mutable Array2D<T, N, N, ndspan::Allocation::Auto, ndspan::Layout::F> jm; // jacobian matrix for the original system
     Array1D<T, 2*N> tmp_state_;
     Array1D<VarDualType> autodiff_args;
     mutable Array1D<VarDualType, JP == JacPolicy::Autodiff ? 4*N : 0> autodiff_jac_worker;
@@ -245,16 +256,14 @@ public:
 
     template<hasRhsFunc<T> OdeType>
     VariationalODE(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> events = {}, Integrator method = Integrator::RK45) : Base(2*nsys){
-        Array1D<T, 2*N> y0(2*nsys);
-        ndspan::copy_array(y0.data(), q0, nsys);
-        ndspan::copy_array(y0.data()+nsys, delta_q0, nsys);
+        // Must create solver BEFORE register_state(), since it accesses solver_
+        this->solver_ = get_virtual_variational_solver<T, N>(method, period, ode, t0, q0, delta_q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+
         this->cached_idx_.resize(events.size(), 0);
         Base::register_state();
         for (size_t i=0; i<events.size(); i++){
             this->event_data_.allocate_event(events[i]->name());
         }
-        this->solver_ = get_virtual_variational_solver<T, N>(method, period, ode, t0, q0, delta_q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-
     }
 
     ODE<T, N>* clone() const override{

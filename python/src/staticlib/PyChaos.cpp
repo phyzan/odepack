@@ -93,12 +93,12 @@ py::object PyVarSolver::copy() const{
 //===========================================================================================
 
 
-PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0, const py::iterable& delta_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : PyODE(scalar_type){
+PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object& t0, const py::iterable& q0_main, const py::iterable& delta_q0, const py::object& period, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& events, const py::str& method, const std::string& scalar_type) : PyODE(scalar_type){
     DISPATCH(void,
         if (jac.is_none()){
             throw py::value_error("Variational solvers require an exact jacobian for the original system");
         }
-        size_t nsys = size_t(py::len(q0));
+        size_t nsys = size_t(py::len(q0_main));
         if (size_t(py::len(delta_q0)) != nsys){
             throw py::value_error("The variational state vector delta_q0 must have the same size as q0");
         }
@@ -106,7 +106,7 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object&
         // ------- fill the initial state vector with q0 and delta_q0 -------
         Array1D<T> vector(2*nsys);
         int i = 0;
-        for (auto item : q0) {
+        for (auto item : q0_main) {
             // Cast Python object to double safely
             auto val = py::cast<T>(item);
             // Construct T from double
@@ -121,6 +121,12 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object&
             i++;
         }
         // ----------------------------------------------------------
+        
+        //Join q0_main and delta_q0 into a python iterable q0 that we can pass to init_ode_data, from the existing vector object that we defined.
+        py::list q0;
+        for (size_t j=0; j<2*nsys; j++){
+            q0.append(py::cast(vector[j]));
+        }
 
         std::vector<T> args;
         init_ode_data<T, true>([&](const auto& ode_obj){

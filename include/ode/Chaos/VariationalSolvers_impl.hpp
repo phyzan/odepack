@@ -18,7 +18,6 @@ VariationalSolver<Solver, T, N, SP, OdeType, Derived>::VariationalSolver(OdeType
         return tmp;
     }().data(),
     2*nsys, rtol, atol, min_step, max_step, stepsize, dir, args, std::forward<Args>(extra)...), jm(nsys, nsys), tmp_state_(2*nsys), autodiff_args(JP == JacPolicy::Autodiff ? args.size() : 0), period_(period), t_next_(t0+period*dir), t_last_(t0) {
-
     if (period <= 0){
         throw std::runtime_error("The renormalization period must be positive");
     }
@@ -31,12 +30,20 @@ VariationalSolver<Solver, T, N, SP, OdeType, Derived>::VariationalSolver(OdeType
             }
         }
     }
-    ndspan::copy_array(tmp_state_.data(), this->ics().vector(), 2*nsys);
-
     if constexpr (JP == JacPolicy::Autodiff){
         for (size_t i=0; i<args.size(); i++){
             autodiff_args[i] = VarDualType(args[i]);
         }
+    }
+    if constexpr (std::is_same_v<Derived, void>){
+        // Create combined ics (base + variational)
+        Array1D<T, 2*N> combined(2*nsys);
+        ndspan::copy_array(combined.data(), q0, nsys);
+        ndspan::copy_array(combined.data()+nsys, delta_q0, nsys);
+        normalized(combined.data(), combined.data(), nsys);
+
+        // Now validate with the COMBINED ics
+        this->ValidateIt(t0, combined.data(), stepsize);
     }
 }
 
@@ -45,6 +52,7 @@ template<typename T>
 void normalized(T* out, const T* src, size_t nsys){
     T N = norm(src+nsys, nsys);
     for (size_t i=0; i<nsys; i++){
+        out[i] = src[i];
         out[i+nsys] /= N;
     }
 }

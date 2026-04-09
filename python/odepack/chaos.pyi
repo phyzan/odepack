@@ -26,14 +26,13 @@ class VariationalSolver(OdeSolver):
     Parameters
     ----------
     f : callable
-        Right-hand side function for the augmented variational system: f(t, q, *args) -> array.
-        The input q has even length (primary state + variational state), and the output
-        must match this length. Typically obtained from compiled variational equations.
+        Right-hand side function for the original system: f(t, q, *args) -> array.
+        The input q has length Nsys, and the output must match this length. The variational equations are automatically constructed from this function and the Jacobian, so they should not be included.
 
     jac : callable
-        Jacobian matrix function for the augmented system: jac(t, q, *args) -> matrix.
-        Required for BDF method. The Jacobian should have shape (2*Nsys, 2*Nsys) for
-        the augmented variational system.
+        Jacobian matrix function for the original system: jac(t, q, *args) -> matrix.
+        Required for BDF method. The Jacobian should have shape (Nsys, Nsys) for
+        the original system.
 
     t0 : float
         Initial time.
@@ -206,8 +205,6 @@ class VariationalLowLevelODE(LowLevelODE):
     during integration. It tracks how perturbations to the state vector grow or shrink
     along the solution trajectory.
 
-    The state vector q0 must have an even number of elements: the first half represents
-    the primary state, and the second half represents the variational state (perturbation).
     The variational state evolves according to the linearized equation:
     d(delta_q)/dt = Jacobian(f) * delta_q
 
@@ -220,9 +217,10 @@ class VariationalLowLevelODE(LowLevelODE):
         Initial time.
 
     q0 : np.ndarray
-        Initial state with even length. First half is primary state, second half
-        is initial perturbation vector. The variational state (second half) is
-        automatically normalized to unit length at initialization.
+        Initial state vector for the original system.
+
+    delta_q0 : np.ndarray
+        Initial perturbation vector for the variational state. This vector is automatically normalized to unit length at initialization and at each renormalization step.
 
     period : float
         Renormalization period for the variational state. The perturbation is

@@ -110,7 +110,6 @@ py::object PyODE::call_Jac(const py::object& t, const py::iterable& py_q) const{
 }
 
 py::object PyODE::py_integrate(const py::object& interval, const py::object& t_eval, const py::iterable& event_options, int max_prints){
-
     return DISPATCH(py::object,
         OdeResult<T>* result = new OdeResult<T>();
         if (t_eval.is_none()){
