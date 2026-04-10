@@ -648,11 +648,6 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
             register_states();
             T new_floor;
             if (THIS->RequestTimeFloor(new_floor) && new_floor*d < t_new()*d){
-                #pragma omp critical
-                {
-                    print(new_floor, this->t_old(), this->t_new());
-                }
-                
                 assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested without additional requests.");
                 this->move_state(new_floor);
             }
