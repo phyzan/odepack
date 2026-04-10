@@ -5,37 +5,27 @@
 
 namespace ode{
 
-template<typename T, typename Callable>
+template<typename T, isObjFun<T> Callable>
 struct ObjFunData{
     
     Callable func;
     T ftol = 0; // tolerance for root finding (0 means machine precision)
     int dir = 0; // 0 means any direction, 1 means increasing, -1 means decreasing
-
-    inline T operator()(const T& t, const T* q) const {
-        return func(t, q);
-    }
+    
 };
 
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived, typename... isObjFun>
-class ObjectiveSolver : public Solver<T, N, SP, OdeType, GetDerived<ObjectiveSolver<Solver, T, N, SP, OdeType, Derived, isObjFun...>, Derived>>{
+template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived, isObjFun<T>... ObjFun>
+class ObjectiveSolver : public Solver<T, N, SP, OdeType, GetDerived<ObjectiveSolver<Solver, T, N, SP, OdeType, Derived, ObjFun...>, Derived>>{
 
-    using Base = Solver<T, N, SP, OdeType, GetDerived<ObjectiveSolver<Solver, T, N, SP, OdeType, Derived, isObjFun...>, Derived>>;
+    using Base = Solver<T, N, SP, OdeType, GetDerived<ObjectiveSolver<Solver, T, N, SP, OdeType, Derived, ObjFun...>, Derived>>;
 
 public:
 
-    static constexpr size_t NOBJ = sizeof...(isObjFun);
-
-    template<size_t... I, size_t... J, typename... Args>
-    ObjectiveSolver(std::index_sequence<I...>, std::index_sequence<J...>, Args&&... args) : Base(ndspan::pack_elem<sizeof...(I) + J>(args...)...), obj(ndspan::pack_elem<I>(args...)...){
-        assert(((std::get<I>(obj).dir == 0 || std::get<I>(obj).dir == 1 || std::get<I>(obj).dir == -1 ) && ... )&& "Invalid direction");
-        cache_current_signs();
-        worker.resize(this->Nsys());
-    }
+    static constexpr size_t NOBJ = sizeof...(ObjFun);
 
     template<typename... Args>
-    ObjectiveSolver(Args&&... args) : ObjectiveSolver(std::make_index_sequence<NOBJ>{}, std::make_index_sequence<sizeof...(Args)-NOBJ>{}, std::forward<Args>(args)...){}
+    ObjectiveSolver(std::tuple<ObjFunData<T, ObjFun>...> funcs, Args&&... args) : Base(std::forward<Args>(args)...), obj(std::move(funcs)){}
 
     void Reset(){
         Base::Reset();
@@ -90,7 +80,7 @@ public:
         T my_floor = this->t_new();
         FOR_LOOP(size_t, I, NOBJ,
             const int old_sgn = cached_sign[I];
-            const int new_sign = sgn(std::get<I>(obj).func(this->t_new(), this->vector().data()));
+            const int new_sign = sgn(std::get<I>(obj).func(this->t_new(), this->vector().data(), this->args().data()));
             cached_sign[I] = new_sign;
             detected[I] = false;
             if (old_sgn != 0){
@@ -107,7 +97,7 @@ public:
                 if ((detected[I] = crossed)){
                     values[I] = bisect<T, RootPolicy::Right>([&](const T& t){
                         this->interp_impl(worker.data(), t);
-                        return std::get<I>(obj).func(t, worker.data());
+                        return std::get<I>(obj).func(t, worker.data(), this->args().data());
                     }, this->t_old(), this->t_new(), std::get<I>(obj).ftol);
                     my_floor = this->minimum_time(my_floor, values[I]);   
                 }
@@ -146,7 +136,7 @@ private:
 
     void cache_current_signs(){
         FOR_LOOP(size_t, I, NOBJ,
-            cached_sign[I] = sgn(std::get<I>(obj).func(this->t(), this->vector().data()));
+            cached_sign[I] = sgn(std::get<I>(obj).func(this->t(), this->vector().data(), this->args().data()));
         );
     }
 
@@ -154,7 +144,7 @@ private:
     std::array<int, NOBJ> cached_sign = {};
     std::array<bool, NOBJ> detected = {};
     Array1D<T, N> worker;
-    std::tuple<ObjFunData<T, isObjFun>...> obj;
+    std::tuple<ObjFunData<T, ObjFun>...> obj;
     int current_idx = -1;
 };
 

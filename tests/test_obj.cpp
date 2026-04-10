@@ -18,7 +18,7 @@ void rhs(T* out, const T& t, const T* q, const T* args){
 void test_single_objective(){
     std::cout << "=== test_single_objective ===\n";
 
-    auto obj = [](const T& t, const T* q) -> T { return q[0]; };
+    auto obj = [](const T& t, const T* q, const T*) -> T { return q[0]; };
     using ObjFun = decltype(obj);
 
     ObjFunData<T, ObjFun> obj_data{.func=obj, .dir=-1};  // decreasing crossing
@@ -26,7 +26,7 @@ void test_single_objective(){
     T y0[2] = {1.0, 0.0};
 
     ObjectiveSolver<RK45, T, 2, SolverPolicy::Static, OdeData<RhsFunc<T>, std::nullptr_t>, void, ObjFun> solver(
-        obj_data,
+        {obj_data},
         OdeData{.Rhs = rhs},
         0.0,              // t0
         y0,               // q0
@@ -69,18 +69,18 @@ void test_single_objective(){
 void test_two_objectives(){
     std::cout << "=== test_two_objectives ===\n";
 
-    auto obj0 = [](const T& t, const T* q) -> T { return q[0]; };  // position
-    auto obj1 = [](const T& t, const T* q) -> T { return q[1]; };  // velocity
+    auto obj0 = [](const T& t, const T* q, const T*) -> T { return q[0]; };  // position
+    auto obj1 = [](const T& t, const T* q, const T*) -> T { return q[1]; };  // velocity
     using ObjFun0 = decltype(obj0);
     using ObjFun1 = decltype(obj1);
 
-    ObjFunData<T, ObjFun0> data0{.func=obj0, .dir=-1};  // q[0]=sin(t) decreasing through 0 at t=pi
-    ObjFunData<T, ObjFun1> data1{.func=obj1, .dir=-1};  // q[1]=cos(t) decreasing through 0 at t=pi/2
+    ObjFunData<T, ObjFun0> data0{.func=obj0, .dir=1};  // q[0]=sin(t) decreasing through 0 at t=pi
+    ObjFunData<T, ObjFun1> data1{.func=obj1, .dir=1};  // q[1]=cos(t) decreasing through 0 at t=pi/2
 
     T y0[2] = {0.0, 1.0};
 
     ObjectiveSolver<RK45, T, 2, SolverPolicy::Static, OdeData<RhsFunc<T>, std::nullptr_t>, void, ObjFun0, ObjFun1> solver(
-        data0, data1,
+        {data0, data1},
         OdeData{.Rhs = rhs},
         0.0, y0, 2,
         1e-10, 1e-10,  // rtol, atol
