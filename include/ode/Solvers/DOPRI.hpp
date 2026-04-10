@@ -29,8 +29,6 @@ protected:
 
     StepResult  adapt_impl(T* res, const T* state);
 
-    bool       ValidateIt(const T& t0, const T* q0, const T& stepsize);
-
     // =========================================================
     using Base = BaseDispatcher<Derived, T, N, SP, OdeType>;
     using RKBase = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;

@@ -7,19 +7,11 @@ namespace ode{
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args) requires (!is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args) {
-    if constexpr (std::is_same_v<Derived, void>){
-        this->ValidateIt(t0, q0, stepsize);
-    }
-}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args) requires (!is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args) {}
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args, EVENTS events) requires (is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args, events) {
-    if constexpr (std::is_same_v<Derived, void>){
-        this->ValidateIt(t0, q0, stepsize);
-    }
-}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, const T* q0, size_t nsys, T stepsize, int dir, const std::vector<T>& args, EVENTS events) requires (is_rich<SP>) : Base(ode, t0, q0, nsys, 0, 0, 0, inf<T>(), stepsize, dir, args, events) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 Euler<T, N, SP, OdeType, Derived>::Euler(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>) : Euler(ode, t0, q0, nsys, stepsize, dir, args) {}

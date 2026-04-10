@@ -24,7 +24,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Rhs(T* dq_dt, const T& t, const T* 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::rhs(T* dq_dt, const T& t, const T* q) const{
-    THIS->Rhs(dq_dt, t, q);
+    this->Rhs(dq_dt, t, q);
     this->_n_evals_rhs++;
 }
 
@@ -78,7 +78,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::jac_approx(T* out, const T& t, cons
     }
 
     ode::jac_approx<T>([this](T* out, const T& t, const T* q){
-        THIS->Rhs(out, t, q);
+        this->Rhs(out, t, q);
     }, out, worker, t, q, dt, this->atol(), n);
 }
 
@@ -563,23 +563,6 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
     return THIS->local_interp();
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-bool BaseSolver<Derived, T, N, SP, OdeType>::ValidateIt(const T& t0, const T* q0, const T& stepsize){
-    if (q0 != nullptr && this->validate_ics_impl(t0, q0)){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
-        _state_data(0, 0) = t0;
-        _state_data(0, 1) = habs;
-        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
-        for (int i=1; i<6; i++){  // Initialize all buffers including buffer 5 (interpolation)
-            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
-        }
-        return true;
-    }else if (q0 != nullptr){
-        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
-    }
-    return false;
-}
-
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
@@ -665,6 +648,11 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
             register_states();
             T new_floor;
             if (THIS->RequestTimeFloor(new_floor) && new_floor*d < t_new()*d){
+                #pragma omp critical
+                {
+                    print(new_floor, this->t_old(), this->t_new());
+                }
+                
                 assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested without additional requests.");
                 this->move_state(new_floor);
             }
@@ -783,7 +771,13 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0
         worker = _cache_ics.data();
     }
 
-    this->rhs(worker, t0, q0);
+    /*
+    Calling "this", not "THIS". Derived classes that override Rhs can have their version validated.
+    However since this function might be called before the Derived classes has been fully constructed,
+    calling "THIS" could lead to undefined behavior.
+    */
+    this->Rhs(worker, t0, q0);
+
     return all_are_finite(worker, this->Nsys());
 }
 
@@ -791,6 +785,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> 
 bool BaseSolver<Derived, T, N, SP, OdeType>::is_at_new_state() const{
     return _true_state_idx == _new_state_idx;
 }
+
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* j) const{
@@ -817,14 +812,25 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
-    if (q0 == nullptr){
-        this->kill("Initial conditions not set (nullptr provided)");
-    }
 
     if constexpr (JP == JacPolicy::Autodiff){
         for (size_t i=0; i<_args.size(); i++){
             _args_worker[i] = DualType(_args[i]);
         }
+    }
+    
+    if (q0 == nullptr){
+        this->kill("Initial conditions not set (nullptr provided)");
+    } else if (this->validate_ics_impl(t0, q0)){
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
+        _state_data(0, 0) = t0;
+        _state_data(0, 1) = habs;
+        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
+        for (int i=1; i<5; i++){
+            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
+        }
+    }else {
+        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
     }
 }
 
@@ -915,13 +921,11 @@ void BaseSolver<Derived, T, N, SP, OdeType>::move_state(const T& time){
             if (_last_true_state_idx == _aux_state_idx){
                 T* ptr = _state_data.ptr(_aux2_state_idx, 0);
                 set_state(time, ptr);
-                _last_true_state_idx = _new_state_idx;
                 _true_state_idx = _aux2_state_idx;
                 _aux2_state_idx = _old_state_idx;
             } else {
                 T* ptr = _state_data.ptr(_aux_state_idx, 0);
                 set_state(time, ptr);
-                _last_true_state_idx = _new_state_idx;
                 _true_state_idx = _aux_state_idx;
                 _aux_state_idx = _aux2_state_idx;
                 _aux2_state_idx = _old_state_idx;

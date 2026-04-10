@@ -60,9 +60,6 @@ K(5, nsys)
 #endif
 {
     // min_step and max_step are not used in RK4
-    if constexpr (std::is_same_v<Derived, void>){
-        this->ValidateIt(t0, q0, stepsize);
-    }
 }
 
 

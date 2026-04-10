@@ -325,18 +325,10 @@ void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, con
 
 // DOP853 implementations
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS) {
-    if constexpr (std::is_same_v<Derived, void>){
-        this->ValidateIt(t0, q0, stepsize);
-    }
-}
+DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {
-    if constexpr (std::is_same_v<Derived, void>){
-        this->ValidateIt(t0, q0, stepsize);
-    }
-}
+DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void DOP853<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{

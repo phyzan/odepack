@@ -85,7 +85,6 @@ public:
      * @param[out] dq_dt Output array for the derivative dq/dt (size Nsys).
      * @param[in]  t     Current time.
      * @param[in]  q     Current state vector (size Nsys).
-     * @note Derived classes should call THIS->Rhs() and not this->Rhs() in case the derived class overrides Rhs()
     */
     void                 Rhs(T* dq_dt, const T& t, const T* q) const;
 
@@ -100,7 +99,6 @@ public:
      * @param[in]  q  Current state vector (size Nsys).
      * @param[in]  dt Optional step sizes for finite difference (size Nsys). If nullptr,
      *                step sizes are computed automatically.
-     * @note Derived classes should call THIS->Jac() and not this->Jac() in case the derived class overrides Jac()
     */
     void                 Jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const;
 
@@ -424,9 +422,6 @@ protected:
      */
     bool    validate_ics_impl(T t0, const T* q0) const;
 
-    // Call at initialization in derived constructors to validate ICs.
-    // Must be explicitly callled by derived classes, so that the derived class has been fully instanticated, avoiding potential UB or segfaults (ValidateIt() calls Rhs which, if defined in derived classes, might not be safe to call before the derived class constructor runs).
-    bool                    ValidateIt(const T& t0, const T* q0, const T& stepsize);
     // ================================================================================
 
 

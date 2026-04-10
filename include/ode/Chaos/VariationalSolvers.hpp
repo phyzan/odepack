@@ -43,8 +43,119 @@ public:
 template<typename T>
 void normalized(T* out, const T* src, size_t nsys);
 
+
+template<typename T, size_t N, hasRhsFunc<T> OdeType>
+struct VariationalOdeSys{
+
+public:
+
+    using DualType      = autodiff::AutoDiff<T, 1, N>;
+    using VarDualType   = autodiff::AutoDiff<T, 2, N>;
+    
+
+    // same as in BaseSolver, but we need to redefine it here for the variational system
+    static constexpr JacPolicy MAIN_JP = (getJacPolicy<T, OdeType>() == JacPolicy::Autodiff && N == 0) ? JacPolicy::Exact : getJacPolicy<T, OdeType>();
+    static constexpr JacPolicy JP = (MAIN_JP == JacPolicy::Autodiff) ? JacPolicy::Autodiff : JacPolicy::Approx;
+    static_assert(MAIN_JP!=JacPolicy::Approx,  "VariationalSolver requires the base solver to have an exact jacobian for the original system");
+
+
+    VariationalOdeSys(OdeType ode, size_t nsys, size_t nargs) : ode_(std::move(ode)), diff_worker(2*nsys), jac_worker(2*nsys), jm(nsys, nsys), diff_args(nargs), autodiff2_args(nargs), nsys(nsys) {
+        if constexpr (N > 0){
+            assert(N==nsys && "Incorrect number of equations in VariationalOdeSys");
+        }
+
+    }
+
+    void    Rhs(T* out, const T& t, const T* q, const T* args) const{
+        const T* delta_q = q + nsys;
+
+        if constexpr (JP == JacPolicy::Autodiff){
+            DualType* rhs = diff_worker.data();
+            DualType* y = diff_worker.data() + N;
+            FOR_LOOP(size_t, I, N,
+                y[I] = DualType(q[I], autodiff::Variable<I>{});
+            );
+
+            for (size_t i=0; i<diff_args.size(); i++){
+                diff_args[i] = DualType(args[i]);
+            }
+
+            ode_.Rhs(rhs, DualType(t), y, diff_args.data());
+
+            std::fill(out+nsys, out+2*nsys, 0);
+            FOR_LOOP(size_t, J, N,
+                out[J] = rhs[J].value();
+                FOR_LOOP(size_t, I, N,
+                    out[I+N] += rhs[I].diff_value(J) * delta_q[J];
+                );
+            );
+        } else {
+            ode_.Rhs(out, t, q, args); //fills the first half (nsys) entries
+            // fills jm with the jacobian of the original system at (t, q)
+            // this should not call Base::jac_approx since we have demanded that the base solver has an exact jacobian for the original system
+            ode_.Jac(jm.data(), t, q, args);
+            for (size_t i=0; i<nsys; i++){
+                out[i+nsys] = 0;
+                for (size_t j=0; j<nsys; j++){
+                    out[i+nsys] += jm(i, j) * q[nsys+j];
+                }
+            }
+        }
+    }
+
+    // Only provided if it does not require finite differences, otherwise the base solver with automatically use jac_approx to compute the jacobian of the full system.
+    void    Jac(T* out, const T& t, const T* q, const T* args, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff) {
+
+        // If autodiff is enabled, then N is positive, so the system size is known at compile time. BaseSolver only allows autodiff if N > 0, so we can safely use a fixed-size array for the autodiff worker.
+        VarDualType* rhs = jac_worker.data();
+        VarDualType* y = jac_worker.data() + N;
+
+        // copy the input state vector to the worker
+        for (size_t i=0; i<N; i++){
+            y[i] = VarDualType(q[i]);
+        }
+
+        // copy args
+        for (size_t i=0; i<autodiff2_args.size(); i++){
+            autodiff2_args[i] = VarDualType(args[i]);
+        }
+
+        // compute the jacobian using autodiff
+        ode_.template Rhs<VarDualType>(rhs, VarDualType(t), y, autodiff2_args.data());
+
+        // extract the jacobian matrix from the autodiff output
+        ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
+        FOR_LOOP(size_t, I, N,
+            FOR_LOOP(size_t, J, N,
+                m(I, J) = m(I+N, J+N) = rhs[I].diff_value(J);
+                m(I, J+N) = 0;
+                //the bottom left block now
+                T sum = 0;
+                for (size_t K=0; K<N; K++){
+                    sum += rhs[I].diff_value(K, J) * q[N+K];
+                }
+                m(I+N, J) = sum;
+            );
+        );
+    }
+
+    const OdeType& ode() const{
+        return ode_;
+    }
+
+private:
+    OdeType ode_;
+    mutable Array1D<DualType, 2*N> diff_worker;
+    mutable Array1D<VarDualType, 2*N> jac_worker;
+    mutable Array2D<T, N, N, ndspan::Allocation::Auto, ndspan::Layout::F> jm;
+    mutable Array1D<DualType> diff_args;
+    mutable Array1D<VarDualType> autodiff2_args;
+    size_t nsys = N; // Size of the original system, without the variational equations (not the augmented system)
+};
+
+
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
-class VariationalSolver : public Solver<T, 2*N, SP, OdeType, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>> {
+class VariationalSolver : public Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>> {
 
 
     /**
@@ -66,13 +177,7 @@ class VariationalSolver : public Solver<T, 2*N, SP, OdeType, GetDerived<Variatio
 
 public:
 
-    using Base = Solver<T, 2*N, SP, OdeType, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>;
-    static_assert(Base::JP!=JacPolicy::Approx,  "VariationalSolver requires the base solver to have an exact jacobian for the original system");
-
-    using VarDualType = autodiff::AutoDiff<T, 2, N>; //second order diffs required for the jacobian of the full system (enabled only if the base solver has a templated Rhs)
-
-    // if Base has a templated rhs, then we can use autodiff to compute the jacobian of the full system (using 2nd order derivatives), otherwise we will have to use finite differences
-    static constexpr JacPolicy JP = (Base::JP == JacPolicy::Autodiff) ? JacPolicy::Autodiff : JacPolicy::Approx;
+    using Base = Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>;
 
     template<typename... Args>
     VariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, Args&&... extra);
@@ -118,75 +223,23 @@ public:
     }
 
     void    RhsMain(T* out, const T& t, const T* q) const{
-        Base::Rhs(out, t, q); //fills the first half (nsys) entries
+        this->ode().ode().Rhs(out, t, q, this->args().data()); //fills the first half (nsys) entries
     }
 
     void    JacMain(T* out, const T& t, const T* q, const T* dt = nullptr) const{
-        Base::Jac(out, t, q, dt);
-    }
-
-    // Derived classes that override this method must implement a Rhs function for the full system (the original system + the variational equations)
-    void    Rhs(T* out, const T& t, const T* q) const{
-        size_t nsys = this->Nsys()/2;
-        Base::Rhs(out, t, q); //fills the first half (nsys) entries
-
-        // fills jm with the jacobian of the original system at (t, q)
-        // this should not call Base::jac_approx since we have demanded that the base solver has an exact jacobian for the original system
-        Base::Jac(jm.data(), t, q);
-        for (size_t i=0; i<nsys; i++){
-            out[i+nsys] = 0;
-            for (size_t j=0; j<nsys; j++){
-                out[i+nsys] += jm(i, j) * q[nsys+j];
-            }
-        }
-    }
-
-    // Derived classes that override this method must implement a Jac function for the full system (the original system + the variational equations)
-    // Important: "out" has a F-storage layout (column-major)
-    void    Jac(T* out, const T& t, const T* q, const T* dt = nullptr) const{
-        //we must call the base solver's jac_approx to fill the part of the jacobian corresponding to the original system, since Base::Jac only affects the original system
-        if constexpr (JP == JacPolicy::Approx){
-            Base::jac_approx(out, t, q, dt);
+        if constexpr (hasJacFunc<OdeType, T>){
+            this->ode().ode().Jac(out, t, q, this->args().data());
+            return;
         } else {
-            // If autodiff is enabled, then N is positive, so the system size is known at compile time. BaseSolver only allows autodiff if N > 0, so we can safely use a fixed-size array for the autodiff worker.
-            VarDualType* rhs = autodiff_jac_worker.data();
-            VarDualType* y = autodiff_jac_worker.data() + N;
-
-            // copy the input state vector to the worker
-            for (size_t i=0; i<2*this->Nsys(); i++){
-                y[i] = VarDualType(q[i]);
-            }
-
-            // compute the jacobian using autodiff
-            this->ode().template Rhs<VarDualType>(rhs, VarDualType(t), y, autodiff_args.data());
-
-            // extract the jacobian matrix from the autodiff output
-            ndspan::MutView<T, ndspan::Layout::F, N, N> m(out);
-            FOR_LOOP(size_t, I, N,
-                FOR_LOOP(size_t, J, N,
-                    m(I, J) = m(I+N, J+N) = rhs[I].diff_value(J);
-                    m(I, J+N) = 0;
-                    //the bottom left block now
-                    T sum = 0;
-                    for (size_t K=0; K<N; K++){
-                        sum += rhs[I].diff_value(K, J) * q[N+K];
-                    }
-                    m(I+N, J) = sum;
-                );
-            );
+            jac_approx<T>([this](T* out, const T& t, const T* q){
+                this->RhsMain(out, t, q);
+            }, out, worker.data(), t, q, dt, this->atol(), this->Nsys()/2);
         }
     }
-
+    
 protected:
 
     friend Base::MainSolverType;
-
-    void    set_args_impl(const T* new_args){
-        Base::set_args_impl(new_args);
-        for (size_t i=0; i<this->args().size(); i++){
-            autodiff_args[i] = VarDualType(new_args[i]);
-        }
-    }
 
     template<typename... Args>
     bool adv_impl(Args&&... args) {
@@ -214,23 +267,9 @@ protected:
         }
     }
 
-    // q0 is the full vector
-    bool ValidateIt(const T& t0, const T* q0, const T& stepsize) {
-        // Initialize tmp_state_ from the now-valid ics
-        if (Base::ValidateIt(t0, q0, stepsize)){
-            ndspan::copy_array(tmp_state_.data(), this->ics().vector(), this->Nsys());
-            return true;
-        } else {
-            return false;
-        }
-    }
-
 private:
-    
-    mutable Array2D<T, N, N, ndspan::Allocation::Auto, ndspan::Layout::F> jm; // jacobian matrix for the original system
+    mutable Array1D<T, 4*N> worker;
     Array1D<T, 2*N> tmp_state_;
-    Array1D<VarDualType> autodiff_args;
-    mutable Array1D<VarDualType, JP == JacPolicy::Autodiff ? 4*N : 0> autodiff_jac_worker;
     T period_;
     T t_next_; // the next time at which to renormalize
     T t_last_;
