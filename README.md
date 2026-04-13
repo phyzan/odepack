@@ -514,7 +514,6 @@ odepack/
 │   │   │   └── OdeResult_impl.hpp   # Implementation
 │   │   │
 │   │   ├── OdeInt.hpp               # High-level ODE wrapper
-│   │   ├── CustomSolver.hpp         # Custom solver extension point
 │   │   ├── SolverDispatcher.hpp     # Factory for solver instantiation
 │   │   ├── SolverState.hpp          # Solver state & status reporting
 │   │   └── Tools.hpp                # Utilities (owner, etc.)
@@ -588,7 +587,6 @@ odepack/
 | **ode/Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
 | **ode/OdeResult/** | Result container for storing integration trajectories and event data |
 | **ode/OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
-| **ode/CustomSolver.hpp** | Extension point for user-defined solvers |
 | **ode/SolverDispatcher.hpp** | Factory functions for solver instantiation |
 | **ode/Tools.hpp** | Utilities including `owner` for polymorphic type ownership |
 | **ndspan/** | Multi-dimensional array views and utilities |
