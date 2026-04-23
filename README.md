@@ -57,7 +57,7 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 ### Event Detection
 
-- **Zero-crossing detection** with bisection refinement
+- **Zero-crossing detection** with bisection algorithm for high precision
 - **Periodic events** at fixed time intervals
 - **State modification masks** for discontinuous changes
 - **Event collections** for managing multiple events
@@ -362,7 +362,7 @@ ODEPACK features an event detection system that handles integration events, with
 
 ```cpp
 // Detect when y[0] crosses zero
-    PreciseEvent evesnt(
+    PreciseEvent event(
     "event",
     [](const double& t, const double* y, const double* args) -> double {
         return y[1]-1;
@@ -392,7 +392,7 @@ ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphi
 │        ┌──────────────────┐         ┌─────────────────────┐                 │
 │        │  OdeSolver<T,N>  │────────▶│ OdeRichSolver<T,N>  │                 │
 │        └──────────────────┘         └─────────────────────┘                 │
-│         (base interface)             (+ events/interpolation)               │
+│         (base interface)             (+ runtime events)                     │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -403,7 +403,7 @@ ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphi
 │        ┌────────────────────┐       ┌───────────────────────┐               │
 │        │ BaseSolver<T,N,SP> │──────▶│  RichSolver<T,N,SP>   │               │
 │        └────────────────────┘       └───────────────────────┘               │
-│              (CRTP base) │             (+ events/interpolation)             │
+│              (CRTP base) │             (+ runtime events)                   │
 │                   │                             │                           │
 │                   │                             │                           │
 │                   ───────────────────────────────                           │
@@ -432,7 +432,7 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 ├─────────────┼───────────────────────────────────────────────────────────────┤
 │             │                                                               │
 │ RichStatic  │   RK45 ───▶ RichSolver ───▶ BaseSolver                        │
-│             │   (events + interpolation, no virtuals)                       │
+│             │   (events, no virtuals)                                       │
 │             │                                                               │
 ├─────────────┼───────────────────────────────────────────────────────────────┤
 │             │                                                               │
@@ -442,19 +442,19 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 ├─────────────┼───────────────────────────────────────────────────────────────┤
 │             │                                                               │
 │ RichVirtual │   RK45 ───▶ RichSolver ───▶ BaseSolver ───▶ OdeRichSolver     │
-│             │   (full features: virtuals + events + interpolation)          │
+│             │   (full features: virtuals + events)                          │
 │             │                                                               │
 └─────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
 ### Policy Summary
 
-| Policy | Virtual | Events | Interpolation | Use Case |
-|--------|---------|--------|---------------|----------|
-| `Static` | No | No | No | Maximum performance, compile-time type |
-| `RichStatic` | No | Yes | Yes | Events needed, type known at compile-time |
-| `Virtual` | Yes | No | No | Runtime solver selection, no events |
-| `RichVirtual` | Yes | Yes | Yes | Full flexibility at runtime |
+| Policy | Virtual | Events | Use Case |
+|--------|---------|--------|---------------|
+| `Static` | No | No | Maximum performance, compile-time type |
+| `RichStatic` | No | Yes | Events needed, type known at compile-time |
+| `Virtual` | Yes | No | Runtime solver selection, no events |
+| `RichVirtual` | Yes | Yes | Full flexibility at runtime |
 
 ### Design Patterns
 
@@ -544,11 +544,8 @@ odepack/
 │   │   └── pycast/                  # Type casters for pybind11
 │   │       └── pycast.hpp
 │   │
-│   ├── mcmc/                        # Markov Chain Monte Carlo utilities
-│   │   ├── mcmc.hpp
-│   │   └── tools.hpp
 │   │
-│   ├── polybox/                     # Polynomial box utilities
+│   ├── polybox/                     # Wrapper for dynamically allocated types with automatic memory management
 │   │   └── polybox.hpp
 │   │
 │   ├── odepack.hpp                  # Main C++ include (all headers)
@@ -592,7 +589,7 @@ odepack/
 | **ndspan/** | Multi-dimensional array views and utilities |
 | **pyode/** | Python binding utilities organized into lib/, lib_impl/, and pycast/ |
 | **mcmc/** | Markov Chain Monte Carlo sampling utilities |
-| **polybox/** | Polynomial box utilities |
+| **polybox/** | Wrapper for dynamically allocated types with automatic memory management |
 
 ---
 
