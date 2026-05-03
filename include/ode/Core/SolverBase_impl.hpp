@@ -479,7 +479,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsi
     direction = (direction == 0) ? _direction : direction; // if 0, keep existing direction;
     if (this->validate_ics(t0, y0)){
         if (stepsize < 0) {
-            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+            this->cerr("Cannot set negative stepsize in solver initialization");
             return false;
         } else if (stepsize == 0) {
             _direction = direction;
@@ -496,7 +496,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsi
         return true;
     }else {
 #ifndef NO_ODE_WARN
-        std::cerr << "Tried to set invalid initial conditions" << std::endl;
+        this->cerr("Tried to set invalid initial conditions");
 #endif
         return false;
     }
@@ -711,14 +711,14 @@ void BaseSolver<Derived, T, N, SP, OdeType>::set_message(const std::string& text
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::warn_paused() const{
 #ifndef NO_ODE_WARN
-    std::cerr << "\n" << "Solver has paused integrating. Resume before advancing." << std::endl;
+    this->cerr("\nSolver has paused integrating. Resume before advancing.");
 #endif
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
 #ifndef NO_ODE_WARN
-    std::cerr << "\n" << "Solver has permanently stopped integrating. Termination cause:\n\t" << _message << std::endl;
+    this->cerr("\nSolver has permanently stopped integrating. Termination cause:\n\t" + _message);
 #endif
 }
 
@@ -955,7 +955,7 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::priv_apply_ics_setter(T* ics, T t0,
         func(ics+2);
         assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
         if (stepsize < 0) {
-            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+            this->cerr("Cannot set negative stepsize in solver initialization");
         } else if (stepsize == 0) {
             stepsize = this->auto_step(t0, ics+2);
         }
@@ -965,7 +965,7 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::priv_apply_ics_setter(T* ics, T t0,
         auto res = func(ics+2);
         assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
         if (stepsize < 0) {
-            std::cerr << "Cannot set negative stepsize in solver initialization" << std::endl;
+            this->cerr("Cannot set negative stepsize in solver initialization");
         } else if (stepsize == 0) {
             stepsize = this->auto_step(t0, ics+2);
         }

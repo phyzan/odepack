@@ -459,6 +459,14 @@ protected:
     /// @brief Check if the current true state matches the new state.
     bool        is_at_new_state() const;
 
+
+    void cerr(const std::string& message) const {
+        #pragma omp critical
+        {
+            std::cerr << message << std::endl;
+        }
+    }
+
     template<typename U, typename... Args>
     T    minimum_time(const U& item, const Args&... args) const{
         if constexpr (sizeof...(Args) > 0){
