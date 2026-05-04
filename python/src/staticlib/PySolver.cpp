@@ -230,12 +230,39 @@ py::object PyConstSolver::copy() const{
     )
 }
 
-bool PyConstSolver::py_at_event() const{
+bool PyConstSolver::py_at_event(const py::object& event_name) const{
     return DISPATCH(bool,
         if (cast<T>()->event_col().size() == 0){
             throw py::value_error("This solver contains no events to check for");
+        } else if (event_name.is_none()){
+            return cast<T>()->at_event();
+        } else {
+            try {
+                auto py_name = event_name.cast<py::str>();
+                std::string name = py_name.cast<std::string>();
+                int event_idx = cast<T>()->event_idx(name);
+                if (event_idx == -1){
+                    throw py::value_error("No event with name '" + name + "' found in the solver");
+                }
+                return cast<T>()->at_event(event_idx);
+            } catch (const py::cast_error&){
+                throw py::value_error("Event parameter must be a string name of an event in the solver (or None to check for any event)");
+            }
         }
-        return cast<T>()->at_event();
+    )
+}
+
+py::object PyConstSolver::current_event() const{
+    return DISPATCH(py::object,
+        const OdeRichSolver<T>* solver = cast<T>();
+        if (solver->event_col().size() == 0){
+            return py::none();
+        }
+        if (EventState<T> ev = solver->current_event()){
+            return py::cast(solver->event_col().event(ev.idx).name());
+        } else {
+            return py::none();
+        }
     )
 }
 

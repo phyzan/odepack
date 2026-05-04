@@ -32,7 +32,8 @@ py::class_<PyConstSolver>(m, "OdeSolverView")
     .def_property_readonly("n_evals_rhs", &PyConstSolver::n_evals_rhs)
     .def_property_readonly("n_evals_jac", &PyConstSolver::n_evals_jac)
     .def_property_readonly("status", &PyConstSolver::status)
-    .def_property_readonly("at_event", &PyConstSolver::py_at_event)
+    .def_property_readonly("current_event", &PyConstSolver::current_event)
+    .def("at_event", &PyConstSolver::py_at_event, py::arg("event_name")=py::none())
     .def("show_state", &PyConstSolver::show_state,
         py::arg("digits") = 8
     )

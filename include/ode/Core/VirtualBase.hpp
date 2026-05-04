@@ -98,7 +98,7 @@ public:
     // ACCESSORS
     virtual const EventCollection<T>&       event_col() const = 0;
     virtual int                             event_idx(const std::string& name) const = 0;
-    virtual bool                            at_event() const = 0;
+    virtual bool                            at_event(int event_idx = -1) const = 0;
     virtual EventState<T>                   current_event() const = 0;
     virtual OdeRichSolver<T, N>*            clone() const = 0;
 

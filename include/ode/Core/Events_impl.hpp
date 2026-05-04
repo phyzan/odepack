@@ -393,6 +393,43 @@ void EventCollection<T>::reset(int direction){
 }
 
 
+
+template<typename T>
+std::vector<EventOptions> EventCollection<T>::validate_events(const std::vector<EventOptions>& options) const {
+    size_t Nevs = this->size();
+    std::vector<EventOptions> res(Nevs);
+    bool found;
+    for (size_t i=0; i<options.size(); i++) {
+        found = false;
+        for (size_t j=0; j<Nevs; j++){
+            if (this->event(j).name() == options[i].name){
+                found = true;
+                break;
+            }
+        }
+        if (!found){
+            throw std::logic_error("Event name \""+options[i].name+"\" is invalid");
+        }
+    }
+
+    for (size_t i=0; i<Nevs; i++){
+        found = false;
+        for (const auto& option : options){
+            if (option.name == this->event(i).name()){
+                found = true;
+                res[i] = option;
+                res[i].max_events = ndspan::max(option.max_events, -1);
+                break;
+            }
+        }
+        if (!found){
+            res[i] = {this->event(i).name()};
+        }
+    }
+    return res;
+}
+
+
 } // namespace ode
 
 #endif // EVENTS_IMPL_HPP

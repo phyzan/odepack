@@ -74,7 +74,9 @@ struct PyConstSolver : DtypeDispatcher {
 
     py::tuple           timeit_jac(const py::object& t, const py::iterable& py_q) const;
 
-    bool                py_at_event() const;
+    bool                py_at_event(const py::object& event_name = py::none()) const;
+
+    py::object          current_event() const;
 
     py::str             status() const;    
 

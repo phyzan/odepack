@@ -21,6 +21,7 @@
 
 #include "../Tools.hpp"
 
+
 namespace ode {
 
     using pbox::owner;
@@ -30,6 +31,12 @@ namespace ode {
 // ============================================================================
 // DECLARATIONS
 // ============================================================================
+struct EventOptions{
+    std::string name;
+    int max_events=-1;
+    bool terminate=false;
+    int period=1;
+};
 
 template<typename T>
 class EventInterp{
@@ -468,7 +475,11 @@ public:
     /// @brief Reset all events to initial state.
     void                    reset(int direction = 0);
 
+    std::vector<EventOptions> validate_events(const std::vector<EventOptions>& options) const;
+
 private:
+
+
     std::unordered_map<std::string, size_t> idx_of_name;    // Map from event names to indices for quick lookup.
     Array1D<owner<Event<T>>>                events;
     Array1D<T>                              event_times;    // Detection time of each event. If located[i] is false, this value is invalid.

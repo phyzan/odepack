@@ -164,7 +164,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     }
 
     //check that all names in max_events are valid
-    const std::vector<EventOptions> options = this->validate_events(event_options);
+    const std::vector<EventOptions> options = this->solver()->event_col().validate_events(event_options);
     EventCounter<T, N>              event_counter(options);
 
     auto event_state_valid = [&]()LAMBDA_INLINE{
@@ -341,45 +341,6 @@ template<typename T, size_t N>
 void ODE<T, N>::register_event(size_t i){
     event_data_.add_event(i, solver_->t(), solver_->vector().data());
 }
-
-
-template<typename T, size_t N>
-std::vector<EventOptions> ODE<T, N>::validate_events(const std::vector<EventOptions>& options)const{
-
-
-    size_t Nevs = solver_->event_col().size();
-    std::vector<EventOptions> res(Nevs);
-    bool found;
-    for (size_t i=0; i<options.size(); i++) {
-        found = false;
-        for (size_t j=0; j<Nevs; j++){
-            if (solver_->event_col().event(j).name() == options[i].name){
-                found = true;
-                break;
-            }
-        }
-        if (!found){
-            throw std::logic_error("Event name \""+options[i].name+"\" is invalid");
-        }
-    }
-
-    for (size_t i=0; i<Nevs; i++){
-        found = false;
-        for (const auto& option : options){
-            if (option.name == solver_->event_col().event(i).name()){
-                found = true;
-                res[i] = option;
-                res[i].max_events = ndspan::max(option.max_events, -1);
-                break;
-            }
-        }
-        if (!found){
-            res[i] = {solver_->event_col().event(i).name()};
-        }
-    }
-    return res;
-}
-
 
 
 } // namespace ode

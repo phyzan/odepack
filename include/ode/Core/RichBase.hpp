@@ -61,15 +61,7 @@ public:
      */
     const EventCollection<T>&   event_col() const;
 
-    /**
-     * @brief Check if the solver is currently positioned at an event.
-     * If an event index is provided, checks if that specific event is active.
-     * @param event Index of the event to check, or -1 to check any event.
-     * @return True if an event has triggered at the current time.
-     */
-    bool                        at_event() const;
-
-    bool                        at_event(int event) const;
+    bool                        at_event(int event_idx = -1) const;
 
     EventState<T>               current_event() const{
         if (this->at_event()){
@@ -112,10 +104,10 @@ public:
     bool                        advance_to_event(const T& tmax, int event_idx = -1);
 
     /// @brief Check if the solver is currently at a canon event.
-    bool        at_canon_event() const;
+    bool                        at_canon_event() const;
 
     /// @brief Reset implementation hook. Resets events and stops interpolation.
-    void Reset();
+    void                        Reset();
 
     RichSolver() = delete;
 

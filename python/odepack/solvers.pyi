@@ -297,9 +297,25 @@ class OdeSolverView:
         ...
 
     @property
-    def at_event(self)->bool:
+    def current_event(self)->str:
+        """
+        Get the name of the currently active event, if any.
+
+        Returns
+        -------
+        str
+            Name of the event that triggered at the current step, or None if no event is active.
+        """
+        ...
+
+    def at_event(self, event_name: str = None)->bool:
         """
         Check if a specific event is located at the current step.
+
+        Parameters
+        ----------
+        event_name : str, optional
+            Name of the event to check. If None, checks if any event is located.
 
         Returns
         -------

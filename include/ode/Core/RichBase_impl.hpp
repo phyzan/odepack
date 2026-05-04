@@ -13,16 +13,11 @@ const EventCollection<T>& RichSolver<Derived, T, N, SP, OdeType>::event_col() co
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-bool RichSolver<Derived, T, N, SP, OdeType>::at_event() const{
-    return is_at_event;
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-bool RichSolver<Derived, T, N, SP, OdeType>::at_event(int event) const{
-    if (event == -1){
+bool RichSolver<Derived, T, N, SP, OdeType>::at_event(int event_idx) const{
+    if (event_idx == -1){
         return is_at_event;
     } else if (EventState<T> es = this->current_event()){
-        return es.idx == size_t(event);
+        return es.idx == size_t(event_idx);
     } else {
         return false;
     }

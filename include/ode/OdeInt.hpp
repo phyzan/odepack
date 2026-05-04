@@ -10,13 +10,6 @@ namespace ode {
 // DECLARATIONS
 // ============================================================================
 
-struct EventOptions{
-    std::string name;
-    int max_events=-1;
-    bool terminate=false;
-    int period=1;
-};
-
 
 template<typename T, size_t N>
 class EventCounter{
@@ -128,8 +121,6 @@ private:
 
     template<typename ArrayType, OptionalObserver<T> Callable = std::nullptr_t>
     bool                                        priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0, bool interpolate = false);
-
-    std::vector<EventOptions>                   validate_events(const std::vector<EventOptions>& options)const;
 
 };
 
