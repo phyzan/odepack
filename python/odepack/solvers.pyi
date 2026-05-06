@@ -1039,6 +1039,20 @@ def advance_all(solvers: Iterable[OdeSolver], t_goal: float, threads=-1, display
 def advance_all_to_event(solvers: Iterable[OdeSolver], events: str | Iterable[str], tmax: float, threads=-1, display_progress = False)->None:
     """
     Similar to advance_all, but advances each solver until a specific event is located, or until tmax is reached.
+
+
+    Parameters    ----------
+    solvers : iterable of OdeSolver
+        Same as advance_all.
+    events : str or Iterable[str]
+        Name of a specific event to advance to, or an iterable of event names. If None (default), advances to the next event regardless of type. If iterable, each solver will be advanced until any of the specified events is located.
+        Each solver must have the specified event(s) registered at initialization.
+    tmax : float
+        Maximum time to advance to if the event is not located. Each solver will be advanced from its current time (solver.t) to this target time using its adaptive stepping algorithm, if the event is not located before reaching tmax.
+    threads : int, optional
+        Same as advance_all.
+    display_progress : bool, optional
+        Same as advance_all.
     """
     ...
 
