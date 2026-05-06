@@ -64,7 +64,7 @@ py::class_<PySolver, PyConstSolver>(m, "OdeSolver")
         py::arg("scalar_type")="double")
     .def("advance", &PySolver::advance)
     .def("timeit_step", &PySolver::timeit_step)
-    .def("advance_to_event", &PySolver::advance_to_event, py::arg("event")=py::none())
+    .def("advance_to_event", &PySolver::advance_to_event, py::arg("events")=py::none())
     .def("advance_until", &PySolver::advance_until, py::arg("t"), py::arg("observer")=py::none(), py::arg("extra_steps")=py::none())
     .def("reset", &PySolver::reset)
     .def("set_ics", &PySolver::set_ics, py::arg("t0"), py::arg("q0"), py::arg("stepsize")=0, py::arg("direction")=0)
@@ -162,7 +162,7 @@ py::class_<PyRK4, PySolver>(m, "RK4")
 
 m.def("advance_all", &py_advance_all, py::arg("solvers"), py::arg("t_goal"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
-m.def("advance_all_to_event", &py_advance_all_to_event, py::arg("solvers"), py::arg("event"), py::arg("tmax"), py::arg("threads")=-1, py::arg("display_progress")=false);
+m.def("advance_all_to_event", &py_advance_all_to_event, py::arg("solvers"), py::arg("events"), py::arg("tmax"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
 
 #ifdef MPREAL

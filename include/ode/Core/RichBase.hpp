@@ -78,6 +78,8 @@ public:
      */
     int                         event_idx(const std::string& name) const;
 
+    std::vector<size_t>         toEventIdx(const std::vector<std::string>& event_names) const;
+
     /**
      * @brief Print the current solver state to stdout.
      *
@@ -95,14 +97,17 @@ public:
      * Repeatedly calls advance() until an event triggers or the solver
      * stops (due to error or reaching a dead state).
      *
-     * @param event_idx Optional index of a specific event to advance to. If -1 (default), advances to the next event regardless of type.
+     * @param event_idx Optional indices of specific events to advance to. If empty (default), advances to the next event regardless of type.
      * @return True if an event was reached, false if solver stopped for other reasons.
      */
-    bool                        advance_to_event(int event_idx = -1);
+    bool                        advance_to_event(const std::vector<size_t>& event_idx = {});
 
-    /// @brief Same as advance_to_event(int), but with an additional maximum time limit. If the time limit is reached before the event, the solver stops and returns false.
-    bool                        advance_to_event(const T& tmax, int event_idx = -1);
+    /// @brief Same as advance_to_event but with a maximum time limit.
+    bool                        advance_to_event(const T& tmax, const std::vector<size_t>& event_idx = {});
 
+    bool                        advance_to_event(const std::vector<std::string>& event_names);
+
+    bool                        advance_to_event(const T& tmax, const std::vector<std::string>& event_names);
     /// @brief Check if the solver is currently at a canon event.
     bool                        at_canon_event() const;
 

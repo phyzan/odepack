@@ -489,14 +489,14 @@ class OdeSolver(OdeSolverView):
         """
         ...
 
-    def advance_to_event(self, event: str = None)->bool:
+    def advance_to_event(self, events: str = None)->bool:
         """
         Advance the solver until the next event occurrence.
 
         Parameters
         ----------
-        event : str, optional
-            Name of a specific event to advance to. If None (default), advances to the next event regardless of type.
+        events : str or Iterable[str], optional
+            Name of a specific event to advance to, or an iterable of event names. If None (default), advances to the next event regardless of type.
 
         Returns
         -------
@@ -1036,7 +1036,7 @@ def advance_all(solvers: Iterable[OdeSolver], t_goal: float, threads=-1, display
     """
     ...
 
-def advance_all_to_event(solvers: Iterable[OdeSolver], event: str, tmax: float, threads=-1, display_progress = False)->None:
+def advance_all_to_event(solvers: Iterable[OdeSolver], events: str | Iterable[str], tmax: float, threads=-1, display_progress = False)->None:
     """
     Similar to advance_all, but advances each solver until a specific event is located, or until tmax is reached.
     """

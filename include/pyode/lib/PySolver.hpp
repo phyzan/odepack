@@ -99,7 +99,7 @@ struct PySolver : public PyConstSolver {
 
     py::tuple           timeit_step();
 
-    py::object          advance_to_event(const py::object& event);
+    py::object          advance_to_event(const py::object& events);
 
     py::object          advance_until(const py::object& time, const py::object& observer, const py::object& extra_steps);
 
@@ -124,7 +124,7 @@ void py_advance_all_general(py::object& list, Callable&& func, int threads, bool
 
 void py_advance_all(py::object& list, double t_goal, int threads, bool display_progress);
 
-void py_advance_all_to_event(py::object& list, const py::str& event, double tmax, int threads, bool display_progress);
+void py_advance_all_to_event(py::object& list, const py::object& events, double tmax, int threads, bool display_progress);
 
 } // namespace ode
 

@@ -29,6 +29,19 @@ int RichSolver<Derived, T, N, SP, OdeType>::event_idx(const std::string& name) c
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+std::vector<size_t> RichSolver<Derived, T, N, SP, OdeType>::toEventIdx(const std::vector<std::string>& event_names) const{
+    std::vector<size_t> event_idx(event_names.size());
+    for (size_t i = 0; i < event_names.size(); ++i){
+        int idx = this->event_idx(event_names[i]);
+        if (idx == -1){
+            throw std::out_of_range("Invalid event name: " + event_names[i]);
+        }
+        event_idx[i] = size_t(idx);
+    }
+    return event_idx;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void RichSolver<Derived, T, N, SP, OdeType>::show_state(int prec) const{
     SolverRichState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->status(), this->current_event().event).show(prec);
 }
@@ -84,8 +97,12 @@ bool RichSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(int event){
-    assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < events.size())) && "Invalid event index passed to advance_to_event");
+bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const std::vector<size_t>& event_idx){
+    for (size_t idx : event_idx){
+        if (idx >= events.size()){
+            throw std::out_of_range("Invalid event index passed to advance_to_event: " + std::to_string(idx));
+        }
+    }
     if (events.size() == 0){
         return false;
     }
@@ -93,7 +110,7 @@ bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(int event){
         if (!this->advance()){
             return false;
         } else if (EventState<T> es = this->current_event()){
-            if (event == -1 || es.idx == size_t(event)){
+            if (event_idx.empty() || std::find(event_idx.begin(), event_idx.end(), es.idx) != event_idx.end()){
                 return true;
             }
         }
@@ -103,20 +120,38 @@ bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(int event){
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const T& tmax, int event){
-    assert((event == -1 || (event >= 0 && static_cast<size_t>(event) < events.size())) && "Invalid event index passed to advance_to_event");
+bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const T& tmax, const std::vector<size_t>& event_idx){
+    for (size_t idx : event_idx){
+        if (idx >= events.size()){
+            throw std::out_of_range("Invalid event index passed to advance_to_event: " + std::to_string(idx));
+        }
+    }
     if (events.size() == 0){
         return false;
     }
     bool success = false;
     Base::advance_until(tmax, [&](const T& t, const T* state, const T* extra)LAMBDA_INLINE{
-        if (this->at_event(event)){
-            success = true;
-            return false; // stop advancing
+        if (EventState<T> es = this->current_event()){
+            if (event_idx.empty() || std::find(event_idx.begin(), event_idx.end(), es.idx) != event_idx.end()){
+                success = true;
+                return false; // stop advancing
+            }
         }
         return true; // continue advancing
     });
     return success;
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const std::vector<std::string>& event_names){
+    std::vector<size_t> event_idx = this->toEventIdx(event_names);
+    return this->advance_to_event(event_idx);
+}
+
+template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const T& tmax, const std::vector<std::string>& event_names){
+    std::vector<size_t> event_idx = this->toEventIdx(event_names);
+    return this->advance_to_event(tmax, event_idx);
 }
 
 

@@ -253,32 +253,62 @@ print("Expected state:", "[..., 1]")
 
 # API Reference
 
-## ODE Solver
+## C++ API
 
-### Solver classes only update their internal state at each step: no reallocation
+### Solver Methods
 
 | Method | Description |
 |--------|-------------|
 | `advance()` | Perform one adaptive integration step |
 | `advance_until(time)` | Integrate until the specified time |
 | `advance_until(time, observer)` | Integrate until `time`, calling `observer(t, q, extra) -> bool` after each step; return `false` from observer to stop early |
-| `advance_to_event(event)` | Advance until a specific event (or any event if `event == -1`) is detected |
-| `advance_to_event(tmax, event)` | Same as above, but stops at `tmax` if the event is not reached; returns `false` if `tmax` was reached without the event |
-| `reset()` | Return to initial conditions |
+| `advance_to_event(event_idx)` | Advance until a specific event is detected; `event_idx` is a `std::vector<size_t>` of event indices (empty = any event) |
+| `advance_to_event(tmax, event_idx)` | Same as above, but stops at `tmax` if the event is not reached |
+| `Reset()` | Return to initial conditions |
 | `set_ics(t0, y0, stepsize, direction)` | Set new initial conditions |
 | `interp(t)` | Interpolate solution at arbitrary time within last step |
 | `clone()` | Create a dynamic copy of the solver |
 
-### Common Properties
+### Solver Properties
 
 | Property | Description |
 |----------|-------------|
 | `t()` | Current time |
 | `vector()` | Current state vector |
 | `stepsize()` | Current step size |
-| `at_event(event = -1)` | Returns `true` if the solver is positioned exactly at an event (`-1` checks any event) |
+| `at_event(event_idx)` | Returns `true` if the solver is positioned at an event (`-1` checks any event) |
+| `event_idx(name)` | Get the index of an event by name |
 
-> **Note:** The `observe_until` virtual method takes a `std::function<bool(const T&, const T*, const T*)>` observer. The observer must return `true` to continue integration or `false` to stop early.
+> **Note:** The `advance_until` observer takes a `std::function<bool(const T&, const T*, const T*)>`. Return `true` to continue integration or `false` to stop early.
+
+---
+
+## Python API
+
+### Solver Methods
+
+| Method | Description |
+|--------|-------------|
+| `advance()` | Perform one adaptive integration step |
+| `advance_until(t, observer=None)` | Integrate until the specified time, optionally calling `observer(solver)` after each step |
+| `advance_to_event(events=None)` | Advance until a specific event is detected; `events` can be a `str` or `Iterable[str]` (`None` = any event) |
+| `reset()` | Return to initial conditions |
+| `set_ics(t0, q0, stepsize=0, direction=0)` | Set new initial conditions |
+| `interp(t)` | Interpolate solution at arbitrary time within last step |
+| `copy()` | Create a deep copy of the solver |
+
+### Solver Properties
+
+| Property | Description |
+|----------|-------------|
+| `t` | Current time |
+| `q` | Current state vector (numpy array) |
+| `stepsize` | Current step size |
+| `at_event(event_name=None)` | Returns `True` if the solver is at an event (`None` checks any event) |
+| `current_event` | Name of the currently active event, or `None` |
+| `status` | Current status message |
+| `is_dead` | Whether the solver has reached a terminal state |
+| `diverges` | Whether the solution has diverged |
 
 ## ODE Class
 

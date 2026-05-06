@@ -288,26 +288,42 @@ py::tuple PySolver::timeit_step() {
     )
 }
 
-py::object PySolver::advance_to_event(const py::object& event) {
+py::object PySolver::advance_to_event(const py::object& events) {
     return DISPATCH(py::object,
-        if (cast<T>()->event_col().size() == 0){
+        OdeRichSolver<T>* solver = cast<T>();
+        if (solver->event_col().size() == 0){
             throw py::value_error("This solver contains no events to advance to");
-        }else if (event.is_none()){
-            return py::cast(cast<T>()->advance_to_event());
+        }else if (events.is_none()){
+            return py::cast(solver->advance_to_event());
         }
 
-        std::string name;
-        try{
-            auto py_name = event.cast<py::str>();
-            name = py_name.cast<std::string>();
-        }catch (const py::cast_error&){
-            throw py::value_error("Event parameter must be a string name of an event in the solver");
+        std::vector<size_t> event_list;
+        if (py::isinstance<py::str>(events)){
+            std::string name = events.cast<std::string>();
+            if (int event_idx = solver->event_idx(name); event_idx != -1){
+                event_list = {size_t(event_idx)};
+                return py::cast(solver->advance_to_event(event_list));
+            } else {
+                throw py::value_error("No event with name '" + name + "' found in the solver");
+            }
+        } else if (py::isinstance<py::iterable>(events)){
+            try{
+                auto py_event_list = events.cast<py::iterable>();
+                for (const auto& item : py_event_list){
+                    std::string name = item.cast<std::string>();
+                    if (int event_idx = solver->event_idx(name); event_idx != -1){
+                        event_list.push_back(size_t(event_idx));
+                    } else {
+                        throw py::value_error("No event with name '" + name + "' found in the solver");
+                    }
+                }
+                return py::cast(solver->advance_to_event(event_list));
+            } catch (const py::cast_error&){
+                throw py::value_error("Event parameter must be either a string name of an event in the solver, or an iterable of such strings");
+            }
+        } else {
+            throw py::value_error("Event parameter must be either a string name of an event in the solver, or an iterable of such strings");
         }
-        int event_idx = cast<T>()->event_idx(name);
-        if (event_idx == -1){
-            throw py::value_error("No event with name '" + name + "' found in the solver");
-        }
-        return py::cast(cast<T>()->advance_to_event(event_idx));
     )
 }
 
@@ -389,14 +405,24 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
 
 }
 
-void py_advance_all_to_event(py::object& list, const py::str& event, double tmax, int threads, bool display_progress){
-    auto event_name = event.cast<std::string>();
-    py_advance_all_general(list, [&]<typename T>(OdeRichSolver<T>* solver){
-        int event_idx = solver->event_idx(event_name);
-        if (event_idx == -1){
-            throw py::value_error("No event with name '" + event_name + "' found in one of the solvers");
+void py_advance_all_to_event(py::object& list, const py::object& events, double tmax, int threads, bool display_progress){
+    std::vector<std::string> event_list;
+    if (py::isinstance<py::str>(events)){
+        event_list = {events.cast<std::string>()};
+    } else if (py::isinstance<py::iterable>(events)){
+        try{
+            auto py_event_list = events.cast<py::iterable>();
+            for (const auto& item : py_event_list){
+                event_list.push_back(item.cast<std::string>());
+            }
+        } catch (const py::cast_error&){
+            throw py::value_error("Event parameter must be either a string name of an event in the solver, or an iterable of such strings");
         }
-        solver->advance_to_event(T(tmax), event_idx);
+    } else {
+        throw py::value_error("Event parameter must be either a string name of an event in the solver, or an iterable of such strings");
+    }
+    py_advance_all_general(list, [&]<typename T>(OdeRichSolver<T>* solver){
+        solver->advance_to_event(T(tmax), event_list);
     }, threads, display_progress);
 }
 

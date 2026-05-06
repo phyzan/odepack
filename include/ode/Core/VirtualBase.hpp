@@ -103,8 +103,11 @@ public:
     virtual OdeRichSolver<T, N>*            clone() const = 0;
 
     // MODIFIERS
-    virtual bool                            advance_to_event(int event = -1) = 0;
-    virtual bool                            advance_to_event(const T& tmax, int event = -1) = 0;
+    virtual bool                            advance_to_event(const std::vector<size_t>& event_idx = {}) = 0;
+    virtual bool                            advance_to_event(const T& tmax, const std::vector<size_t>& event_idx = {}) = 0;
+    virtual bool                            advance_to_event(const std::vector<std::string>& event_names) = 0;
+    virtual bool                            advance_to_event(const T& tmax, const std::vector<std::string>& event_names) = 0;
+    virtual bool                            at_canon_event() const = 0;
 
 protected:
 
