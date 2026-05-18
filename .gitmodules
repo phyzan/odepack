@@ -1,0 +1,9 @@
+[submodule "external/autodiff"]
+	path = external/autodiff
+	url = https://github.com/phyzan/autodiff.git
+[submodule "external/qhull"]
+	path = external/qhull
+	url = https://github.com/qhull/qhull.git
+[submodule "external/mpreal"]
+	path = external/mpreal
+	url = https://github.com/advanpix/mpreal.git
