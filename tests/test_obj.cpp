@@ -1,4 +1,4 @@
-#include "../include/odepack.hpp"
+#include "../include/odepack/odepack.hpp"
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -128,3 +128,6 @@ int main(){
     std::cout << "All tests passed.\n";
     return 0;
 }
+
+
+// g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/test_obj.cpp -o test -lmpfr -lgmp

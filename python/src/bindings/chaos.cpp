@@ -1,4 +1,4 @@
-#include "../../../include/pyode/lib/PyChaos.hpp"
+#include "../../../include/odepack/pyode/lib/PyChaos.hpp"
 
 using namespace ode;
 

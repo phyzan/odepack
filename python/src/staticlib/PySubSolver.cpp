@@ -1,4 +1,4 @@
-#include "../../../include/pyode/lib/PySubSolver.hpp"
+#include "../../../include/odepack/pyodepack.hpp"
 
 
 namespace ode{

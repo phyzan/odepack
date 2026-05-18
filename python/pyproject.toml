@@ -19,7 +19,7 @@ dev = [
 ]
 
 [tool.scikit-build]
-cmake.source-dir = ".."
+cmake.source-dir = "."
 cmake.build-type = "Release"
 wheel.packages = ["odepack"]
 install.components = ["python"]

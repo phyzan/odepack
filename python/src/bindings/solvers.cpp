@@ -1,5 +1,5 @@
-#include "../../../include/pyode/lib/PySubSolver.hpp"
-#include "../../../include/pyode/lib/PyTools.hpp"
+#include "../../../include/odepack/pyode/lib/PySubSolver.hpp"
+#include "../../../include/odepack/pyode/lib/PyTools.hpp"
 
 using namespace ode;
 

@@ -1,4 +1,5 @@
-#include "../../../include/pyodepack.hpp"
+#include "../../../include/odepack/pyodepack.hpp"
+
 
 namespace ode{
 

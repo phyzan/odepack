@@ -1,4 +1,4 @@
-#include "../../../include/pyode/lib/PyOde.hpp"
+#include "../../../include/odepack/pyode/lib/PyOde.hpp"
 
 
 using namespace ode;

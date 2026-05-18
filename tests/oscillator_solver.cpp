@@ -1,6 +1,4 @@
-// #include "../include/odepack.hpp"
-
-#include <odepack/odepack.hpp>
+#include "../include/odepack/odepack.hpp"
 
 using namespace ode;
 
@@ -170,4 +168,6 @@ int main() {
 
     std::cout << "Expected event at t = 3.48143\n";
     std::cout << "Even state expected: {-2.82843, 1}\n";
+
+    // g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/oscillator_solver.cpp -o test -lmpfr -lgmp
 }

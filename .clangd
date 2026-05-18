@@ -13,7 +13,10 @@ CompileFlags:
     - "-fno-math-errno"
     - "-DMPREAL"
     - "-Wno-sign-conversion"
-    - "-Iinclude"
+    - "-Iinclude/odepack"
+    - "-Iexternal/autodiff/include"
+    - "-Iexternal/mpreal"
+    - "-Iexternal/qhull/src"
     - "-I/usr/include/python3.12"
     - "-I/usr/include/pybind11"
   Compiler: clang++

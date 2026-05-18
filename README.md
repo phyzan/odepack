@@ -69,50 +69,16 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 ### Prerequisites
 
-The Jacobian computation can optionally be performed using automatic differentation. As this is hardcoded into the library,
-compilation requires that the header-only C++ autodiff library `autodiff` is installed. To install it, run the following command:
+The prebuilt mpfr and gmp libraries are required for arbitrary precision support. These must be installed separately:
 
 ```bash
-git clone https://github.com/phyzan/autodiff.git
-cd autodiff
-sudo make install
-cd ..
-rm -rf autodiff
+sudo apt install libmpfr-dev libgmp-dev
 ```
 
-The library contains modules for interpolating sampled fields using the Q-Hull headers.
-To exploit this functionality, install Q-Hull by running the following command.
-For the Python installation, this is a required dependency.
+The rest of the external header-only dependencies are included as submodules in the `external/` directory, and they must be initialized and updated with the following command:
 
 ```bash
-sudo apt install libqhull-dev
-```
-
-To use the arbitrary precision features, install the C++ wrapper of MPFR and GMP:
-
-```bash
-sudo apt install libmpfrc++-dev
-```
-
-
-### C++ (Header-Only)
-
-```bash
-git clone https://github.com/phyzan/odepack.git
-cd odepack
-sudo make install
-cd ..
-rm -rf odepack
-```
-
-To uninstall:
-```bash
-sudo make uninstall
-```
-
-Then include in your code:
-```cpp
-#include <odepack/odepack.hpp> 
+git submodule update --init --recursive
 ```
 
 **Requirements:**
@@ -124,7 +90,7 @@ Then include in your code:
 pip install ./python
 ```
 
-To install with arbitrary precision support, assuming that the C++ wrapper of MPFR and GMP is installed (see above), run
+To install with arbitrary precision support, assuming that MPFR and GMP is installed (see above), run
 ```bash
 CMAKE_ARGS="-DMPREAL=ON" pip install ./python
 ```
@@ -502,87 +468,92 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 ```
 odepack/
 ├── include/
-│   ├── ode/                         # Core ODE library
-│   │   ├── Core/                    # Foundation & base classes
-│   │   │   ├── VirtualBase.hpp      # Virtual interfaces & solver policies
-│   │   │   ├── SolverBase.hpp       # CRTP base solver
-│   │   │   ├── RichBase.hpp         # Event-aware solver extension
-│   │   │   ├── Events.hpp           # Event detection system
-│   │   │   ├── Dispatcher.hpp       # Solver dispatching utilities
-│   │   │   ├── FinDiff.hpp          # Finite difference utilities
-│   │   │   ├── ObjectiveSolver.hpp  # Objective-based solver interface
-│   │   │   └── *_impl.hpp           # Implementation files
-│   │   │
-│   │   ├── Solvers/                 # Concrete solver implementations
-│   │   │   ├── Solvers.hpp          # Common solver includes
-│   │   │   ├── Euler.hpp            # Simple Euler method (1st order)
-│   │   │   ├── RungeKutta.hpp       # Generic Runge-Kutta framework
-│   │   │   ├── DOPRI.hpp            # Runge-Kutta RK23, RK45 (adaptive)
-│   │   │   ├── DOP853.hpp           # High-order explicit RK (8th order)
-│   │   │   ├── BDF.hpp              # Implicit solver for stiff systems
-│   │   │   └── *_impl.hpp           # Implementation files
-│   │   │
-│   │   ├── Interpolation/           # Dense output & interpolation
-│   │   │   ├── NdInterpolator.hpp   # N-dimensional interpolator base
-│   │   │   ├── VectorFields.hpp     # Sampled vector field interpolation
-│   │   │   ├── Regular/             # Regular grid interpolation
-│   │   │   │   ├── Grids.hpp        # Grid data structures
-│   │   │   │   └── RegularGridInterpolator.hpp
-│   │   │   ├── Scattered/           # Scattered data interpolation
-│   │   │   │   ├── Delaunay.hpp     # Delaunay triangulation
-│   │   │   │   └── ScatteredNdInterpolator.hpp
-│   │   │   ├── Univariate/          # 1D interpolation
-│   │   │   │   └── StateInterp.hpp  # State interpolation for solvers
-│   │   │   └── *_impl.hpp           # Implementation files
-│   │   │
-│   │   ├── Chaos/                   # Dynamical systems analysis
-│   │   │   ├── VariationalSolvers.hpp    # Lyapunov exponent computation
-│   │   │   └── *_impl.hpp           # Implementation files
-│   │   │
-│   │   ├── OdeResult/               # Integration result storage
-│   │   │   ├── OdeResult.hpp        # Result container
-│   │   │   └── OdeResult_impl.hpp   # Implementation
-│   │   │
-│   │   ├── OdeInt.hpp               # High-level ODE wrapper
-│   │   ├── SolverDispatcher.hpp     # Factory for solver instantiation
-│   │   ├── SolverState.hpp          # Solver state & status reporting
-│   │   └── Tools.hpp                # Utilities (owner, etc.)
-│   │
-│   ├── ndspan/                      # Multi-dimensional array library
-│   │   ├── layouts/                 # Layout implementations
-│   │   │   ├── standard_layouts.hpp
-│   │   │   └── morton.hpp
-│   │   ├── ndspan.hpp
-│   │   ├── arrays.hpp
-│   │   ├── ndview.hpp
-│   │   ├── ndtools.hpp
-│   │   └── layoutmap.hpp
-│   │
-│   ├── pyode/                       # Python binding utilities
-│   │   ├── lib/                     # Core binding modules
-│   │   │   ├── PyOde.hpp            # Main Python ODE interface
-│   │   │   ├── PySolver.hpp         # Solver bindings
-│   │   │   ├── PyEvents.hpp         # Event system bindings
-│   │   │   ├── PyResult.hpp         # Result container bindings
-│   │   │   ├── PyInterp.hpp         # Interpolation bindings
-│   │   │   ├── PyField.hpp          # Vector field bindings
-│   │   │   ├── PyChaos.hpp          # Chaos analysis bindings
-│   │   │   ├── PyTools.hpp          # Utility bindings
-│   │   │   └── PySubSolver.hpp      # Sub-solver bindings
-│   │   ├── lib_impl/                # Implementation files
-│   │   │   └── *_impl.hpp
-│   │   └── pycast/                  # Type casters for pybind11
-│   │       └── pycast.hpp
-│   │
-│   │
-│   ├── polybox/                     # Wrapper for dynamically allocated types with automatic memory management
-│   │   └── polybox.hpp
-│   │
-│   ├── odepack.hpp                  # Main C++ include (all headers)
-│   ├── odepackDecl.hpp              # Forward declarations
-│   ├── ndspan.hpp                   # Main ndspan include
-│   ├── pyodepack.hpp                # Python binding include
-│   └── pyodepackDecl.hpp            # Python binding declarations
+│   └── odepack/                     # All headers under odepack namespace
+│       ├── ode/                     # Core ODE library
+│       │   ├── Core/                # Foundation & base classes
+│       │   │   ├── VirtualBase.hpp  # Virtual interfaces & solver policies
+│       │   │   ├── SolverBase.hpp   # CRTP base solver
+│       │   │   ├── RichBase.hpp     # Event-aware solver extension
+│       │   │   ├── Events.hpp       # Event detection system
+│       │   │   ├── Dispatcher.hpp   # Solver dispatching utilities
+│       │   │   ├── FinDiff.hpp      # Finite difference utilities
+│       │   │   ├── ObjectiveSolver.hpp  # Objective-based solver interface
+│       │   │   └── *_impl.hpp       # Implementation files
+│       │   │
+│       │   ├── Solvers/             # Concrete solver implementations
+│       │   │   ├── Solvers.hpp      # Common solver includes
+│       │   │   ├── Euler.hpp        # Simple Euler method (1st order)
+│       │   │   ├── RungeKutta.hpp   # Generic Runge-Kutta framework
+│       │   │   ├── DOPRI.hpp        # Runge-Kutta RK23, RK45 (adaptive)
+│       │   │   ├── DOP853.hpp       # High-order explicit RK (8th order)
+│       │   │   ├── BDF.hpp          # Implicit solver for stiff systems
+│       │   │   └── *_impl.hpp       # Implementation files
+│       │   │
+│       │   ├── Interpolation/       # Dense output & interpolation
+│       │   │   ├── NdInterpolator.hpp   # N-dimensional interpolator base
+│       │   │   ├── VectorFields.hpp # Sampled vector field interpolation
+│       │   │   ├── Regular/         # Regular grid interpolation
+│       │   │   │   ├── Grids.hpp    # Grid data structures
+│       │   │   │   └── RegularGridInterpolator.hpp
+│       │   │   ├── Scattered/       # Scattered data interpolation
+│       │   │   │   ├── Delaunay.hpp # Delaunay triangulation
+│       │   │   │   └── ScatteredNdInterpolator.hpp
+│       │   │   ├── Univariate/      # 1D interpolation
+│       │   │   │   └── StateInterp.hpp  # State interpolation for solvers
+│       │   │   └── *_impl.hpp       # Implementation files
+│       │   │
+│       │   ├── Chaos/               # Dynamical systems analysis
+│       │   │   ├── VariationalSolvers.hpp    # Lyapunov exponent computation
+│       │   │   └── *_impl.hpp       # Implementation files
+│       │   │
+│       │   ├── OdeResult/           # Integration result storage
+│       │   │   ├── OdeResult.hpp    # Result container
+│       │   │   └── OdeResult_impl.hpp   # Implementation
+│       │   │
+│       │   ├── OdeInt.hpp           # High-level ODE wrapper
+│       │   ├── SolverDispatcher.hpp # Factory for solver instantiation
+│       │   ├── SolverState.hpp      # Solver state & status reporting
+│       │   └── Tools.hpp            # Utilities (owner, etc.)
+│       │
+│       ├── ndspan/                  # Multi-dimensional array library
+│       │   ├── layouts/             # Layout implementations
+│       │   │   ├── standard_layouts.hpp
+│       │   │   └── morton.hpp
+│       │   ├── ndspan.hpp
+│       │   ├── arrays.hpp
+│       │   ├── ndview.hpp
+│       │   ├── ndtools.hpp
+│       │   └── layoutmap.hpp
+│       │
+│       ├── pyode/                   # Python binding utilities
+│       │   ├── lib/                 # Core binding modules
+│       │   │   ├── PyOde.hpp        # Main Python ODE interface
+│       │   │   ├── PySolver.hpp     # Solver bindings
+│       │   │   ├── PyEvents.hpp     # Event system bindings
+│       │   │   ├── PyResult.hpp     # Result container bindings
+│       │   │   ├── PyInterp.hpp     # Interpolation bindings
+│       │   │   ├── PyField.hpp      # Vector field bindings
+│       │   │   ├── PyChaos.hpp      # Chaos analysis bindings
+│       │   │   ├── PyTools.hpp      # Utility bindings
+│       │   │   └── PySubSolver.hpp  # Sub-solver bindings
+│       │   ├── lib_impl/            # Implementation files
+│       │   │   └── *_impl.hpp
+│       │   └── pycast/              # Type casters for pybind11
+│       │       └── pycast.hpp
+│       │
+│       ├── polybox/                 # Wrapper for dynamically allocated types
+│       │   └── polybox.hpp
+│       │
+│       ├── odepack.hpp              # Main C++ include (all headers)
+│       ├── odepackDecl.hpp          # Forward declarations
+│       ├── ndspan.hpp               # Main ndspan include
+│       ├── pyodepack.hpp            # Python binding include
+│       └── pyodepackDecl.hpp        # Python binding declarations
+│
+├── external/                        # Git submodules
+│   ├── autodiff/                    # Automatic differentiation library
+│   ├── mpreal/                      # Multi-precision floating point (header-only)
+│   └── qhull/                       # Convex hull library (for Delaunay triangulation)
 │
 ├── python/
 │   ├── src/                         # Python bindings (pybind11)

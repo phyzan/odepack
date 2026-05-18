@@ -1,4 +1,4 @@
-#include "../include/odepack.hpp"
+#include "../include/odepack/odepack.hpp"
 #include <lazy/mpfrLazy.hpp>
 
 using namespace ode;
@@ -27,5 +27,5 @@ int main(){
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
     return 0;
 
-    // g++ -std=c++20 -O3 -DMPREAL tests/lazy_eval_test.cpp -o test -lmpfr -lgmp
+    // g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/lazy_eval_test.cpp -o test -lmpfr -lgmp
 }

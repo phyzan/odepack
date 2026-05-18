@@ -1,4 +1,4 @@
-#include "../include/odepack.hpp"
+#include "../include/odepack/odepack.hpp"
 
 
 struct MyODE{
@@ -48,5 +48,5 @@ int main(){
     print("Expected Lyapunov exponent: ~0.905");
     print("Computed Lyapunov exponent: ", solver.lyapunov_exponent());
 
-    // g++ -std=c++20 -O3 tests/variational_test.cpp -o test
+    // g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/variational_test.cpp -o test -lmpfr -lgmp
 }

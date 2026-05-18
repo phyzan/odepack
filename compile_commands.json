@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/home/senpy/Documents/repos/odepack",
+    "command": "clang++ -std=c++20 -Iinclude/odepack -Iexternal/autodiff/include -Iexternal/mpreal -Iexternal/qhull/src -I/usr/include/python3.12 -DMPREAL -c include/odepack/odepack.hpp",
+    "file": "include/odepack/odepack.hpp"
+  }
+]
