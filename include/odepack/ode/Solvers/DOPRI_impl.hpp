@@ -8,7 +8,7 @@ namespace ode{
 // RungeKuttaMainBase implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
 RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T))
-    requires (!is_rich<SP>): Base(ARGS), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    requires (!traits::is_rich<SP>): Base(ARGS), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
     if (q0 != nullptr){
         this->rhs(K_.data()+Nstages*nsys, t0, q0);
@@ -17,7 +17,7 @@ RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::RungeKu
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
 RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T), EVENTS events)
-    requires (is_rich<SP>): Base(ARGS, events), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
+    requires (traits::is_rich<SP>): Base(ARGS, events), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
     // Compute K[Nstages] = f(t0, q0) for FSAL
     if (q0 != nullptr){
         this->rhs(K_.data()+Nstages*nsys, t0, q0);
@@ -71,7 +71,7 @@ T RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::step_
     const auto& C_ = THIS->Cm_;
     const auto& A_ = THIS->Am_;
 
-    for_each<0, Nstages-1>([&]<size_t I>() LAMBDA_INLINE{
+    ndspan::for_each<0, Nstages-1>([&]<size_t I>() LAMBDA_INLINE{
         for (size_t j = 0; j < this->Nsys(); j++) {
             r[j] = q[j] + h * EXPAND_SUM(T, I+1, J,
                 A_(I+1, J)*K[J*this->Nsys()+j]
@@ -159,10 +159,10 @@ T StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::estimate_
 // StandardRungeKutta implementations
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
 StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T))
-    requires (!is_rich<SP>): Base(ARGS) {}
+    requires (!traits::is_rich<SP>): Base(ARGS) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events) {}
+StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events) {}
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
 auto StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::local_interp() const{
@@ -197,10 +197,10 @@ void StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::set_co
 
 // RK45 implementations
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS){}
+RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>): Base(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events){}
+RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events){}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Atype RK45<T, N, SP, OdeType, Derived>::Amatrix() {
@@ -332,10 +332,10 @@ T RK45<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T
 
 // RK23 implementations
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T)) requires (!is_rich<SP>): Base(ARGS){}
+RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>): Base(ARGS){}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>): Base(ARGS, events){}
+RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events){}
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 constexpr typename RK23<T, N, SP, OdeType, Derived>::Base::Atype RK23<T, N, SP, OdeType, Derived>::Amatrix() {
     return {T(0),       T(0),       T(0),

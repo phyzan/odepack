@@ -54,9 +54,9 @@ class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType,
 
 public:
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>);
 
     auto    local_interp() const;
 

@@ -4,7 +4,7 @@
 
 #include "NdInterpolator.hpp"
 
-namespace ode {
+namespace ode::interp {
 
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
@@ -77,7 +77,7 @@ bool NdInterpolator<Derived, T, NDIM, AS_VIRTUAL>::contains(const T* coords) con
 }
 
 
-} // namespace ode
+} // namespace ode::interp
 
 
 #endif // ND_INTERPOLATOR_IMPL_HPP

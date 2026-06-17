@@ -7,7 +7,7 @@
 #include "../../odepackDecl.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 
 namespace py = pybind11;
@@ -188,6 +188,6 @@ inline mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mp
 
 #endif // MPREAL
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PYTOOLS_HPP

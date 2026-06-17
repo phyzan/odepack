@@ -3,7 +3,7 @@
 
 #include "PyTools.hpp"
 
-namespace ode{
+namespace ode::python {
 
 class PyODE : public DtypeDispatcher{
 
@@ -79,6 +79,6 @@ public:
 
 void py_integrate_all(py::object& list, double interval, const py::object& t_eval, const py::iterable& event_options, int threads, bool display_progress);
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PY_ODE_HPP

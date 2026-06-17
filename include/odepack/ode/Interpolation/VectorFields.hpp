@@ -5,7 +5,7 @@
 #include "../Tools.hpp"
 #include "../OdeInt.hpp"
 
-namespace ode {
+namespace ode::interp {
 
 struct VirtualVectorField {
 
@@ -56,6 +56,6 @@ protected:
 
 }; // class VectorField
 
-} // namespace ode
+} // namespace ode::interp
 
 #endif // VECTOR_FIELDS_HPP

@@ -6,7 +6,7 @@
 #include "../../Tools.hpp"
 #include <libqhull_r/qhull_ra.h>
 
-namespace ode{
+namespace ode::interp::sci{
 
 template<size_t NDIM>
 DelaunayTri<NDIM>::DelaunayTri(const double* points, size_t n_points, size_t ndim) : points_(points, n_points, ndim) {
@@ -482,7 +482,7 @@ void DelaunayTri<NDIM>::set_state(const View2D<double, 0, NDIM>& points, const V
 }
 
 
-} // namespace ode
+} // namespace ode::interp::sci
 
 
 #endif // DELAUNAY_IMPL_HPP

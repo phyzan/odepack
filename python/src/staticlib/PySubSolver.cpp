@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 //===========================================================================================
 //                                      PyRK23
@@ -64,4 +64,4 @@ py::object PyRK4::copy() const{
     return py::cast(PyRK4(*this));
 }
 
-} // namespace ode
+} // namespace ode::python

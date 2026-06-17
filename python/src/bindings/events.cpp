@@ -1,21 +1,21 @@
 #include "../../../include/odepack/pyode/lib/PyEvents.hpp"
 
 
-using namespace ode;
+using namespace ode::python;
 
 PYBIND11_MODULE(events, m) {
 
 
-py::class_<EventOptions>(m, "EventOpt")
+py::class_<ode::EventOptions>(m, "EventOpt")
     .def(py::init<const std::string&, int, bool, int>(),
             py::arg("name"),
             py::arg("max_events") = -1,
             py::arg("terminate") = false,
             py::arg("period") = 1)
-    .def_readwrite("name", &EventOptions::name)
-    .def_readwrite("max_events", &EventOptions::max_events)
-    .def_readwrite("terminate", &EventOptions::terminate)
-    .def_readwrite("period", &EventOptions::period);
+    .def_readwrite("name", &ode::EventOptions::name)
+    .def_readwrite("max_events", &ode::EventOptions::max_events)
+    .def_readwrite("terminate", &ode::EventOptions::terminate)
+    .def_readwrite("period", &ode::EventOptions::period);
 
 
 py::class_<PyEvent>(m, "Event")

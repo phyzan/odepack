@@ -12,7 +12,7 @@ namespace ode {
 // T error_norm(const T* E, const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h, size_t size);
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-class RungeKuttaMainBase : public BaseDispatcher<Derived, T, N, SP, OdeType>{
+class RungeKuttaMainBase : public detail::BaseDispatcher<Derived, T, N, SP, OdeType>{
 
 public:
 
@@ -30,16 +30,16 @@ protected:
     StepResult  adapt_impl(T* res, const T* state);
 
     // =========================================================
-    using Base = BaseDispatcher<Derived, T, N, SP, OdeType>;
+    using Base = detail::BaseDispatcher<Derived, T, N, SP, OdeType>;
     using RKBase = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
 
     using Atype = Array2D<T, Nstages, Nstages, Allocation::Stack>;
     using Btype = Array1D<T, Nstages, Allocation::Stack>;
     using Ctype = Array1D<T, Nstages, Allocation::Stack>;
 
-    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
+    RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RungeKuttaMainBase)
 
@@ -100,9 +100,9 @@ protected:
 
     using Etype = Array1D<T, Nstages+1, Allocation::Stack>;
 
-    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (is_rich<SP>);
+    StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(StandardRungeKuttaBase)
     // ================ STATIC OVERRIDES ========================
@@ -161,9 +161,9 @@ public:
     static constexpr size_t Norder = 5;
     static constexpr size_t Nstages = 6;
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    RK45(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
+    RK45(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK45);
 
@@ -211,9 +211,9 @@ public:
     static constexpr size_t Norder = 3;
     static constexpr size_t Nstages = 3;
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>);
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    RK23(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>);
+    RK23(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>);
 
     DEFAULT_RULE_OF_FOUR(RK23);
 

@@ -4,7 +4,7 @@
 
 #include "VectorFields.hpp"
 
-namespace ode {
+namespace ode::interp {
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
 bool VectorField<Derived, T, NDIM, AS_VIRTUAL>::interp(T* out, const T* coords) const{
@@ -76,6 +76,6 @@ ODE<T, NDIM>* VectorField<Derived, T, NDIM, AS_VIRTUAL>::get_streamline_ode(cons
     }
 }
 
-} // namespace ode
+} // namespace ode::interp
 
 #endif // VECTOR_FIELDS_IMPL_HPP

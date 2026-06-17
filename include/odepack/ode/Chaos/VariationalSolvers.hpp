@@ -5,15 +5,46 @@
 #include "../OdeInt.hpp"
 #include "../Core/VirtualBase.hpp"
 
-namespace ode {
+namespace ode::chaos {
 
 // ============================================================================
 // DECLARATIONS
 // ============================================================================
 
 
+namespace detail{
+
+// out (size 2*nsys) and in (size 2*nsys) can be the same pointer
+template<typename T>
+void normalized(T* out, const T* src, size_t nsys);
+
+} // namespace detail
+
+template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+class VariationalSolver;
+
+template<typename T, size_t N, hasRhsFunc<T> OdeType>
+pbox::owner<OdeRichSolver<T, 2*N>> get_virtual_variational_solver(Integrator method, T period, OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, EVENTS events = {}){
+    switch (method){
+        case Integrator::RK4:
+            return pbox::make_box<VariationalSolver<RK4, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        case Integrator::DOP853:
+            return pbox::make_box<VariationalSolver<DOP853, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        case Integrator::RK23:
+            return pbox::make_box<VariationalSolver<RK23, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        case Integrator::RK45:
+            return pbox::make_box<VariationalSolver<RK45, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        case Integrator::BDF:
+            return pbox::make_box<VariationalSolver<BDF, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        case Integrator::Euler:
+            return pbox::make_box<VariationalSolver<Euler, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+        default:
+            throw std::runtime_error("Unsupported integrator type");
+    }
+}
+
 template<typename T, size_t N, SolverPolicy SP>
-class ChaoticSolver : public std::conditional_t<is_rich<SP>, OdeRichSolver<T, 2*N>, OdeSolver<T, 2*N>>{
+class ChaoticSolver : public std::conditional_t<traits::is_rich<SP>, OdeRichSolver<T, 2*N>, OdeSolver<T, 2*N>>{
 
 public:
 
@@ -34,14 +65,6 @@ public:
     virtual T       stretching_number() const = 0;
 
 };
-
-
-
-
-
-// out (size 2*nsys) and in (size 2*nsys) can be the same pointer
-template<typename T>
-void normalized(T* out, const T* src, size_t nsys);
 
 
 template<typename T, size_t N, hasRhsFunc<T> OdeType>
@@ -154,7 +177,7 @@ private:
 };
 
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 class VariationalSolver : public Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>> {
 
 
@@ -257,7 +280,7 @@ protected:
             ndspan::copy_array(tmp_state_.data(), THIS->true_state_ptr()+2, 2*nsys);
             logksi_last_ = logksi_;
             logksi_ += log(norm(tmp_state_.data()+nsys, nsys));
-            normalized(tmp_state_.data(), tmp_state_.data(), nsys);
+            detail::normalized(tmp_state_.data(), tmp_state_.data(), nsys);
             flagged = true;
             return true;
         }else if (success){
@@ -280,10 +303,7 @@ private:
 };
 
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename DerivedVS, size_t NBase>
-struct SolverVirtualTypeTraits<VariationalSolver<Solver, T, N, SP, OdeType, DerivedVS>, T, NBase, SP> {
-    using type = std::conditional_t<SP == SolverPolicy::Virtual || SP == SolverPolicy::RichVirtual, ChaoticSolver<T, N, SP>, EmptySolver>;
-};
+
 
 
 template<typename T, size_t N>
@@ -362,39 +382,26 @@ private:
 
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-requires (!is_rich<SP>)
+requires (!traits::is_rich<SP>)
 Solver<T, N, SP, OdeType, void> getVariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}){
     return VariationalSolver<Solver, T, N, SP, OdeType, void>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args);
 }
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-requires (is_rich<SP>)
+requires (traits::is_rich<SP>)
 Solver<T, N, SP, OdeType, void> getVariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, EVENTS events = {}){
     return VariationalSolver<Solver, T, N, SP, OdeType, void>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
 }
 
-
-template<typename T, size_t N, hasRhsFunc<T> OdeType>
-pbox::owner<OdeRichSolver<T, 2*N>> get_virtual_variational_solver(Integrator method, T period, OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, EVENTS events = {}){
-    switch (method){
-        case Integrator::RK4:
-            return pbox::make_box<VariationalSolver<RK4, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::DOP853:
-            return pbox::make_box<VariationalSolver<DOP853, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::RK23:
-            return pbox::make_box<VariationalSolver<RK23, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::RK45:
-            return pbox::make_box<VariationalSolver<RK45, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::BDF:
-            return pbox::make_box<VariationalSolver<BDF, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::Euler:
-            return pbox::make_box<VariationalSolver<Euler, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        default:
-            throw std::runtime_error("Unsupported integrator type");
-    }
-}
+} // namespace ode::chaos
 
 
+namespace ode{
+
+template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename DerivedVS, size_t NBase>
+struct traits::SolverVirtualTypeTraits<chaos::VariationalSolver<Solver, T, N, SP, OdeType, DerivedVS>, T, NBase, SP> {
+    using type = std::conditional_t<SP == SolverPolicy::Virtual || SP == SolverPolicy::RichVirtual, chaos::ChaoticSolver<T, N, SP>, EmptySolver>;
+};
 
 } // namespace ode
 

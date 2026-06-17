@@ -4,7 +4,7 @@
 
 #include "ScatteredNdInterpolator.hpp"
 
-namespace ode {
+namespace ode::interp::sci {
 
 
 // ============================================================================================
@@ -77,6 +77,6 @@ bool ScatteredVectorField<NDIM, AS_VIRTUAL>::contains(const double* coords) cons
     return InterpBase::contains(coords);
 }
 
-} // namespace ode
+} // namespace ode::interp::sci
 
 #endif // SCATTERED_ND_INTERPOLATOR_IMPL_HPP

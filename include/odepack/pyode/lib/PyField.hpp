@@ -6,22 +6,22 @@
 #include "PyOde.hpp"
 #include "PyResult.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 struct PyScalarField {
 
     // returns double (not array), as this is a scalar field.
-    static py::object py_value_at(const VirtualNdInterpolator& self, const py::args& x);
+    static py::object py_value_at(const ode::interp::VirtualNdInterpolator& self, const py::args& x);
 }; // struct PyScalarField
 
 
 
-class PyRegScalarField : public RegularGridInterpolator<double, 0, true>, public PyScalarField {
+class PyRegScalarField : public ode::interp::rgi::RegularGridInterpolator<double, 0, true>, public PyScalarField {
 
 public:
 
-    using RGBase = RegularGridInterpolator<double, 0, true>;
+    using RGBase = ode::interp::rgi::RegularGridInterpolator<double, 0, true>;
 
     static py::array_t<double> parse_values(const py::array_t<double>& values, const py::args& py_grid);
     
@@ -46,12 +46,12 @@ public:
 
 
 
-class PyScatteredField : public ScatteredNdInterpolator<0, true>, public PyScalarField {
+class PyScatteredField : public ode::interp::sci::ScatteredNdInterpolator<0, true>, public PyScalarField {
 
 
 public:
 
-    using InterpBase = ScatteredNdInterpolator<0, true>;
+    using InterpBase = ode::interp::sci::ScatteredNdInterpolator<0, true>;
 
     // Python signature is ScatteredField(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints,)
     PyScatteredField(const py::array_t<double>& x, const py::array_t<double>& values);
@@ -95,7 +95,7 @@ struct PyVecField {
 
     // returns array, as this is a vector field.
 
-    using CLS = VirtualVectorField;
+    using CLS = ode::interp::VirtualVectorField;
 
     static void check_coords(const CLS& self, const double* coords);
 
@@ -111,7 +111,7 @@ struct PyRegVecField {
     using RGBase = PyRegGridInterp;
     using VFBase = PyVecField;
 
-    using CLS = RegularVectorField<double, 0, true>;
+    using CLS = ode::interp::rgi::RegularVectorField<double, 0, true>;
 
     // ============================= Python interface =============================
     
@@ -133,7 +133,7 @@ struct PyScatVecField {
     using SCBase = PyScatteredInterp;
     using VFBase = PyVecField;
 
-    using CLS = ScatteredVectorField<0, true>;
+    using CLS = ode::interp::sci::ScatteredVectorField<0, true>;
 
 
 public:
@@ -146,6 +146,6 @@ public:
 
 }; // class PyScatVecField
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PY_FIELD_HPP

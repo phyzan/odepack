@@ -27,7 +27,7 @@ int main(){
     std::array<T, 3> y0_var = {1.0, 1.0, 1.0};
     std::vector<T> args = {10.0, 28.0, 8.0/3.0}; // sigma, rho, beta
 
-    VariationalSolver<RK45, T, NSYS, ode::SolverPolicy::Static, MyODE> solver(
+    chaos::VariationalSolver<RK45, T, NSYS, ode::SolverPolicy::Static, MyODE> solver(
         MyODE{},
         0.0,
         y0.data(),

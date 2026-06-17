@@ -5,7 +5,7 @@
 #include "../NdInterpolator.hpp"
 #include "../VectorFields.hpp"
 
-namespace ode {
+namespace ode::interp::rgi {
 
 
 enum class CoordType : uint8_t {
@@ -85,6 +85,7 @@ private:
 }; // RegularVectorField
 
 
+namespace detail{
 
 template<typename AxisViewContainer>
 inline int get_point_count(const AxisViewContainer& grid){
@@ -95,6 +96,8 @@ inline int get_point_count(const AxisViewContainer& grid){
     return count;
 }
 
-} // namespace ode
+} // namespace detail
+
+} // namespace ode::interp::rgi
 
 #endif // REGULAR_GRID_INTERPOLATOR_HPP

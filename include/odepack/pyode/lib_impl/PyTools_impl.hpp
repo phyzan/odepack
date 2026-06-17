@@ -12,7 +12,7 @@
 
 
 
-namespace ode{
+namespace ode::python{
 
 
 namespace py = pybind11;
@@ -138,6 +138,6 @@ T py_event(const T& t, const T* q, const T*, const void* obj){
 }
 
 
-} // namespace ode
+} // namespace ode::python
 
 #endif

@@ -7,7 +7,7 @@
 #include "../pycast/pycast.hpp"
 #include <atomic>
 
-namespace ode{
+namespace ode::python{
 
 template<typename T>
 void PyConstSolver::init_solver(py::object f, py::object jac, const py::object& t0, const py::iterable& py_q0, const py::object& rtol, const py::object& atol, const py::object& min_step, const py::object& max_step, const py::object& stepsize, int dir, const py::iterable& py_args, const py::iterable& py_events, const std::string& name){
@@ -201,6 +201,6 @@ void py_advance_all_general(py::object& list, Callable&& func, int threads, bool
 
 }
 
-}
+} // namespace ode::python
 
 #endif // PYSOLVER_IMPL_HPP

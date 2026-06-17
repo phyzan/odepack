@@ -55,13 +55,13 @@ void bdf_interp(T* result, const T& t, const T& t2, const T& h, const T* D, size
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
-class BDF : public BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>{
+class BDF : public detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>{
 
 public:
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!is_rich<SP>) : BDF(ARGS, None()) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>) : BDF(ARGS, None()) {}
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (is_rich<SP>) : BDF(ARGS, None(), events) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>) : BDF(ARGS, None(), events) {}
 
     auto  local_interp() const;
 
@@ -71,7 +71,7 @@ public:
 
 protected:
 
-    using Base = BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>;
+    using Base = detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>;
     using Dlike = Array2D<T, 0, N>;
     struct None{};
     friend Base::MainSolverType;

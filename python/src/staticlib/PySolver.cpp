@@ -1,6 +1,6 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
-namespace ode{
+namespace ode::python {
 
 //===========================================================================================
 //                                      PyConstSolver
@@ -427,4 +427,4 @@ void py_advance_all_to_event(py::object& list, const py::object& events, double 
 }
 
 
-} // namespace ode
+} // namespace ode::python

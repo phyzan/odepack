@@ -4,7 +4,7 @@
 
 #include "PyTools.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 struct PyOdeResult : DtypeDispatcher{
@@ -68,6 +68,6 @@ struct PyOdeSolution : public PyOdeResult{
 };
 
 
-}
+} // namespace ode::python
 
 #endif // PY_RESULT_HPP

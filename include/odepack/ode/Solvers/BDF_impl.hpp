@@ -153,7 +153,7 @@ BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();
 #ifndef NO_ODE_WARN
-        this->cerr("Warning: rtol=0 not allowed in the BDF method. Setting rtol = " + std::to_string(rtol));
+        this->cerr("Warning: rtol=0 not allowed in the BDF method. Setting rtol = " + to_string(rtol));
 #endif
     }
     _newton_tol = ndspan::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, ndspan::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));

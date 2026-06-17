@@ -3,7 +3,7 @@
 
 #include "PyTools.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 class PyEvent : public DtypeDispatcher{
@@ -91,7 +91,7 @@ std::vector<std::unique_ptr<Event<T>>> to_Events(const py::iterable& events, con
 
 bool all_are_lowlevel(const py::iterable& events);
 
-} // namespace ode
+} // namespace ode::python
 
 
 #endif // PY_EVENTS_HPP

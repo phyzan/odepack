@@ -5,7 +5,7 @@
 #include "../lib/PyTools.hpp"
 #include "../../ode/Core/VirtualBase.hpp"
 
-namespace ode{
+namespace ode::python {
 
 struct PyConstSolver : DtypeDispatcher {
 
@@ -126,7 +126,7 @@ void py_advance_all(py::object& list, double t_goal, int threads, bool display_p
 
 void py_advance_all_to_event(py::object& list, const py::object& events, double tmax, int threads, bool display_progress);
 
-} // namespace ode
+} // namespace ode::python
 
 
 #endif // PY_SOLVER_HPP

@@ -17,7 +17,7 @@ void rk4_interp(T* out, const T& t, const T& t1, const T& t2, const T* y1, const
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
-class RK4 : public BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>{
+class RK4 : public detail::BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>{
 
 public:
 
@@ -28,7 +28,7 @@ public:
 
 protected:
 
-    using Base = BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
+    using Base = detail::BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
     friend typename Base::MainSolverType;
 
     static constexpr Integrator integrator = Integrator::RK4;

@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python{
 
 //===========================================================================================
 //                                      PyEvent
@@ -134,4 +134,4 @@ bool all_are_lowlevel(const py::iterable& events){
 //===========================================================================================
 
 
-} // namespace ode
+} // namespace ode::python

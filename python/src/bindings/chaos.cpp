@@ -1,6 +1,6 @@
 #include "../../../include/odepack/pyode/lib/PyChaos.hpp"
 
-using namespace ode;
+using namespace ode::python;
 
 PYBIND11_MODULE(chaos, m) {
 

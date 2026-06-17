@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 
 
@@ -78,4 +78,4 @@ std::vector<EventOptions> to_Options(const py::iterable& d) {
 
 
 
-} // namespace ode
+} // namespace ode::python

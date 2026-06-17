@@ -5,7 +5,7 @@
 #include "../lib/PyResult.hpp"
 #include "../../ode/OdeResult/OdeResult_impl.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 // ============================================================================================
@@ -50,6 +50,6 @@ py::object PyOdeSolution::_get_array(const py::array& py_array) const{
     return py::cast(res);
 }
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PY_RESULT_IMPL_HPP

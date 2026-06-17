@@ -205,6 +205,8 @@ private:
 };
 
 
+namespace detail{
+
 /**
  * @brief Type alias that selects between BaseSolver and RichSolver based on policy.
  *
@@ -220,6 +222,8 @@ private:
  */
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP, OdeType>, BaseSolver<Derived, T, N, SP, OdeType>>;
+
+} // namespace detail
 
 } // namespace ode
 

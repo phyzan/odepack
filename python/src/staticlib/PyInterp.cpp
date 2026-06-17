@@ -1,8 +1,9 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
+using namespace ode::interp;
 
 //===========================================================================================
 //                                      PyNdInterp
@@ -110,7 +111,7 @@ PyRegGridInterp::CLS PyRegGridInterp::init(const py::array_t<double>& values, co
         // we need to convert this to (n_points, ...)
         // github copilot complete this
         std::vector<int> new_shape(values_c.ndim() - grid.size()+1, 1); //fill with 1's initially
-        int n_points = get_point_count(grid);
+        int n_points = rgi::detail::get_point_count(grid);
         new_shape[0] = n_points;
         for (int i = 1; i < int(new_shape.size()); i++){
             new_shape[i] = int(values_c.shape(i + grid.size() - 1));
@@ -120,7 +121,7 @@ PyRegGridInterp::CLS PyRegGridInterp::init(const py::array_t<double>& values, co
         // current shape is e.g. for 2D: (..., nx, ny), where ... is any shape
         // we need to convert this to (..., n_points)
         std::vector<int> new_shape(values_c.ndim() - grid.size()+1, 1); //fill with 1's initially
-        int n_points = get_point_count(grid);
+        int n_points = rgi::detail::get_point_count(grid);
         for (int i = 0; i < int(new_shape.size()) - 1; i++){
             new_shape[i] = int(values_c.shape(i));
         }
@@ -152,7 +153,7 @@ std::vector<Array1D<double>> PyRegGridInterp::parse_args(const py::array_t<doubl
             auto coords = py::array_t<double, py::array::c_style | py::array::forcecast>(item.cast<py::array_t<double>>());
             if (coords.ndim() != 1){
                 throw py::value_error("Grid arrays must be 1D");
-            }else if (!isStrictlyAscending(coords.data(), coords.size())){
+            }else if (!ndspan::isStrictlyAscending(coords.data(), coords.size())){
                 throw py::value_error("Grid arrays must be sorted in ascending order");
             }else if (coords.size() < 2){
                 throw py::value_error("Grid arrays must have at least 2 points");
@@ -182,11 +183,11 @@ std::vector<Array1D<double>> PyRegGridInterp::parse_args(const py::array_t<doubl
 
 PyDelaunay::PyDelaunay(const py::array_t<double>& x) : PyDelaunay(parse_args(x), x) {}
 
-PyDelaunay::PyDelaunay(TriPtr<0> tri) : tri_(std::move(tri)) {}
+PyDelaunay::PyDelaunay(sci::TriPtr<0> tri) : tri_(std::move(tri)) {}
 
 PyDelaunay::PyDelaunay(std::nullptr_t, const py::array_t<double>& x) : tri_([&]{
     auto x_c = py::array_t<double, py::array::c_style | py::array::forcecast>(x);
-    return std::make_shared<DelaunayTri<0>>(x_c.data(), x_c.shape(0), (x_c.ndim() == 1 ? 1 : x_c.shape(1)));
+    return std::make_shared<sci::DelaunayTri<0>>(x_c.data(), x_c.shape(0), (x_c.ndim() == 1 ? 1 : x_c.shape(1)));
 }()) {}
 
 py::object PyDelaunay::py_points() const{
@@ -246,7 +247,7 @@ py::object PyDelaunay::py_get_simplex(const py::array_t<double>& point) const{
     return py::cast(simplex_coords);
 }
 
-TriPtr<0> PyDelaunay::tri() const{
+sci::TriPtr<0> PyDelaunay::tri() const{
     return tri_;
 }
 
@@ -294,7 +295,7 @@ PyDelaunay PyDelaunay::py_set_state(const py::dict& state){
         //Array3D<double, 0, NDIM, NDIM>
         auto py_invT = py::array_t<double, py::array::c_style | py::array::forcecast>(state["invT"].cast<py::array_t<double>>());
 
-        PyDelaunay obj(std::make_shared<DelaunayTri<0>>());
+        PyDelaunay obj(std::make_shared<sci::DelaunayTri<0>>());
         
         View2D<double, 0, 0> points(py_points.data(), py_points.shape(), py_points.ndim());
         View2D<int, 0, 0> simplices(py_simplices.data(), py_simplices.shape(), py_simplices.ndim());
@@ -385,4 +386,4 @@ std::nullptr_t PyScatteredInterp::parse_tri_args(const PyDelaunay& tri, const py
 }
 
 
-} // namespace ode
+} // namespace ode::python

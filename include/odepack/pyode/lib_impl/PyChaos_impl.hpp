@@ -6,30 +6,30 @@
 #include "../../ode/Chaos/VariationalSolvers_impl.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 
 template<typename T>
-VariationalODE<T, 0>& PyVarODE::varode(){
-    return *static_cast<VariationalODE<T, 0>*>(this->ode);
+ode::chaos::VariationalODE<T, 0>& PyVarODE::varode(){
+    return *static_cast<ode::chaos::VariationalODE<T, 0>*>(this->ode);
 }
 
 template<typename T>
-const VariationalODE<T, 0>& PyVarODE::varode() const {
-    return *static_cast<const VariationalODE<T, 0>*>(this->ode);
+const ode::chaos::VariationalODE<T, 0>& PyVarODE::varode() const {
+    return *static_cast<const ode::chaos::VariationalODE<T, 0>*>(this->ode);
 }
 
 
 template<typename T>
-ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast(){
-    return static_cast<ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
+ode::chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast(){
+    return static_cast<ode::chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
 }
 
 template<typename T>
-const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast() const {
-    return static_cast<const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
+const ode::chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* PyVarSolver::cast() const {
+    return static_cast<const ode::chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>*>(this->s);
 }
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PYCHAOS_IMPL_HPP

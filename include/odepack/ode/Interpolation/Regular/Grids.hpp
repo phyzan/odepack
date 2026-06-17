@@ -3,7 +3,7 @@
 
 #include "../../../ndspan.hpp"
 
-namespace ode{
+namespace ode::interp::rgi{
 
 using namespace ndspan;
 
@@ -46,6 +46,6 @@ private:
     std::vector<int> shape_;
 };
 
-} // namespace ode
+} // namespace ode::interp::rgi
 
 #endif // GRIDS_HPP

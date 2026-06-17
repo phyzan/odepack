@@ -3,7 +3,7 @@
 
 #include "../../Tools.hpp"
 
-namespace ode {
+namespace ode::interp::uni {
 
 template<typename T>
 class Interval{
@@ -363,6 +363,6 @@ void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y
 template<typename T, size_t N>
 using InterpObj = pbox::owner<Interpolator<T, N>>;
 
-} // namespace ode
+} // namespace ode::interp::uni
 
 #endif // STATE_INTERP_HPP

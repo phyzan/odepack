@@ -5,7 +5,7 @@
 #include "../../ode/Core/Events_impl.hpp"
 #include "../pycast/pycast.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 template<typename T>
@@ -69,6 +69,6 @@ std::vector<std::unique_ptr<Event<T>>> to_Events(const py::iterable& events, con
     return res;
 }
 
-} // namespace ode
+} // namespace ode::python
 
 #endif // PY_EVENTS_IMPL_HPP

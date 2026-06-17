@@ -2,7 +2,8 @@
 
 // namespace ode{
 
-using namespace ode;
+using namespace ode::python;
+using namespace ode::interp;
 
 PYBIND11_MODULE(fields, m) {
 
@@ -42,12 +43,12 @@ py::class_<VirtualVectorField>(m, "SampledVectorField")
         py::arg("normalized")=false, py::keep_alive<0, 1>()
     );
 
-py::class_<PyRegScalarField, PyScalarField, RegularGridInterpolator<double, 0, true>>(m, "RegularGridScalarField")
+py::class_<PyRegScalarField, PyScalarField, rgi::RegularGridInterpolator<double, 0, true>>(m, "RegularGridScalarField")
     .def(py::init<py::array_t<double>, py::args>(),
         py::arg("values"));
 
 
-py::class_<RegularVectorField<double, 0, true>, VirtualVectorField, RegularGridInterpolator<double, 0, true>>(m, "RegularGridVectorField")
+py::class_<rgi::RegularVectorField<double, 0, true>, VirtualVectorField, rgi::RegularGridInterpolator<double, 0, true>>(m, "RegularGridVectorField")
     .def(py::init(&PyRegVecField::init_main),
         py::arg("values"), py::arg("coordinates") = "cartesian")
     .def("component", &PyRegVecField::component,
@@ -64,7 +65,7 @@ py::class_<RegularVectorField<double, 0, true>, VirtualVectorField, RegularGridI
         py::arg("method")="RK45"
     );
         
-py::class_<PyScatteredField, PyScalarField, ScatteredNdInterpolator<0, true>>(m, "ScatteredScalarField")
+py::class_<PyScatteredField, PyScalarField, sci::ScatteredNdInterpolator<0, true>>(m, "ScatteredScalarField")
     .def(py::init<py::array_t<double>, py::array_t<double>>(),
         py::arg("points"),
         py::arg("values"))
@@ -75,7 +76,7 @@ py::class_<PyScatteredField, PyScalarField, ScatteredNdInterpolator<0, true>>(m,
     .def_property_readonly("values", &PyScatteredField::py_values)
     .def_property_readonly("tri", &PyScatteredField::py_delaunay);
 
-py::class_<ScatteredVectorField<0, true>, VirtualVectorField, ScatteredNdInterpolator<0, true>>(m, "ScatteredVectorField")
+py::class_<sci::ScatteredVectorField<0, true>, VirtualVectorField, sci::ScatteredNdInterpolator<0, true>>(m, "ScatteredVectorField")
     .def(py::init(&PyScatVecField::init),
         py::arg("points"),
         py::arg("values"))

@@ -3,7 +3,7 @@
 
 #include "Grids.hpp"
 
-namespace ode{
+namespace ode::interp::rgi{
 
 template<typename T, int NDIM>
 template<typename AxisData>

@@ -74,7 +74,7 @@ INLINE T expand_sum(Callable&& func){
 }
 
 
-#define EXPAND_SUM(T, N, I, ...) expand_sum<T, N>([&]<size_t I>() LAMBDA_INLINE{ return __VA_ARGS__; })
+#define EXPAND_SUM(T, N, I, ...) ndspan::expand_sum<T, N>([&]<size_t I>() LAMBDA_INLINE{ return __VA_ARGS__; })
 
 template<size_t TERMS, typename Callable>
 INLINE void expand(Callable&& func){

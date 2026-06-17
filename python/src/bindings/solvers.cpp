@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyode/lib/PySubSolver.hpp"
 #include "../../../include/odepack/pyode/lib/PyTools.hpp"
 
-using namespace ode;
+using namespace ode::python;
 
 PYBIND11_MODULE(solvers, m) {
 

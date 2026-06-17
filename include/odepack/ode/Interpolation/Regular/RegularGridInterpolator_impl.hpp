@@ -3,7 +3,7 @@
 
 #include "RegularGridInterpolator.hpp"
 
-namespace ode{
+namespace ode::interp::rgi{
 
 
 // ============================================================================================
@@ -15,7 +15,7 @@ template<typename ValuesContainer, typename AxisViewContainer>
 RegularGridInterpolator<T, NDIM, AS_VIRTUAL>::RegularGridInterpolator(const ValuesContainer& values, const AxisViewContainer& grid, bool coord_axis_first) : Base(values, coord_axis_first), grid_(grid) {
     assert([&](){
         int tot_size = coord_axis_first ? values.shape(0) : values.shape(values.ndim()-1);
-        return static_cast<bool>(tot_size == get_point_count(grid));
+        return static_cast<bool>(tot_size == detail::get_point_count(grid));
     }() && "Mismatch between values and grid points");
 }
 

@@ -6,13 +6,13 @@
 namespace ode{
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-requires (is_rich<SP>)
+requires (traits::is_rich<SP>)
 Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, EVENTS events) {
     return Solver<T, N, SP, OdeType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
 }
 
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-requires (!is_rich<SP>)
+requires (!traits::is_rich<SP>)
 Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args) {
     return Solver<T, N, SP, OdeType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args);
 }

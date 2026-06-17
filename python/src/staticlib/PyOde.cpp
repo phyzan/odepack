@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 //===========================================================================================
 //                                      PyODE
@@ -317,4 +317,4 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
 }
 
 
-} // namespace ode
+} // namespace ode::python

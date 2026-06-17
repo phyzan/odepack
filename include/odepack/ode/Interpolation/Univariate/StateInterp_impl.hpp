@@ -4,7 +4,7 @@
 
 #include "StateInterp.hpp"
 
-namespace ode{
+namespace ode::interp::uni {
 
 template<typename T>
 Interval<T>::Interval(const T& a, const T& b, int left_bdr, int right_bdr) : _a(a), _b(b), _h(b-a), _left(sgn(left_bdr)), _right(sgn(right_bdr)), _dir(sgn(a, b)){
@@ -695,6 +695,6 @@ void coef_mat_interp(T* result, const T& t, const T& t1, const T& t2, const T* y
     }
 }
 
-}
+} // namespace ode::interp::uni
 
 #endif // STATE_INTERP_IMPL_HPP

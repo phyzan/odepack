@@ -8,6 +8,8 @@
 
 namespace ode {
 
+using namespace interp::uni;
+
 template<typename T, size_t N>
 using VirtualInterp = std::unique_ptr<Interpolator<T, N>>;
 
@@ -120,6 +122,8 @@ enum class UtilPolicy : std::uint8_t{ Virtual, RichVirtual};
 
 enum class SolverPolicy : std::uint8_t{ Static, RichStatic, Virtual, RichVirtual};
 
+namespace traits{
+
 template<typename T, size_t N, SolverPolicy SP>
 struct HelperVirtualSolver{ using type = EmptySolver;};
 
@@ -136,6 +140,7 @@ using BaseInterface = typename HelperVirtualSolver<T, N, SP>::type;
 template<typename Solver, typename T, size_t N, SolverPolicy SP>
 using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<T, N>, std::conditional_t<SP==SolverPolicy::RichVirtual, OdeRichSolver<T, N>, Solver>>;
 
+
 template<SolverPolicy SP>
 constexpr bool is_rich = (SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual);
 
@@ -145,6 +150,8 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP>
 struct SolverVirtualTypeTraits {
     using type = BaseInterface<T, N, SP>;
 };
+
+} // namespace traits
 
 
 

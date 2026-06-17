@@ -5,7 +5,7 @@
 #include "PySolver.hpp"
 #include "../../ode/Chaos/VariationalSolvers.hpp"
 
-namespace ode{
+namespace ode::python {
 
 struct PyVarSolver : public PySolver{
 
@@ -26,10 +26,10 @@ struct PyVarSolver : public PySolver{
     py::object copy() const override;
 
     template<typename T>
-    ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast();
+    chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast();
 
     template<typename T>
-    const ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast() const;
+    const chaos::ChaoticSolver<T, 0, SolverPolicy::RichVirtual>* cast() const;
 
 };
 
@@ -42,10 +42,10 @@ public:
     DEFAULT_RULE_OF_FOUR(PyVarODE);
 
     template<typename T>
-    VariationalODE<T, 0>& varode();
+    chaos::VariationalODE<T, 0>& varode();
 
     template<typename T>
-    const VariationalODE<T, 0>& varode() const;
+    const chaos::VariationalODE<T, 0>& varode() const;
 
     py::object py_t_lyap() const;
 
@@ -58,6 +58,6 @@ public:
 };
 
 
-} // namespace ode
+} // namespace ode::python
 
 #endif

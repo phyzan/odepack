@@ -4,7 +4,7 @@
 
 #include "../Tools.hpp"
 
-namespace ode {
+namespace ode::interp {
 
 struct VirtualNdInterpolator {
 
@@ -63,7 +63,7 @@ private:
     Array<T> field_; // shape = (n_points, ...)
 };
 
-} // namespace ode
+} // namespace ode::interp
 
 
 #endif // ND_INTERPOLATOR_HPP

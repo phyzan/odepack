@@ -4,7 +4,7 @@
 
 #include "PySolver.hpp"
 
-namespace ode {
+namespace ode::python {
 
 
 struct PyRK23 : public PySolver{
@@ -70,7 +70,7 @@ struct PyRK4 : public PySolver{
 
 };
 
-} // namespace ode
+} // namespace ode::python
 
 
 #endif // PY_SUBSOLVER_HPP

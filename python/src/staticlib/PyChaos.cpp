@@ -2,7 +2,7 @@
 
 
 
-namespace ode{
+namespace ode::python {
 
 //===========================================================================================
 //                                      PyVarSolver
@@ -48,7 +48,7 @@ PyVarSolver::PyVarSolver(const py::object& f, const py::object& jac, const py::o
                 evs[j] = safe_events[j].get();
             }
 
-            this->s = get_virtual_variational_solver<T, 0>(getIntegrator(method), period.cast<T>(), ode_obj, t0.cast<T>(), vector.data(), vector.data()+nsys, nsys, rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, evs).release();
+            this->s = ode::chaos::get_virtual_variational_solver<T, 0>(getIntegrator(method), period.cast<T>(), ode_obj, t0.cast<T>(), vector.data(), vector.data()+nsys, nsys, rtol.cast<T>(), atol.cast<T>(), min_step.cast<T>(), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), stepsize.cast<T>(), dir, args, evs).release();
         }, this->data, args, f, py_q0, jac, py_args, events);
 
 
@@ -136,7 +136,7 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object&
                 evs[j] = safe_events[j].get();
             }
 
-            this->ode = new VariationalODE<T, 0>(ode_obj, py::cast<T>(t0), vector.data(), vector.data()+nsys, nsys, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
+            this->ode = new ode::chaos::VariationalODE<T, 0>(ode_obj, py::cast<T>(t0), vector.data(), vector.data()+nsys, nsys, py::cast<T>(period), py::cast<T>(rtol), py::cast<T>(atol), py::cast<T>(min_step), (max_step.is_none() ? inf<T>() : max_step.cast<T>()), py::cast<T>(stepsize), dir, args, evs, getIntegrator(method));
 
             }, this->data, args, f, q0, jac, py_args, events);
     )
@@ -144,7 +144,7 @@ PyVarODE::PyVarODE(const py::object& f, const py::object& jac, const py::object&
 
 py::object PyVarODE::py_t_lyap() const{
     return DISPATCH(py::object,
-        const VariationalODE<T, 0>& vode = varode<T>();
+        const ode::chaos::VariationalODE<T, 0>& vode = varode<T>();
         View<T> res(vode.renorm_times().data(), vode.renorm_times().size());
         return py::cast(res);
     )
@@ -153,7 +153,7 @@ py::object PyVarODE::py_t_lyap() const{
 py::object PyVarODE::py_lyap() const{
 
     return DISPATCH(py::object,
-        const VariationalODE<T, 0>& vode = varode<T>();
+        const ode::chaos::VariationalODE<T, 0>& vode = varode<T>();
         View<T> res(vode.lyap_values().data(), vode.lyap_values().size());
         return py::cast(res);
     )
@@ -161,7 +161,7 @@ py::object PyVarODE::py_lyap() const{
 
 py::object PyVarODE::py_kicks() const{
     return DISPATCH(py::object,
-        const VariationalODE<T, 0>& vode = varode<T>();
+        const ode::chaos::VariationalODE<T, 0>& vode = varode<T>();
         View<T> res(vode.kick_values().data(), vode.kick_values().size());
         return py::cast(res);
     )
@@ -179,4 +179,4 @@ py::object PyVarODE::copy() const{
 
 
 
-} // namespace ode
+} // namespace ode::python

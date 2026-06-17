@@ -6,7 +6,7 @@
 #include "../NdInterpolator.hpp"
 #include "../VectorFields.hpp"
 
-namespace ode {
+namespace ode::interp::sci {
 
 template<int NDIM, bool AS_VIRTUAL = false>
 class ScatteredNdInterpolator : public NdInterpolator<ScatteredNdInterpolator<NDIM, AS_VIRTUAL>, double, NDIM, AS_VIRTUAL>{
@@ -65,6 +65,6 @@ public:
 
 };
 
-} // namespace ode
+} // namespace ode::interp::sci
 
 #endif // SCATTERED_ND_INTERPOLATOR_HPP

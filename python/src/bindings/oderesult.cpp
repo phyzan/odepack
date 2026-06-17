@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyode/lib/PyResult.hpp"
 
 
-using namespace ode;
+using namespace ode::python;
 
 PYBIND11_MODULE(oderesult, m) {
 

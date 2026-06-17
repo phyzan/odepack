@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 //===========================================================================================
 //                                      PyOdeResult
@@ -131,4 +131,4 @@ py::object PyOdeSolution::operator()(const py::object& t) const{
 
 
 
-} // namespace ode
+} // namespace ode::python

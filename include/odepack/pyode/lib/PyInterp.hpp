@@ -6,14 +6,14 @@
 #include "../../ode/Interpolation/Scattered/ScatteredNdInterpolator.hpp"
 #include "PyTools.hpp"
 
-namespace ode{
+namespace ode::python {
 
 
 struct PyNdInterp {
 
-    static py::object py_value_at(const VirtualNdInterpolator& self, const py::args& x);
+    static py::object py_value_at(const ode::interp::VirtualNdInterpolator& self, const py::args& x);
 
-    static int ndim(const VirtualNdInterpolator& self);
+    static int ndim(const ode::interp::VirtualNdInterpolator& self);
 
 }; // struct PyNdInterp
 
@@ -21,7 +21,7 @@ struct PyNdInterp {
 
 struct PyRegGridInterp {
 
-    using CLS = RegularGridInterpolator<double, 0, true>;
+    using CLS = ode::interp::rgi::RegularGridInterpolator<double, 0, true>;
 
     // ======================= Python interface =====================================
     static CLS init_main(const py::array_t<double>& values, const py::args& py_grid);
@@ -44,13 +44,13 @@ struct PyRegGridInterp {
 
 class PyDelaunay {
 
-    using Base = DelaunayTri<0>;
+    using Base = ode::interp::sci::DelaunayTri<0>;
 
 public:
 
     PyDelaunay(const py::array_t<double>& x);
 
-    PyDelaunay(TriPtr<0> tri);
+    PyDelaunay(ode::interp::sci::TriPtr<0> tri);
 
     py::object py_points() const;
 
@@ -67,7 +67,7 @@ public:
 
     double total_volume() const;
 
-    TriPtr<0> tri() const;
+    ode::interp::sci::TriPtr<0> tri() const;
 
     // ================ Pickling ===================
     py::dict    py_get_state() const;
@@ -84,7 +84,7 @@ private:
 
     static std::nullptr_t parse_args(const py::array_t<double>& x);
 
-    TriPtr<0> tri_;
+    ode::interp::sci::TriPtr<0> tri_;
     mutable bool volume_is_cached_ = false;
     mutable double cached_total_volume_ = 0;
 
@@ -93,7 +93,7 @@ private:
 
 struct PyScatteredInterp {
 
-    using CLS = ScatteredNdInterpolator<0, true>;
+    using CLS = ode::interp::sci::ScatteredNdInterpolator<0, true>;
 
     // Python signature is ScatteredNdInterpolator(x: np.ndarray (npoints, ndim), values: np.ndarray (npoints, ...)), where
     static CLS init_main(const py::array_t<double>& x, const py::array_t<double>& values);
@@ -125,7 +125,7 @@ struct PyScatteredInterp {
 }; // struct PyScatteredInterp
 
 
-} // namespace ode
+} // namespace ode::python
 
 
 #endif // PY_INTERP_HPP

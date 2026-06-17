@@ -60,9 +60,9 @@ Integrator getIntegrator(const std::string& name);
 Integrator getIntegrator(const char* name);
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-class BaseSolver : public SolverVirtualTypeTraits<Derived, T, N, SP>::type {
+class BaseSolver : public traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type {
 
-    using Clone = SolverCloneType<Derived, T, N, SP>;
+    using Clone = traits::SolverCloneType<Derived, T, N, SP>;
 
 public:
 
@@ -71,7 +71,7 @@ public:
     
 
     using Scalar = T;
-    using Base = typename SolverVirtualTypeTraits<Derived, T, N, SP>::type;
+    using Base = typename traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type;
     using DualType = autodiff::AutoDiff<T, 1, N>;
     static constexpr size_t NSYS = N;
     static constexpr SolverPolicy Policy = SP;
@@ -577,8 +577,13 @@ private:
 };
 
 
+namespace traits{
+
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
+
+} // namespace traits
+
 
 #define SolverTemplate template<typename T, size_t, SolverPolicy, hasRhsFunc<T>, typename>
 

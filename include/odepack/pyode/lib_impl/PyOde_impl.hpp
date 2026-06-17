@@ -5,7 +5,7 @@
 #include "../../ode/OdeInt_impl.hpp"
 #include "../pycast/pycast.hpp"
 
-namespace ode{
+namespace ode::python {
 
 template<typename T, hasRhsFunc<T> OdeType>
 PyODE::PyODE(OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, const std::vector<const Event<T>*>& events, Integrator method) : DtypeDispatcher(get_scalar_type<T>()){
@@ -24,6 +24,6 @@ const ODE<T>* PyODE::cast() const {
     return reinterpret_cast<const ODE<T>*>(this->ode);
 }
 
-}
+} // namespace ode::python
 
 #endif // PYODE_IMPL_HPP

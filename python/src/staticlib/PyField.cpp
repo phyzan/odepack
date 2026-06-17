@@ -1,7 +1,7 @@
 #include "../../../include/odepack/pyodepack.hpp"
 
 
-namespace ode{
+namespace ode::python {
 
 //Explicit instanciation
 
@@ -10,7 +10,7 @@ namespace ode{
 //                                      PyScalarField
 // ============================================================================================
 
-py::object PyScalarField::py_value_at(const VirtualNdInterpolator& self, const py::args& x){
+py::object PyScalarField::py_value_at(const ode::interp::VirtualNdInterpolator& self, const py::args& x){
     return PyNdInterp::py_value_at(self, x);
 }
 
@@ -127,13 +127,13 @@ PyRegVecField::CLS PyRegVecField::init_main(const py::array_t<double>& values, c
     // values shape right not is (ndim, ...), where (...) has a product of n_points.
     // We need to reshape to (ndim, n_points)
     View2D<double> v_view(v_data, values_c.shape(0), values_c.size() / values_c.shape(0));
-    CoordType coord_type_enum;
+    ode::interp::rgi::CoordType coord_type_enum;
     if (coord_type == "cartesian"){
-        coord_type_enum = CoordType::Cartesian;
+        coord_type_enum = ode::interp::rgi::CoordType::Cartesian;
     } else if (coord_type == "polar"){
-        coord_type_enum = CoordType::Polar;
+        coord_type_enum = ode::interp::rgi::CoordType::Polar;
     } else if (coord_type == "spherical"){
-        coord_type_enum = CoordType::Spherical;
+        coord_type_enum = ode::interp::rgi::CoordType::Spherical;
     }else{
         throw py::value_error("Invalid coordinate type. Must be one of 'cartesian', 'polar', or 'spherical'");
     }
@@ -202,5 +202,5 @@ void PyScatVecField::parse_values( const py::array_t<double>& values){
     }
 }
 
-} // namespace ode
+} // namespace ode::python
 

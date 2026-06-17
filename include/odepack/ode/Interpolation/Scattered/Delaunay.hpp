@@ -4,7 +4,7 @@
 #include <memory>
 #include "../../../ndspan.hpp"
 
-namespace ode {
+namespace ode::interp::sci {
 
 using namespace ndspan;
 
@@ -94,7 +94,7 @@ private:
 template<size_t NDIM>
 using TriPtr = std::shared_ptr<DelaunayTri<NDIM>>;
 
-} // namespace ode
+} // namespace ode::interp::sci
 
 
 #endif // DELAUNAY_HPP
