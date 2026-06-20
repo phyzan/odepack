@@ -25,7 +25,9 @@ public:
     static constexpr size_t NOBJ = sizeof...(ObjFun);
 
     template<typename... Args>
-    ObjectiveSolver(std::tuple<ObjFunData<T, ObjFun>...> funcs, Args&&... args) : Base(std::forward<Args>(args)...), obj(std::move(funcs)){}
+    ObjectiveSolver(std::tuple<ObjFunData<T, ObjFun>...> funcs, Args&&... args) : Base(std::forward<Args>(args)...), obj(std::move(funcs)){
+        this->cache_current_signs();
+    }
 
     void Reset(){
         Base::Reset();
@@ -115,6 +117,10 @@ public:
         return current_idx != -1;
     }
 
+    int current_objective() const {
+        return current_idx;
+    }
+
 private:
 
     bool get_nearest_floor(T& out, size_t& idx) const{
@@ -140,13 +146,20 @@ private:
         );
     }
 
-    std::array<T, NOBJ> values;
+    std::array<T, NOBJ> values = {};
     std::array<int, NOBJ> cached_sign = {};
     std::array<bool, NOBJ> detected = {};
     Array1D<T, N> worker;
     std::tuple<ObjFunData<T, ObjFun>...> obj;
     int current_idx = -1;
 };
+
+
+template<SolverTemplate typename Solver, typename T, size_t N, hasRhsFunc<T> OdeType, isObjFun<T>... ObjFun, typename... Args>
+inline auto getObjectiveSolver(std::tuple<ObjFunData<T, ObjFun>...> funcs, Args&&... args){
+    return ObjectiveSolver<Solver, T, N, SolverPolicy::Static, OdeType, void, ObjFun...>(std::move(funcs), std::forward<Args>(args)...);
+}
+
 
 }; // namespace ode
 
