@@ -372,6 +372,72 @@ ODEPACK features an event detection system that handles integration events, with
     );
 ```
 
+
+### Compile-time events
+
+The Event classes, (e.g. `PreciseEvent`, `PeriodicEvent`) use virtual inheritance and are passed as runtime pointers to the solver. To avoid runtime overhead, one can create a solver where the events are passed as compile-time template parameters as follows:
+
+```cpp
+
+#include <odepack/odepack.hpp>
+
+
+using T = double;
+using namespace ode;
+
+int main(){
+
+    Array1D<T, 2> y0{-0.001, 2};
+
+    OdeData ode_data{.Rhs = [](T* out, const T& t, const T* q, const T*){
+        out[0] = q[1];
+        out[1] = -q[0];}
+    };
+
+    ObjFunData obj_fun{ .func = [](const T& t, const T* q, const T*)
+                                    { return q[0]; },
+                        .ftol = T(0),
+                        .dir = 1};
+
+    auto solver = getObjectiveSolver<RK45, T, 2, decltype(ode_data)>(
+        std::tuple{obj_fun},
+        ode_data,
+        0.0,              // t0
+        y0.data(),
+        2,                // nsys
+        1e-10,            // rtol
+        1e-10,            // atol
+        0.0,              // min_step
+        0.1,              // max_step
+        0.0,              // stepsize (auto)
+        1,                // direction (forward)
+        std::vector<T>{}  // args
+    );
+
+
+    solver.advance_until(10, [&](const T& t, const T* q, const T*){
+        if (int obj = solver.is_at_objective(); obj != -1){ // same as if (solver.is_at_objective())
+            std::cout << "t = " << t << ", q[0] = " << q[0] << ", q[1] = " << q[1] << "\n";
+            std::cout << obj << "\n\n";
+        }
+
+        return true;
+    });
+
+    return 0;
+}
+```
+
+To compile, run
+```bash
+g++ -std=c++20 -O3 -DMPREAL test.cpp -o test
+```
+
+To compile using ```T = mpfr::mpreal``` instead of ```T = double```, run
+```bash
+g++ -std=c++20 -O3 -DMPREAL test.cpp -o test -lmpfr -lgmp
+```
+
 ---
 
 ## Architecture

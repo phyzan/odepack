@@ -50,8 +50,6 @@ class RichSolver : public BaseSolver<Derived, T, N, SP, OdeType>{
 
     using Base = BaseSolver<Derived, T, N, SP, OdeType>;
 
-    friend Base; // So that Base can access specific private methods for static override
-
 public:
 
     // ACCESSORS
@@ -114,6 +112,9 @@ public:
     /// @brief Reset implementation hook. Resets events and stops interpolation.
     void                        Reset();
 
+    /// @brief Args update that also updates event arguments.
+    void                        SetArgs(const T* new_args);
+
     RichSolver() = delete;
 
 protected:
@@ -131,7 +132,7 @@ protected:
 
     /// @brief Advance implementation with event detection.
     template<typename... Args>
-    bool        adv_impl(Args&&... args);
+    bool        Adv_Impl(Args&&... args);
 
     /**
      * @brief Re-adjustment hook for state changes at events.
@@ -139,21 +140,14 @@ protected:
      */
     void ReAdjust(const T* new_vector);
 
-    struct Accessor : Derived {
-        
-        static void call_ReAdjust(Derived& self, const T* new_vector){
-            constexpr auto fn = &Accessor::ReAdjust;
-            (self.*fn)(new_vector);
-        }
-    };
-
-
+    struct Accessor : Base::Accessor {};
+    
     //================= STATIC OVERRIDES ======================
 
     bool    RequestTimeFloor(T& out) {
         // no need to call Base::RequestTimeFloor, the Base class does not request it.
         detection_idx = -1; // reset detection index at the start of a new detection round
-        // do not also set is_at_event to false, as the adv_impl might fail and the step should remain in the same state.
+        // do not also set is_at_event to false, as the Adv_Impl might fail and the step should remain in the same state.
         if ((is_event_waiting = events.detect_all_between(this->old_state(), this->new_state(), [this](T* out, const T& t){
             this->interp_impl(out, t);
         }))){
@@ -168,9 +162,6 @@ protected:
             return false;
         }
     }
-
-    /// @brief Args update that also updates event arguments.
-    void        set_args_impl(const T* new_args);
     //=========================================================
 
 private:
@@ -182,7 +173,7 @@ private:
             // determine if this one is a canon event
             if (const MaskedState<T>* ms = events.masked_state()){
                 if ((is_at_canon_event = static_cast<bool>(ms->idx == current_idx)) && !events.event(current_idx).hides_mask()){
-                    Accessor::call_ReAdjust(*THIS, ms->masked_vector.data());
+                    ODEPACK_CALL_DERIVED(ReAdjust, ms->masked_vector.data());
                 }
             }
             // determine if there is another event after this one

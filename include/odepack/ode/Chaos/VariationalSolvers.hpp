@@ -241,10 +241,6 @@ public:
         logksi_last_ = 0;
     }
 
-    void    ReAdjust(const T* new_vector){
-        assert(false && "ReAdjust is not supported in VariationalSolver because it would interfere with the renormalization process. If you need to re-adjust the state at intermediate times, consider using a different solver or implementing a custom solution.");
-    }
-
     void    RhsMain(T* out, const T& t, const T* q) const{
         this->ode().ode().Rhs(out, t, q, this->args().data()); //fills the first half (nsys) entries
     }
@@ -262,17 +258,20 @@ public:
     
 protected:
 
-    friend Base::MainSolverType;
+
+    void    ReAdjust(const T* new_vector){
+        assert(false && "ReAdjust is not supported in VariationalSolver because it would interfere with the renormalization process. If you need to re-adjust the state at intermediate times, consider using a different solver or implementing a custom solution.");
+    }
 
     template<typename... Args>
-    bool adv_impl(Args&&... args) {
+    bool Adv_Impl(Args&&... args) {
         if (flagged){
             Base::ReAdjust(tmp_state_.data());
             flagged = false;
         }
 
         const int d = this->direction();
-        const bool success = Base::adv_impl(t_next_, std::forward<Args>(args)...);
+        const bool success = Base::Adv_Impl(t_next_, std::forward<Args>(args)...);
         if (success && (this->t() == t_next_)){
             const size_t nsys = this->Nsys()/2;
             t_last_ = t_next_;

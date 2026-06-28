@@ -18,14 +18,14 @@ public:
 
     void        Reset();
 
-    void        ReAdjust(const T* new_vector);
+    static constexpr bool   IS_IMPLICIT = false;
     
 protected:
 
     // ================ STATIC OVERRIDES ========================
-    static constexpr bool   IS_IMPLICIT = false;
+    void        ReAdjust(const T* new_vector);
 
-    T    step_impl(T* result, const T* state, const T& h);
+    T           step_impl(T* result, const T* state, const T& h);
 
     StepResult  adapt_impl(T* res, const T* state);
 
@@ -67,6 +67,7 @@ class RungeKuttaBaseStatic : public RungeKuttaMainBase<Derived, T, N, Nstages, N
 protected:
     using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
     using Base::Base;
+    friend Base;
 
     static constexpr typename Base::Atype Am_ = Derived::Amatrix();
     static constexpr typename Base::Btype Bm_ = Derived::Bmatrix();
@@ -79,6 +80,7 @@ class RungeKuttaBaseDynamic : public RungeKuttaMainBase<Derived, T, N, Nstages, 
 protected:
     using Base = RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>;
     using Base::Base;
+    friend Base;
 
     typename Base::Atype Am_ = Derived::Amatrix();
     typename Base::Btype Bm_ = Derived::Bmatrix();
@@ -93,10 +95,13 @@ template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, 
 class StandardRungeKuttaBase : public DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, OdeType>{
 
 protected:
+    void    set_coef_matrix_impl() const;
+
+    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h) const;
+
     using Base = DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, OdeType>;
     friend Base;
     friend Base::Base;
-    friend BaseSolver<Derived, T, N, SP, OdeType>; // So that Base can access specific private methods for static override
 
     using Etype = Array1D<T, Nstages+1, Allocation::Stack>;
 
@@ -111,18 +116,14 @@ protected:
 
     void    interp_impl(T* result, const T& t) const;
 
-    void    set_coef_matrix_impl() const;
-
     // ==========================================================
-
-    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h) const;
 
 };
 
 template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
 class StandardRungeKuttaBaseStatic : public StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>{
 
-    
+
 protected:
     using Base = StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>;
     using Base::Base;
@@ -143,7 +144,6 @@ protected:
     using Base::Base;
     friend Base;
     friend Base::Base;
-    friend Base::Base::Base;
 
     typename Base::Etype Em_ = Derived::Ematrix();
 
@@ -158,6 +158,9 @@ class RK45 : public STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, OdeType,
 
 public:
 
+    static constexpr Integrator INTEGRATOR = Integrator::RK45;
+    static constexpr size_t     ERR_EST_ORDER = 4;
+    static constexpr size_t     INTERP_ORDER = 4;
     static constexpr size_t Norder = 5;
     static constexpr size_t Nstages = 6;
 
@@ -169,20 +172,15 @@ public:
 
 protected:
 
+    T    step_impl(T* result, const T* state, const T& h);
+
     using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, OdeType, Derived>, Derived>, T, N, 6, 5, SP, OdeType>;
     using Ptype = Array2D<T, Nstages+1, 4, Allocation::Stack>;
-    
+
     friend Base;
     friend Base::Base;
     friend Base::Base::Base;
-    friend Base::Base::Base::Base;
-    friend Base::MainSolverType;
-
-    T    step_impl(T* result, const T* state, const T& h);
-
-    static constexpr Integrator integrator = Integrator::RK45;
-    static constexpr size_t         ERR_EST_ORDER = 4;
-    static constexpr size_t         INTERP_ORDER = 4;
+    friend RungeKuttaMainBase<GetDerived<RK45<T, N, SP, OdeType, Derived>, Derived>, T, N, 6, 5, 7, SP, OdeType>;
 
     static constexpr typename Base::Atype Amatrix();
 
@@ -217,22 +215,25 @@ public:
 
     DEFAULT_RULE_OF_FOUR(RK23);
 
+    T    step_impl(T* result, const T* state, const T& h);
+
 protected:
 
     using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK23<T, N, SP, OdeType, Derived>, Derived>, T, N, 3, 3, SP, OdeType>;
     using Ptype = Array2D<T, Nstages+1, 3, Allocation::Stack>;
     friend Base;
     friend Base::Base;
-    friend Base::Base::Base;
-    friend Base::Base::Base::Base;
-    friend Base::MainSolverType;
+    friend RungeKuttaMainBase<GetDerived<RK23<T, N, SP, OdeType, Derived>, Derived>, T, N, 3, 3, 4, SP, OdeType>;
 
-    T    step_impl(T* result, const T* state, const T& h);
 
-    static constexpr Integrator integrator = Integrator::RK23;
-    static constexpr size_t         ERR_EST_ORDER = 2;
-    static constexpr size_t         INTERP_ORDER = 3;
+public:
+    static constexpr Integrator INTEGRATOR = Integrator::RK23;
+    static constexpr size_t     ERR_EST_ORDER = 2;
+    static constexpr size_t     INTERP_ORDER = 3;
 
+protected:
+
+public:
     static constexpr typename Base::Atype Amatrix();
 
     static constexpr typename Base::Btype Bmatrix();
@@ -240,6 +241,8 @@ protected:
     static constexpr typename Base::Ctype Cmatrix();
 
     static constexpr typename Base::Etype Ematrix();
+
+protected:
 
     static constexpr                Ptype Pmatrix();
 

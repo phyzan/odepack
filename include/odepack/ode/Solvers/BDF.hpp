@@ -69,6 +69,10 @@ public:
 
     void            Reset();
 
+    static constexpr Integrator INTEGRATOR = Integrator::BDF;
+    static constexpr int ERR_EST_ORDER = 1;
+    static constexpr bool IS_IMPLICIT = true;
+
 protected:
 
     using Base = detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>;
@@ -76,11 +80,6 @@ protected:
     struct None{};
     friend Base::MainSolverType;
     static constexpr size_t NEWTON_MAXITER = 4;
-
-    static constexpr Integrator integrator = Integrator::BDF;
-
-    static constexpr bool IS_IMPLICIT = true;
-    static constexpr int ERR_EST_ORDER = 1;
 
     StepResult      adapt_impl(T* res, const T* state);
     void            interp_impl(T* result, const T& t) const;

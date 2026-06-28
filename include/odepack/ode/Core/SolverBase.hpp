@@ -31,6 +31,36 @@
 
 #define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args
 
+
+// For non-template member functions: use pointer-to-member (standard-compliant)
+#define ODEPACK_ACCESSOR(NAME) \
+    template<typename... Args> \
+    static auto call_##NAME(Derived& self, Args&&... args){ \
+        constexpr auto fn = &Accessor::NAME; \
+        return (self.*fn)(std::forward<Args>(args)...); \
+    } \
+    template<typename... Args> \
+    static auto call_##NAME(const Derived& self, Args&&... args){ \
+        constexpr auto fn = &Accessor::NAME; \
+        return (self.*fn)(std::forward<Args>(args)...); \
+    } \
+
+// For template member functions: use pointer-to-member with explicit template args
+#define ODEPACK_ACCESSOR_TEMPLATE(NAME) \
+    template<typename... Args> \
+    static auto call_##NAME(Derived& self, Args&&... args){ \
+        auto fn = &Accessor::template NAME<Args...>; \
+        return (self.*fn)(std::forward<Args>(args)...); \
+    } \
+    template<typename... Args> \
+    static auto call_##NAME(const Derived& self, Args&&... args){ \
+        auto fn = &Accessor::template NAME<Args...>; \
+        return (self.*fn)(std::forward<Args>(args)...); \
+    } \
+
+#define ODEPACK_CALL_DERIVED(NAME, ...) Accessor::call_##NAME(*THIS, __VA_ARGS__)
+
+
 namespace ode{
 /**
  * @brief Base class for adaptive-step ODE solvers using CRTP.
@@ -344,11 +374,14 @@ public:
      */
     bool                resume();
 
+    /// @brief Reset implementation hook. Derived should call base first.
+    void                Reset();
+
     /**
      * @brief Update the additional arguments passed to the ODE function.
      * @param new_args Pointer to new argument values (must match original size).
      */
-    void                set_args(const T* new_args);
+    void                SetArgs(const T* new_args);
 
     /**
      * @brief Create an interpolator for dense output between two boundaries.
@@ -357,7 +390,7 @@ public:
      * @return Unique pointer to an interpolator object.
      * @note Must be implemented by derived class.
      */
-    VirtualInterp<T, N>     state_interpolator(int bdr1, int bdr2) const;
+    VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const;
 
 protected:
 
@@ -366,11 +399,11 @@ protected:
     // Derived classes MUST implement these methods.
 
     /// @brief Name of the integration method (must be defined in Derived).
-    static constexpr Integrator integrator = Derived::integrator;
+    static constexpr Integrator INTEGRATOR = Derived::INTEGRATOR;
     /// @brief Whether the method is implicit (must be defined in Derived).
-    static constexpr bool           IS_IMPLICIT = Derived::IS_IMPLICIT;
+    static constexpr bool       IS_IMPLICIT = Derived::IS_IMPLICIT;
     /// @brief Order of the error estimator (must be defined in Derived).
-    static constexpr int            ERR_EST_ORDER = Derived::ERR_EST_ORDER;
+    static constexpr int        ERR_EST_ORDER = Derived::ERR_EST_ORDER;
 
     /**
      * @brief Perform one adaptive integration step.
@@ -394,15 +427,13 @@ protected:
     // ========================= STATIC OVERRIDES (OPTIONAL) ==========================
     // Derived classes MAY override these methods. Call base implementation first.
 
+    /// @brief Advance implementation. If t_lim is nullptr, advance normally. Otherwise, if the implementation yields a time beyond t_lim, it should only cache the step information (e.g. counters, or event or state register etc) since the solver is "not to go there yet" and only apply them once Adv_Impl is called with t_lim beyond the implementation's predicted step.
+    template<typename... Args>
+    bool        Adv_Impl(Args&&... args);
+
     constexpr bool    RequestTimeFloor(T& out) {
         return false;
     }
-
-    /// @brief Reset implementation hook. Derived should call base first.
-    void    Reset();
-
-    /// @brief Args update implementation hook. Derived should call base first.
-    void    set_args_impl(const T* new_args);
 
     /**
     @brief Re-adjustment hook right before new_state modification. Derived should call base first.
@@ -423,6 +454,18 @@ protected:
     bool    validate_ics_impl(T t0, const T* q0) const;
 
     // ================================================================================
+
+
+    struct Accessor : Derived {
+
+        ODEPACK_ACCESSOR(adapt_impl)
+        ODEPACK_ACCESSOR(interp_impl)
+        ODEPACK_ACCESSOR(local_interp)
+        ODEPACK_ACCESSOR_TEMPLATE(Adv_Impl)  // Template member function
+        ODEPACK_ACCESSOR(RequestTimeFloor)
+        ODEPACK_ACCESSOR(ReAdjust)
+        ODEPACK_ACCESSOR(validate_ics_impl)
+    };
 
 
     // =========================== HELPER METHODS =====================================
@@ -485,9 +528,6 @@ protected:
     /// @brief Get pointer to the previous "true" state.
     const T*    last_true_state_ptr() const;
 
-    /// @brief Advance implementation. If t_lim is nullptr, advance normally. Otherwise, if the implementation yields a time beyond t_lim, it should only cache the step information (e.g. counters, or event or state register etc) since the solver is "not to go there yet" and only apply them once adv_impl is called with t_lim beyond the implementation's predicted step.
-    template<typename... Args>
-    bool        adv_impl(Args&&... args);
     // ================================================================================
 
     DEFAULT_RULE_OF_FOUR(BaseSolver)
@@ -537,7 +577,7 @@ private:
         }
     }
 
-    /// @brief Only use inside adv_impl (so that if the state here is updated, all derived classes are aware). Move the current state to a new time between the current time and the most recently adapted state. This is a lowlevel operation, so use carefully or the intended bahavior might break.
+    /// @brief Only use inside Adv_Impl (so that if the state here is updated, all derived classes are aware). Move the current state to a new time between the current time and the most recently adapted state. This is a lowlevel operation, so use carefully or the intended bahavior might break.
     void                    move_state(const T& time);
 
     template<typename Setter>

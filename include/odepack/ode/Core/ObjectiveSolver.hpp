@@ -36,13 +36,23 @@ public:
         current_idx = -1;
     }
 
+    bool is_at_objective() const {
+        return current_idx != -1;
+    }
+
+    int current_objective() const {
+        return current_idx;
+    }
+
+protected:
+
     template<typename... Args>
-    bool adv_impl(Args&&... args){
+    bool Adv_Impl(Args&&... args){
         T nearest_floor;
         size_t idx;
         current_idx = -1;
         if (this->is_at_new_state()){
-            bool success = Base::adv_impl(std::forward<Args>(args)...);
+            bool success = Base::Adv_Impl(std::forward<Args>(args)...);
             if (success && this->get_nearest_floor(nearest_floor, idx)){
                 if (this->t() == nearest_floor){
                     detected[idx] = false;
@@ -54,7 +64,7 @@ public:
                 return success;
             }
         } else if (this->get_nearest_floor(nearest_floor, idx)){
-            if (Base::adv_impl(nearest_floor, std::forward<Args>(args)...)){
+            if (Base::Adv_Impl(nearest_floor, std::forward<Args>(args)...)){
                 if (this->t() == nearest_floor){
                     detected[idx] = false; //turn off for next step, since the goal was achieved
                     cached_sign[idx] = 0;
@@ -65,7 +75,7 @@ public:
                 return false;
             }
         } else {
-            return Base::adv_impl(std::forward<Args>(args)...);
+            return Base::Adv_Impl(std::forward<Args>(args)...);
         }
     }
 
@@ -111,14 +121,6 @@ public:
             out = my_floor;
         }
         return true;
-    }
-
-    bool is_at_objective() const {
-        return current_idx != -1;
-    }
-
-    int current_objective() const {
-        return current_idx;
     }
 
 private:

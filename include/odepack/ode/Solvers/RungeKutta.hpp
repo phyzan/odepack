@@ -19,6 +19,8 @@ void rk4_interp(T* out, const T& t, const T& t1, const T& t2, const T* y1, const
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
 class RK4 : public detail::BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>{
 
+    using Base = detail::BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
+
 public:
 
     template<typename... Type>
@@ -26,21 +28,18 @@ public:
 
     auto  local_interp() const;
 
-protected:
+    void        Reset();
 
-    using Base = detail::BaseDispatcher<GetDerived<RK4<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
-    friend typename Base::MainSolverType;
-
-    static constexpr Integrator integrator = Integrator::RK4;
-    static constexpr bool           IS_IMPLICIT = false;
+    static constexpr Integrator     INTEGRATOR = Integrator::RK4;
     static constexpr int            ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
+    static constexpr bool           IS_IMPLICIT = false;
+
+protected:
 
     StepResult  adapt_impl(T* res, const T* state);
 
     void        interp_impl(T* result, const T& t) const;
-
-    void        Reset();
 
     void        ReAdjust(const T* new_vector);
 

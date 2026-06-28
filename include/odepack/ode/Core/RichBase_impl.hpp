@@ -55,31 +55,31 @@ RichSolver<Derived, T, N, SP, OdeType>::RichSolver(SOLVER_CONSTRUCTOR(T), std::v
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename... Args>
-bool RichSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
+bool RichSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
 
     // When restarting from a masked event, then at the next step, the last state vector will display the masked state, whether the mask was hidden or not
     
     if (events.size() == 0){
-        return Base::adv_impl(std::forward<Args>(args)...);
+        return Base::Adv_Impl(std::forward<Args>(args)...);
     } else if (this->at_canon_event()) {
         const MaskedState<T>* ms = events.masked_state();
         assert(ms != nullptr && "Solver is at a canon event but has no masked state. Report bug.");
         if (this->current_event().event->hides_mask()){
-            Accessor::call_ReAdjust(*THIS, ms->masked_vector.data());
+            ODEPACK_CALL_DERIVED(ReAdjust, ms->masked_vector.data());
         } // if the mask is not hidden, the state has already been ReAdjusted
     }
     
     if (this->is_at_new_state()){
-        if (!Base::adv_impl(std::forward<Args>(args)...)){
+        if (!Base::Adv_Impl(std::forward<Args>(args)...)){
             // new event detection pass was triggered in this command
             return false;
         } else if (!this->push_event_queue()){
             is_at_event = false;
-            is_at_canon_event = false; // is_event_waiting has been set to false in the previous adv_impl call, no need to set it again here
+            is_at_canon_event = false; // is_event_waiting has been set to false in the previous Adv_Impl call, no need to set it again here
         }
         return true;
     }else if (is_event_waiting){
-        if (Base::adv_impl(events.get_time(size_t(detection_idx+1)), std::forward<Args>(args)...)){
+        if (Base::Adv_Impl(events.get_time(size_t(detection_idx+1)), std::forward<Args>(args)...)){
             if (!this->push_event_queue()){
                 is_at_event = false;
                 is_at_canon_event = false;
@@ -91,7 +91,7 @@ bool RichSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
     }else{
         is_at_event = false;
         is_at_canon_event = false;
-        return Base::adv_impl(std::forward<Args>(args)...);
+        return Base::Adv_Impl(std::forward<Args>(args)...);
     }
 }
 
@@ -176,8 +176,8 @@ void RichSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
 // PRIVATE METHODS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void RichSolver<Derived, T, N, SP, OdeType>::set_args_impl(const T* new_args){
-    Base::set_args_impl(new_args);
+void RichSolver<Derived, T, N, SP, OdeType>::SetArgs(const T* new_args){
+    Base::SetArgs(new_args);
     events.set_args(new_args, this->args().size());
 }
 

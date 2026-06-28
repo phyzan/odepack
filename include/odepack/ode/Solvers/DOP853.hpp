@@ -54,28 +54,34 @@ class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType,
 
 public:
 
+    static constexpr Integrator INTEGRATOR = Integrator::DOP853;
+    static constexpr int    ERR_EST_ORDER = 7;
+    static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
+
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>);
 
     auto    local_interp() const;
 
+
 protected:
 
     using Base = RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, 12, 8, 16, SP, OdeType>;
     friend Base;
     friend Base::Base;
-    friend Base::MainSolverType; // So that Base can access specific private methods for static override
+    friend Base::Base::Base;
 
-    static constexpr Integrator integrator = Integrator::DOP853;
-    
+    void set_coef_matrix_impl() const;
+
+    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
+
+
     static constexpr size_t N_STAGES = 12;
     static constexpr size_t N_ORDER = 8;
     static constexpr size_t N_STAGES_EXTRA = 3;
-    static constexpr int    ERR_EST_ORDER = 7;
     static constexpr size_t N_STAGES_EXT = DOP_COEFS<T>::N_STAGES_EXT;
-    static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
-    
+
 
     using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
 
@@ -92,10 +98,6 @@ protected:
     static constexpr A_EXTRA_TYPE Amatrix_extra();
 
     static constexpr C_EXTRA_TYPE Cmatrix_extra();
-
-    void set_coef_matrix_impl() const;
-    
-    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
 
 private:
     A_EXTRA_TYPE A_EXTRA = Amatrix_extra();

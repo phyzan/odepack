@@ -78,7 +78,7 @@ public:
     virtual bool                resume() = 0;
     virtual void                stop(const std::string& text = "") = 0;
     virtual void                kill(const std::string& text = "") = 0;
-    virtual void                set_args(const T* new_args) = 0;
+    virtual void                SetArgs(const T* new_args) = 0;
     virtual bool                set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0) = 0;
 
 protected:

@@ -201,7 +201,7 @@ State<T> BaseSolver<Derived, T, N, SP, OdeType>::ics() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 Integrator BaseSolver<Derived, T, N, SP, OdeType>::method() const{
-    return Derived::integrator;
+    return Derived::INTEGRATOR;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -302,7 +302,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance(){
         this->warn_paused();
         return false;
     }
-    return THIS->adv_impl();
+    return Accessor::call_Adv_Impl(*THIS);
 }
 
 
@@ -392,7 +392,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const 
     bool success;
     auto evolve = [&]() LAMBDA_INLINE -> bool {
         bool res;
-        while ((res = (this->is_running() && THIS->adv_impl(time))) && (time != this->t())){
+        while ((res = (this->is_running() && Accessor::call_Adv_Impl(*THIS, time))) && (time != this->t())){
             bool obs_res;
             if constexpr (Observer<Callable, T>){
                 obs_res = observer(this->t(), this->true_state_ptr()+2, nullptr);
@@ -534,8 +534,13 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::resume(){
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::set_args(const T* new_args){
-    THIS->set_args_impl(new_args);
+void BaseSolver<Derived, T, N, SP, OdeType>::SetArgs(const T* new_args){
+    ndspan::copy_array(_args.data(), new_args, _args.size());
+    if constexpr (JP == JacPolicy::Autodiff){
+        for (size_t i=0; i<_args.size(); i++){
+            _args_worker[i] = DualType(new_args[i]);
+        }
+    }
 }
 
 //====================== STATIC OVERRIDES =====================================
@@ -550,17 +555,17 @@ std::unique_ptr<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::stat
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 StepResult BaseSolver<Derived, T, N, SP, OdeType>::adapt_impl(T* state, const T* old_state){
-    return THIS->adapt_impl(state, old_state);
+    return ODEPACK_CALL_DERIVED(adapt_impl, state, old_state);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::interp_impl(T* result, const T& t) const{
-    THIS->interp_impl(result, t);
+    ODEPACK_CALL_DERIVED(interp_impl, result, t);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
-    return THIS->local_interp();
+    return Accessor::call_local_interp(*THIS);
 }
 
 
@@ -585,16 +590,6 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
     }
 }
 
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::set_args_impl(const T* new_args){
-    ndspan::copy_array(_args.data(), new_args, _args.size());
-    if constexpr (JP == JacPolicy::Autodiff){
-        for (size_t i=0; i<_args.size(); i++){
-            _args_worker[i] = DualType(new_args[i]);
-        }
-    }
-}
-
 //=============================================================================
 
 // OVERRIDEN IN RICH SOLVER
@@ -612,7 +607,7 @@ const T* BaseSolver<Derived, T, N, SP, OdeType>::last_true_state_ptr() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<typename... Args>
-bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
+bool BaseSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
     const int d = this->direction();
     if constexpr (sizeof...(Args) > 0){
         T time_floor = minimum_time(args...);
@@ -623,7 +618,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
             if (validate_it(result, this->aux_state_ptr())){
                 register_states();
                 T new_floor;
-                if (THIS->RequestTimeFloor(new_floor)){
+                if (ODEPACK_CALL_DERIVED(RequestTimeFloor, new_floor)){
                     assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested, with additional requests");
                     time_floor = minimum_time(new_floor, time_floor);
                 }
@@ -647,7 +642,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::adv_impl(Args&&... args){
         if (validate_it(result, this->aux_state_ptr())){
             register_states();
             T new_floor;
-            if (THIS->RequestTimeFloor(new_floor) && new_floor*d < t_new()*d){
+            if (ODEPACK_CALL_DERIVED(RequestTimeFloor, new_floor) && new_floor*d < t_new()*d){
                 assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested without additional requests.");
                 this->move_state(new_floor);
             }
@@ -743,7 +738,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics(T t0, const T* q0) const {
-    return THIS->validate_ics_impl(t0, q0);
+    return ODEPACK_CALL_DERIVED(validate_ics_impl, t0, q0);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
