@@ -77,12 +77,12 @@ public:
     
 
     // same as in BaseSolver, but we need to redefine it here for the variational system
-    static constexpr JacPolicy MAIN_JP = (getJacPolicy<T, OdeType>() == JacPolicy::Autodiff && N == 0) ? JacPolicy::Exact : getJacPolicy<T, OdeType>();
-    static constexpr JacPolicy JP = (MAIN_JP == JacPolicy::Autodiff) ? JacPolicy::Autodiff : JacPolicy::Approx;
+    static constexpr JacPolicy MAIN_JP = getJacPolicy<T, N, OdeType>();
+    static constexpr JacPolicy JP = (getJacPolicy<T, 2*N, OdeType>() == JacPolicy::Autodiff) ? JacPolicy::Autodiff : JacPolicy::Approx;
     static_assert(MAIN_JP!=JacPolicy::Approx,  "VariationalSolver requires the base solver to have an exact jacobian for the original system");
 
 
-    VariationalOdeSys(OdeType ode, size_t nsys, size_t nargs) : ode_(std::move(ode)), diff_worker(2*nsys), jac_worker(2*nsys), jm(nsys, nsys), diff_args(nargs), autodiff2_args(nargs), nsys(nsys) {
+    VariationalOdeSys(OdeType ode, size_t nsys, size_t nargs) : ode_(std::move(ode)), diff_worker(2*nsys), jac_worker(2*nsys), jm(nsys, nsys), nsys(nsys) {
         if constexpr (N > 0){
             assert(N==nsys && "Incorrect number of equations in VariationalOdeSys");
         }
@@ -99,11 +99,7 @@ public:
                 y[I] = DualType(q[I], autodiff::Variable<I>{});
             );
 
-            for (size_t i=0; i<diff_args.size(); i++){
-                diff_args[i] = DualType(args[i]);
-            }
-
-            ode_.Rhs(rhs, DualType(t), y, diff_args.data());
+            ode_.Rhs(rhs, t, y, args);
 
             std::fill(out+nsys, out+2*nsys, 0);
             FOR_LOOP(size_t, J, N,
@@ -138,13 +134,8 @@ public:
             y[i] = VarDualType(q[i]);
         }
 
-        // copy args
-        for (size_t i=0; i<autodiff2_args.size(); i++){
-            autodiff2_args[i] = VarDualType(args[i]);
-        }
-
         // compute the jacobian using autodiff
-        ode_.template Rhs<VarDualType>(rhs, VarDualType(t), y, autodiff2_args.data());
+        ode_.Rhs(rhs, t, y, args);
 
         // extract the jacobian matrix from the autodiff output
         ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
@@ -171,8 +162,6 @@ private:
     mutable Array1D<DualType, 2*N> diff_worker;
     mutable Array1D<VarDualType, 2*N> jac_worker;
     mutable Array2D<T, N, N, ndspan::Allocation::Auto, ndspan::Layout::F> jm;
-    mutable Array1D<DualType> diff_args;
-    mutable Array1D<VarDualType> autodiff2_args;
     size_t nsys = N; // Size of the original system, without the variational equations (not the augmented system)
 };
 

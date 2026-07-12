@@ -37,7 +37,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
         FOR_LOOP(size_t, I, N,
             _diff_worker[I+N] = DualType(q[I], autodiff::Variable<I>{});
         );
-        _ode.Rhs(_diff_worker.data(), DualType(t), _diff_worker.data()+N, _args_worker.data());
+        _ode.Rhs(_diff_worker.data(), t, _diff_worker.data()+N, _args.data());
 
         const DualType* rhs = _diff_worker.data();
         FOR_LOOP(size_t, I, N,
@@ -54,7 +54,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
-    THIS->Jac(jm, t, q, dt);
+    this->Jac(jm, t, q, dt);
     this->_n_evals_jac++;
 }
 
@@ -536,11 +536,6 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::resume(){
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::SetArgs(const T* new_args){
     ndspan::copy_array(_args.data(), new_args, _args.size());
-    if constexpr (JP == JacPolicy::Autodiff){
-        for (size_t i=0; i<_args.size(); i++){
-            _args_worker[i] = DualType(new_args[i]);
-        }
-    }
 }
 
 //====================== STATIC OVERRIDES =====================================
@@ -793,7 +788,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _args_worker(JP==JacPolicy::Autodiff ? args.size() : 0), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
@@ -801,12 +796,6 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
     }
     if (max_step < min_step){
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
-    }
-
-    if constexpr (JP == JacPolicy::Autodiff){
-        for (size_t i=0; i<_args.size(); i++){
-            _args_worker[i] = DualType(_args[i]);
-        }
     }
     
     if (q0 == nullptr){

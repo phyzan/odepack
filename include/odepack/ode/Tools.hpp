@@ -189,19 +189,19 @@ concept hasJacFunc =
     };
 
 // Check if F has a callable templated Rhs (static or non-static)
-template<typename F, typename T>
-concept hasTemplateRhs =
-    requires(F f, T* out, T t, const T* q, const T* args) {
-        { f.template Rhs<T>(out, t, q, args) } -> std::same_as<void>;
-        { f.template Rhs<T>(out, std::as_const(t), q, args) } -> std::same_as<void>;
+template<typename F, typename T, size_t N>
+concept supportsDualRhs =
+    N > 0 && requires(F f, autodiff::AutoDiff<T, 1, N>* out, T t, const autodiff::AutoDiff<T, 1, N>* q, const T* args) {
+        { f.Rhs(out, t, q, args) } -> std::same_as<void>;
+        { f.Rhs(out, std::as_const(t), q, args) } -> std::same_as<void>;
     };
 
 // Check if F has a callable templated Jac (static or non-static)
-template<typename F, typename T>
-concept hasTemplateJac =
-    requires(F f, T* out, T t, const T* q, const T* args) {
-        { f.template Jac<T>(out, t, q, args) } -> std::same_as<void>;
-        { f.template Jac<T>(out, std::as_const(t), q, args) } -> std::same_as<void>;
+template<typename F, typename T, size_t N>
+concept supportsDualJac =
+    requires(F f, autodiff::AutoDiff<T, 1, N>* out, T t, const autodiff::AutoDiff<T, 1, N>* q, const T* args) {
+        { f.Jac(out, t, q, args) } -> std::same_as<void>;
+        { f.Jac(out, std::as_const(t), q, args) } -> std::same_as<void>;
     };
 
 template<typename F, typename T>
@@ -218,9 +218,9 @@ enum class JacPolicy : std::uint8_t{
 };
 
 
-template<typename T, hasRhsFunc<T> F>
+template<typename T, size_t N, hasRhsFunc<T> F>
 constexpr JacPolicy getJacPolicy(){
-    if constexpr (hasTemplateRhs<F, T> && !hasJacFunc<F, T>){
+    if constexpr (supportsDualRhs<F, T, N> && !hasJacFunc<F, T>){
         return JacPolicy::Autodiff;
     } else if (hasJacFunc<F, T>){
         return JacPolicy::Exact;

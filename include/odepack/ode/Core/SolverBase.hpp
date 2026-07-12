@@ -97,7 +97,7 @@ class BaseSolver : public traits::SolverVirtualTypeTraits<Derived, T, N, SP>::ty
 public:
 
     // Autodiff is only enabled when the size of the ODE system is known at compile time.
-    static constexpr JacPolicy JP = (getJacPolicy<T, OdeType>() == JacPolicy::Autodiff && N == 0) ? JacPolicy::Exact : getJacPolicy<T, OdeType>();
+    static constexpr JacPolicy JP = getJacPolicy<T, N, OdeType>();
     
 
     using Scalar = T;
@@ -591,7 +591,6 @@ private:
     mutable Array1D<T, 0>                               _cache_ics; // initially empty
     Array1D<T>                                          _args;
     mutable Array1D<DualType, JP==JacPolicy::Autodiff ? 2*N : 0>           _diff_worker;
-    Array1D<DualType>                                   _args_worker;
     OdeType                                             _ode;
     size_t                                              _Nsys = N;
     size_t                                              _Nupdates = 0;

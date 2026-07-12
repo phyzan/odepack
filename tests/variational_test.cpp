@@ -3,8 +3,7 @@
 
 struct MyODE{
 
-    template<typename T>
-    static void Rhs(T* dy_dt, const T& t, const T* y, const T* args) {
+    static void Rhs(auto* dy_dt, const auto& t, const auto* y, const auto* args) {
         //3D lorenz system, args = {sigma, rho, beta}
         dy_dt[0] = args[0]*(y[1] - y[0]);
         dy_dt[1] = y[0]*(args[1] - y[2]) - y[1];
