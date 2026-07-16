@@ -21,6 +21,25 @@ target_include_directories(odepack_autodiff INTERFACE
 )
 
 #===========================================================================================
+#                           ndspan (header-only)
+#===========================================================================================
+add_library(odepack_ndspan INTERFACE)
+add_library(odepack::ndspan ALIAS odepack_ndspan)
+target_include_directories(odepack_ndspan INTERFACE
+    ${ODEPACK_ROOT}/external/ndspan/include
+)
+
+#===========================================================================================
+#                           polybox (header-only)
+#===========================================================================================
+add_library(odepack_polybox INTERFACE)
+add_library(odepack::polybox ALIAS odepack_polybox)
+target_include_directories(odepack_polybox INTERFACE
+    ${ODEPACK_ROOT}/external/polybox/include
+)
+
+
+#===========================================================================================
 #                           mpreal (header-only, requires system MPFR/GMP)
 #===========================================================================================
 add_library(odepack_mpreal INTERFACE)
@@ -51,6 +70,6 @@ target_link_libraries(odepack_qhull INTERFACE qhullstatic_r)
 add_library(odepack_headers INTERFACE)
 add_library(odepack::headers ALIAS odepack_headers)
 target_include_directories(odepack_headers INTERFACE
-    ${ODEPACK_ROOT}/include/odepack
+    ${ODEPACK_ROOT}/include
 )
 target_compile_features(odepack_headers INTERFACE cxx_std_20)

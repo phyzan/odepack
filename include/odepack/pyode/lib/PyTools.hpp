@@ -70,7 +70,7 @@ auto call_dispatch(ScalarType scalar_type, Callable&& f){
             return f.template operator()<double>();
         case ScalarType::LongDouble:
             return f.template operator()<long double>();
-#ifdef MPREAL
+#ifdef DPK_MPREAL
         case ScalarType::MPReal:
             return f.template operator()<mpfr::mpreal>();
 #endif
@@ -146,7 +146,7 @@ void py_mask(T* res, const T& t, const T* q, const T*, const void* obj);
 template<typename T>
 T py_event(const T& t, const T* q, const T*, const void* obj);
 
-#ifdef MPREAL
+#ifdef DPK_MPREAL
 // Specializations for mpfr::mpreal
 
 template<>
@@ -186,7 +186,7 @@ inline mpfr::mpreal py_event<mpfr::mpreal>(const mpfr::mpreal& t, const mpfr::mp
     return p.event(t, Array<mpfr::mpreal>(q, p.shape.data(), p.shape.size()), *p.py_args).template cast<mpfr::mpreal>();
 }
 
-#endif // MPREAL
+#endif // DPK_MPREAL
 
 } // namespace ode::python
 

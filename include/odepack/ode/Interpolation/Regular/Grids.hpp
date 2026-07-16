@@ -1,7 +1,7 @@
 #ifndef GRIDS_HPP
 #define GRIDS_HPP
 
-#include "../../../ndspan.hpp"
+#include <ndspan/arrays.hpp>
 
 namespace ode::interp::rgi{
 

@@ -14,6 +14,8 @@ add_library(odepack::odepack ALIAS odepack)
 target_link_libraries(odepack INTERFACE
     odepack::headers
     odepack::autodiff
+    odepack::ndspan
+    odepack::polybox
     odepack::qhull
 )
 
@@ -23,5 +25,5 @@ if(ODEPACK_ENABLE_MPREAL)
     find_library(MPFR_LIBRARY mpfr REQUIRED)
     find_library(GMP_LIBRARY gmp REQUIRED)
     target_link_libraries(odepack INTERFACE odepack::mpreal ${MPFR_LIBRARY} ${GMP_LIBRARY})
-    target_compile_definitions(odepack INTERFACE MPREAL)
+    target_compile_definitions(odepack INTERFACE DPK_MPREAL)
 endif()

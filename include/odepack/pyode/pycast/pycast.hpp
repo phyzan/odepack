@@ -6,7 +6,7 @@
 #include <pybind11/numpy.h>
 #include <vector>
 #include <type_traits>
-#ifdef MPREAL
+#ifdef DPK_MPREAL
 #include <mpreal.h>
 #endif
 
@@ -159,7 +159,7 @@ namespace py = pybind11;
 
 namespace pybind11::detail {
 
-#ifdef MPREAL
+#ifdef DPK_MPREAL
 // ====================== mpreal <-> double caster ======================
 template <>
 struct type_caster<mpfr::mpreal> {
@@ -185,7 +185,7 @@ public:
         return py::cast(val).release();
     }
 };
-#endif // MPREAL
+#endif // DPK_MPREAL
 
 // ====================== ArrayType<T> caster ======================
 // Assumes ArrayType<T> has:
@@ -224,7 +224,7 @@ struct type_caster<ArrayType, std::enable_if_t<
     {
         using T = typename ArrayType::value_type;
 
-#ifdef MPREAL
+#ifdef DPK_MPREAL
         constexpr bool is_mpreal = std::is_same_v<T, mpfr::mpreal>;
 #endif
         const size_t ndim = src.ndim();
@@ -233,7 +233,7 @@ struct type_caster<ArrayType, std::enable_if_t<
         for (size_t i = 0; i < ndim; ++i) {
             shape[i] = static_cast<ssize_t>(src.shape(i));
         }
-#ifdef MPREAL
+#ifdef DPK_MPREAL
         if constexpr (is_mpreal) {
             // For mpreal: numpy array of doubles
             size_t total_size = 1;

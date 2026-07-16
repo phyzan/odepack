@@ -1,31 +1,30 @@
 #ifndef ODEPACK_HPP
 #define ODEPACK_HPP
 
-#include "polybox/polybox.hpp"
-#include "ode/Tools_impl.hpp"
-#include "ode/SolverDispatcher_impl.hpp"
-#include "ode/OdeInt_impl.hpp"
-#include "ode/SolverState_impl.hpp"
+#include <polybox/polybox.hpp>
+#include <odepack/ode/Tools_impl.hpp>
+#include <odepack/ode/SolverDispatcher_impl.hpp>
+#include <odepack/ode/OdeInt_impl.hpp>
+#include <odepack/ode/SolverState_impl.hpp>
 
-#include "ode/Core/SolverBase_impl.hpp"
-#include "ode/Core/RichBase_impl.hpp"
-#include "ode/Core/Events_impl.hpp"
-#include "ode/Core/ObjectiveSolver.hpp"
+#include <odepack/ode/Core/SolverBase_impl.hpp>
+#include <odepack/ode/Core/RichBase_impl.hpp>
+#include <odepack/ode/Core/Events_impl.hpp>
+#include <odepack/ode/Core/ObjectiveSolver.hpp>
 
-#include "ode/OdeResult/OdeResult_impl.hpp"
+#include <odepack/ode/OdeResult/OdeResult_impl.hpp>
 
-#include "ode/Interpolation/NdInterpolator_impl.hpp"
-#include "ode/Interpolation/VectorFields_impl.hpp"
-#include "ode/Interpolation/Regular/Grids_impl.hpp"
-#include "ode/Interpolation/Regular/RegularGridInterpolator_impl.hpp"
-#include "ode/Interpolation/Scattered/Delaunay_impl.hpp"
-#include "ode/Interpolation/Scattered/ScatteredNdInterpolator_impl.hpp"
-#include "ode/Interpolation/Univariate/StateInterp_impl.hpp"
+#include <odepack/ode/Interpolation/NdInterpolator_impl.hpp>
+#include <odepack/ode/Interpolation/VectorFields_impl.hpp>
+#include <odepack/ode/Interpolation/Regular/Grids_impl.hpp>
+#include <odepack/ode/Interpolation/Regular/RegularGridInterpolator_impl.hpp>
+#include <odepack/ode/Interpolation/Scattered/Delaunay_impl.hpp>
+#include <odepack/ode/Interpolation/Scattered/ScatteredNdInterpolator_impl.hpp>
+#include <odepack/ode/Interpolation/Univariate/StateInterp_impl.hpp>
 
-#include "ode/Solvers/Solvers_impl.hpp"
+#include <odepack/ode/Solvers/Solvers_impl.hpp>
 
-#include "ode/Chaos/VariationalSolvers_impl.hpp"
-
+#include <odepack/ode/Chaos/VariationalSolvers_impl.hpp>
 
 
 /**

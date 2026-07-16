@@ -127,7 +127,7 @@ int main() {
 
     /*
     Compile with:
-    g++ -std=c++20 -O3 -DMPREAL tests/oscillator_solver.cpp -o test -lmpfr -lgmp
+    g++ -std=c++20 -O3 -DDPK_MPREAL tests/oscillator_solver.cpp -o test -lmpfr -lgmp
     */
 
     // Test with double precision
@@ -169,5 +169,5 @@ int main() {
     std::cout << "Expected event at t = 3.48143\n";
     std::cout << "Even state expected: {-2.82843, 1}\n";
 
-    // g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/oscillator_solver.cpp -o test -lmpfr -lgmp
+    // g++ -std=c++20 -O3 -DDPK_MPREAL -Iexternal/autodiff/include tests/oscillator_solver.cpp -o test -lmpfr -lgmp
 }

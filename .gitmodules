@@ -7,3 +7,9 @@
 [submodule "external/mpreal"]
 	path = external/mpreal
 	url = https://github.com/advanpix/mpreal.git
+[submodule "external/ndspan"]
+	path = external/ndspan
+	url = https://github.com/phyzan/ndspan
+[submodule "external/polybox"]
+	path = external/polybox
+	url = https://github.com/phyzan/polybox

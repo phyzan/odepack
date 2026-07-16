@@ -8,20 +8,21 @@
 #include <omp.h>
 #include <cmath>
 #include <autodiff/autodiff.hpp>
-#include "../polybox/polybox.hpp"
+#include <sstream>
+#include <polybox/polybox.hpp>
 
-#ifdef MPREAL
+#ifdef DPK_MPREAL
 #include <mpreal.h>
 #endif
 
-#include "../ndspan/arrays.hpp"
+#include <ndspan/arrays.hpp>
 
 
 namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, ndspan::min, ndspan::max, std::complex;
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::View3D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array, ndspan::to_string, ndspan::abs;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::View3D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array, ndspan::abs;
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
@@ -318,7 +319,7 @@ bool resize_step(T& factor, T& habs, const T& min_step, const T& max_step);
 
 template <typename T>
 inline bool isfinite(const T& value) {
-#ifndef NO_NAN_CHECK
+#ifndef DPK_NO_NAN_CHECK
     if constexpr (!std::is_integral_v<T>) {
         #ifdef __FAST_MATH__
         // When -ffast-math is enabled, std::isfinite may not work correctly
@@ -332,7 +333,7 @@ inline bool isfinite(const T& value) {
         return true; // Integral types are always finite
     }
 #else
-    return true; // If NO_NAN_CHECK is defined, assume all values are finite
+    return true; // If DPK_NO_NAN_CHECK is defined, assume all values are finite
 #endif
 }
 
@@ -355,7 +356,7 @@ std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
 
 template<typename T>
 INLINE bool all_are_finite(const T* data, size_t n){
-#ifndef NO_NAN_CHECK
+#ifndef DPK_NO_NAN_CHECK
     for (size_t i=0; i<n; i++){
         if (!isfinite(data[i])){
             return false;
@@ -363,6 +364,14 @@ INLINE bool all_are_finite(const T* data, size_t n){
     }
 #endif
     return true;
+}
+
+
+template<typename... Args>
+std::string GetStr(Args&&... args) {
+    std::ostringstream out;
+    (out << ... << std::forward<Args>(args));
+    return out.str();
 }
 
 

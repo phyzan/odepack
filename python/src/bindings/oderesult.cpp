@@ -1,4 +1,4 @@
-#include "../../../include/odepack/pyode/lib/PyResult.hpp"
+#include <odepack/pyode/lib/PyResult.hpp>
 
 
 using namespace ode::python;

@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include "../../ndspan/arrays.hpp"
+#include <ndspan/arrays.hpp>
 #include "../lib/PyTools.hpp"
 #include "../../ode/Tools_impl.hpp"
 #include  "../pycast/pycast.hpp"

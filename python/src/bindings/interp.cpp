@@ -1,4 +1,4 @@
-#include "../../../include/odepack/pyode/lib/PyInterp.hpp"
+#include <odepack/pyode/lib/PyInterp.hpp>
 
 
 using namespace ode::python;

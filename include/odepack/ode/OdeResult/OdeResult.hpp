@@ -132,7 +132,7 @@ public:
 
     OdeSolution() = default;
 
-    OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator);
+    OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const interp::uni::Interpolator<T, N>& interpolator);
 
     template<typename Interp>
     OdeSolution(OdeResult<T, N>&& other, Interp&& interpolator) : OdeResult<T, N>(std::move(other)), interpolator_(std::forward<Interp>(interpolator)) {}
@@ -143,7 +143,7 @@ public:
 
 private:
 
-    InterpObj<T, N> interpolator_;
+    interp::uni::InterpObj<T, N> interpolator_;
 
 };
 

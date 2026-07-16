@@ -1,5 +1,5 @@
-#include "../../../include/odepack/pyode/lib/PySubSolver.hpp"
-#include "../../../include/odepack/pyode/lib/PyTools.hpp"
+#include <odepack/pyode/lib/PySubSolver.hpp>
+#include <odepack/pyode/lib/PyTools.hpp>
 
 using namespace ode::python;
 
@@ -165,7 +165,7 @@ m.def("advance_all", &py_advance_all, py::arg("solvers"), py::arg("t_goal"), py:
 m.def("advance_all_to_event", &py_advance_all_to_event, py::arg("solvers"), py::arg("events"), py::arg("tmax"), py::arg("threads")=-1, py::arg("display_progress")=false);
 
 
-#ifdef MPREAL
+#ifdef DPK_MPREAL
     m.def("set_mpreal_prec",
       &mpfr::mpreal::set_default_prec,
       py::arg("bits"),

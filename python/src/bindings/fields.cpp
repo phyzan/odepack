@@ -1,4 +1,4 @@
-#include "../../../include/odepack/pyode/lib/PyField.hpp"
+#include <odepack/pyode/lib/PyField.hpp>
 
 // namespace ode{
 

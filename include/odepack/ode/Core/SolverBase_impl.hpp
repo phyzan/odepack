@@ -6,6 +6,9 @@
 #include "../Interpolation/Univariate/StateInterp_impl.hpp"
 #include "Events_impl.hpp"
 #include "FinDiff.hpp"
+#include <odepack/ode/Tools.hpp>
+#include <sstream>
+#include <stdexcept>
 
 #define NOW \
 std::chrono::high_resolution_clock::now()
@@ -382,7 +385,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const 
     if (time == this->t()){
         return false;
     } else if (time*d < this->t()*d) {
-        throw std::runtime_error("Cannot advance until time " + to_string(time) + " because it is in the opposite direction of integration. Current time is " + to_string(this->t()) + " and direction is " + to_string(d) + ".");
+        throw std::runtime_error(GetStr("Cannot advance until time ", time, " because it is in the opposite direction of integration. Current time is ", this->t(), " and direction is ", d, "."));
     }
 
     constexpr bool explicit_steps = !std::is_same_v<std::decay_t<ArrayType>, EmptyArr<T>>;
@@ -419,11 +422,11 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const 
     if (!has_extra_steps){
         return evolve();
     }else if (extra_steps[extra_steps.size()-1]*d > time*d){
-        throw std::runtime_error("Invalid extra steps: last extra step is " + to_string(extra_steps[extra_steps.size()-1]) + " but target time is " + to_string(time) + ". Extra steps must be in the same direction and between the current time and the target time.");
+        throw std::runtime_error(GetStr("Invalid extra steps: last extra step is ", extra_steps[extra_steps.size()-1], " but target time is ", time, ". Extra steps must be in the same direction and between the current time and the target time."));
     }else{
         auto validate_idx = [&](size_t idx) LAMBDA_INLINE{
             if (extra_steps[idx]*d <= this->t()*d){
-                throw std::runtime_error("Invalid extra step: " + to_string(extra_steps[idx]) + ". Extra steps must be in the same direction and between the current time (" + to_string(this->t()) + ") and the target time (" + to_string(time) + ").");
+                throw std::runtime_error(GetStr("Invalid extra step: ", extra_steps[idx], ". Extra steps must be in the same direction and between the current time (", this->t(), ") and the target time (", time, ")."));
             }
             return idx;
         };
@@ -495,7 +498,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsi
         THIS->Reset();
         return true;
     }else {
-#ifndef NO_ODE_WARN
+#ifndef DPK_NO_WARN
         this->cerr("Tried to set invalid initial conditions");
 #endif
         return false;
@@ -700,14 +703,14 @@ void BaseSolver<Derived, T, N, SP, OdeType>::set_message(const std::string& text
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::warn_paused() const{
-#ifndef NO_ODE_WARN
+#ifndef DPK_NO_WARN
     this->cerr("\nSolver has paused integrating. Resume before advancing.");
 #endif
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
-#ifndef NO_ODE_WARN
+#ifndef DPK_NO_WARN
     this->cerr("\nSolver has permanently stopped integrating. Termination cause:\n\t" + _message);
 #endif
 }

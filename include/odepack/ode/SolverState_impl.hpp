@@ -13,7 +13,10 @@ void SolverState<T, N>::show(int precision) const{
     std::cout << "\n" << std::setprecision(precision) << 
     "OdeSolver current state:\n---------------------------\n"
     "\tt          : " << t << "\n" <<
-    "\tq          : " << array_repr<T>(vector, precision) << "\n" <<
+    "\tq          : ";
+    
+    array_repr(std::cout, vector);
+    std::cout << "\n" <<
     "\th          : " << habs << "\n" <<
     "\tDiverges   : " << (diverges ? "true" : "false") << "\n" << 
     "\tRunning    : " << (is_running ? "true" : "false") << "\n" <<

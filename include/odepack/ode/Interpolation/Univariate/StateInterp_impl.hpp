@@ -1,8 +1,8 @@
 #ifndef STATE_INTERP_IMPL_HPP
 #define STATE_INTERP_IMPL_HPP
 
-
 #include "StateInterp.hpp"
+
 
 namespace ode::interp::uni {
 
@@ -122,13 +122,14 @@ void Interval<T>::link_with(Interval<T>& other){
 
 template<typename T>
 std::string Interval<T>::signature(int prec) const{
+    std::ostringstream  oss;
+    oss << std::setprecision(prec);
     if (is_point()){
-        return "[" + to_string(_a, prec) + "]";
-    }
-    else{
-        std::string left = (_left == 1) ? "[" : (_left == -1 ? "(" : "|");
-        std::string right = (_right == 1) ? "]" : (_right == -1 ? ")" : "|");
-        return left + to_string(_a, prec) + ", " + to_string(_b, prec) + right;
+        oss << "[" << _a << "]";
+        return oss.str();
+    }else{
+        oss << (_left == 1 ? "[" : (_left == -1 ? "(" : "|")) << _a << ", " << _b << (_right == 1 ? "]" : (_right == -1 ? ")" : "|"));
+        return oss.str();
     }
 }
 
@@ -139,7 +140,9 @@ Interpolator<T, N>::Interpolator(size_t n) : _array_size(n) {}
 template<typename T, size_t N>
 void Interpolator<T, N>::call(T* result, const T& t) const{
     if (this->is_out_of_bounds(t)){
-        throw std::runtime_error("Scalar " + to_string(t, 8) + " is out of bounds in LinkedInterpolator with range " + interval().signature(8));
+        std::ostringstream oss;
+        oss << std::setprecision(8) << "Scalar " << t << " is out of bounds in LinkedInterpolator with range " << interval().signature(8);
+        throw std::runtime_error(oss.str());
     }
     this->_call_impl(result, t);
 }

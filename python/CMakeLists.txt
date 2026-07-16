@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.15...3.26)
 project(odepack_python LANGUAGES CXX)
 
 # Build options
-option(MPREAL "Enable MPFR multi-precision support" OFF)
 option(DEBUG "Enable debug build" OFF)
-option(RK4_DENSE "Enable accurate RK4 dense output" OFF)
-option(NO_ODE_WARN "Disable ODE warnings" OFF)
-option(NO_NAN_CHECK "Disable NaN/inf checks for performance" OFF)
+option(DPK_MPREAL "Enable MPFR multi-precision support" OFF)
+option(DPK_DENSE_RK4 "Enable accurate RK4 dense output" OFF)
+option(DPK_NO_WARN "Disable ODE warnings" OFF)
+option(DPK_NO_NAN_CHECK "Disable NaN/inf checks for performance" OFF)
 option(ODEPACK_NATIVE_ARCH "Enable -march=native for local builds" OFF)
 option(ODEPACK_STRIP_INSTALL "Strip binaries at install time" OFF)
 
@@ -66,7 +66,7 @@ set(ODEPACK_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 include(${ODEPACK_ROOT}/cmake/external.cmake)
 
 # MPFR/GMP (optional)
-if(MPREAL)
+if(DPK_MPREAL)
     find_library(MPFR_LIBRARY mpfr REQUIRED)
     find_library(GMP_LIBRARY gmp REQUIRED)
 endif()
@@ -91,16 +91,16 @@ else()
     list(APPEND COMMON_COMPILE_OPTIONS -march=x86-64)
 endif()
 
-if(MPREAL)
-    list(APPEND COMMON_COMPILE_OPTIONS -DMPREAL)
+if(DPK_MPREAL)
+    list(APPEND COMMON_COMPILE_OPTIONS -DDPK_MPREAL)
 endif()
-if(NO_NAN_CHECK)
+if(DPK_NO_NAN_CHECK)
     list(APPEND COMMON_COMPILE_OPTIONS -DNO_NAN_CHECK)
 endif()
-if(RK4_DENSE)
+if(DPK_DENSE_RK4)
     list(APPEND COMMON_COMPILE_OPTIONS -DRK4_DENSE)
 endif()
-if(NO_ODE_WARN)
+if(DPK_NO_WARN)
     list(APPEND COMMON_COMPILE_OPTIONS -DNO_ODE_WARN)
 endif()
 
@@ -140,6 +140,8 @@ function(configure_odepack_lib target_name)
     target_link_libraries(${target_name} PUBLIC
         odepack_headers
         odepack_autodiff
+        odepack_ndspan
+        odepack_polybox
         pybind11::pybind11
         Python::Module
     )
@@ -151,7 +153,7 @@ function(configure_odepack_lib target_name)
         target_link_options(${target_name} PRIVATE ${COMMON_LINK_OPTIONS})
     endif()
     set_target_properties(${target_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    if(MPREAL)
+    if(DPK_MPREAL)
         target_link_libraries(${target_name} PUBLIC odepack_mpreal ${MPFR_LIBRARY} ${GMP_LIBRARY})
     endif()
 endfunction()
@@ -205,8 +207,8 @@ target_link_libraries(odepack_fields PUBLIC odepack_interp)
 
 function(configure_py_module target_name)
     target_compile_options(${target_name} PRIVATE ${COMMON_COMPILE_OPTIONS})
-    if(MPREAL)
-        target_compile_definitions(${target_name} PRIVATE MPREAL)
+    if(DPK_MPREAL)
+        target_compile_definitions(${target_name} PRIVATE DPK_MPREAL)
     endif()
 endfunction()
 

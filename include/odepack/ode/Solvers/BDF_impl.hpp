@@ -3,6 +3,7 @@
 
 
 #include "BDF.hpp"
+#include <odepack/ode/Tools.hpp>
 
 namespace ode{
 
@@ -152,8 +153,8 @@ BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();
-#ifndef NO_ODE_WARN
-        this->cerr("Warning: rtol=0 not allowed in the BDF method. Setting rtol = " + to_string(rtol));
+#ifndef DPK_NO_WARN
+        this->cerr(GetStr("Warning: rtol=0 not allowed in the BDF method. Setting rtol = ", rtol));
 #endif
     }
     _newton_tol = ndspan::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, ndspan::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));

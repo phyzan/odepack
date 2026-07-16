@@ -1,4 +1,4 @@
-#include "../../../include/odepack/pyode/lib/PyEvents.hpp"
+#include <odepack/pyode/lib/PyEvents.hpp>
 
 
 using namespace ode::python;

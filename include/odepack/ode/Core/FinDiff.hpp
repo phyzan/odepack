@@ -3,7 +3,7 @@
 
 #include <algorithm>
 #include <limits>
-#include "../../ndspan/arrays.hpp"
+#include <ndspan/arrays.hpp>
 
 namespace ode{
 

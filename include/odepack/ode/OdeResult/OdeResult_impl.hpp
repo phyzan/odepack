@@ -2,6 +2,7 @@
 #define ODE_RESULT_IMPL_HPP
 
 #include "OdeResult.hpp"
+#include <sstream>
 
 namespace ode{
 
@@ -222,17 +223,16 @@ void OdeResult<T, N>::examine() const {
 
 template<typename T, size_t N>
 std::string OdeResult<T, N>::event_log() const {
-    std::string res;
-    res += "\tEvents:\n\t----------\n";
+    std::ostringstream oss;
+    oss << "\tEvents:\n\t----------\n";
     for (size_t i=0; i<event_data_.size(); i++){
         const OrbitData<T>& data = event_data_.data(i);
         const std::string& name = event_data_.name(i);
-        res += "\t    " + name + " : " + std::to_string(data.t.size()) + "\n";
+        oss << "\t    " << name << " : " << data.t.size() << "\n";
     }
-    res += "\n\t----------\n";
-    return res;
+    oss << "\n\t----------\n";
+    return oss.str();
 }
-
 
 
 // ==================================================================================
@@ -241,7 +241,7 @@ std::string OdeResult<T, N>::event_log() const {
 
 
 template<typename T, size_t N>
-OdeSolution<T, N>::OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(orbit_data), std::move(event_data), orb_idx_start, diverges, success, runtime, std::move(message)), interpolator_(interpolator.clone()) {}
+OdeSolution<T, N>::OdeSolution(OrbitData<T> orbit_data, EventData<T> event_data, size_t orb_idx_start, bool diverges, bool success, double runtime, std::string message, const interp::uni::Interpolator<T, N>& interpolator) : OdeResult<T, N>(std::move(orbit_data), std::move(event_data), orb_idx_start, diverges, success, runtime, std::move(message)), interpolator_(interpolator.clone()) {}
 
 
 template<typename T, size_t N>

@@ -92,7 +92,7 @@ pip install ./python
 
 To install with arbitrary precision support, assuming that MPFR and GMP is installed (see above), run
 ```bash
-CMAKE_ARGS="-DMPREAL=ON" pip install ./python
+CMAKE_ARGS="-DDPK_MPREAL=ON" pip install ./python
 ```
 
 **Requirements:**
@@ -101,9 +101,9 @@ CMAKE_ARGS="-DMPREAL=ON" pip install ./python
 
 There are optional build flags for the Python bindings:
 
-- MPREAL: Enable arbitrary precision support
+- DPK_MPREAL: Enable arbitrary precision support
 - DEBUG: Enable debug build
-- RK4_DENSE: Enable accurate RK4 dense output for the RK4 solver, with the cost of additional memory usage and slightly slower performance.
+- DPK_DENSE_RK4: Enable accurate RK4 dense output for the RK4 solver, with the cost of additional memory usage and slightly slower performance.
 
 Use any of them by setting the `CMAKE_ARGS` environment variable before installation, and adding the `-D` character before the flag, for example:
 
@@ -114,7 +114,7 @@ CMAKE_ARGS="-DDEBUG=ON" pip install ./python
 
 or for a debug build with arbitrary precision support, run
 ```bash
-CMAKE_ARGS="-DDEBUG=ON -DMPREAL=ON" pip install ./python
+CMAKE_ARGS="-DDEBUG=ON -DDPK_MPREAL=ON" pip install ./python
 ```
 
 ---
@@ -430,12 +430,12 @@ int main(){
 
 To compile, run
 ```bash
-g++ -std=c++20 -O3 -DMPREAL test.cpp -o test
+g++ -std=c++20 -O3 -DDPK_MPREAL test.cpp -o test
 ```
 
 To compile using ```T = mpfr::mpreal``` instead of ```T = double```, run
 ```bash
-g++ -std=c++20 -O3 -DMPREAL test.cpp -o test -lmpfr -lgmp
+g++ -std=c++20 -O3 -DDPK_MPREAL test.cpp -o test -lmpfr -lgmp
 ```
 
 ---
@@ -735,10 +735,10 @@ int main() {
 }
 ```
 
-Compile with `-DMPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`:
+Compile with `-DDPK_MPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`:
 
 ```
-g++ -std=c++20 -DMPREAL test.cpp -o test -lmpfr -lgmp
+g++ -std=c++20 -DDPK_MPREAL test.cpp -o test -lmpfr -lgmp
 ```
 
 ---

@@ -130,4 +130,4 @@ int main(){
 }
 
 
-// g++ -std=c++20 -O3 -DMPREAL -Iexternal/autodiff/include tests/test_obj.cpp -o test -lmpfr -lgmp
+// g++ -std=c++20 -O3 -DDPK_MPREAL -Iexternal/autodiff/include tests/test_obj.cpp -o test -lmpfr -lgmp

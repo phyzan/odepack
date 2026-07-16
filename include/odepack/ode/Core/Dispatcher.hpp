@@ -6,7 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <map>
-#ifdef MPREAL
+#ifdef DPK_MPREAL
 #include <mpreal.h>
 #endif
 
@@ -18,7 +18,7 @@ enum class ScalarType : std::uint8_t {
     Float,
     Double,
     LongDouble,
-#ifdef MPREAL
+#ifdef DPK_MPREAL
     MPReal
 #endif
 };
@@ -27,7 +27,7 @@ static const std::map<ScalarType, const char*> SCALAR_TYPE_MAP = {
     {ScalarType::Float, "float"},
     {ScalarType::Double, "double"},
     {ScalarType::LongDouble, "long double"},
-#ifdef MPREAL
+#ifdef DPK_MPREAL
     {ScalarType::MPReal, "mpreal"}
 #endif
 };
@@ -36,7 +36,7 @@ static const std::map<std::string, ScalarType> DTYPE_MAP = {
     {"float", ScalarType::Float},
     {"double", ScalarType::Double},
     {"long double", ScalarType::LongDouble},
-#ifdef MPREAL
+#ifdef DPK_MPREAL
     {"mpreal", ScalarType::MPReal}
 #endif
 };
@@ -73,7 +73,7 @@ inline std::string get_scalar_type(){
     else if constexpr (std::is_same_v<T, long double>){
         return "long double";
     }
-#ifdef MPREAL
+#ifdef DPK_MPREAL
     else if constexpr (std::is_same_v<T, mpfr::mpreal>){
         return "mpreal";
     }
