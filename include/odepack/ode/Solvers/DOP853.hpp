@@ -72,6 +72,9 @@ protected:
     friend Base::Base;
     friend Base::Base::Base;
 
+    // Explicit hardcoded stage computation (boost::odeint style)
+    void compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const;
+
     void set_coef_matrix_impl() const;
 
     T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;

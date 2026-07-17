@@ -90,7 +90,7 @@ protected:
         bool base_floor = Base::RequestTimeFloor(out);
         const int d = this->direction();
         T my_floor = this->t_new();
-        FOR_LOOP(size_t, I, NOBJ,
+        NDSPAN_FOR_LOOP(I, NOBJ,
             const int old_sgn = cached_sign[I];
             const int new_sign = sgn(std::get<I>(obj).func(this->t_new(), this->vector().data(), this->args().data()));
             cached_sign[I] = new_sign;
@@ -127,7 +127,7 @@ private:
 
     bool get_nearest_floor(T& out, size_t& idx) const{
         bool found = false;
-        FOR_LOOP(size_t, I, NOBJ,
+        NDSPAN_FOR_LOOP(I, NOBJ,
             if (detected[I]){
                 if (!found){
                     out = values[I];
@@ -143,7 +143,7 @@ private:
     }
 
     void cache_current_signs(){
-        FOR_LOOP(size_t, I, NOBJ,
+        NDSPAN_FOR_LOOP(I, NOBJ,
             cached_sign[I] = sgn(std::get<I>(obj).func(this->t(), this->vector().data(), this->args().data()));
         );
     }

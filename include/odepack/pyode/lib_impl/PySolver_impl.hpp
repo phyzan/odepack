@@ -171,7 +171,7 @@ void py_advance_all_general(py::object& list, Callable&& func, int threads, bool
     for (size_t i=0; i<array.size(); i++){
         if (error_flag.load()){ continue;}
         try {
-            call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+            call_dispatch(types[i], [&]<typename T>() NDSPAN_LAMBDA_INLINE {
                 auto* solver = reinterpret_cast<OdeRichSolver<T>*>(array[i]);
                 func(solver);
             });

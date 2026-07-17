@@ -130,7 +130,7 @@ bool RichSolver<Derived, T, N, SP, OdeType>::advance_to_event(const T& tmax, con
         return false;
     }
     bool success = false;
-    Base::advance_until(tmax, [&](const T& t, const T* state, const T* extra)LAMBDA_INLINE{
+    Base::advance_until(tmax, [&](const T& t, const T* state, const T* extra)NDSPAN_LAMBDA_INLINE{
         if (EventState<T> es = this->current_event()){
             if (event_idx.empty() || std::find(event_idx.begin(), event_idx.end(), es.idx) != event_idx.end()){
                 success = true;

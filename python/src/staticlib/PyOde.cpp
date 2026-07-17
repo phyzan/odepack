@@ -294,7 +294,7 @@ void py_integrate_all(py::object& list, double interval, const py::object& t_eva
     #pragma omp parallel for schedule(dynamic) num_threads(num)
     for (size_t i=0; i<array.size(); i++){
 
-        call_dispatch(types[i], [&]<typename T>() LAMBDA_INLINE {
+        call_dispatch(types[i], [&]<typename T>() NDSPAN_LAMBDA_INLINE {
             ODE<T>* ode = reinterpret_cast<ODE<T>*>(array[i]);
             if (t_eval_is_none){
                 ode->integrate(nullptr, T(interval), options);

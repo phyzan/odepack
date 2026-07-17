@@ -97,7 +97,7 @@ py::array_t<T> array(T* data, const std::vector<py::ssize_t>& shape);
 std::vector<py::ssize_t> shape(const py::object& obj);
 
 template<typename T>
-INLINE void pass_values(T* out, const py::iterable& obj, size_t n){
+NDSPAN_INLINE void pass_values(T* out, const py::iterable& obj, size_t n){
     if (py::len(obj) != n){
         throw py::value_error("Expected iterable of length " + std::to_string(n));
     }

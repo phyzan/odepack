@@ -167,7 +167,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     const std::vector<EventOptions> options = this->solver()->event_col().validate_events(event_options);
     EventCounter<T, N>              event_counter(options);
 
-    auto event_state_valid = [&]()LAMBDA_INLINE{
+    auto event_state_valid = [&]()NDSPAN_LAMBDA_INLINE{
         bool res = false;
         if (const EventState<T> es = solver_->current_event()){
             if (event_counter.count_it(es.idx)){
@@ -180,7 +180,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
 
     // Since we pass an array of t_eval in the solver later, if step_ptr is not null,
     // it is guaranteed to point to an element in t_eval.
-    auto main_observer = [&](const T& t, const T* q, const T* step_ptr) LAMBDA_INLINE -> bool {
+    auto main_observer = [&](const T& t, const T* q, const T* step_ptr) NDSPAN_LAMBDA_INLINE -> bool {
         const bool at_valid_event = solver_->at_event() && event_state_valid();
 
         if constexpr (!store_explicit_steps) {

@@ -95,16 +95,16 @@ public:
         if constexpr (JP == JacPolicy::Autodiff){
             DualType* rhs = diff_worker.data();
             DualType* y = diff_worker.data() + N;
-            FOR_LOOP(size_t, I, N,
+            NDSPAN_FOR_LOOP(I, N,
                 y[I] = DualType(q[I], autodiff::Variable<I>{});
             );
 
             ode_.Rhs(rhs, t, y, args);
 
             std::fill(out+nsys, out+2*nsys, 0);
-            FOR_LOOP(size_t, J, N,
+            NDSPAN_FOR_LOOP(J, N,
                 out[J] = rhs[J].value();
-                FOR_LOOP(size_t, I, N,
+                NDSPAN_FOR_LOOP(I, N,
                     out[I+N] += rhs[I].diff_value(J) * delta_q[J];
                 );
             );
@@ -139,8 +139,8 @@ public:
 
         // extract the jacobian matrix from the autodiff output
         ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
-        FOR_LOOP(size_t, I, N,
-            FOR_LOOP(size_t, J, N,
+        NDSPAN_FOR_LOOP(I, N,
+            NDSPAN_FOR_LOOP(J, N,
                 m(I, J) = m(I+N, J+N) = rhs[I].diff_value(J);
                 m(I, J+N) = 0;
                 //the bottom left block now

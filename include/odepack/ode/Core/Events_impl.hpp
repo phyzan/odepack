@@ -186,7 +186,7 @@ bool PreciseEvent<T, Target, MaskFunc, Derived>::locate_impl(T& t, State<T> befo
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && (abs<T>(val1) > ftol)){
         T* vec = this->worker.data();
 
-        auto obj_fun_scalar = [&](T t) LAMBDA_INLINE{
+        auto obj_fun_scalar = [&](T t) NDSPAN_LAMBDA_INLINE{
             obj_fun(vec, t); // interpolate the state vector at time t, and pass the value on vec
             return this->obj_fun(t, vec);
         };

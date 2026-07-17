@@ -37,14 +37,14 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
     if constexpr (JP == JacPolicy::Approx){
         return this->jac_approx(jm, t, q, dt);
     } else if constexpr (JP == JacPolicy::Autodiff){
-        FOR_LOOP(size_t, I, N,
+        NDSPAN_FOR_LOOP(I, N,
             _diff_worker[I+N] = DualType(q[I], autodiff::Variable<I>{});
         );
         _ode.Rhs(_diff_worker.data(), t, _diff_worker.data()+N, _args.data());
 
         const DualType* rhs = _diff_worker.data();
-        FOR_LOOP(size_t, I, N,
-            FOR_LOOP(size_t, J, N,
+        NDSPAN_FOR_LOOP(I, N,
+            NDSPAN_FOR_LOOP(J, N,
                 jm[I + J*N] = rhs[I].diff_value(J);
             );
         );
@@ -393,7 +393,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const 
     const T& t_dual = has_extra_steps ? extra_steps[extra_steps.size() - 1] : time;
 
     bool success;
-    auto evolve = [&]() LAMBDA_INLINE -> bool {
+    auto evolve = [&]() NDSPAN_LAMBDA_INLINE -> bool {
         bool res;
         while ((res = (this->is_running() && Accessor::call_Adv_Impl(*THIS, time))) && (time != this->t())){
             bool obs_res;
@@ -424,7 +424,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance_until(const T& time, const 
     }else if (extra_steps[extra_steps.size()-1]*d > time*d){
         throw std::runtime_error(GetStr("Invalid extra steps: last extra step is ", extra_steps[extra_steps.size()-1], " but target time is ", time, ". Extra steps must be in the same direction and between the current time and the target time."));
     }else{
-        auto validate_idx = [&](size_t idx) LAMBDA_INLINE{
+        auto validate_idx = [&](size_t idx) NDSPAN_LAMBDA_INLINE -> size_t{
             if (extra_steps[idx]*d <= this->t()*d){
                 throw std::runtime_error(GetStr("Invalid extra step: ", extra_steps[idx], ". Extra steps must be in the same direction and between the current time (", this->t(), ") and the target time (", time, ")."));
             }

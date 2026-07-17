@@ -355,7 +355,7 @@ template<typename T>
 std::vector<T> subvec(const std::vector<T>& x, size_t start, size_t size);
 
 template<typename T>
-INLINE bool all_are_finite(const T* data, size_t n){
+NDSPAN_INLINE bool all_are_finite(const T* data, size_t n){
 #ifndef DPK_NO_NAN_CHECK
     for (size_t i=0; i<n; i++){
         if (!isfinite(data[i])){
@@ -381,7 +381,7 @@ inline void show_progress(int n, int target, const Clock& clock){
 }
 
 template<typename... Arg>
-inline void print(Arg... x){
+NDSPAN_INLINE void print(Arg&&... x){
     ((std::cout << x << ' '), ...);
     std::cout << "\n";
 }

@@ -99,6 +99,9 @@ protected:
 
     T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h) const;
 
+    // CRTP dispatch to derived class for explicit error computation (boost::odeint style)
+    T compute_error_impl(size_t j, const T* K, const T& h) const;
+
     using Base = DOPRI_DISPATCHER<Derived, T, N, Nstages, Norder, Nstages+1, SP, OdeType>;
     friend Base;
     friend Base::Base;
@@ -174,6 +177,12 @@ protected:
 
     T    step_impl(T* result, const T* state, const T& h);
 
+    // Explicit hardcoded stage computation (boost::odeint style)
+    void compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const;
+
+    // Explicit hardcoded error computation (boost::odeint style)
+    T compute_error_impl(size_t j, const T* K, const T& h) const;
+
     using Base = STANDARD_DOPRI_DISPATCHER<GetDerived<RK45<T, N, SP, OdeType, Derived>, Derived>, T, N, 6, 5, SP, OdeType>;
     using Ptype = Array2D<T, Nstages+1, 4, Allocation::Stack>;
 
@@ -216,6 +225,12 @@ public:
     DEFAULT_RULE_OF_FOUR(RK23);
 
     T    step_impl(T* result, const T* state, const T& h);
+
+    // Explicit hardcoded stage computation (boost::odeint style)
+    void compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const;
+
+    // Explicit hardcoded error computation (boost::odeint style)
+    T compute_error_impl(size_t j, const T* K, const T& h) const;
 
 protected:
 

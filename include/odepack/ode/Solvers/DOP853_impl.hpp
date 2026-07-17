@@ -331,6 +331,103 @@ template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename 
 DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void DOP853<T, N, SP, OdeType, Derived>::compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const {
+    const size_t n = this->Nsys();
+
+    // A coefficients (from DOP_COEFS, only non-zero entries)
+    const T& a10 = this->Am_(1,0);
+
+    const T& a20 = this->Am_(2,0); const T& a21 = this->Am_(2,1);
+
+    const T& a30 = this->Am_(3,0); const T& a32 = this->Am_(3,2);
+
+    const T& a40 = this->Am_(4,0); const T& a42 = this->Am_(4,2); const T& a43 = this->Am_(4,3);
+
+    const T& a50 = this->Am_(5,0); const T& a53 = this->Am_(5,3); const T& a54 = this->Am_(5,4);
+
+    const T& a60 = this->Am_(6,0); const T& a63 = this->Am_(6,3); const T& a64 = this->Am_(6,4); const T& a65 = this->Am_(6,5);
+
+    const T& a70 = this->Am_(7,0); const T& a73 = this->Am_(7,3); const T& a74 = this->Am_(7,4); const T& a75 = this->Am_(7,5); const T& a76 = this->Am_(7,6);
+
+    const T& a80 = this->Am_(8,0); const T& a83 = this->Am_(8,3); const T& a84 = this->Am_(8,4); const T& a85 = this->Am_(8,5); const T& a86 = this->Am_(8,6); const T& a87 = this->Am_(8,7);
+
+    const T& a90 = this->Am_(9,0); const T& a93 = this->Am_(9,3); const T& a94 = this->Am_(9,4); const T& a95 = this->Am_(9,5); const T& a96 = this->Am_(9,6); const T& a97 = this->Am_(9,7); const T& a98 = this->Am_(9,8);
+
+    const T& a100 = this->Am_(10,0); const T& a103 = this->Am_(10,3); const T& a104 = this->Am_(10,4); const T& a105 = this->Am_(10,5); const T& a106 = this->Am_(10,6); const T& a107 = this->Am_(10,7); const T& a108 = this->Am_(10,8); const T& a109 = this->Am_(10,9);
+
+    const T& a110 = this->Am_(11,0); const T& a113 = this->Am_(11,3); const T& a114 = this->Am_(11,4); const T& a115 = this->Am_(11,5); const T& a116 = this->Am_(11,6); const T& a117 = this->Am_(11,7); const T& a118 = this->Am_(11,8); const T& a119 = this->Am_(11,9); const T& a1110 = this->Am_(11,10);
+
+    // B weights (b1=b2=b3=b4=0)
+    const T& b0 = this->Bm_(0); const T& b5 = this->Bm_(5); const T& b6 = this->Bm_(6); const T& b7 = this->Bm_(7); const T& b8 = this->Bm_(8); const T& b9 = this->Bm_(9); const T& b10 = this->Bm_(10); const T& b11 = this->Bm_(11);
+
+    // C nodes
+    const T& c1 = this->Cm_[1]; const T& c2 = this->Cm_[2]; const T& c3 = this->Cm_[3]; const T& c4 = this->Cm_[4]; const T& c5 = this->Cm_[5];
+    const T& c6 = this->Cm_[6]; const T& c7 = this->Cm_[7]; const T& c8 = this->Cm_[8]; const T& c9 = this->Cm_[9]; const T& c10 = this->Cm_[10];
+
+    const T* __restrict__ K0 = K;
+    T* __restrict__ K1 = K + n;
+    T* __restrict__ K2 = K + 2*n;
+    T* __restrict__ K3 = K + 3*n;
+    T* __restrict__ K4 = K + 4*n;
+    T* __restrict__ K5 = K + 5*n;
+    T* __restrict__ K6 = K + 6*n;
+    T* __restrict__ K7 = K + 7*n;
+    T* __restrict__ K8 = K + 8*n;
+    T* __restrict__ K9 = K + 9*n;
+    T* __restrict__ K10 = K + 10*n;
+    T* __restrict__ K11 = K + 11*n;
+
+    // Stage 2 (K1)
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a10*K0[j]); }
+    this->rhs(K1, t + c1*h, r);
+
+    // Stage 3 (K2)
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a20*K0[j] + a21*K1[j]); }
+    this->rhs(K2, t + c2*h, r);
+
+    // Stage 4 (K3) - a31=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a30*K0[j] + a32*K2[j]); }
+    this->rhs(K3, t + c3*h, r);
+
+    // Stage 5 (K4) - a41=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a40*K0[j] + a42*K2[j] + a43*K3[j]); }
+    this->rhs(K4, t + c4*h, r);
+
+    // Stage 6 (K5) - a51=a52=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a50*K0[j] + a53*K3[j] + a54*K4[j]); }
+    this->rhs(K5, t + c5*h, r);
+
+    // Stage 7 (K6) - a61=a62=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a60*K0[j] + a63*K3[j] + a64*K4[j] + a65*K5[j]); }
+    this->rhs(K6, t + c6*h, r);
+
+    // Stage 8 (K7) - a71=a72=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a70*K0[j] + a73*K3[j] + a74*K4[j] + a75*K5[j] + a76*K6[j]); }
+    this->rhs(K7, t + c7*h, r);
+
+    // Stage 9 (K8) - a81=a82=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a80*K0[j] + a83*K3[j] + a84*K4[j] + a85*K5[j] + a86*K6[j] + a87*K7[j]); }
+    this->rhs(K8, t + c8*h, r);
+
+    // Stage 10 (K9) - a91=a92=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a90*K0[j] + a93*K3[j] + a94*K4[j] + a95*K5[j] + a96*K6[j] + a97*K7[j] + a98*K8[j]); }
+    this->rhs(K9, t + c9*h, r);
+
+    // Stage 11 (K10) - a101=a102=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a100*K0[j] + a103*K3[j] + a104*K4[j] + a105*K5[j] + a106*K6[j] + a107*K7[j] + a108*K8[j] + a109*K9[j]); }
+    this->rhs(K10, t + c10*h, r);
+
+    // Stage 12 (K11) - a111=a112=0
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a110*K0[j] + a113*K3[j] + a114*K4[j] + a115*K5[j] + a116*K6[j] + a117*K7[j] + a118*K8[j] + a119*K9[j] + a1110*K10[j]); }
+    this->rhs(K11, t + h, r);
+
+    // Solution update (b1=b2=b3=b4=0)
+    for (size_t j = 0; j < n; j++) {
+        q_new[j] = q[j] + h * (b0*K0[j] + b5*K5[j] + b6*K6[j] + b7*K7[j] + b8*K8[j] + b9*K9[j] + b10*K10[j] + b11*K11[j]);
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void DOP853<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();

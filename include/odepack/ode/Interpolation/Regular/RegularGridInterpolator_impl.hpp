@@ -196,7 +196,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     Array1D<int, NDIM, InterpBase::ALLOC> i_start(this->ndim());
     Array1D<int, NDIM, InterpBase::ALLOC> i_curr(this->ndim());
 
-    auto GetIdx = [&](Array1D<int, NDIM, InterpBase::ALLOC>& i, const T* x) LAMBDA_INLINE{
+    auto GetIdx = [&](Array1D<int, NDIM, InterpBase::ALLOC>& i, const T* x) NDSPAN_LAMBDA_INLINE{
         if constexpr (NDIM > 0){
             ((i[I] = int(std::round((x[I] - X[I][0]) / Dx[I]))), ...);
         }else{
@@ -208,7 +208,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
     Array1D<int, NDIM, InterpBase::ALLOC> idx_aux(this->ndim());
 
-    auto InBounds = [&](const Array1D<int, NDIM, InterpBase::ALLOC>& i) LAMBDA_INLINE{
+    auto InBounds = [&](const Array1D<int, NDIM, InterpBase::ALLOC>& i) NDSPAN_LAMBDA_INLINE{
         if constexpr (NDIM > 0){
             return ((i[I] >= 0 && i[I] < int(N[I])) && ...);
         }else{
@@ -359,7 +359,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     };
 
     std::vector<Array2D<T, NDIM, 0>> streamlines;
-    auto TryTrajectory = [&](Array2D<T, NDIM, 0>& worker_line, const Array1D<int, NDIM, InterpBase::ALLOC>& idx) LAMBDA_INLINE{
+    auto TryTrajectory = [&](Array2D<T, NDIM, 0>& worker_line, const Array1D<int, NDIM, InterpBase::ALLOC>& idx) NDSPAN_LAMBDA_INLINE{
 
         if constexpr (NDIM > 0) {
             if (((idx[I] < 0 || idx[I] >= int(N[I])) || ...)) {
