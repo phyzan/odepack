@@ -102,7 +102,7 @@ public:
 
     using Scalar = T;
     using Base = typename traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type;
-    using DualType = autodiff::AutoDiff<T, 1, N>;
+    using DualType = ::ode::DualType<T, N, 1>;
     static constexpr size_t NSYS = N;
     static constexpr SolverPolicy Policy = SP;
     

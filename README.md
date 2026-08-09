@@ -617,7 +617,9 @@ odepack/
 │       └── pyodepackDecl.hpp        # Python binding declarations
 │
 ├── external/                        # Git submodules
-│   ├── autodiff/                    # Automatic differentiation library
+│   ├── xdiff/                    # Automatic differentiation library
+│   ├── ndspan/                    # Multi-dimensional array views and utilities
+│   ├── polybox/                    # Wrapper for dynamically allocated types
 │   ├── mpreal/                      # Multi-precision floating point (header-only)
 │   └── qhull/                       # Convex hull library (for Delaunay triangulation)
 │

@@ -72,8 +72,8 @@ struct VariationalOdeSys{
 
 public:
 
-    using DualType      = autodiff::AutoDiff<T, 1, N>;
-    using VarDualType   = autodiff::AutoDiff<T, 2, N>;
+    using DualType      = ::ode::DualType<T, N, 1>;
+    using VarDualType   = ::ode::DualType<T, N, 2>;
     
 
     // same as in BaseSolver, but we need to redefine it here for the variational system
@@ -93,21 +93,40 @@ public:
         const T* delta_q = q + nsys;
 
         if constexpr (JP == JacPolicy::Autodiff){
-            DualType* rhs = diff_worker.data();
-            DualType* y = diff_worker.data() + N;
-            NDSPAN_FOR_LOOP(I, N,
-                y[I] = DualType(q[I], autodiff::Variable<I>{});
-            );
-
-            ode_.Rhs(rhs, t, y, args);
-
-            std::fill(out+nsys, out+2*nsys, 0);
-            NDSPAN_FOR_LOOP(J, N,
-                out[J] = rhs[J].value();
+            if constexpr (N > 0){
+                DualType* rhs = diff_worker.data();
+                DualType* y = diff_worker.data() + N;
                 NDSPAN_FOR_LOOP(I, N,
-                    out[I+N] += rhs[I].diff_value(J) * delta_q[J];
+                    y[I] = DualType(q[I], {.axis=I});
                 );
-            );
+
+                ode_.Rhs(rhs, t, y, args);
+
+                std::fill(out+nsys, out+2*nsys, 0);
+                NDSPAN_FOR_LOOP(J, N,
+                    out[J] = rhs[J].value();
+                    NDSPAN_FOR_LOOP(I, N,
+                        out[I+N] += rhs[I].get_diff_wrt(J) * delta_q[J];
+                    );
+                );
+            } else {
+                const size_t nvars_default = DualType::get_default_nvars();
+                DualType::set_default_nvars(nsys);
+                DualType* rhs = diff_worker.data();
+                DualType* y = diff_worker.data() + nsys;
+                for (size_t i=0; i<nsys; i++){
+                    y[i] = DualType(q[i], {.axis=int(i)});
+                }
+                ode_.Rhs(rhs, t, y, args);
+                std::fill(out+nsys, out+2*nsys, 0);
+                for (size_t j=0; j<nsys; j++){
+                    out[j] = rhs[j].value();
+                    for (size_t i=0; i<nsys; i++){
+                        out[i+nsys] += rhs[i].get_diff_wrt(j) * delta_q[j];
+                    }
+                }
+                DualType::set_default_nvars(nvars_default);
+            }
         } else {
             ode_.Rhs(out, t, q, args); //fills the first half (nsys) entries
             // fills jm with the jacobian of the original system at (t, q)
@@ -122,35 +141,62 @@ public:
         }
     }
 
-    // Only provided if it does not require finite differences, otherwise the base solver with automatically use jac_approx to compute the jacobian of the full system.
+    // Only provided if it does not require finite differences, otherwise the base solver will automatically use jac_approx to compute the jacobian of the full system.
     void    Jac(T* out, const T& t, const T* q, const T* args, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff) {
 
-        // If autodiff is enabled, then N is positive, so the system size is known at compile time. BaseSolver only allows autodiff if N > 0, so we can safely use a fixed-size array for the autodiff worker.
-        VarDualType* rhs = jac_worker.data();
-        VarDualType* y = jac_worker.data() + N;
+        if constexpr (N > 0){
+            VarDualType* rhs = jac_worker.data();
+            VarDualType* y = jac_worker.data() + N;
 
-        // copy the input state vector to the worker
-        for (size_t i=0; i<N; i++){
-            y[i] = VarDualType(q[i]);
+            // copy the input state vector to the worker
+            for (size_t i=0; i<N; i++){
+                y[i] = VarDualType(q[i], {.axis=i});
+            }
+
+            // compute the jacobian using autodiff
+            ode_.Rhs(rhs, t, y, args);
+
+            // extract the jacobian matrix from the autodiff output
+            ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
+            NDSPAN_FOR_LOOP(I, N,
+                NDSPAN_FOR_LOOP(J, N,
+                    m(I, J) = m(I+N, J+N) = rhs[I].get_diff_wrt(J);
+                    m(I, J+N) = 0;
+                    //the bottom left block now
+                    T sum = 0;
+                    for (size_t K=0; K<N; K++){
+                        sum += rhs[I].get_diff_wrt(K, J) * q[N+K];
+                    }
+                    m(I+N, J) = sum;
+                );
+            );
+        } else {
+            const size_t nvars_default = VarDualType::get_default_nvars();
+            VarDualType::set_default_nvars(nsys);
+            VarDualType* rhs = jac_worker.data();
+            VarDualType* y = jac_worker.data() + nsys;
+
+            for (size_t i=0; i<nsys; i++){
+                y[i] = VarDualType(q[i], {.axis=i});
+            }
+
+            ode_.Rhs(rhs, t, y, args);
+
+            ndspan::MutView<T, ndspan::Layout::F> m(out, 2*nsys, 2*nsys);
+            for (size_t i=0; i<nsys; i++){
+                for (size_t j=0; j<nsys; j++){
+                    m(i, j) = m(i+nsys, j+nsys) = rhs[i].get_diff_wrt(j);
+                    m(i, j+nsys) = 0;
+                    T sum = 0;
+                    for (size_t k=0; k<nsys; k++){
+                        sum += rhs[i].get_diff_wrt(k, j) * q[nsys+k];
+                    }
+                    m(i+nsys, j) = sum;
+                }
+            }
+            VarDualType::set_default_nvars(nvars_default);
         }
 
-        // compute the jacobian using autodiff
-        ode_.Rhs(rhs, t, y, args);
-
-        // extract the jacobian matrix from the autodiff output
-        ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
-        NDSPAN_FOR_LOOP(I, N,
-            NDSPAN_FOR_LOOP(J, N,
-                m(I, J) = m(I+N, J+N) = rhs[I].diff_value(J);
-                m(I, J+N) = 0;
-                //the bottom left block now
-                T sum = 0;
-                for (size_t K=0; K<N; K++){
-                    sum += rhs[I].diff_value(K, J) * q[N+K];
-                }
-                m(I+N, J) = sum;
-            );
-        );
     }
 
     const OdeType& ode() const{

@@ -139,7 +139,7 @@ endif()
 function(configure_odepack_lib target_name)
     target_link_libraries(${target_name} PUBLIC
         odepack_headers
-        odepack_autodiff
+        odepack_xdiff
         odepack_ndspan
         odepack_polybox
         pybind11::pybind11

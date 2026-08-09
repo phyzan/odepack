@@ -127,7 +127,7 @@ int main() {
 
     /*
     Compile with:
-    g++ -std=c++20 -O3 -DDPK_MPREAL tests/oscillator_solver.cpp -o test -lmpfr -lgmp
+    g++ -std=c++20 -O3 -DDPK_MPREAL -Iinclude -Iexternal/xdiff/include -Iexternal/xdiff/external/lazy/include -Iexternal/polybox/include -Iexternal/ndspan/include tests/oscillator_solver.cpp -o test -lmpfr -lgmp
     */
 
     // Test with double precision

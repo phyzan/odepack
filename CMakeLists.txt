@@ -13,7 +13,7 @@ add_library(odepack INTERFACE)
 add_library(odepack::odepack ALIAS odepack)
 target_link_libraries(odepack INTERFACE
     odepack::headers
-    odepack::autodiff
+    odepack::xdiff
     odepack::ndspan
     odepack::polybox
     odepack::qhull

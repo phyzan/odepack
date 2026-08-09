@@ -47,5 +47,5 @@ int main(){
     print("Expected Lyapunov exponent: ~0.905");
     print("Computed Lyapunov exponent: ", solver.lyapunov_exponent());
 
-    // g++ -std=c++20 -O3 -DDPK_MPREAL -Iexternal/autodiff/include tests/variational_test.cpp -o test -lmpfr -lgmp
+    // g++ -std=c++20 -O3 -DDPK_MPREAL -Iinclude -Iexternal/xdiff/include -Iexternal/xdiff/external/lazy/include -Iexternal/polybox/include -Iexternal/ndspan/include tests/variational_test.cpp -o test -lmpfr -lgmp
 }

@@ -37,18 +37,34 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
     if constexpr (JP == JacPolicy::Approx){
         return this->jac_approx(jm, t, q, dt);
     } else if constexpr (JP == JacPolicy::Autodiff){
-        NDSPAN_FOR_LOOP(I, N,
-            _diff_worker[I+N] = DualType(q[I], autodiff::Variable<I>{});
-        );
-        _ode.Rhs(_diff_worker.data(), t, _diff_worker.data()+N, _args.data());
-
-        const DualType* rhs = _diff_worker.data();
-        NDSPAN_FOR_LOOP(I, N,
-            NDSPAN_FOR_LOOP(J, N,
-                jm[I + J*N] = rhs[I].diff_value(J);
+        if constexpr (N > 0){
+            NDSPAN_FOR_LOOP(I, N,
+                _diff_worker[I+N] = DualType(q[I], {.axis=I});
             );
-        );
-        return;
+            _ode.Rhs(_diff_worker.data(), t, _diff_worker.data()+N, _args.data());
+            const DualType* rhs = _diff_worker.data();
+            NDSPAN_FOR_LOOP(I, N,
+                NDSPAN_FOR_LOOP(J, N,
+                    jm[I + J*N] = rhs[I].get_diff_wrt(J);
+                );
+            );
+            return;
+        } else {
+            const size_t nsys = this->Nsys();
+            const size_t nvars_default = DualType::get_default_nvars();
+            DualType::set_default_nvars(nsys);
+            for (size_t i=0; i<nsys; i++){
+                _diff_worker[i + nsys] = DualType(q[i], {.axis=int(i)});
+            }
+            _ode.Rhs(_diff_worker.data(), t, _diff_worker.data() + nsys, _args.data());
+            const DualType* rhs = _diff_worker.data();
+            for (size_t i=0; i<nsys; i++){
+                for (size_t j=0; j<nsys; j++){
+                    jm[i + j*nsys] = rhs[i].get_diff_wrt(j);
+                }
+            }
+            DualType::set_default_nvars(nvars_default);
+        }
     } else {
         _ode.Jac(jm, t, q, _args.data());
     }
@@ -791,7 +807,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _ode(ode), _Nsys(nsys), _direction(dir){
+BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _diff_worker(JP==JacPolicy::Autodiff ? 2*nsys : 0), _ode(ode), _Nsys(nsys), _direction(dir){
     assert(nsys > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
@@ -811,7 +827,7 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
         for (int i=1; i<5; i++){
             ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }
-    }else {
+    } else {
         this->kill("Initial conditions contain nan or inf, or ode(ics) does");
     }
 }

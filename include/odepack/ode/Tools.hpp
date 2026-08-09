@@ -7,7 +7,7 @@
 #include <chrono>
 #include <omp.h>
 #include <cmath>
-#include <autodiff/autodiff.hpp>
+#include <xdiff/xdiff.hpp>
 #include <sstream>
 #include <polybox/polybox.hpp>
 
@@ -34,6 +34,9 @@ using RhsFunc = void(*)(T*, const T&, const T*, const T*); // f(t, q, args) -> a
 
 template<typename T>
 using ObjFun = T(*)(const T&, const T*, const T*); // f(t, q, args) -> scalar
+
+template<typename T, size_t N, size_t Order>
+using DualType = std::conditional_t<(N > 0), xdiff::Dual<T, N, Order, xdiff::Layout::Flat>, xdiff::Dual<T, 0, Order, xdiff::Layout::Nested>>;
 
 template<typename F, typename T>
 concept isRhsFunc = 
@@ -192,7 +195,7 @@ concept hasJacFunc =
 // Check if F has a callable templated Rhs (static or non-static)
 template<typename F, typename T, size_t N>
 concept supportsDualRhs =
-    N > 0 && requires(F f, autodiff::AutoDiff<T, 1, N>* out, T t, const autodiff::AutoDiff<T, 1, N>* q, const T* args) {
+    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q, const T* args) {
         { f.Rhs(out, t, q, args) } -> std::same_as<void>;
         { f.Rhs(out, std::as_const(t), q, args) } -> std::same_as<void>;
     };
@@ -200,7 +203,7 @@ concept supportsDualRhs =
 // Check if F has a callable templated Jac (static or non-static)
 template<typename F, typename T, size_t N>
 concept supportsDualJac =
-    requires(F f, autodiff::AutoDiff<T, 1, N>* out, T t, const autodiff::AutoDiff<T, 1, N>* q, const T* args) {
+    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q, const T* args) {
         { f.Jac(out, t, q, args) } -> std::same_as<void>;
         { f.Jac(out, std::as_const(t), q, args) } -> std::same_as<void>;
     };

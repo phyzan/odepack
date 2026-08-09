@@ -1,5 +1,5 @@
 #include <odepack/odepack.hpp>
-#include <lazy/mpfrLazy.hpp>
+#include <lazy/apps/mpfrLazy.hpp>
 
 using namespace ode;
 template<typename T>
@@ -16,7 +16,7 @@ int main(){
     lazy::set_default_mpreal_prec(256);
     auto y0 = std::vector<T>{1, -3};
 
-    auto solver = getSolver<RK45, T, 2, SolverPolicy::Static>(
+    auto solver = getSolver<BDF, T, 2, SolverPolicy::Static>(
         OdeData{.Rhs=f<T>}, 0, y0.data(), 2, 1e-40, 1e-40
     );
 
@@ -27,5 +27,5 @@ int main(){
     std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count() << " ms" << std::endl;
     return 0;
 
-    // g++ -std=c++20 -O3 -DDPK_MPREAL -Iexternal/autodiff/include tests/lazy_eval_test.cpp -o test -lmpfr -lgmp
+    // g++ -std=c++20 -O3 -DDPK_MPREAL -Iinclude -Iexternal/xdiff/include -Iexternal/xdiff/external/lazy/include -Iexternal/polybox/include -Iexternal/ndspan/include tests/lazy_eval_test.cpp -o test -lmpfr -lgmp
 }

@@ -1,7 +1,7 @@
 [
   {
     "directory": "/home/senpy/Documents/repos/odepack",
-    "command": "clang++ -std=c++20 -Iinclude -Iexternal/autodiff/include -Iexternal/ndspan/include -Iexternal/polybox/include -Iexternal/mpreal -Iexternal/qhull/src -I/usr/include/python3.12 -DDPK_MPREAL -c include/odepack/odepack.hpp",
+    "command": "clang++ -std=c++20 -Iinclude -Iexternal/xdiff/include -Iexternal/xdiff/external/lazy/include -Iexternal/ndspan/include -Iexternal/polybox/include -Iexternal/mpreal -Iexternal/qhull/src -I/usr/include/python3.12 -DDPK_MPREAL -c include/odepack/odepack.hpp",
     "file": "include/odepack/odepack.hpp"
   }
 ]

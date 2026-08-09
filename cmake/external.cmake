@@ -7,17 +7,18 @@ if(NOT DEFINED ODEPACK_ROOT)
 endif()
 
 # Guard against multiple inclusion
-if(TARGET odepack_autodiff)
+if(TARGET odepack_xdiff)
     return()
 endif()
 
 #===========================================================================================
-#                           autodiff (header-only)
+#                           xdiff (header-only)
 #===========================================================================================
-add_library(odepack_autodiff INTERFACE)
-add_library(odepack::autodiff ALIAS odepack_autodiff)
-target_include_directories(odepack_autodiff INTERFACE
-    ${ODEPACK_ROOT}/external/autodiff/include
+add_library(odepack_xdiff INTERFACE)
+add_library(odepack::xdiff ALIAS odepack_xdiff)
+target_include_directories(odepack_xdiff INTERFACE
+    ${ODEPACK_ROOT}/external/xdiff/include
+    ${ODEPACK_ROOT}/external/xdiff/external/lazy/include
 )
 
 #===========================================================================================
