@@ -265,10 +265,10 @@ const Event<T>& EventCollection<T>::event(size_t event_idx) const{
 
 
 template<typename T>
-size_t EventCollection<T>::event_idx(const std::string& name) const{
+int EventCollection<T>::event_idx(const std::string& name) const{
     auto it = idx_of_name.find(name);
     if (it != idx_of_name.end()){
-        return it->second;
+        return int(it->second);
     }
     return -1;
 }

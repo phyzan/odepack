@@ -437,11 +437,10 @@ public:
     }
 
     /// @brief Get the index of the event with the given name, or -1 if not found.
-    size_t                  event_idx(const std::string& name) const;
+    int                  event_idx(const std::string& name) const;
 
     size_t                  get_event_idx(size_t detection_idx) const{
-        assert(detection_idx < detections && "Detection index out of bounds in get_event_idx");
-        return detection_order[detection_idx];
+        assert(detection_idx < detections && detection_idx >= 0 && "Detection index out of bounds in get_event_idx");        return detection_order[detection_idx];
     }
 
     /// @brief Get total number of events.

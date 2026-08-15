@@ -274,7 +274,7 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
         }else if (habs > max_step){
             _change_D(max_step/habs);
             habs = max_step;
-            interp_idx = _idx_D;
+            interp_idx = int(_idx_D);
             return StepResult::Success; // The step is acceptet, but the stepsize is limited by max_step.
         }else if (habs < this->MIN_STEP){
             return StepResult::TINY_STEP_ERROR;
@@ -363,7 +363,7 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     }
 
     if (_n_eq_steps < _order + 1){
-        interp_idx = _idx_D;
+        interp_idx = int(_idx_D);
         return StepResult::Success;
     }
 
@@ -404,7 +404,7 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     habs *= factor;
     _change_D(factor);
     _valid_LU = false;
-    interp_idx = _idx_D;
+    interp_idx = int(_idx_D);
     return StepResult::Success;
 }
 

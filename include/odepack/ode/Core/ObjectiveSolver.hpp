@@ -57,7 +57,7 @@ protected:
                 if (this->t() == nearest_floor){
                     detected[idx] = false;
                     cached_sign[idx] = 0;
-                    current_idx = idx;
+                    current_idx = int(idx);
                 }
                 return true;
             } else {
@@ -68,7 +68,7 @@ protected:
                 if (this->t() == nearest_floor){
                     detected[idx] = false; //turn off for next step, since the goal was achieved
                     cached_sign[idx] = 0;
-                    current_idx = idx;
+                    current_idx = int(idx);
                 }
                 return true;
             } else {
