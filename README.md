@@ -35,7 +35,14 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 
 ## Solvers
 
-All solvers must derive from the `BaseSolver` class:
+The library focuses on integrating systems of ODEs through objects that once instantiated, preallocate memory for any process that might be encountered,
+and can be advanced in time while only updating their state in-place, without storing any integration history (if not requested).
+This is particularly useful for long-running simulations, where memory usage and performance are critical.
+
+Essentially, a solver object *iterates* over the solution of a system with a predefined accuracy, providing explicit
+control over the integration process, and allowing for event detection and interpolation between steps (dense output).
+
+This is achieved by defining a common interface for all solvers through the `BaseSolver` class, which is then specialized for any integration algorithm:
 
 ```cpp
 template<typename Derived, typename T, size_t N, ode::SolverPolicy SP, ode::hasRhsFunc<T> OdeType>
