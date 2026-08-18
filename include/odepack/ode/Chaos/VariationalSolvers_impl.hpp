@@ -184,7 +184,7 @@ T VariationalSolver<Solver, T, N, SP, OdeType, Derived>::log_ksi() const{
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 T VariationalSolver<Solver, T, N, SP, OdeType, Derived>::lyapunov_exponent() const{
-    return np == 0 ? 0 : log_ksi()/elapsed_time();
+    return np == 0 ? T{0} : T(log_ksi()/elapsed_time());
 }
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
