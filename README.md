@@ -1,7 +1,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge&logo=cplusplus&logoColor=white" alt="C++20">
   <img src="https://img.shields.io/badge/Header_Only-yes-green?style=for-the-badge" alt="Header Only">
-  <img src="https://img.shields.io/badge/Python-3.12%2B-yellow?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License">
 </p>
 
@@ -12,7 +11,7 @@
 </p>
 
 <p align="center">
-  High-performance, header-only ODE solvers with event detection, dense output, and Python bindings
+  High-performance, header-only ODE solvers with event detection and dense output
 </p>
 
 ---
@@ -21,22 +20,104 @@
 
 ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary Differential Equations (ODEs)**. Originally inspired by Alan Hindmarsh's classic Fortran77 ODEPACK library, this implementation brings a fresh, template-based design heavily influenced by SciPy's ODE solver interface.
 
-### Why ODEPACK?
+## Features:
 
-| Feature | Benefit |
-|---------|---------|
-| **Header-only** | No compilation needed, just include and use |
-| **Template-based** | Use any numeric type including arbitrary precision (MPFR) |
-| **Event system** | Detect and respond to user-defined conditions during integration |
-| **Dense output** | Smooth interpolation between computed steps |
-| **Python bindings** | Seamless integration with Python via pybind11 |
-| **Memory efficient** | Only stores what you need |
+- **Header-only**: No compilation needed, just include and use
+- **Event system**: Detect and respond to user-defined conditions during integration
+- **Dense output**: Smooth interpolation between computed steps
+- **Memory efficient**: Solvers preallocate memory for zero heap (de)allocations between steps
+- **Flexible solver policies**: Choose between static, rich, virtual, and rich-virtual solvers for performance vs. flexibility trade-offs
+- **Extensible**: Easily add new solvers or event types
+- **Template-based**: Allows for any numeric type including arbitrary precision (MPFR), supports automatic differentiation via `xdiff`, lazy evaluation via `lazy`, and more
+- **Dynamical systems analysis**: Built-in support for variational equations and Lyapunov exponent calculations
 
 ---
 
-## Features
+## Solvers
 
-### Solvers
+All solvers must derive from the `BaseSolver` class:
+
+```cpp
+template<typename Derived, typename T, size_t N, ode::SolverPolicy SP, ode::hasRhsFunc<T> OdeType>
+class BaseSolver;
+```
+
+where:
+- `Derived` is the derived solver class (CRTP)
+- `T` is the numeric type (e.g., `double`, `float`, `mpfr::mpreal`)
+- `N` is the number of equations in the system (`N > 0` for size known at compile-time, `N=0` for dynamic size using heap allocation)
+- `SP` is the solver policy (see below)
+- `OdeType` is the type of the ODE function (must satisfy `hasRhsFunc<T>` concept)
+
+### SolverPolicy (SP) template parameter
+
+The `SolverPolicy` template parameter controls inheritance and feature availability:
+
+| Policy | Virtual | Events | Use Case |
+|--------|---------|--------|---------------|
+| `Static` | No | No | Maximum performance, compile-time type |
+| `RichStatic` | No | Yes | Events needed, type known at compile-time |
+| `Virtual` | Yes | No | Runtime solver selection, no events |
+| `RichVirtual` | Yes | Yes | Full flexibility at runtime |
+
+
+### OdeType template parameter
+
+The `OdeType` template parameter must satisfy the `hasRhsFunc<T>` concept, which requires the ODE type to expose an `Rhs` member computing dq/dt:
+
+```cpp
+void Rhs(T* out, const T& t, const T* q, const T* args);
+```
+
+- `out` — output array, receives dq/dt
+- `t` — independent variable (time)
+- `q` — current state array
+- `args` — extra parameters
+
+An analytic Jacobian can optionally be provided via the `N x N` Jacobian matrix function
+```cpp
+void Jac(T* jac_mat, const T& t, const T* q, const T* args);
+```
+which satisfies the `hasJacFunc<T>` concept, and is filled in column-major order as
+```cpp
+jac_mat[i + j*system_size] = df_i/dx_j
+```
+
+**Automatic differentiation**: if no analytic `Jac` is given but `Rhs` is written generically enough (templated), ideally as
+```cpp
+void Rhs(auto* out, const auto& t, const auto* q, const auto* args);
+```
+to also run over `xdiff::Dual` numbers (checked via `supportsDualRhs`), the library seeds the state with dual numbers and differentiates `Rhs` itself to obtain an exact Jacobian at no extra coding cost — no finite-difference approximation needed. Jacobian source is chosen automatically: exact analytic `Jac` > autodiff via `xdiff` > finite-difference approximation.
+
+---
+
+The `BaseSolver` class provides a common interface for all solvers, with the following main methods:
+
+```cpp
+// Accessors
+void                Rhs(T* dq_dt, const T& t, const T* q) const; // Compute the right-hand side of the ODE system
+void                Jac(T* J, const T& t, const T* q) const; // Compute the Jacobian of the ODE system (optional)
+const T&            t() const; // Get the current time
+View1D<T, N>        vector() const; // Get the current state vector
+State<T>            ics() const; // Get the initial conditions
+bool                is_running() const; // Check if the solver is still running
+bool                is_dead() const; // Check if the solver cannot advance further
+bool                diverges() const; // Check if the solver has diverged (nan/inf detected)
+void                interp(T* out, const T& t) const; // Interpolate the solution at a given time within the old and new step interval
+const std::string&  status() const; // Get the solver's status message
+
+// Modifiers
+bool                advance(); // Advance the solver by one step (automatic step size control)
+bool                advance_until(const T& time); // Advance the solver until a specified time is reached
+bool                advance_until(const T& time, const Callable& observer); // Advance the solver until a specified time is reached, calling an observer function at each step
+bool                set_ics(T t0, const T* y0, T stepsize, int direction); // Set new initial conditions and reset the solver in-place (no memory reallocation happens)
+void                Reset(); // Reset the solver to its initial state
+pbox::Box<Interpolator<T, N>> interpolate_until(const T& time, const Callable& observer = nullptr); // Advance the solver until a specified time is reached, returning an interpolator over the integration interval
+```
+
+### Available Solvers
+
+Currently, the following solver classes are provided, overriding the proper `BaseSolver` methods for their respective algorithms:
 
 | Solver | Type | Order | Description |
 |--------|------|-------|-------------|
@@ -45,29 +126,24 @@ ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary D
 | `RK45` | Explicit | 4/5 | Dormand-Prince method (recommended for most problems) |
 | `DOP853` | Explicit | 8 | High-order method with excellent dense output |
 | `BDF` | Implicit | 1-5 | Backward Differentiation Formula for stiff problems |
+| `RK4` | Explicit | 4 | Classic Runge-Kutta method with fixed step size |
 
-### Core Capabilities
+## Event Detection
 
-- **Adaptive Step Size Control** - Automatic error estimation and step adjustment
-- **Forward & Backward Integration** - Integrate in either time direction
-- **Configurable Tolerances** - Set `rtol`, `atol`, `min_step`, `max_step`
-- **Variational Equations** - Built-in support for Lyapunov exponent calculations
-- **Parallel Integration** - OpenMP support for solving multiple ODE systems in Python simultaneously via `advance_all` and `advance_all_to_event`
-- **Custom Solvers** - Extend the library with your own integration methods
+One main component of the library is the event detection system, which allows users to define conditions that trigger during integration. This feature was mainly developed for accurately detecting crossings in a *Poincaré surface of section* in dynamical systems, but it can be used for any situation where you need to detect when a certain condition is met during the integration of a system of ODE's.
 
-### Event Detection
+- **Compile-time events**: For events that can be hardcoded in a project, it is preferred to use the compile-time event system, which avoids the overhead of virtual function calls, and allows for inlining and more compiler optimizations. This is achieved via the `ObjectiveSolver` class. See tutorials/CompileTimeEvents.cpp for different ways to declare relevant solvers.
 
-- **Zero-crossing detection** with bisection algorithm for high precision
-- **Periodic events** at fixed time intervals
-- **State modification masks** for discontinuous changes
-- **Event collections** for managing multiple events
+- **Runtime events**: For events whose number or type is not known at compile-time, the polymorphic `Event<T>` class
+is provided, which requires that the solver is declared with `ode::SolverPolicy::RichVirtual` or `RichStatic`.
+See tutorials/RuntimeEvents.cpp for examples of how to use the runtime event system.
 
 ---
 
 # Installation
 
 
-### Prerequisites
+## Prerequisites
 
 The prebuilt mpfr and gmp libraries are required for arbitrary precision support. These must be installed separately:
 
@@ -84,367 +160,48 @@ git submodule update --init --recursive
 **Requirements:**
 - C++20 compatible compiler
 
-### Python
+## C++ / CMake
 
-```bash
-pip install ./python
+### Macros
+
+CMake options that toggle preprocessor macros across the library, its bundled dependencies, and the `odepack_tests` executable:
+
+| CMake Option | Macro | Effect |
+|--------------|-------|--------|
+| `DPK_DENSE_RK4` | `RK4_DENSE` | Enable accurate RK4 dense output for the `RK4` solver, at the cost of additional memory usage and slightly slower performance. |
+| `DPK_NO_WARN` | `NO_ODE_WARN` | Disable ODE solver console warnings. |
+| `DPK_NO_NAN_CHECK` | `DPK_NO_NAN_CHECK` | Disable NaN/inf checks on solver output, for performance. |
+| `DEBUG` | — | Debug build: `-O0 -g3 -ggdb3 -fno-omit-frame-pointer -UNDEBUG` (asserts enabled), instead of the default optimized release build (`-O3 -DNDEBUG`, LTO where supported). Also triggered by `-DCMAKE_BUILD_TYPE=Debug`. |
+| `ODEPACK_BUILD_TESTS` | — | Build the `odepack_tests` executable from `tests/src/*.cpp`. Defaults to `ON` when configuring odepack directly, `OFF` when pulled in via `add_subdirectory` by another project. |
+
+See useful [macros](external/xdiff/README.md##Macros) for the `xdiff` submodule.
+
+## Linking via CMake
+
+```cmake
+add_subdirectory(path/to/odepack)
+target_link_libraries(your_target PRIVATE odepack::odepack)
 ```
+This gives you `<odepack/...>`, `<xdiff/...>` etc. includes, the required C++20 standard, and [macros](#macros) (toggle with e.g. `-D<MACRO_NAME>=ON`)
 
-To install with arbitrary precision support, assuming that MPFR and GMP is installed (see above), run
+**Building and running the test suite:**
 ```bash
-CMAKE_ARGS="-DDPK_MPREAL=ON" pip install ./python
+cmake -S . -B build
+cmake --build build
+./build/odepack_tests
 ```
-
-**Requirements:**
-- Python 3.12+
-- g++ 13.3.0 for installation and compiling ODE systems at runtime
-
-There are optional build flags for the Python bindings:
-
-- DPK_MPREAL: Enable arbitrary precision support
-- DEBUG: Enable debug build
-- DPK_DENSE_RK4: Enable accurate RK4 dense output for the RK4 solver, with the cost of additional memory usage and slightly slower performance.
-
-Use any of them by setting the `CMAKE_ARGS` environment variable before installation, and adding the `-D` character before the flag, for example:
-
-For a standard debug build, run
+or, with some macros enabled at configure time:
 ```bash
-CMAKE_ARGS="-DDEBUG=ON" pip install ./python
-```
-
-or for a debug build with arbitrary precision support, run
-```bash
-CMAKE_ARGS="-DDEBUG=ON -DDPK_MPREAL=ON" pip install ./python
+cmake -S . -B build -DDEBUG=ON
+cmake --build build
 ```
 
 ---
 
-## Quick Start
-
-### C++ Example
-
-```cpp
-#include <odepack/odepack.hpp>
-
-using namespace ode;
-
-int main() {
-
-    // Initial conditions
-    double t = 0.0;
-    std::array<double, 2> y0 = {3.0, 0.0};
-
-    // Define the y' = 1 crossing
-    PreciseEvent event(
-        "event",
-        [](const double& t, const double* y, const double* args){
-            return y[1] - 1.0;
-        }, 1e-12);
-
-
-    // General signature for ODE function
-    auto df_dt = [&](double* dy_dt, const double& t, const double* y, const double* args) {
-        //2D oscillator: y'' + y = 0  => y1' = y2, y2' = -y1
-        dy_dt[0] = y[1];
-        dy_dt[1] = -y[0];
-    };
-
-    // Solver policy determines the capabilities of the solver,
-    // by slightly sacrificing performance. Here we use RichStatic
-    // which allows event detection.
-    constexpr SolverPolicy SP = SolverPolicy::RichStatic;
-
-    // Create solver
-    auto solver = getSolver<RK45, double, 2, SP>(
-        OdeData{.Rhs=df_dt},   // ODE function
-        t,                 // Initial time
-        y0.data(),
-        2,             // ODE system size
-        1e-6,          // Relative tolerance
-        1e-9,          // Absolute tolerance
-        0.0,       // Minimum step size
-        1.0,       // Maximum step size
-        0.0,    // First step size (0 = auto)
-        1,              // Integration direction
-        {},            // Additional args to be passed to ODE function
-        {&event} // Events
-
-    );
-
-    // Advance until event is detected
-    while (!solver.at_event()) {
-        solver.advance();
-    }
-
-    std::cout << "Event detected at t = " << solver.t() << "\n";
-    std::cout << "State at event: ";
-    auto v = solver.vector();
-    for (size_t i = 0; i < 2; ++i) {
-        std::cout << v[i] << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "Expected state: {..., 1}" << std::endl;
-
-    return 0;
-}
-```
-
-### Python Example
-
-```python
-from odepack import *
-
-t, x, y = symbols('t, x, y')
-
-event = SymbolicPreciseEvent("event", y-1)
-
-dq_dt = [y, -x]
-odesys = OdeSystem(dq_dt, t, [x, y], events=[event])
-
-ode = odesys.get(t0=0, q0=[3.0, 0.0], rtol=1e-6, atol=1e-9, stepsize=0.01, compiled=True, scalar_type="double") #use False for pure python version
-
-solver = ode.solver()   # get a copy of the internal solver
-print(ode.__class__)    #LowLevelODE
-print(solver.__class__) #RK45
-
-while not solver.at_event():
-    solver.advance()
-
-print(f"Event detected at t={solver.t:.6f}")
-print("State at event:", solver.q)
-print("Expected state:", "[..., 1]")
-```
-
----
-
-# API Reference
-
-## C++ API
-
-### Solver Methods
-
-| Method | Description |
-|--------|-------------|
-| `advance()` | Perform one adaptive integration step |
-| `advance_until(time)` | Integrate until the specified time |
-| `advance_until(time, observer)` | Integrate until `time`, calling `observer(t, q, extra) -> bool` after each step; return `false` from observer to stop early |
-| `advance_to_event(event_idx)` | Advance until a specific event is detected; `event_idx` is a `std::vector<size_t>` of event indices (empty = any event) |
-| `advance_to_event(tmax, event_idx)` | Same as above, but stops at `tmax` if the event is not reached |
-| `Reset()` | Return to initial conditions |
-| `set_ics(t0, y0, stepsize, direction)` | Set new initial conditions |
-| `interp(t)` | Interpolate solution at arbitrary time within last step |
-| `clone()` | Create a dynamic copy of the solver |
-
-### Solver Properties
-
-| Property | Description |
-|----------|-------------|
-| `t()` | Current time |
-| `vector()` | Current state vector |
-| `stepsize()` | Current step size |
-| `at_event(event_idx)` | Returns `true` if the solver is positioned at an event (`-1` checks any event) |
-| `event_idx(name)` | Get the index of an event by name |
-
-> **Note:** The `advance_until` observer takes a `std::function<bool(const T&, const T*, const T*)>`. Return `true` to continue integration or `false` to stop early.
-
----
-
-## Python API
-
-### Solver Methods
-
-| Method | Description |
-|--------|-------------|
-| `advance()` | Perform one adaptive integration step |
-| `advance_until(t, observer=None)` | Integrate until the specified time, optionally calling `observer(solver)` after each step |
-| `advance_to_event(events=None)` | Advance until a specific event is detected; `events` can be a `str` or `Iterable[str]` (`None` = any event) |
-| `reset()` | Return to initial conditions |
-| `set_ics(t0, q0, stepsize=0, direction=0)` | Set new initial conditions |
-| `interp(t)` | Interpolate solution at arbitrary time within last step |
-| `copy()` | Create a deep copy of the solver |
-
-### Solver Properties
-
-| Property | Description |
-|----------|-------------|
-| `t` | Current time |
-| `q` | Current state vector (numpy array) |
-| `stepsize` | Current step size |
-| `at_event(event_name=None)` | Returns `True` if the solver is at an event (`None` checks any event) |
-| `current_event` | Name of the currently active event, or `None` |
-| `status` | Current status message |
-| `is_dead` | Whether the solver has reached a terminal state |
-| `diverges` | Whether the solution has diverged |
-
-## ODE Class
-
-### ODE classes use an internal solver to store integration history
-
-```cpp
-#include <odepack/odepack.hpp>
-
-using namespace ode;
-
-void df_dt(double* dy_dt, const double& t, const double* y, const double* args) {
-    //2D oscillator: y'' + y = 0
-    dy_dt[0] = y[1];
-    dy_dt[1] = -y[0];
-}
-
-int main() {
-
-    // Initial conditions
-    double t0 = 0.0;
-    std::array<double, 2> y0 = {3.0, 0.0};
-
-    // y' = 1 crossing
-    PreciseEvent event(
-        "event",
-        [](const double& t, const double* y, const double* args){
-            return y[1]-1;
-        }, 1e-12);
-
-    // Create ode
-    ODE<double, 2> ode(
-        OdeData{.Rhs=df_dt},   // ODE function
-        t0,                 // Initial time
-        y0.data(),
-        2,             // ODE system size
-        1e-13,          // Relative tolerance
-        1e-13,          // Absolute tolerance
-        0.0,       // Minimum step size (0 = auto)
-        1.0,       // Maximum step size
-        0.01,    // First step size
-        1,              // Integration direction
-        {},            // Additional args
-        {&event},// Events
-        Integrator::RK45       // Solver method, dynamically selected
-    );
-
-    EventOptions options{.name = "event", .max_events = 10, .terminate = true};
-
-    // Integrate until the maximum number of events is reached
-
-    // Set a long integration interval to ensure we hit the event multiple times
-    // The result stores all specified time steps, along with events encountered
-    OdeResult<double, 2> result;
-    ode.integrate(&result, 1000000, {options});
-    std::cout << "Integration completed at t = " << result.t().back() << "\n";
-    std::cout << "Integration completed in " << result.runtime() << " seconds.\n";
-    std::cout << "Number of time points: " << result.t().size() << "\n";
-    std::cout << "Integration success: " << (result.success() ? "true" : "false") << "\n";
-    std::cout << "Divergence detected: " << (result.diverges() ? "true" : "false") << "\n";
-    std::cout << "Termination message: " << result.message() << "\n";
-
-    // Extract the indices of the event occurrences
-    const OrbitData<double>& event_data = result.event_data().data("event");
-
-    for (size_t i = 0; i < event_data.size(); i++) {
-        std::cout << "Event detected at t = " << event_data.t[i] << "\n";
-        std::cout << "State vector at event: " << event_data.get_q(i, 0) << ", " << event_data.get_q(i, 1) << std::endl;
-    }
-
-    return 0;
-}
-```
-
----
-
-## Event System
-
-ODEPACK features an event detection system that handles integration events, with special processing for multiple or simultaneous event detections, with or without discontinuities, at each time step.
-
-### Zero-Crossing Events
-
-```cpp
-// Detect when y[0] crosses zero
-    PreciseEvent event(
-    "event",
-    [](const double& t, const double* y, const double* args) -> double {
-        return y[1]-1;
-    }, //crossing at y[1] = 1
-    1e-12,
-    1, //only cross when the sign change is from negative to positive
-    [](double* y_new, const double& t, const double* y, const double* args) -> void {
-        y_new[0] = 1;
-        y_new[1] = -2.5;
-    } // change the ODE state vector when the event is encountered    
-    );
-```
-
-
-### Compile-time events
-
-The Event classes, (e.g. `PreciseEvent`, `PeriodicEvent`) use virtual inheritance and are passed as runtime pointers to the solver. To avoid runtime overhead, one can create a solver where the events are passed as compile-time template parameters as follows:
-
-```cpp
-
-#include <odepack/odepack.hpp>
-
-
-using T = double;
-using namespace ode;
-
-int main(){
-
-    Array1D<T, 2> y0{-0.001, 2};
-
-    OdeData ode_data{.Rhs = [](T* out, const T& t, const T* q, const T*){
-        out[0] = q[1];
-        out[1] = -q[0];}
-    };
-
-    ObjFunData obj_fun{ .func = [](const T& t, const T* q, const T*)
-                                    { return q[0]; },
-                        .ftol = T(0),
-                        .dir = 1};
-
-    auto solver = getObjectiveSolver<RK45, T, 2, decltype(ode_data)>(
-        std::tuple{obj_fun},
-        ode_data,
-        0.0,              // t0
-        y0.data(),
-        2,                // nsys
-        1e-10,            // rtol
-        1e-10,            // atol
-        0.0,              // min_step
-        0.1,              // max_step
-        0.0,              // stepsize (auto)
-        1,                // direction (forward)
-        std::vector<T>{}  // args
-    );
-
-
-    solver.advance_until(10, [&](const T& t, const T* q, const T*){
-        if (int obj = solver.is_at_objective(); obj != -1){ // same as if (solver.is_at_objective())
-            std::cout << "t = " << t << ", q[0] = " << q[0] << ", q[1] = " << q[1] << "\n";
-            std::cout << obj << "\n\n";
-        }
-
-        return true;
-    });
-
-    return 0;
-}
-```
-
-To compile, run
-```bash
-g++ -std=c++20 -O3 -DDPK_MPREAL test.cpp -o test
-```
-
-To compile using ```T = mpfr::mpreal``` instead of ```T = double```, run
-```bash
-g++ -std=c++20 -O3 -DDPK_MPREAL test.cpp -o test -lmpfr -lgmp
-```
-
----
 
 ## Architecture
 
-ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphism via CRTP (Curiously Recurring Template Pattern):
-
-### Class Hierarchy
+The library uses a **two-tier architecture** combining static and dynamic polymorphism via CRTP (Curiously Recurring Template Pattern):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -470,16 +227,14 @@ ODEPACK uses a **two-tier architecture** combining static and dynamic polymorphi
 │                   │                             │                           │
 │                   ───────────────────────────────                           │
 │                                  │                                          │
-│         ┌────────────────────────┼──────────────────────────┐               │
-│         │            │           │          │               │               │
-│      ┌──▼───┐   ┌────▼───┐  ┌────▼───┐ ┌────▼──┐  ┌────▼──┐                 │
-│      │Euler │   │  RK23  │  │  RK45  │ │DOP853 │  │  BDF  │                 │
-│      └──────┘   └────────┘  └────────┘ └───────┘  └───────┘                 │
+│        ┌─────────────────────────┼────────────────────────┐                 │
+│        │            │            │            │           │                 │
+│     ┌───▼───┐  ┌────▼───┐   ┌────▼───┐   ┌────▼───┐   ┌───▼───┐             │
+│     │ Euler │  │  RK23  │   │  RK45  │   │ DOP853 │   │  BDF  │             │
+│     └───────┘  └────────┘   └────────┘   └────────┘   └───────┘             │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
-
-### Solver Policies (SP)
 
 The `SolverPolicy` template parameter controls inheritance and feature availability:
 
@@ -509,14 +264,6 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 └─────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
-### Policy Summary
-
-| Policy | Virtual | Events | Use Case |
-|--------|---------|--------|---------------|
-| `Static` | No | No | Maximum performance, compile-time type |
-| `RichStatic` | No | Yes | Events needed, type known at compile-time |
-| `Virtual` | Yes | No | Runtime solver selection, no events |
-| `RichVirtual` | Yes | Yes | Full flexibility at runtime |
 
 ### Design Patterns
 
@@ -524,8 +271,7 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 |---------|-------|
 | **CRTP** | `BaseSolver<Derived, ...>` enables static dispatch without virtual overhead |
 | **Policy Pattern** | `SolverPolicy` enum for compile-time feature selection |
-| **Factory Pattern** | `getSolver()` and `get_virtual_solver()` for solver instantiation |
-| **Polymorphic Wrapper** | `owner<T>` for type-erased ownership of interpolators & events |
+| **Factory Pattern** | `getSolver()` and `make_solver()` for solver instantiation |
 
 ---
 
@@ -534,14 +280,13 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 ```
 odepack/
 ├── include/
-│   └── odepack/                     # All headers under odepack namespace
+│   └── odepack/                     # All headers under odepack namespace, header-only
 │       ├── ode/                     # Core ODE library
 │       │   ├── Core/                # Foundation & base classes
 │       │   │   ├── VirtualBase.hpp  # Virtual interfaces & solver policies
 │       │   │   ├── SolverBase.hpp   # CRTP base solver
 │       │   │   ├── RichBase.hpp     # Event-aware solver extension
 │       │   │   ├── Events.hpp       # Event detection system
-│       │   │   ├── Dispatcher.hpp   # Solver dispatching utilities
 │       │   │   ├── FinDiff.hpp      # Finite difference utilities
 │       │   │   ├── ObjectiveSolver.hpp  # Objective-based solver interface
 │       │   │   └── *_impl.hpp       # Implementation files
@@ -570,213 +315,55 @@ odepack/
 │       │   │
 │       │   ├── Chaos/               # Dynamical systems analysis
 │       │   │   ├── VariationalSolvers.hpp    # Lyapunov exponent computation
-│       │   │   └── *_impl.hpp       # Implementation files
+│       │   │   └── VariationalSolvers_impl.hpp
 │       │   │
 │       │   ├── OdeResult/           # Integration result storage
 │       │   │   ├── OdeResult.hpp    # Result container
 │       │   │   └── OdeResult_impl.hpp   # Implementation
 │       │   │
+│       │   ├── IntegratorEnum.hpp   # enum class of implemented integrators
 │       │   ├── OdeInt.hpp           # High-level ODE wrapper
 │       │   ├── SolverDispatcher.hpp # Factory for solver instantiation
 │       │   ├── SolverState.hpp      # Solver state & status reporting
-│       │   └── Tools.hpp            # Utilities (owner, etc.)
-│       │
-│       ├── ndspan/                  # Multi-dimensional array library
-│       │   ├── layouts/             # Layout implementations
-│       │   │   ├── standard_layouts.hpp
-│       │   │   └── morton.hpp
-│       │   ├── ndspan.hpp
-│       │   ├── arrays.hpp
-│       │   ├── ndview.hpp
-│       │   ├── ndtools.hpp
-│       │   └── layoutmap.hpp
-│       │
-│       ├── pyode/                   # Python binding utilities
-│       │   ├── lib/                 # Core binding modules
-│       │   │   ├── PyOde.hpp        # Main Python ODE interface
-│       │   │   ├── PySolver.hpp     # Solver bindings
-│       │   │   ├── PyEvents.hpp     # Event system bindings
-│       │   │   ├── PyResult.hpp     # Result container bindings
-│       │   │   ├── PyInterp.hpp     # Interpolation bindings
-│       │   │   ├── PyField.hpp      # Vector field bindings
-│       │   │   ├── PyChaos.hpp      # Chaos analysis bindings
-│       │   │   ├── PyTools.hpp      # Utility bindings
-│       │   │   └── PySubSolver.hpp  # Sub-solver bindings
-│       │   ├── lib_impl/            # Implementation files
-│       │   │   └── *_impl.hpp
-│       │   └── pycast/              # Type casters for pybind11
-│       │       └── pycast.hpp
-│       │
-│       ├── polybox/                 # Wrapper for dynamically allocated types
-│       │   └── polybox.hpp
+│       │   └── Tools.hpp            # Utilities, shared concepts & OdeData
 │       │
 │       ├── odepack.hpp              # Main C++ include (all headers)
-│       ├── odepackDecl.hpp          # Forward declarations
-│       ├── ndspan.hpp               # Main ndspan include
-│       ├── pyodepack.hpp            # Python binding include
-│       └── pyodepackDecl.hpp        # Python binding declarations
+│       └── odepackDecl.hpp          # Forward declarations
 │
-├── external/                        # Git submodules
-│   ├── xdiff/                    # Automatic differentiation library
-│   ├── ndspan/                    # Multi-dimensional array views and utilities
-│   ├── polybox/                    # Wrapper for dynamically allocated types
-│   ├── mpreal/                      # Multi-precision floating point (header-only)
+├── external/                        # Git submodules (bundled header-only dependencies)
+│   ├── xdiff/                       # Automatic differentiation library (bundles its own `lazy` + `mpreal` submodules)
+│   ├── ndspan/                      # Multi-dimensional array views and utilities
+│   ├── polybox/                     # Wrapper for dynamically allocated types
 │   └── qhull/                       # Convex hull library (for Delaunay triangulation)
 │
-├── python/
-│   ├── src/                         # Python bindings (pybind11)
-│   │   ├── bindings/                # C++ binding implementations
-│   │   └── staticlib/               # Static library sources
-│   ├── odepack/                     # Python package
-│   │   ├── __init__.py              # Package initialization
-│   │   ├── symode.py                # Symbolic ODE interface
-│   │   ├── interpolate.py           # Interpolation utilities
-│   │   └── *.pyi                    # Type stubs for IDE support
-│   └── py_tests/                    # Python tests
+├── tests/                           # C++ test suite, compiled into one odepack_tests executable
+│   ├── include/                     # One <name>.hpp per test file, declaring void test_<name>()
+│   └── src/                         # One <name>.cpp per test file, implementing it; main.cpp calls them all
 │
-├── tests/                           # C++ tests
-├── cmake/                           # CMake configuration files
-├── ODEPACK_Python_Tutorial.ipynb    # Jupyter notebook tutorial
-├── CMakeLists.txt                   # Main CMake configuration
-├── Makefile                         # Build automation
+├── tutorials/                       # Standalone example programs referenced from the README
+│   ├── CompileTimeEvents.cpp        # Compile-time event system usage
+│   └── RuntimeEvents.cpp            # Runtime (polymorphic) event system usage
+│
+├── .clang-tidy                      # clang-tidy check configuration
+├── CMakeLists.txt                   # odepack::odepack interface target + odepack_tests build
 ├── LICENSE
 └── README.md
-```
-
-### Component Overview
-
-| Component | Description |
-|-----------|-------------|
-| **ode/Core/** | Base classes, virtual interfaces, event system, and solver policies |
-| **ode/Solvers/** | Concrete integrator implementations (Euler, RK23, RK45, DOP853, BDF) |
-| **ode/Interpolation/** | Dense output providers with Regular, Scattered, and Univariate sub-modules |
-| **ode/Chaos/** | Specialized tools for variational equations and Lyapunov exponents |
-| **ode/OdeResult/** | Result container for storing integration trajectories and event data |
-| **ode/OdeInt.hpp** | High-level `ODE<T,N>` wrapper for trajectory storage and result access |
-| **ode/SolverDispatcher.hpp** | Factory functions for solver instantiation |
-| **ode/Tools.hpp** | Utilities including `owner` for polymorphic type ownership |
-| **ndspan/** | Multi-dimensional array views and utilities |
-| **pyode/** | Python binding utilities organized into lib/, lib_impl/, and pycast/ |
-| **mcmc/** | Markov Chain Monte Carlo sampling utilities |
-| **polybox/** | Wrapper for dynamically allocated types with automatic memory management |
-
----
-
-## Arbitrary Precision
-
-ODEPACK supports arbitrary precision arithmetic via MPFR:
-
-```cpp
-#include <odepack/odepack.hpp>
-
-using namespace ode;
-
-using mpfr::mpreal;
-
-template<typename T>
-void df_dt(T* dy_dt, const T& t, const T* y, const T* args) {
-    //2D oscillator: y'' + y = 0
-    dy_dt[0] = y[1];
-    dy_dt[1] = -y[0];
-}
-
-template<typename T>
-T crossing(const T& t, const T* y, const T* args) {
-    return y[1] - 1;
-}
-
-int main() {
-
-    // Initial conditions
-    std::array<mpreal, 2> y0 = {3, 0};
-
-    // Define the y' = 1 crossing
-    PreciseEvent event("event", crossing<mpreal>, mpreal("1e-12"));
-
-    constexpr SolverPolicy SP = SolverPolicy::RichStatic;
-
-    // Create solver
-    mpreal t = 0;
-    mpreal rtol = "1e-6";
-    mpreal atol = "1e-9";
-    mpreal min_step = 0;
-    mpreal max_step = 1;
-    mpreal stepsize = 0;
-    constexpr size_t nsys = 2;
-    int dir = 1;
-    auto solver = getSolver<RK45, mpreal, nsys, SP>(
-        OdeData{.Rhs=df_dt<mpreal>},
-        t,
-        y0.data(),
-        nsys,
-        rtol,
-        atol,
-        min_step,
-        max_step,
-        stepsize,
-        dir,
-        {},
-        {&event}
-    );
-
-    // Advance until event is detected
-    while (!solver.at_event()) {
-        solver.advance();
-    }
-
-    std::cout << "Event detected at t = " << solver.t() << "\n";
-    std::cout << "State at event: ";
-    auto v = solver.vector();
-    for (size_t i = 0; i < 2; ++i) {
-        std::cout << v[i] << " ";
-    }
-    std::cout << std::endl;
-    std::cout << "Expected state: {..., 1}" << std::endl;
-
-    return 0;
-}
-```
-
-Compile with `-DDPK_MPREAL` flag and link against MPFR/GMP with `-lmpfr -lgmp`:
-
-```
-g++ -std=c++20 -DDPK_MPREAL test.cpp -o test -lmpfr -lgmp
 ```
 
 ---
 
 ## Performance Tips
 
-1. **Use static solvers** (`RK45<T, N, SolverPolicy::Static>`) when no event detection is required
-2. **Set appropriate tolerances** - tighter tolerances mean smaller steps
-3. **Use `BDF`** for stiff problems
+- **Prefer SolverPolicy::Static**  when no runtime-event detection or type-erasure is required 
+- **Set appropriate tolerances** - tighter tolerances mean smaller steps
+- **Use `BDF`** for stiff problems
 
----
-
-## Comparison with Other Libraries
-
-| Feature | ODEPACK | Boost.Odeint | GSL | SciPy |
-|---------|---------|--------------|-----|-------|
-| Header-only | Yes | Yes | No | N/A |
-| C++ Standard | C++20 | C++11 | C99 | N/A |
-| Event detection | Yes | Limited | No | Yes |
-| Dense output | Yes | Limited | No | Yes |
-| Arbitrary precision | Yes | Yes | No | No |
-| Python bindings | Yes | No | No | Native |
 
 ---
 
 ## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
-## Acknowledgments
-
-- **Alan Hindmarsh** - Original ODEPACK Fortran library
-- **SciPy Team** - Design inspiration for the Python-like interface
-- **pybind11** - Seamless C++/Python bindings
 
 ---
 

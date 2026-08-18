@@ -4,6 +4,8 @@
 #include "../Core/Events.hpp"
 #include "../OdeInt.hpp"
 #include "../Core/VirtualBase.hpp"
+#include "odepack/ode/IntegratorEnum.hpp"
+#include "polybox/polybox.hpp"
 
 namespace ode::chaos {
 
@@ -18,33 +20,21 @@ namespace detail{
 template<typename T>
 void normalized(T* out, const T* src, size_t nsys);
 
-} // namespace detail
+} // namespace ode::chaos::detail
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+
+template<typename T, size_t N, UtilPolicy UP>
+class ChaoticSolver;
+
+template<UtilPolicy UP, typename T, size_t N, hasRhsFunc<T> OdeType, typename... Args>
+pbox::Box<ChaoticSolver<T, 2*N, UP>> make_variational_solver(Integrator method, OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, Args&&... args);
+
+template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
 class VariationalSolver;
 
-template<typename T, size_t N, hasRhsFunc<T> OdeType>
-pbox::owner<OdeRichSolver<T, 2*N>> get_virtual_variational_solver(Integrator method, T period, OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, EVENTS events = {}){
-    switch (method){
-        case Integrator::RK4:
-            return pbox::make_box<VariationalSolver<RK4, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::DOP853:
-            return pbox::make_box<VariationalSolver<DOP853, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::RK23:
-            return pbox::make_box<VariationalSolver<RK23, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::RK45:
-            return pbox::make_box<VariationalSolver<RK45, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::BDF:
-            return pbox::make_box<VariationalSolver<BDF, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        case Integrator::Euler:
-            return pbox::make_box<VariationalSolver<Euler, T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-        default:
-            throw std::runtime_error("Unsupported integrator type");
-    }
-}
 
-template<typename T, size_t N, SolverPolicy SP>
-class ChaoticSolver : public std::conditional_t<traits::is_rich<SP>, OdeRichSolver<T, 2*N>, OdeSolver<T, 2*N>>{
+template<typename T, size_t N, UtilPolicy UP>
+class ChaoticSolver : public std::conditional_t<UP==UtilPolicy::RichVirtual, OdeRichSolver<T, 2*N>, OdeSolver<T, 2*N>>{
 
 public:
 
@@ -74,134 +64,22 @@ public:
 
     using DualType      = ::ode::DualType<T, N, 1>;
     using VarDualType   = ::ode::DualType<T, N, 2>;
-    
+
 
     // same as in BaseSolver, but we need to redefine it here for the variational system
     static constexpr JacPolicy MAIN_JP = getJacPolicy<T, N, OdeType>();
     static constexpr JacPolicy JP = (getJacPolicy<T, 2*N, OdeType>() == JacPolicy::Autodiff) ? JacPolicy::Autodiff : JacPolicy::Approx;
-    static_assert(MAIN_JP!=JacPolicy::Approx,  "VariationalSolver requires the base solver to have an exact jacobian for the original system");
+    static_assert(MAIN_JP != JacPolicy::Approx,  "VariationalSolver requires the base solver to have an exact jacobian for the original system");
 
 
-    VariationalOdeSys(OdeType ode, size_t nsys, size_t nargs) : ode_(std::move(ode)), diff_worker(2*nsys), jac_worker(2*nsys), jm(nsys, nsys), nsys(nsys) {
-        if constexpr (N > 0){
-            assert(N==nsys && "Incorrect number of equations in VariationalOdeSys");
-        }
+    VariationalOdeSys(OdeType ode, size_t ode_nsys);
 
-    }
-
-    void    Rhs(T* out, const T& t, const T* q, const T* args) const{
-        const T* delta_q = q + nsys;
-
-        if constexpr (JP == JacPolicy::Autodiff){
-            if constexpr (N > 0){
-                DualType* rhs = diff_worker.data();
-                DualType* y = diff_worker.data() + N;
-                NDSPAN_FOR_LOOP(I, N,
-                    y[I] = DualType(q[I], {.axis=I});
-                );
-
-                ode_.Rhs(rhs, t, y, args);
-
-                std::fill(out+nsys, out+2*nsys, 0);
-                NDSPAN_FOR_LOOP(J, N,
-                    out[J] = rhs[J].value();
-                    NDSPAN_FOR_LOOP(I, N,
-                        out[I+N] += rhs[I].get_diff_wrt(J) * delta_q[J];
-                    );
-                );
-            } else {
-                const size_t nvars_default = DualType::get_default_nvars();
-                DualType::set_default_nvars(nsys);
-                DualType* rhs = diff_worker.data();
-                DualType* y = diff_worker.data() + nsys;
-                for (size_t i=0; i<nsys; i++){
-                    y[i] = DualType(q[i], {.axis=int(i)});
-                }
-                ode_.Rhs(rhs, t, y, args);
-                std::fill(out+nsys, out+2*nsys, 0);
-                for (size_t j=0; j<nsys; j++){
-                    out[j] = rhs[j].value();
-                    for (size_t i=0; i<nsys; i++){
-                        out[i+nsys] += rhs[i].get_diff_wrt(j) * delta_q[j];
-                    }
-                }
-                DualType::set_default_nvars(nvars_default);
-            }
-        } else {
-            ode_.Rhs(out, t, q, args); //fills the first half (nsys) entries
-            // fills jm with the jacobian of the original system at (t, q)
-            // this should not call Base::jac_approx since we have demanded that the base solver has an exact jacobian for the original system
-            ode_.Jac(jm.data(), t, q, args);
-            for (size_t i=0; i<nsys; i++){
-                out[i+nsys] = 0;
-                for (size_t j=0; j<nsys; j++){
-                    out[i+nsys] += jm(i, j) * q[nsys+j];
-                }
-            }
-        }
-    }
+    void    Rhs(T* out, const T& t, const T* q, const T* args) const;
 
     // Only provided if it does not require finite differences, otherwise the base solver will automatically use jac_approx to compute the jacobian of the full system.
-    void    Jac(T* out, const T& t, const T* q, const T* args, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff) {
+    void    Jac(T* out, const T& t, const T* q, const T* args, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff);
 
-        if constexpr (N > 0){
-            VarDualType* rhs = jac_worker.data();
-            VarDualType* y = jac_worker.data() + N;
-
-            // copy the input state vector to the worker
-            for (size_t i=0; i<N; i++){
-                y[i] = VarDualType(q[i], {.axis=i});
-            }
-
-            // compute the jacobian using autodiff
-            ode_.Rhs(rhs, t, y, args);
-
-            // extract the jacobian matrix from the autodiff output
-            ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
-            NDSPAN_FOR_LOOP(I, N,
-                NDSPAN_FOR_LOOP(J, N,
-                    m(I, J) = m(I+N, J+N) = rhs[I].get_diff_wrt(J);
-                    m(I, J+N) = 0;
-                    //the bottom left block now
-                    T sum = 0;
-                    for (size_t K=0; K<N; K++){
-                        sum += rhs[I].get_diff_wrt(K, J) * q[N+K];
-                    }
-                    m(I+N, J) = sum;
-                );
-            );
-        } else {
-            const size_t nvars_default = VarDualType::get_default_nvars();
-            VarDualType::set_default_nvars(nsys);
-            VarDualType* rhs = jac_worker.data();
-            VarDualType* y = jac_worker.data() + nsys;
-
-            for (size_t i=0; i<nsys; i++){
-                y[i] = VarDualType(q[i], {.axis=i});
-            }
-
-            ode_.Rhs(rhs, t, y, args);
-
-            ndspan::MutView<T, ndspan::Layout::F> m(out, 2*nsys, 2*nsys);
-            for (size_t i=0; i<nsys; i++){
-                for (size_t j=0; j<nsys; j++){
-                    m(i, j) = m(i+nsys, j+nsys) = rhs[i].get_diff_wrt(j);
-                    m(i, j+nsys) = 0;
-                    T sum = 0;
-                    for (size_t k=0; k<nsys; k++){
-                        sum += rhs[i].get_diff_wrt(k, j) * q[nsys+k];
-                    }
-                    m(i+nsys, j) = sum;
-                }
-            }
-            VarDualType::set_default_nvars(nvars_default);
-        }
-
-    }
-
-    const OdeType& ode() const{
-        return ode_;
-    }
+    const OdeType& ode() const;
 
 private:
     OdeType ode_;
@@ -212,9 +90,8 @@ private:
 };
 
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-class VariationalSolver : public Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>> {
-
+template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+class VariationalSolver : public SolverTypeGetter<Solver, T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>::type {
 
     /**
     This solvers integrates the coupled / augmented ODE system consisting of the original system and the variational equations. The state vector is of size 2*N, where the first N entries correspond to the state of the original system and the last N entries correspond to the deviation vector. The deviation vector is renormalized every "period" time units, and log_ksi keeps track of the logarithm of the stretching factor since the last renormalization. The user can retrieve the current value of the largest Lyapunov exponent using lyapunov_exponent(), which is computed as log_ksi divided by the elapsed time since the beginning of the integration.
@@ -235,96 +112,41 @@ class VariationalSolver : public Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeT
 
 public:
 
-    using Base = Solver<T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>;
+    using Base = typename SolverTypeGetter<Solver, T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>::type;
 
     template<typename... Args>
-    VariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, Args&&... extra);
+    VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args = {}, Args&&... extra);
 
-    T elapsed_time() const{
-        return this->t() - this->ics_ptr()[0];
-    }
+    T elapsed_time() const;
 
-    T stretching_number() const{
-        const size_t nsys = this->Nsys()/2;
-        return log(norm(this->true_state_ptr()+2+nsys, nsys));
-    }
+    T stretching_number() const;
 
-    T kick() const{
-        return stretching_number()/(this->t() - t_last_);
-    }
+    T kick() const;
 
-    T period() const{
-        return period_;
-    }
+    T period() const;
 
-    T log_ksi() const{
-        return logksi_ + this->stretching_number();
-    }
+    T log_ksi() const;
 
-    T lyapunov_exponent() const{
-        return np == 0 ? 0 : log_ksi()/elapsed_time();
-    }
+    T lyapunov_exponent() const;
 
-    void    Reset(){
-        Base::Reset();
-        ndspan::copy_array(tmp_state_.data(), this->ics().vector(), this->Nsys());
-        t_last_ = this->ics_ptr()[0];
-        t_next_ = t_last_ + period_*this->direction();
-        np = 0;
-        flagged = false;
-        logksi_ =  0;
-        logksi_last_ = 0;
-    }
+    void    Reset();
 
-    void    RhsMain(T* out, const T& t, const T* q) const{
-        this->ode().ode().Rhs(out, t, q, this->args().data()); //fills the first half (nsys) entries
-    }
+    void    RhsMain(T* out, const T& t, const T* q) const;
 
-    void    JacMain(T* out, const T& t, const T* q, const T* dt = nullptr) const{
-        if constexpr (hasJacFunc<OdeType, T>){
-            this->ode().ode().Jac(out, t, q, this->args().data());
-            return;
-        } else {
-            jac_approx<T>([this](T* out, const T& t, const T* q){
-                this->RhsMain(out, t, q);
-            }, out, worker.data(), t, q, dt, this->atol(), this->Nsys()/2);
-        }
-    }
-    
+    void    JacMain(T* out, const T& t, const T* q, const T* dt = nullptr) const;
+
 protected:
 
-
-    void    ReAdjust(const T* new_vector){
-        assert(false && "ReAdjust is not supported in VariationalSolver because it would interfere with the renormalization process. If you need to re-adjust the state at intermediate times, consider using a different solver or implementing a custom solution.");
-    }
+    void    ReAdjust(const T* new_vector);
 
     template<typename... Args>
-    bool Adv_Impl(Args&&... args) {
-        if (flagged){
-            Base::ReAdjust(tmp_state_.data());
-            flagged = false;
-        }
-
-        const int d = this->direction();
-        const bool success = Base::Adv_Impl(t_next_, std::forward<Args>(args)...);
-        if (success && (this->t() == t_next_)){
-            const size_t nsys = this->Nsys()/2;
-            t_last_ = t_next_;
-            t_next_ = this->ics_ptr()[0] + (++np + 1)*period_*d;
-            ndspan::copy_array(tmp_state_.data(), THIS->true_state_ptr()+2, 2*nsys);
-            logksi_last_ = logksi_;
-            logksi_ += log(norm(tmp_state_.data()+nsys, nsys));
-            detail::normalized(tmp_state_.data(), tmp_state_.data(), nsys);
-            flagged = true;
-            return true;
-        }else if (success){
-            return true;
-        }else{
-            return false;
-        }
-    }
+    bool Adv_Impl(Args&&... args);
 
 private:
+    struct private_tag{};
+
+    static Array1D<T, 2*N> join_arrays(View1D<T, N> q0, View1D<T, N> delta_q0);
+
     mutable Array1D<T, 4*N> worker;
     Array1D<T, 2*N> tmp_state_;
     T period_;
@@ -348,61 +170,27 @@ public:
     using Base = ODE<T, N>;
 
     template<hasRhsFunc<T> OdeType>
-    VariationalODE(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args = {}, std::vector<const Event<T>*> events = {}, Integrator method = Integrator::RK45) : Base(2*nsys){
-        // Must create solver BEFORE register_state(), since it accesses solver_
-        this->solver_ = get_virtual_variational_solver<T, N>(method, period, ode, t0, q0, delta_q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+    VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args = {}, EventList<T> events = {}, Integrator method = Integrator::RK45);
 
-        this->cached_idx_.resize(events.size(), 0);
-        Base::register_state();
-        for (size_t i=0; i<events.size(); i++){
-            this->event_data_.allocate_event(events[i]->name());
-        }
-    }
+    std::unique_ptr<ODE<T, N>> clone() const override;
 
-    ODE<T, N>* clone() const override{
-        return new VariationalODE<T, N>(*this);
-    }
+    const std::vector<T>& renorm_times() const;
 
-    const std::vector<T>& renorm_times() const{
-        return renorm_times_;
-    }
+    const std::vector<T>& lyap_values() const;
 
-    const std::vector<T>& lyap_values() const{
-        return lyap_values_;
-    }
+    const std::vector<T>& kick_values() const;
 
-    const std::vector<T>& kick_values() const{
-        return kick_values_;
-    }
+    DEFAULT_RULE_OF_FOUR(VariationalODE)
 
-    DEFAULT_RULE_OF_FOUR(VariationalODE);
+    void clear() override;
 
-    void clear() override{
-        Base::clear();
-        renorm_times_ = std::vector<T>{};
-        lyap_values_ = std::vector<T>{};
-        kick_values_ = std::vector<T>{};
-    }
+    void reset() override;
 
-    void reset() override{
-        Base::reset();
-        renorm_times_ = std::vector<T>{};
-        lyap_values_ = std::vector<T>{};
-        kick_values_ = std::vector<T>{};
-    }
-
-    const ChaoticSolver<T, N, SolverPolicy::RichVirtual>* solver() const {
-        return static_cast<const ChaoticSolver<T, N, SolverPolicy::RichVirtual>*>(Base::solver());
-    }
+    const ChaoticSolver<T, N, UtilPolicy::RichVirtual>* solver() const;
 
 protected:
 
-    void register_state() override{
-        Base::register_state();
-        renorm_times_.push_back(this->solver()->t());
-        lyap_values_.push_back(this->solver()->lyapunov_exponent());
-        kick_values_.push_back(this->solver()->kick());
-    }
+    void register_state() override;
 
 private:
 
@@ -414,27 +202,33 @@ private:
 
 
 
+template<UtilPolicy UP, typename T, size_t N, hasRhsFunc<T> OdeType, typename... Args>
+pbox::Box<ChaoticSolver<T, 2*N, UP>> make_variational_solver(Integrator method, OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, Args&&... args);
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+
+template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (!traits::is_rich<SP>)
-Solver<T, N, SP, OdeType, void> getVariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}){
-    return VariationalSolver<Solver, T, N, SP, OdeType, void>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args);
-}
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args={});
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+
+template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (traits::is_rich<SP>)
-Solver<T, N, SP, OdeType, void> getVariationalSolver(OdeType ode, T t0, const T* q0, const T* delta_q0, size_t nsys, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}, EVENTS events = {}){
-    return VariationalSolver<Solver, T, N, SP, OdeType, void>(ode, t0, q0, delta_q0, nsys, period, rtol, atol, min_step, max_step, stepsize, dir, args, events);
-}
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args={}, EventList<T> events = {});
 
 } // namespace ode::chaos
 
 
 namespace ode{
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename DerivedVS, size_t NBase>
-struct traits::SolverVirtualTypeTraits<chaos::VariationalSolver<Solver, T, N, SP, OdeType, DerivedVS>, T, NBase, SP> {
-    using type = std::conditional_t<SP == SolverPolicy::Virtual || SP == SolverPolicy::RichVirtual, chaos::ChaoticSolver<T, N, SP>, EmptySolver>;
+template<Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType, typename DerivedVS, size_t NBase>
+struct traits::SolverVirtualTypeTraits<chaos::VariationalSolver<Solver, T, N, SolverPolicy::Virtual, OdeType, DerivedVS>, T, NBase, SolverPolicy::Virtual> {
+    using type = chaos::ChaoticSolver<T, N, UtilPolicy::Virtual>;
+};
+
+
+template<Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType, typename DerivedVS, size_t NBase>
+struct traits::SolverVirtualTypeTraits<chaos::VariationalSolver<Solver, T, N, SolverPolicy::RichVirtual, OdeType, DerivedVS>, T, NBase, SolverPolicy::RichVirtual> {
+    using type = chaos::ChaoticSolver<T, N, UtilPolicy::RichVirtual>;
 };
 
 } // namespace ode

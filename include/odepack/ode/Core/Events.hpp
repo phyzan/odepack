@@ -20,13 +20,20 @@
  */
 
 #include "../Tools.hpp"
+#include "polybox/polybox.hpp"
 
 
 namespace ode {
 
-    using pbox::owner;
+using pbox::owner;
 
-    using ndspan::copy_array;
+using ndspan::copy_array;
+
+template<typename T>
+class Event;
+
+template<typename T>
+using EventList = Vector<pbox::Box<Event<T>>>;
 
 // ============================================================================
 // DECLARATIONS
@@ -114,7 +121,7 @@ public:
     virtual const std::vector<T>&   args() const = 0;
 
     /// @brief Create a dynamically allocated copy of this event.
-    virtual Event<T>*               clone() const = 0;
+    virtual std::unique_ptr<Event<T>> clone() const = 0;
 
     /// @brief Get the integration direction (+1 forward, -1 backward).
     virtual int                     direction() const = 0;
@@ -197,7 +204,7 @@ public:
     const std::vector<T>&   args() const;
 
     /// @brief Clone this event.
-    Event<T>*               clone() const;
+    std::unique_ptr<Event<T>> clone() const;
 
     /// @brief Get the integration direction.
     int                     direction() const;
@@ -242,7 +249,7 @@ protected:
      */
     EventBase(std::string name, MaskFunc mask, bool hide_mask);
 
-    DEFAULT_RULE_OF_FOUR(EventBase);
+    DEFAULT_RULE_OF_FOUR(EventBase)
 
     // ================ STATIC OVERRIDE (REQUIRED) ======================
 
@@ -406,10 +413,8 @@ class EventCollection{
 
 public:
 
-    /// @brief Construct from array of event pointers.
-    EventCollection(const Event<T>*const* events, size_t size);
     /// @brief Construct from vector of event pointers.
-    EventCollection(const std::vector<const Event<T>*>& events);
+    EventCollection(EventList<T> evs);
     EventCollection() = default;
     DEFAULT_RULE_OF_FOUR(EventCollection)
     ~EventCollection() = default;
@@ -437,10 +442,11 @@ public:
     }
 
     /// @brief Get the index of the event with the given name, or -1 if not found.
-    int                  event_idx(const std::string& name) const;
+    int                     event_idx(const std::string& name) const;
 
     size_t                  get_event_idx(size_t detection_idx) const{
-        assert(detection_idx < detections && detection_idx >= 0 && "Detection index out of bounds in get_event_idx");        return detection_order[detection_idx];
+        assert(detection_idx < detections && "Detection index out of bounds in get_event_idx");
+        return detection_order[detection_idx];
     }
 
     /// @brief Get total number of events.
@@ -502,6 +508,18 @@ struct EventState{
         return active;
     }
 };
+
+
+template<typename T, template<typename...> typename EventType, typename... Args>
+inline pbox::Box<Event<T>> make_event(Args&&... args){
+    return pbox::make_template_box<EventType>(std::forward<Args>(args)...);
+}
+
+template<typename T, typename... U>
+requires (std::is_same_v<T, U> && ...)
+inline EventList<T> make_event_list(pbox::Box<Event<U>>... events){
+    return make_vector<pbox::Box<Event<T>>>(std::move(events)...);
+}
 
 } // namespace ode
 

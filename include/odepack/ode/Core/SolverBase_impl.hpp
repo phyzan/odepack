@@ -3,11 +3,8 @@
 
 #include "SolverBase.hpp"
 #include "../Tools_impl.hpp"
-#include "../Interpolation/Univariate/StateInterp_impl.hpp"
-#include "Events_impl.hpp"
 #include "FinDiff.hpp"
 #include <odepack/ode/Tools.hpp>
-#include <sstream>
 #include <stdexcept>
 
 #define NOW \
@@ -96,8 +93,8 @@ void BaseSolver<Derived, T, N, SP, OdeType>::jac_approx(T* out, const T& t, cons
         worker = _cache_4.data();
     }
 
-    ode::jac_approx<T>([this](T* out, const T& t, const T* q){
-        this->Rhs(out, t, q);
+    ode::jac_approx<T>([this](T* dummy_out, const T& dummy_t, const T* dummy_q){
+        this->Rhs(dummy_out, dummy_t, dummy_q);
     }, out, worker, t, q, dt, this->atol(), n);
 }
 
@@ -219,17 +216,12 @@ State<T> BaseSolver<Derived, T, N, SP, OdeType>::ics() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-Integrator BaseSolver<Derived, T, N, SP, OdeType>::method() const{
-    return Derived::INTEGRATOR;
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::interp(T* result, const T& t) const{
+void BaseSolver<Derived, T, N, SP, OdeType>::interp(T* out, const T& t) const{
     assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->interp_new_state_ptr()[0]*this->direction()) && "Out of bounds interpolation requested");
     if (this->t_old() == this->t_new()){
-        ndspan::copy_array(result, this->new_state_ptr(), this->Nsys());
+        ndspan::copy_array(out, this->new_state_ptr(), this->Nsys());
     }
-    return interp_impl(result, t);
+    return interp_impl(out, t);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -306,8 +298,8 @@ T BaseSolver<Derived, T, N, SP, OdeType>::auto_step() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-BaseSolver<Derived, T, N, SP, OdeType>::Clone* BaseSolver<Derived, T, N, SP, OdeType>::clone() const {
-    return new Derived(*THIS);
+std::unique_ptr<typename BaseSolver<Derived, T, N, SP, OdeType>::CloneType> BaseSolver<Derived, T, N, SP, OdeType>::clone() const {
+    return std::make_unique<Derived>(*THIS);
 }
 
 // PUBLIC MODIFIERS
@@ -807,8 +799,8 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, nsys+2), _args(args.data(), args.size()), _diff_worker(JP==JacPolicy::Autodiff ? 2*nsys : 0), _ode(ode), _Nsys(nsys), _direction(dir){
-    assert(nsys > 0 && "Ode system size is 0");
+BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, q0.size()+2), _args(args.data(), args.size()), _diff_worker(JP==JacPolicy::Autodiff ? 2*q0.size() : 0), _ode(ode), _Nsys(q0.size()), _direction(dir){
+    assert(this->Nsys() > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
         throw std::runtime_error("The stepsize argument cannot be negative");
@@ -817,13 +809,13 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
         throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
     }
     
-    if (q0 == nullptr){
+    if (q0.data() == nullptr){
         this->kill("Initial conditions not set (nullptr provided)");
-    } else if (this->validate_ics_impl(t0, q0)){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0) : abs<T>(stepsize));
+    } else if (this->validate_ics_impl(t0, q0.data())){
+        T habs = (stepsize == 0 ? this->auto_step(t0, q0.data()) : abs<T>(stepsize));
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
-        ndspan::copy_array(_state_data.ptr(0, 2), q0, this->Nsys());
+        ndspan::copy_array(_state_data.ptr(0, 2), q0.data(), this->Nsys());
         for (int i=1; i<5; i++){
             ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
         }

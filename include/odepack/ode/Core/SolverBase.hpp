@@ -19,17 +19,15 @@
 
 #include "../Tools.hpp"
 #include "VirtualBase.hpp"
-#include "../SolverState.hpp"
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, const std::vector<T>& args={}
 
-#define MAIN_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
+#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1,  std::vector<T> args={}
 
-#define SOLVER_CONSTRUCTOR(T) OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args
+#define MAIN_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args
 
-#define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events={}, Integrator method = Integrator::RK45
+#define SOLVER_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args
 
-#define ARGS ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args
+#define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events={}, Integrator method = Integrator::RK45
 
 
 // For non-template member functions: use pointer-to-member (standard-compliant)
@@ -71,7 +69,6 @@ namespace ode{
  * method overrides.
  *
  * @tparam Derived The derived solver class (CRTP pattern). Must define:
- *                 - static constexpr const char* name
  *                 - static constexpr bool IS_IMPLICIT
  *                 - static constexpr int ERR_EST_ORDER
  *                 - adapt_impl(), interp_impl(), local_interp()
@@ -83,28 +80,24 @@ namespace ode{
  *       first template parameter.
  */
 
-enum class Integrator : uint8_t;
-
-Integrator getIntegrator(const std::string& name);
-
-Integrator getIntegrator(const char* name);
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 class BaseSolver : public traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type {
 
-    using Clone = traits::SolverCloneType<Derived, T, N, SP>;
+    using CloneType = traits::SolverCloneType<Derived, T, N, SP>;
 
 public:
 
-    // Autodiff is only enabled when the size of the ODE system is known at compile time.
+    using Base = typename traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type;
+    using DualType = ::ode::DualType<T, N, 1>;
     static constexpr JacPolicy JP = getJacPolicy<T, N, OdeType>();
     
 
-    using Scalar = T;
-    using Base = typename traits::SolverVirtualTypeTraits<Derived, T, N, SP>::type;
-    using DualType = ::ode::DualType<T, N, 1>;
+    using value_type = T;
+    using ode_type = OdeType;
     static constexpr size_t NSYS = N;
     static constexpr SolverPolicy Policy = SP;
+
     
     BaseSolver() = delete;
 
@@ -245,16 +238,13 @@ public:
     */
     bool                validate_ics(T t0, const T* q0) const;
 
-    /// @brief Get the name of the integration method (e.g., "RK45").
-    Integrator          method() const;
-
     /**
      * @brief Interpolate the solution at a time within the last step interval.
-     * @param[out] result Output array for interpolated state (size Nsys).
+     * @param[out] out Output array for interpolated state (size Nsys).
      * @param[in]  t      Time to interpolate at (must be in [t_old, t_new]).
      * @throws std::runtime_error If t is outside the valid interpolation range.
     */
-    void                interp(T* result, const T& t) const;
+    void                interp(T* out, const T& t) const;
 
     /**
      * @brief Get the number of RHS function evaluations performed so far.
@@ -283,7 +273,7 @@ public:
      * @brief Create a dynamically allocated copy of this solver.
      * @return Pointer to a new solver instance. Caller owns the memory.
      */
-    Clone*              clone() const;
+    std::unique_ptr<CloneType> clone() const;
 
     // MODIFIERS
 
@@ -350,7 +340,7 @@ public:
      * @param t0      New initial time.
      * @param y0      New initial state vector (size Nsys).
      * @param stepsize Initial step size (0 = auto-compute).
-     * @param direction Integration direction for the new ICs (+1 forward, -1 backward, 0 default).
+     * @param direction Integration direction for the new ICs (+1 forward, -1 backward, 0 for unchanged).
      * @return True if ICs were valid and set successfully. Otherwise returns false and stops the solver. Simply call resume() to continue.
      * @throws std::runtime_error If stepsize is negative.
      */
@@ -392,14 +382,18 @@ public:
      */
     VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const;
 
+    // =================== STATIC OVERRIDES (NECESSARY) ===============================
+    // Derived classes MUST implement these methods / attributes.
+
+    Integrator method() const {
+        return THIS->method();
+    }
+
 protected:
 
     using MainSolverType = BaseSolver;
-    // =================== STATIC OVERRIDES (NECESSARY) ===============================
-    // Derived classes MUST implement these methods.
 
-    /// @brief Name of the integration method (must be defined in Derived).
-    static constexpr Integrator INTEGRATOR = Derived::INTEGRATOR;
+
     /// @brief Whether the method is implicit (must be defined in Derived).
     static constexpr bool       IS_IMPLICIT = Derived::IS_IMPLICIT;
     /// @brief Order of the error estimator (must be defined in Derived).
@@ -431,7 +425,7 @@ protected:
     template<typename... Args>
     bool        Adv_Impl(Args&&... args);
 
-    constexpr bool    RequestTimeFloor(T& out) {
+    constexpr bool    RequestTimeFloor(T& /*out*/) {
         return false;
     }
 
@@ -481,6 +475,12 @@ protected:
     /// @brief Get pointer to the initial conditions state data.
     const T*    ics_ptr() const;
 
+    /// @brief Get pointer to the current "true" state.
+    const T*    true_state_ptr() const;
+
+    /// @brief Get pointer to the previous "true" state.
+    const T*    last_true_state_ptr() const;
+
     /// @brief Get pointer to the most recently computed state.
     const T*    new_state_ptr() const;
 
@@ -518,15 +518,6 @@ protected:
             return item;
         }
     }
-
-    // ================================================================================
-
-    // ============================ OVERRIDEN IN RICH SOLVER ==========================
-    /// @brief Get pointer to the current "true" state.
-    const T*    true_state_ptr() const;
-
-    /// @brief Get pointer to the previous "true" state.
-    const T*    last_true_state_ptr() const;
 
     // ================================================================================
 
@@ -621,7 +612,7 @@ namespace traits{
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
 
-} // namespace traits
+} // namespace ode::traits
 
 
 #define SolverTemplate template<typename T, size_t, SolverPolicy, hasRhsFunc<T>, typename>

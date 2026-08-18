@@ -2,6 +2,7 @@
 #define REGULAR_GRID_INTERPOLATOR_IMPL_HPP
 
 #include "RegularGridInterpolator.hpp"
+#include "odepack/ode/Core/VirtualBase.hpp"
 
 namespace ode::interp::rgi{
 
@@ -156,9 +157,14 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");
     std::vector<T> args{};
-    std::vector<const Event<T>*> events{};
-    std::unique_ptr<OdeRichSolver<T, NDIM>> unique_solver = get_virtual_solver<T, NDIM>(method, OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ this->OdeFuncNorm(out, t, q, args); }}, 0, nullptr, this->ndim(), rtol, atol, min_step, max_step, stepsize, +1, static_cast<const std::vector<T>&>(args), static_cast<const std::vector<const Event<T>*>&>(events));
-    OdeRichSolver<T, NDIM>* solver = unique_solver.get();
+    EventList<T> events{};
+    pbox::Box<OdeRichSolver<T, NDIM>> solver = make_solver<UtilPolicy::RichVirtual>(method,
+        OdeData{
+            .Rhs=[this](T* out, const T& t, const T* q, const T* args_dummy){
+                this->OdeFuncNorm(out, t, q, args_dummy);
+            }
+        },
+        T{0}, View1D<T, NDIM>{nullptr, this->ndim()}, rtol, atol, min_step, max_step, stepsize, +1, std::move(args), std::move(events));
 
     const auto& X = this->grid().data();
     Array1D<int, NDIM, InterpBase::ALLOC> N(this->ndim());
@@ -221,7 +227,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         }
     };
 
-    auto IntegrateDirection = [&](OdeRichSolver<T, NDIM>* solver, T& s_total, T* const * x, int& n_steps_tot, const int dir) -> int {
+    auto IntegrateDirection = [&](pbox::Box<OdeRichSolver<T, NDIM>>& rich_solver, T& s_total, T* const * x, int& n_steps_tot, const int dir) -> int {
         // x[I] are preallocated arrays of size max_pts + 1. x[I][0] = x0[I], so at each step, we write to x[I][step], starting from x[I][1]
         Array1D<T, NDIM, InterpBase::ALLOC> ics(this->ndim());
         if constexpr (NDIM > 0){
@@ -234,7 +240,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         
         assert(this->contains(ics.data()) && "Initial point out of bounds");
         assert((dir == 1 || dir == -1) && "Direction must be either +1 or -1");
-        if (!solver->set_ics(0, ics.data(), stepsize, dir)) {
+        if (!rich_solver->set_ics(0, ics.data(), stepsize, dir)) {
             return 0;
         }
         int n_steps = 0;
@@ -242,8 +248,8 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
 
         GetIdx(i_start, ics.data());
-        while ((n_steps < max_pts) && solver->advance_by(ds)){
-            q_new = solver->vector().data();
+        while ((n_steps < max_pts) && rich_solver->advance_by(ds)){
+            q_new = rich_solver->vector().data();
             GetIdx(i_curr, q_new);
             n_steps++;
             n_steps_tot++;
@@ -251,9 +257,9 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
                 ((x[I][n_steps*dir] = q_new[I]), ...);
                 if (((i_curr[I] != i_start[I]) || ...) && InBounds(i_curr)){
                     if(is_full(i_curr[I]...)){
-                        break;  // Stop if cell already occupied (like Python line 193)
+                        break;  // Stop if cell already occupied
                     }
-                    // Mark cell and record it (like Python lines 186-189)
+                    // Mark cell and record it
                     is_full(i_curr[I]...) = true;
                     (reached[I].push_back(i_curr[I]), ...);
                     ((i_start[I] = i_curr[I]), ...);
@@ -276,7 +282,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
             }
 
         }
-        s_total += std::abs(solver->t());
+        s_total += std::abs(rich_solver->t());
         return n_steps;
     };
 
@@ -292,9 +298,6 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         
 
         int n_steps_tot = 0;
-
-        // The args and events are passed as const & because this exact signature is compiled in the
-        // Python bindings, so this saves binary size and compilation time.
 
         T s_total = 0;
         Array1D<T*, NDIM, InterpBase::ALLOC> x(this->ndim());

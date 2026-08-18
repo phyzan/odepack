@@ -30,7 +30,7 @@ public:
     DelaunayTri(const double* points, size_t n_points, size_t ndim);
 
     // Allowes derived classes to set a state into the object
-    // wihtout having to recompute the triangulation. Used for pickling in Python wrapper.
+    // wihtout having to recompute the triangulation.
     DelaunayTri() = default;
 
     void set_state(const View2D<double, 0, NDIM>& points, const View2D<int, 0, DIM_SPX>& simplices, const View2D<int, 0, DIM_SPX>& neighbors, const View2D<double, 0, NDIM>& v0, const View3D<double, 0, NDIM, NDIM>& invT);

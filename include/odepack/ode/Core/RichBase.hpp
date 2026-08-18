@@ -19,7 +19,6 @@
 
 #include "SolverBase.hpp"
 
-#define EVENTS const std::vector<const Event<T>*>&
 
 namespace ode{
 
@@ -63,7 +62,11 @@ public:
 
     EventState<T>               current_event() const{
         if (this->at_event()){
-            return EventState<T>{.event = &events.event(current_idx), .idx = current_idx, .is_masked = is_at_canon_event, .active = true};
+            return EventState<T>{
+                .event = &evt_col.event(current_idx),
+                .idx = current_idx,
+                .is_masked = is_at_canon_event,
+                .active = true};
         } else {
             return EventState<T>{.active = false};
         }
@@ -124,7 +127,7 @@ protected:
      * @param events Vector of event pointers to monitor during integration.
      * @see SOLVER_CONSTRUCTOR macro for other parameter details.
      */
-    RichSolver(SOLVER_CONSTRUCTOR(T), std::vector<const Event<T>*> events = {});
+    RichSolver(SOLVER_CONSTRUCTOR(T), EventList<T> evs = {});
 
     DEFAULT_RULE_OF_FOUR(RichSolver)
 
@@ -144,49 +147,16 @@ protected:
     
     //================= STATIC OVERRIDES ======================
 
-    bool    RequestTimeFloor(T& out) {
-        // no need to call Base::RequestTimeFloor, the Base class does not request it.
-        detection_idx = -1; // reset detection index at the start of a new detection round
-        // do not also set is_at_event to false, as the Adv_Impl might fail and the step should remain in the same state.
-        if ((is_event_waiting = events.detect_all_between(this->old_state(), this->new_state(), [this](T* out, const T& t){
-            this->interp_impl(out, t);
-        }))){
-            // is_event_waiting has been set to true, preparing the push_event_queue for the first event
-            if (Base::RequestTimeFloor(out)){
-                out = this->minimum_time(out, events.get_time(0));
-            } else {
-                out = events.get_time(0);
-            }
-            return true;
-        } else {
-            return false;
-        }
-    }
+    bool    RequestTimeFloor(T& out);
     //=========================================================
 
 private:
 
     /// @brief Returns true if the queue was successfully advanced to the next event, updating flags, and false nothing happened.
-    bool push_event_queue(){
-        if (is_event_waiting && events.get_time(size_t(detection_idx+1)) == this->t()){
-            current_idx = events.get_event_idx(size_t(++detection_idx));
-            // determine if this one is a canon event
-            if (const MaskedState<T>* ms = events.masked_state()){
-                if ((is_at_canon_event = static_cast<bool>(ms->idx == current_idx)) && !events.event(current_idx).hides_mask()){
-                    ODEPACK_CALL_DERIVED(ReAdjust, ms->masked_vector.data());
-                }
-            }
-            // determine if there is another event after this one
-            is_event_waiting = size_t(detection_idx) < events.detection_size() - 1;
-            is_at_event = true;
-            return true;
-        } else {
-            return false;
-        }
-    }
+    bool push_event_queue();
 
     /// @brief Collection of events being monitored.
-    EventCollection<T>                      events;
+    EventCollection<T>                      evt_col;
     size_t                                  current_idx = 0; //index of the currently triggered event. If not at an event, this should not be accessed.
     int                                     detection_idx = -1; //index of the currently triggered event in the detection order. At the start of an event detection this is -1, at the end of the iteration it is equal to the number of detections - 1.
     bool                                    is_at_event = false;
@@ -214,7 +184,7 @@ namespace detail{
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 using BaseDispatcher = std::conditional_t<(SP == SolverPolicy::RichStatic || SP == SolverPolicy::RichVirtual), RichSolver<Derived, T, N, SP, OdeType>, BaseSolver<Derived, T, N, SP, OdeType>>;
 
-} // namespace detail
+} // namespace ode::detail
 
 } // namespace ode
 

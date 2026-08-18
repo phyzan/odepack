@@ -26,11 +26,12 @@ public:
     template<typename... Type>
     RK4(MAIN_DEFAULT_CONSTRUCTOR(T), Type&&... extras);
 
+    Integrator method() const;
+
     auto  local_interp() const;
 
     void        Reset();
 
-    static constexpr Integrator     INTEGRATOR = Integrator::RK4;
     static constexpr int            ERR_EST_ORDER = 4;
     static constexpr size_t         INTERP_ORDER = 4;
     static constexpr bool           IS_IMPLICIT = false;
@@ -55,6 +56,12 @@ protected:
 
 };
 
+
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+struct SolverTypeGetter<Integrator::RK4, T, N, SP, OdeType, Derived>{
+    using type = RK4<T, N, SP, OdeType, Derived>;
+};
 
 
 } // namespace ode

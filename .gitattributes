@@ -1,2 +1,0 @@
-# Exclude Jupyter notebooks from GitHub language statistics
-*.ipynb linguist-documentation

@@ -113,7 +113,7 @@ BDFCONSTS<T>::BDFCONSTS(){
 
     for (size_t i=0; i<BDF_MAX_ORDER+1; i++){
         ALPHA[i] = (1-KAPPA[i])*GAMMA[i];
-        ERR_CONST[i] = KAPPA[i]*GAMMA[i] + T(1)/(1+i);
+        ERR_CONST[i] = KAPPA[i]*GAMMA[i] + T(1)/T(1UL+i);
     }
 }
 
@@ -149,7 +149,7 @@ void bdf_interp(T* result, const T& t, const T& t2, const T& h, const T* D, size
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 template<typename... Type>
-BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras) : Base(ARGS, std::forward<Type>(extras)...), _J(nsys, nsys), _B(nsys, nsys), _LU(nsys), _R((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _U((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _RU((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _f(nsys), _dy(nsys), _b(nsys), _scale(nsys), _ypred(nsys), _psi(nsys), _d(nsys), _error(nsys), _error_m(nsys), _error_p(nsys) {
+BDF<T, N, SP, OdeType, Derived>::BDF(private_tag, MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::forward<Type>(extras)...), _J(q0.size(), q0.size()), _B(q0.size(), q0.size()), _LU(q0.size()), _R((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _U((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _RU((BDF_MAX_ORDER+1)*(BDF_MAX_ORDER+1)), _f(q0.size()), _dy(q0.size()), _b(q0.size()), _scale(q0.size()), _ypred(q0.size()), _psi(q0.size()), _d(q0.size()), _error(q0.size()), _error_m(q0.size()), _error_p(q0.size()) {
     
     if (rtol == 0){
         rtol = 100*std::numeric_limits<T>::epsilon();
@@ -159,8 +159,8 @@ BDF<T, N, SP, OdeType, Derived>::BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras
     }
     _newton_tol = ndspan::max<T>(10 * std::numeric_limits<T>::epsilon() / rtol, ndspan::min<T>(T(3)/100, pow(rtol, T(1)/T(2))));
 
-    if (!this->is_dead() && q0 != nullptr){
-        if (this->validate_ics_impl(t0, q0)){
+    if (!this->is_dead() && q0.data() != nullptr){
+        if (this->validate_ics_impl(t0, q0.data())){
             this->_reset_impl_alone();
         }else{
             this->kill("Initial Jacobian contains nan or inf");
@@ -199,6 +199,12 @@ bool BDF<T, N, SP, OdeType, Derived>::validate_ics_impl(T t0, const T* q0) const
         return false;
     }
 }
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Integrator BDF<T, N, SP, OdeType, Derived>::method() const {
+    return Integrator::BDF;
+}
+
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
@@ -330,7 +336,7 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
             continue;
         }
 
-        safety = T(9)/10 * T(2 * NEWTON_MAXITER + 1)/(2 * NEWTON_MAXITER + conv_result.n_iter);
+        safety = T(9)/10 * T(2UL * NEWTON_MAXITER + 1UL)/(2UL * NEWTON_MAXITER + conv_result.n_iter);
         #pragma omp simd
         for (size_t i=0; i<nsys; i++){
             _scale[i] = atol + rtol * abs<T>(y_new[i]);
@@ -390,16 +396,16 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
 
     delta_order = -1;
     max_factor = pow(_error_norms[0], T(-1)/(_order));
-    for (int i=1; i<3; i++){
+    for (size_t i=1; i<3; i++){
         T tmp = pow(_error_norms[i], T(-1)/(_order+i));
         if (tmp > max_factor){
             max_factor = tmp;
-            delta_order = i - 1;
+            delta_order = int(i) - 1;
         }
     }
 
     _order += delta_order;
-    T candidate_factor = safety * max_factor;
+    auto candidate_factor = safety * max_factor;
     factor = std::min<T>(this->MAX_FACTOR, candidate_factor);
     habs *= factor;
     _change_D(factor);

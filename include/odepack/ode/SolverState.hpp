@@ -1,7 +1,6 @@
 #ifndef SOLVERSTATE_HPP
 #define SOLVERSTATE_HPP
 
-#include "Core/Events.hpp"
 #include <ndspan/arrays.hpp>
 
 namespace ode {
@@ -9,16 +8,16 @@ namespace ode {
 template<typename T, size_t N>
 struct SolverState{
     
-    Array1D<T> vector;
-    T t;
-    T habs;
-    bool diverges;
-    bool is_running;
-    bool is_dead;
-    size_t Nt;
-    std::string message;
+    ndspan::Array1D<T, N> vector;
+    std::string msg;
+    size_t nt;
+    T time;
+    T stepsize;
+    bool diverging;
+    bool running;
+    bool dead;
 
-    SolverState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, std::string message);
+    SolverState(const T* q, T t, T habs, size_t nsys, bool diverges, bool is_running, bool is_dead, size_t updates, std::string message);
 
     void show(int precision = 15) const;
 
@@ -30,7 +29,7 @@ struct SolverRichState : public SolverState<T, N>{
 
     std::string event_name;
 
-    SolverRichState(const T* vector, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, std::string message, const Event<T>* event);
+    SolverRichState(const T* q, T t, T habs, size_t Nsys, bool diverges, bool is_running, bool is_dead, size_t Nt, std::string message, std::string event);
 
     void show(int precision = 15) const;
 
@@ -38,4 +37,4 @@ struct SolverRichState : public SolverState<T, N>{
 
 } // namespace ode
 
-#endif
+#endif // SOLVERSTATE_HPP

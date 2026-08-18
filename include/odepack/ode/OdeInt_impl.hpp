@@ -4,8 +4,9 @@
 #include <algorithm>
 
 #include "OdeInt.hpp"
-#include "Tools_impl.hpp"
 #include "Core/VirtualBase.hpp"
+#include "odepack/ode/Core/Events.hpp"
+
 
 namespace ode{
 
@@ -60,8 +61,8 @@ size_t EventCounter<T, N>::total()const{
 // ODE implementations
 template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
-ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method) : ODE(nsys){
-    init(ARGS, events, method);
+ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method) : ODE(q0.size()){
+    init(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events), method);
 }
 
 template<typename T, size_t N>
@@ -80,13 +81,8 @@ void ODE<T, N>::Jac(T* out, const T& t, const T* q, const T* dt) const{
 }
 
 template<typename T, size_t N>
-ODE<T, N>* ODE<T, N>::clone() const{
-    return new ODE<T, N>(*this);
-}
-
-template<typename T, size_t N>
-std::unique_ptr<ODE<T, N>> ODE<T, N>::safe_clone() const{
-    return std::unique_ptr<ODE<T, N>>(this->clone());
+std::unique_ptr<ODE<T, N>> ODE<T, N>::clone() const{
+    return std::make_unique<ODE<T, N>>(*this);
 }
 
 template<typename T, size_t N>
@@ -220,9 +216,8 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     pbox::Box<Interpolator<T, N>> interpolator;
     if constexpr (store_explicit_steps){
         success = solver_->observe_until(t_max, main_observer, t_eval);
-    }else if (interpolate){
+    } else if (interpolate){
         success = static_cast<bool>(interpolator = solver_->interp_until(t_max, main_observer));
-        success = solver_->interp_until(t_max, main_observer);
     } else {
         success = solver_->observe_until(t_max, main_observer);
     }
@@ -323,12 +318,13 @@ void ODE<T, N>::reset(){
 
 template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
-void ODE<T, N>::init(MAIN_CONSTRUCTOR(T), EVENTS events, Integrator method){
-    solver_.steal(get_virtual_solver<T, N>(method, ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events).release());
-    cached_idx_.resize(events.size(), 0);
+void ODE<T, N>::init(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method){
+    solver_ = make_solver<UtilPolicy::RichVirtual>(method, std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
+    const EventCollection<T>& event_coll = this->solver_->event_col();
+    cached_idx_.resize(event_coll.size(), 0);
     register_state();
-    for (size_t i=0; i<events.size(); i++){
-        event_data_.allocate_event(events[i]->name());
+    for (size_t i=0; i<event_coll.size(); i++){
+        event_data_.allocate_event(event_coll.event(i).name());
     }
 }
 

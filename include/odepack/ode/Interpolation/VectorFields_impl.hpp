@@ -22,7 +22,7 @@ bool VectorField<Derived, T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
 }
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
-void VectorField<Derived, T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const{
+void VectorField<Derived, T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& /*t*/, const T* q, const T* /*args*/) const{
     size_t nd = this->ndim();
     if (!this->interp(out, q)){
         std::fill(out, out + nd, 0);
@@ -40,7 +40,7 @@ void VectorField<Derived, T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& t, 
 
 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
-void VectorField<Derived, T, NDIM, AS_VIRTUAL>::OdeFunc(T* out, const T& t, const T* q, const T* args) const{
+void VectorField<Derived, T, NDIM, AS_VIRTUAL>::OdeFunc(T* out, const T& /*t*/, const T* q, const T* /*args*/) const{
     size_t nd = this->ndim();
     if (!this->interp(out, q)){
         std::fill(out, out + nd, 0);
@@ -70,9 +70,9 @@ OdeResult<T> VectorField<Derived, T, NDIM, AS_VIRTUAL>::streamline(const T* x0, 
 template<typename Derived, typename T, int NDIM, bool AS_VIRTUAL>
 ODE<T, NDIM>* VectorField<Derived, T, NDIM, AS_VIRTUAL>::get_streamline_ode(const T* x0, T rtol, T atol, T min_step, T max_step, T stepsize, int direction, Integrator method, bool normalized) const{
     if (normalized){
-        return new ODE<T, NDIM>(OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ THIS->OdeFuncNorm(out, t, q, args); }}, 0, x0, this->ndim(), rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
+        return new ODE<T, NDIM>(OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ THIS->OdeFuncNorm(out, t, q, args); }}, T{0}, View1D<T, NDIM>{x0, this->ndim()}, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
     } else {
-        return new ODE<T, NDIM>(OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ THIS->OdeFunc(out, t, q, args); }}, 0, x0, this->ndim(), rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
+        return new ODE<T, NDIM>(OdeData{.Rhs=[this](T* out, const T& t, const T* q, const T* args){ THIS->OdeFunc(out, t, q, args); }}, T{0}, View1D<T, NDIM>{x0, this->ndim()}, rtol, atol, min_step, max_step, stepsize, direction, {}, {}, method);
     }
 }
 

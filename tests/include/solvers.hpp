@@ -1,0 +1,6 @@
+#ifndef ODEPACK_TESTS_SOLVERS_HPP
+#define ODEPACK_TESTS_SOLVERS_HPP
+
+void test_solvers();
+
+#endif // ODEPACK_TESTS_SOLVERS_HPP

@@ -2,191 +2,372 @@
 #define DOPRI_IMPL_HPP
 
 #include "DOPRI.hpp"
+#include "ndspan/ndtools.hpp"
 
 namespace ode{
 
-// RungeKuttaMainBase implementations
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T))
-    requires (!traits::is_rich<SP>): Base(ARGS), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
-    // Compute K[Nstages] = f(t0, q0) for FSAL
-    if (q0 != nullptr){
-        this->rhs(K_.data()+Nstages*nsys, t0, q0);
+// ============================================================================
+// Shared explicit Runge-Kutta building blocks
+// ============================================================================
+
+namespace detail{
+
+template<typename T>
+void rk_interp_matrix(T* coef_mat, const T* K, const T* P, size_t Nstages, size_t order, size_t n){
+    for (size_t i = 0; i < n; i++){
+        for (size_t j = 0; j < order; j++){
+            T sum = 0;
+            for (size_t k = 0; k <= Nstages; k++){
+                sum += K[k*n + i] * P[k*order + j];
+            }
+            coef_mat[i*order + j] = sum;
+        }
     }
 }
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::RungeKuttaMainBase(SOLVER_CONSTRUCTOR(T), EVENTS events)
-    requires (traits::is_rich<SP>): Base(ARGS, events), K_(K_ROWS, nsys), _df_tmp(nsys), _coef_mat(nsys, Derived::INTERP_ORDER) {
-    // Compute K[Nstages] = f(t0, q0) for FSAL
-    if (q0 != nullptr){
-        this->rhs(K_.data()+Nstages*nsys, t0, q0);
-    }
-}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::Reset(){
-    Base::Reset();
-    K_.fill(0);
-    _mat_is_set = false;
-    // Compute K[Nstages] = f(t0, q0) for FSAL
-    const T* state = this->new_state_ptr();
-    this->rhs(K_.data()+Nstages*this->Nsys(), state[0], state+2);
-}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::ReAdjust(const T* new_vector){
-    // Re-compute K[Nstages] = f(t, q) after restarting at intermediate time (e.g. because of discontinuity due to masked event)
-    Base::ReAdjust(new_vector);
-
-    //prepate the coef matrix for interpolation
-    //before altering K, so that interpolation is valid
-    //from t_old to t
-    this->set_coef_matrix();
-    //copy the new state vector into the last stage of K
-    this->rhs(K_.data() + Nstages*this->Nsys(), this->t(), new_vector);
-}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::set_coef_matrix_impl() const{
-    THIS->set_coef_matrix_impl();
-}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
- void RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::set_coef_matrix() const{
-    if (!this->_mat_is_set){
-        this->set_coef_matrix_impl();
-        this->_mat_is_set = true;
-    }
-}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-T RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::step_impl(T* result, const T* state, const T& h){
-    const T& t = state[0];
-    T* __restrict__ q_new = result + 2;
-    T* __restrict__ K = this->K_.data();
-    T* __restrict__ r = this->_df_tmp.data();
-    const T* __restrict__ q = state + 2;
-
-    // CRTP dispatch to derived class for explicit stage computation
-    THIS->compute_stages_and_solution_impl(K, r, q_new, q, t, h);
-
-    // Final: K[Nstages] = f(t + h, q_new) for error estimation and FSAL
-    this->rhs(K + Nstages*this->Nsys(), t + h, q_new);
-    result[0] = t + h;
-    return THIS->estimate_error_norm(K, q, q_new, this->rtol(), this->atol(), h);
-}
 
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, size_t K_ROWS, SolverPolicy SP, hasRhsFunc<T> OdeType>
-StepResult RungeKuttaMainBase<Derived, T, N, Nstages, Norder, K_ROWS, SP, OdeType>::adapt_impl(T* res, const T* state){
-    this->_mat_is_set = false;
-    const T& h_min = this->min_step();
-    const T& max_step = this->max_step();
-    const size_t n = this->Nsys();
-
+template<typename T, typename StepFn>
+StepResult rk_adapt_step(T* res, const T* state, T* K, size_t n, size_t fsal_row,
+                          const T& min_step, const T& max_step, const T& min_step_abs,
+                          const T& safety, const T& max_factor, const T& min_factor,
+                          const T& err_exp, const T& inc_exp, const T& min_err,
+                          int direction, StepFn&& step_fn){
     T& habs = res[1];
     habs = state[1];
-    T h, err_norm, factor, _factor;
-    T* q_new = res+2;
+    T* q_new = res + 2;
+
+    ndspan::copy_array(K, K + fsal_row*n, n); // FSAL: reuse the last stage of the previous step
 
     bool step_accepted = false;
-    T* K = K_.data();
-    ndspan::copy_array(K, K + Nstages*this->Nsys(), this->Nsys()); //FSAL: K[0] for next step = K[Nstages] from this step
+    T factor;
     while (!step_accepted){
-        h = habs * this->direction();
-        err_norm = THIS->step_impl(res, state, h);
+        const T h = habs * direction;
+        const T err_norm = step_fn(res, state, h);
 
         if (err_norm <= 1){
-            // Accept step
             step_accepted = true;
-            if (2*err_norm < 1) {
-                T err_clamped = ndspan::max<T>(err_norm, MIN_ERR);
-                _factor = this->SAFETY * pow(err_clamped, INC_EXP);
-                factor = ndspan::min<T>(this->MAX_FACTOR, _factor);
+            if (2*err_norm < 1){
+                const auto& err_clamped = max_ref(err_norm, min_err);
+                set_min(factor, max_factor, safety * pow(err_clamped, inc_exp));
             } else {
-                factor = T(1);
+                factor = 1;
             }
         } else {
-            // Reject step
-            _factor = this->SAFETY * pow(err_norm, ERR_EXP);
-            factor = ndspan::max<T>(this->MIN_FACTOR, _factor);
+            set_max(factor, min_factor, safety * pow(err_norm, err_exp));
         }
 
         if (!all_are_finite(q_new, n)){
             return StepResult::INF_ERROR;
-        }else if (habs < this->MIN_STEP){
+        } else if (habs < min_step_abs){
             return StepResult::TINY_STEP_ERROR;
-        }else if (!resize_step(factor, habs, h_min, max_step)){
+        } else if (!resize_step(factor, habs, min_step, max_step)){
             break;
         }
     }
     return StepResult::Success;
 }
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-T StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, const T& h) const {
-    // Boost-style error calculation: max norm with |x| + |dxdt|*|h| scaling
+} // namespace ode::detail
+
+// ============================================================================
+// RK23
+// ============================================================================
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)),
+      K_(Nstages+1, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + Nstages*q0.size(), t0, q0.data());
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T), EventList<T> events) requires (traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)),
+      K_(Nstages+1, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + Nstages*q0.size(), t0, q0.data());
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Integrator RK23<T, N, SP, OdeType, Derived>::method() const{
+    return Integrator::RK23;
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK23<T, N, SP, OdeType, Derived>::Reset(){
+    Base::Reset();
+    K_.fill(0);
+    mat_is_set_ = false;
+    const T* state = this->new_state_ptr();
+    this->rhs(K_.data() + Nstages*this->Nsys(), state[0], state+2);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK23<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
+    Base::ReAdjust(new_vector);
+    // freeze the interpolation coefficients (from t_old to t) before K is overwritten
+    this->set_coef_matrix();
+    this->rhs(K_.data() + Nstages*this->Nsys(), this->t(), new_vector);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK23<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
+    if (!mat_is_set_){
+        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->Nsys());
+        mat_is_set_ = true;
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+T RK23<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h){
+    const T& t = state[0];
+    T* __restrict__ q_new = result + 2;
+    T* __restrict__ K = K_.data();
+    T* __restrict__ r = df_tmp_.data();
+    const T* __restrict__ q = state + 2;
+    const size_t n = this->Nsys();
+
+    const T rtol = this->rtol(), atol = this->atol();
     const T habs = abs<T>(h);
+
+    const T* __restrict__ K0 = K;
+    T* __restrict__       K1 = K +   n;
+    T* __restrict__       K2 = K + 2*n;
+    T* __restrict__       K3 = K + 3*n;
+
+    // Stage 2
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(1,0)*K0[j]); }
+    this->rhs(K1, t + C[1]*h, r);
+
+    // Stage 3 (a31 = 0, so K0 absent)
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(2,1)*K1[j]); }
+    this->rhs(K2, t + C[2]*h, r);
+
+    // Solution update
+    for (size_t j = 0; j < n; j++) {
+        q_new[j] = q[j] + h * (B(0)*K0[j] + B(1)*K1[j] + B(2)*K2[j]);
+    }
+
+    // FSAL: K3 = f(t+h, q_new)
+    this->rhs(K3, t + h, q_new);
+    result[0] = t + h;
+
+    // Error norm
     T err_max = 0;
-    for (size_t j = 0; j < this->Nsys(); j++) {
-        // CRTP dispatch to derived class for explicit error computation
-        T err_total = THIS->compute_error_impl(j, K, h);
-        T scale = atol + rtol * (abs<T>(q[j]) + abs<T>(this->K_[j]) * habs);
-        err_max = ndspan::max<T>(err_max, abs<T>(err_total) / scale);
+    for (size_t j = 0; j < n; j++) {
+        const auto err   = h * (E[0]*K0[j] + E[1]*K1[j] + E[2]*K2[j] + E[3]*K3[j]);
+        const auto scale = atol + rtol * (abs<T>(q[j]) + abs<T>(K0[j]) * habs);
+        err_max = ndspan::max<T>(err_max, abs<T>(err) / scale);
     }
     return err_max;
 }
 
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+StepResult RK23<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
+    mat_is_set_ = false;
+    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), Nstages,
+                          this->min_step(), this->max_step(), this->MIN_STEP,
+                          this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
+                          ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
+                          [this](T* r, const T* s, const T& h){ return this->step_impl(r, s, h); });
+}
 
-// StandardRungeKutta implementations
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T))
-    requires (!traits::is_rich<SP>): Base(ARGS) {}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::StandardRungeKuttaBase(SOLVER_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events) {}
-
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-auto StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::local_interp() const{
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK23<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    return [cm=this->_coef_mat, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(d+2, this->Nsys()), n=this->Nsys(), order=Derived::INTERP_ORDER](T* out, const T& t){
-        coef_mat_interp(out, t, t1, t2, y1.data(), y2.data(), cm.data(), order, n);
+    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+auto RK23<T, N, SP, OdeType, Derived>::local_interp() const{
+    this->set_coef_matrix();
+    const T* d = this->interp_new_state_ptr();
+    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(d+2, this->Nsys()), n=this->Nsys()](T* out, const T& t){
+        coef_mat_interp(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);
     };
 }
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
- void StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::interp_impl(T* result, const T& t) const{
-    this->set_coef_matrix();
-    const T* d = this->interp_new_state_ptr();
-    return coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->_coef_mat.data(), Derived::INTERP_ORDER, this->Nsys());
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK23<T, N, SP, OdeType, Derived>::Atype RK23<T, N, SP, OdeType, Derived>::Amatrix() {
+    return {T(0),   T(0),      T(0),
+            T(1)/2, T(0),      T(0),
+            T(0),   T(3)/T(4), T(0)};
 }
 
-template<typename Derived, typename T, size_t N, size_t Nstages, size_t Norder, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void StandardRungeKuttaBase<Derived, T, N, Nstages, Norder, SP, OdeType>::set_coef_matrix_impl() const{
-    const auto& P = THIS->Pm_;
-    for (size_t i=0; i<this->Nsys(); i++){
-        for (size_t j=0; j<Derived::INTERP_ORDER; j++){
-            T sum = 0;
-            for (size_t k=0; k<Nstages+1; k++){
-                sum += this->K_(k, i) * P(k, j);
-            }
-            this->_coef_mat(i, j) = sum;
-        }
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK23<T, N, SP, OdeType, Derived>::Btype RK23<T, N, SP, OdeType, Derived>::Bmatrix(){
+    return {T(2)/9,
+            T(1)/3,
+            T(4)/9};
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK23<T, N, SP, OdeType, Derived>::Ctype RK23<T, N, SP, OdeType, Derived>::Cmatrix(){
+    return {T(0),
+            T(1)/T(2),
+            T(3)/T(4)};
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK23<T, N, SP, OdeType, Derived>::Etype RK23<T, N, SP, OdeType, Derived>::Ematrix() {
+    return {T(5)/T(72),
+            T(-1)/T(12),
+            T(-1)/T(9),
+            T(1)/T(8)};
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK23<T, N, SP, OdeType, Derived>::Ptype RK23<T, N, SP, OdeType, Derived>::Pmatrix() {
+    return {T(1),  -T(4)/T(3),  T(5)/T(9),
+            T(0),   T(1),      -T(2)/T(3),
+            T(0),   T(4)/T(3), -T(8)/T(9),
+            T(0),  -T(1),       T(1)};
+}
+
+
+// ============================================================================
+// RK45
+// ============================================================================
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)),
+      K_(Nstages+1, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + Nstages*q0.size(), t0, q0.data());
     }
 }
 
-
-// RK45 implementations
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>): Base(ARGS){}
+RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T), EventList<T> events) requires (traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)),
+      K_(Nstages+1, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + Nstages*q0.size(), t0, q0.data());
+    }
+}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK45<T, N, SP, OdeType, Derived>::RK45(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events){}
+Integrator RK45<T, N, SP, OdeType, Derived>::method() const{
+    return Integrator::RK45;
+}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Atype RK45<T, N, SP, OdeType, Derived>::Amatrix() {
+void RK45<T, N, SP, OdeType, Derived>::Reset(){
+    Base::Reset();
+    K_.fill(0);
+    mat_is_set_ = false;
+    const T* state = this->new_state_ptr();
+    this->rhs(K_.data() + Nstages*this->Nsys(), state[0], state+2);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK45<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
+    Base::ReAdjust(new_vector);
+    this->set_coef_matrix();
+    this->rhs(K_.data() + Nstages*this->Nsys(), this->t(), new_vector);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK45<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
+    if (!mat_is_set_){
+        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->Nsys());
+        mat_is_set_ = true;
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+T RK45<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h){
+    const T& t = state[0];
+    T* __restrict__ q_new = result + 2;
+    T* __restrict__ K = K_.data();
+    T* __restrict__ r = df_tmp_.data();
+    const T* __restrict__ q = state + 2;
+    const size_t n = this->Nsys();
+
+    const T rtol = this->rtol(), atol = this->atol();
+    const T habs = abs<T>(h);
+
+    const T* __restrict__ K0 = K;
+    T* __restrict__       K1 = K +   n;
+    T* __restrict__       K2 = K + 2*n;
+    T* __restrict__       K3 = K + 3*n;
+    T* __restrict__       K4 = K + 4*n;
+    T* __restrict__       K5 = K + 5*n;
+    T* __restrict__       K6 = K + 6*n;
+
+    // Stage 2
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(1,0)*K0[j]); }
+    this->rhs(K1, t + C[1]*h, r);
+
+    // Stage 3
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(2,0)*K0[j] + A(2,1)*K1[j]); }
+    this->rhs(K2, t + C[2]*h, r);
+
+    // Stage 4
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(3,0)*K0[j] + A(3,1)*K1[j] + A(3,2)*K2[j]); }
+    this->rhs(K3, t + C[3]*h, r);
+
+    // Stage 5
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(4,0)*K0[j] + A(4,1)*K1[j] + A(4,2)*K2[j] + A(4,3)*K3[j]); }
+    this->rhs(K4, t + C[4]*h, r);
+
+    // Stage 6
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(5,0)*K0[j] + A(5,1)*K1[j] + A(5,2)*K2[j] + A(5,3)*K3[j] + A(5,4)*K4[j]); }
+    this->rhs(K5, t + h, r);
+
+    // Solution update (b2 = 0)
+    for (size_t j = 0; j < n; j++) {
+        q_new[j] = q[j] + h * (B(0)*K0[j] + B(2)*K2[j] + B(3)*K3[j] + B(4)*K4[j] + B(5)*K5[j]);
+    }
+
+    // FSAL: K6 = f(t+h, q_new)
+    this->rhs(K6, t + h, q_new);
+    result[0] = t + h;
+
+    // Error norm (e2 = 0; scale uses initial derivative K0)
+    T err_max = 0;
+    for (size_t j = 0; j < n; j++) {
+        const auto err   = h * (E[0]*K0[j] + E[2]*K2[j] + E[3]*K3[j] + E[4]*K4[j] + E[5]*K5[j] + E[6]*K6[j]);
+        const auto scale = atol + rtol * (abs<T>(q[j]) + abs<T>(K0[j]) * habs);
+        err_max = ndspan::max<T>(err_max, abs<T>(err) / scale);
+    }
+    return err_max;
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+StepResult RK45<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
+    mat_is_set_ = false;
+    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), Nstages,
+                          this->min_step(), this->max_step(), this->MIN_STEP,
+                          this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
+                          ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
+                          [this](T* r, const T* s, const T& h){ return this->step_impl(r, s, h); });
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void RK45<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
+    this->set_coef_matrix();
+    const T* d = this->interp_new_state_ptr();
+    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+auto RK45<T, N, SP, OdeType, Derived>::local_interp() const{
+    this->set_coef_matrix();
+    const T* d = this->interp_new_state_ptr();
+    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(d+2, this->Nsys()), n=this->Nsys()](T* out, const T& t){
+        coef_mat_interp(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);
+    };
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+constexpr typename RK45<T, N, SP, OdeType, Derived>::Atype RK45<T, N, SP, OdeType, Derived>::Amatrix() {
     return {T(0),        T(0),        T(0),        T(0),        T(0), T(0),
             T(1)/T(5),  T(0),        T(0),        T(0),        T(0), T(0),
             T(3)/T(40), T(9)/T(40), T(0),        T(0),        T(0), T(0),
@@ -196,7 +377,7 @@ constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Atype RK45<T, N, SP, 
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Btype RK45<T, N, SP, OdeType, Derived>::Bmatrix(){
+constexpr typename RK45<T, N, SP, OdeType, Derived>::Btype RK45<T, N, SP, OdeType, Derived>::Bmatrix(){
     return {T(35)/T(384),
             T(0),
             T(500)/T(1113),
@@ -206,7 +387,7 @@ constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Btype RK45<T, N, SP, 
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Ctype RK45<T, N, SP, OdeType, Derived>::Cmatrix(){
+constexpr typename RK45<T, N, SP, OdeType, Derived>::Ctype RK45<T, N, SP, OdeType, Derived>::Cmatrix(){
     return {T(0),
             T(1)/T(5),
             T(3)/T(10),
@@ -216,7 +397,7 @@ constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Ctype RK45<T, N, SP, 
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK45<T, N, SP, OdeType, Derived>::Base::Etype RK45<T, N, SP, OdeType, Derived>::Ematrix() {
+constexpr typename RK45<T, N, SP, OdeType, Derived>::Etype RK45<T, N, SP, OdeType, Derived>::Ematrix() {
     return {T(-71)/T(57600),
             T(0),
             T(71)/T(16695),
@@ -235,290 +416,6 @@ constexpr typename RK45<T, N, SP, OdeType, Derived>::Ptype RK45<T, N, SP, OdeTyp
             T(0),    T(127303824393)/T(49829197408), -T(318862633887)/T(49829197408), T(701980252875)/T(199316789632),
             T(0),   -T(282668133)/T(205662961),       T(2019193451)/T(616988883),   -T(1453857185)/T(822651844),
             T(0),    T(40617522)/T(29380423),        -T(110615467)/T(29380423),     T(69997945)/T(29380423)};
-}
-
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-T RK45<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h) {
-
-    // Hardcoded for performance, no algorithmic difference from Base.
-    const T& t = state[0];
-    T* __restrict__ q_new = result + 2;
-    T* __restrict__ K = this->K_.data();
-    T* __restrict__ r = this->_df_tmp.data();
-    const T* __restrict__ q = state + 2;
-    const size_t n = this->Nsys();
-
-    // A coefficients (lower-triangular, 1-based stage notation)
-    const T a21 = this->Am_(1,0);
-    const T a31 = this->Am_(2,0), a32 = this->Am_(2,1);
-    const T a41 = this->Am_(3,0), a42 = this->Am_(3,1), a43 = this->Am_(3,2);
-    const T a51 = this->Am_(4,0), a52 = this->Am_(4,1), a53 = this->Am_(4,2), a54 = this->Am_(4,3);
-    const T a61 = this->Am_(5,0), a62 = this->Am_(5,1), a63 = this->Am_(5,2), a64 = this->Am_(5,3), a65 = this->Am_(5,4);
-    // B weights (b2 = 0)
-    const T b1 = this->Bm_(0), b3 = this->Bm_(2), b4 = this->Bm_(3), b5 = this->Bm_(4), b6 = this->Bm_(5);
-    // C nodes
-    const T c2 = this->Cm_[1], c3 = this->Cm_[2], c4 = this->Cm_[3], c5 = this->Cm_[4];
-    // E error coefficients (e2 = 0)
-    const T e1 = this->Em_[0], e3 = this->Em_[2], e4 = this->Em_[3], e5 = this->Em_[4], e6 = this->Em_[5], e7 = this->Em_[6];
-
-    const T rtol = this->rtol(), atol = this->atol();
-    const T habs = abs<T>(h);
-
-    const T* __restrict__ K0 = K;
-    T* __restrict__       K1 = K +   n;
-    T* __restrict__       K2 = K + 2*n;
-    T* __restrict__       K3 = K + 3*n;
-    T* __restrict__       K4 = K + 4*n;
-    T* __restrict__       K5 = K + 5*n;
-    T* __restrict__       K6 = K + 6*n;
-
-    // Stage 2
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a21*K0[j]); }
-    this->rhs(K1, t + c2*h, r);
-
-    // Stage 3
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a31*K0[j] + a32*K1[j]); }
-    this->rhs(K2, t + c3*h, r);
-
-    // Stage 4
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a41*K0[j] + a42*K1[j] + a43*K2[j]); }
-    this->rhs(K3, t + c4*h, r);
-
-    // Stage 5
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a51*K0[j] + a52*K1[j] + a53*K2[j] + a54*K3[j]); }
-    this->rhs(K4, t + c5*h, r);
-
-    // Stage 6
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a61*K0[j] + a62*K1[j] + a63*K2[j] + a64*K3[j] + a65*K4[j]); }
-    this->rhs(K5, t + h, r);
-
-    // Solution update (b2 = 0)
-    for (size_t j = 0; j < n; j++) {
-        q_new[j] = q[j] + h * (b1*K0[j] + b3*K2[j] + b4*K3[j] + b5*K4[j] + b6*K5[j]);
-    }
-
-    // FSAL: K6 = f(t+h, q_new)
-    this->rhs(K6, t + h, q_new);
-    result[0] = t + h;
-
-    // Error norm (e2 = 0; scale uses initial derivative K0)
-    T err_max = 0;
-    for (size_t j = 0; j < n; j++) {
-        const T err   = h * (e1*K0[j] + e3*K2[j] + e4*K3[j] + e5*K4[j] + e6*K5[j] + e7*K6[j]);
-        const T scale = atol + rtol * (abs<T>(q[j]) + abs<T>(K0[j]) * habs);
-        err_max = ndspan::max<T>(err_max, abs<T>(err) / scale);
-    }
-    return err_max;
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-void RK45<T, N, SP, OdeType, Derived>::compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const {
-    const size_t n = this->Nsys();
-
-    // A coefficients (lower-triangular, 1-based stage notation)
-    const T& a21 = this->Am_(1,0);
-    const T& a31 = this->Am_(2,0); const T& a32 = this->Am_(2,1);
-    const T& a41 = this->Am_(3,0); const T& a42 = this->Am_(3,1); const T& a43 = this->Am_(3,2);
-    const T& a51 = this->Am_(4,0); const T& a52 = this->Am_(4,1); const T& a53 = this->Am_(4,2); const T& a54 = this->Am_(4,3);
-    const T& a61 = this->Am_(5,0); const T& a62 = this->Am_(5,1); const T& a63 = this->Am_(5,2); const T& a64 = this->Am_(5,3); const T& a65 = this->Am_(5,4);
-    // B weights (b2 = 0)
-    const T& b1 = this->Bm_(0); const T& b3 = this->Bm_(2); const T& b4 = this->Bm_(3); const T& b5 = this->Bm_(4); const T& b6 = this->Bm_(5);
-    // C nodes
-    const T& c2 = this->Cm_[1]; const T& c3 = this->Cm_[2]; const T& c4 = this->Cm_[3]; const T& c5 = this->Cm_[4];
-
-    const T* __restrict__ K0 = K;
-    T* __restrict__       K1 = K +   n;
-    T* __restrict__       K2 = K + 2*n;
-    T* __restrict__       K3 = K + 3*n;
-    T* __restrict__       K4 = K + 4*n;
-    T* __restrict__       K5 = K + 5*n;
-
-    // Stage 2
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a21*K0[j]); }
-    this->rhs(K1, t + c2*h, r);
-
-    // Stage 3
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a31*K0[j] + a32*K1[j]); }
-    this->rhs(K2, t + c3*h, r);
-
-    // Stage 4
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a41*K0[j] + a42*K1[j] + a43*K2[j]); }
-    this->rhs(K3, t + c4*h, r);
-
-    // Stage 5
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a51*K0[j] + a52*K1[j] + a53*K2[j] + a54*K3[j]); }
-    this->rhs(K4, t + c5*h, r);
-
-    // Stage 6
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a61*K0[j] + a62*K1[j] + a63*K2[j] + a64*K3[j] + a65*K4[j]); }
-    this->rhs(K5, t + h, r);
-
-    // Solution update (b2 = 0)
-    for (size_t j = 0; j < n; j++) {
-        q_new[j] = q[j] + h * (b1*K0[j] + b3*K2[j] + b4*K3[j] + b5*K4[j] + b6*K5[j]);
-    }
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-T RK45<T, N, SP, OdeType, Derived>::compute_error_impl(size_t j, const T* K, const T& h) const {
-    const size_t n = this->Nsys();
-
-    // E error coefficients (e2 = 0)
-    const T& e1 = this->Em_[0]; const T& e3 = this->Em_[2]; const T& e4 = this->Em_[3]; const T& e5 = this->Em_[4]; const T& e6 = this->Em_[5]; const T& e7 = this->Em_[6];
-
-    const T* __restrict__ K0 = K;
-    const T* __restrict__ K2 = K + 2*n;
-    const T* __restrict__ K3 = K + 3*n;
-    const T* __restrict__ K4 = K + 4*n;
-    const T* __restrict__ K5 = K + 5*n;
-    const T* __restrict__ K6 = K + 6*n;
-
-    return h * (e1*K0[j] + e3*K2[j] + e4*K3[j] + e5*K4[j] + e6*K5[j] + e7*K6[j]);
-}
-
-
-// RK23 implementations
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>): Base(ARGS){}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-RK23<T, N, SP, OdeType, Derived>::RK23(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events){}
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK23<T, N, SP, OdeType, Derived>::Base::Atype RK23<T, N, SP, OdeType, Derived>::Amatrix() {
-    return {T(0),       T(0),       T(0),
-            T(1)/2,     T(0),       T(0),
-            T(0),       T(3)/T(4),  T(0)};
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK23<T, N, SP, OdeType, Derived>::Base::Btype RK23<T, N, SP, OdeType, Derived>::Bmatrix(){
-    return {T(2)/9,
-            T(1)/3,
-            T(4)/9};
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK23<T, N, SP, OdeType, Derived>::Base::Ctype RK23<T, N, SP, OdeType, Derived>::Cmatrix(){
-    return { T(0),
-            T(1)/T(2),
-            T(3)/T(4)};
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK23<T, N, SP, OdeType, Derived>::Base::Etype RK23<T, N, SP, OdeType, Derived>::Ematrix() {
-    return {T(5)/T(72),
-            T(-1)/T(12),
-            T(-1)/T(9),
-            T(1)/T(8)};
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename RK23<T, N, SP, OdeType, Derived>::Ptype RK23<T, N, SP, OdeType, Derived>::Pmatrix() {
-    return {T(1),   -T(4)/T(3),  T(5)/T(9),
-            T(0),    T(1),      -T(2)/T(3),
-            T(0),    T(4)/T(3), -T(8)/T(9),
-            T(0),   -T(1),       T(1)};
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-T RK23<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h) {
-    const T& t = state[0];
-    // Hardcoded for performance, no algorithmic difference from Base.
-    T* __restrict__ q_new = result + 2;
-    T* __restrict__ K = this->K_.data();
-    T* __restrict__ r = this->_df_tmp.data();
-    const T* __restrict__ q = state + 2;
-    const size_t n = this->Nsys();
-
-    // A coefficients: a21=1/2, a31=0 (so K0 absent in stage 3), a32=3/4
-    const T a21 = this->Am_(1,0);
-    const T a32 = this->Am_(2,1);
-    // B weights: all nonzero
-    const T b1 = this->Bm_(0), b2 = this->Bm_(1), b3 = this->Bm_(2);
-    // C nodes
-    const T c2 = this->Cm_[1], c3 = this->Cm_[2];
-    // E error coefficients: all nonzero
-    const T e1 = this->Em_[0], e2 = this->Em_[1], e3 = this->Em_[2], e4 = this->Em_[3];
-
-    const T rtol = this->rtol(), atol = this->atol();
-    const T habs = abs<T>(h);
-
-    const T* __restrict__ K0 = K;
-    T* __restrict__       K1 = K +   n;
-    T* __restrict__       K2 = K + 2*n;
-    T* __restrict__       K3 = K + 3*n;
-
-    // Stage 2
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a21*K0[j]); }
-    this->rhs(K1, t + c2*h, r);
-
-    // Stage 3 (a31 = 0, so K0 absent)
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a32*K1[j]); }
-    this->rhs(K2, t + c3*h, r);
-
-    // Solution update
-    for (size_t j = 0; j < n; j++) {
-        q_new[j] = q[j] + h * (b1*K0[j] + b2*K1[j] + b3*K2[j]);
-    }
-
-    // FSAL: K3 = f(t+h, q_new)
-    this->rhs(K3, t + h, q_new);
-    result[0] = t + h;
-
-    // Error norm
-    T err_max = 0;
-    for (size_t j = 0; j < n; j++) {
-        const T err   = h * (e1*K0[j] + e2*K1[j] + e3*K2[j] + e4*K3[j]);
-        const T scale = atol + rtol * (abs<T>(q[j]) + abs<T>(K0[j]) * habs);
-        err_max = ndspan::max<T>(err_max, abs<T>(err) / scale);
-    }
-    return err_max;
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-void RK23<T, N, SP, OdeType, Derived>::compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const {
-    const size_t n = this->Nsys();
-
-    // A coefficients: a21=1/2, a31=0 (so K0 absent in stage 3), a32=3/4
-    const T& a21 = this->Am_(1,0);
-    const T& a32 = this->Am_(2,1);
-    // B weights: all nonzero
-    const T& b1 = this->Bm_(0); const T& b2 = this->Bm_(1); const T& b3 = this->Bm_(2);
-    // C nodes
-    const T& c2 = this->Cm_[1]; const T& c3 = this->Cm_[2];
-
-    const T* __restrict__ K0 = K;
-    T* __restrict__       K1 = K +   n;
-    T* __restrict__       K2 = K + 2*n;
-
-    // Stage 2
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a21*K0[j]); }
-    this->rhs(K1, t + c2*h, r);
-
-    // Stage 3 (a31 = 0, so K0 absent)
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a32*K1[j]); }
-    this->rhs(K2, t + c3*h, r);
-
-    // Solution update
-    for (size_t j = 0; j < n; j++) {
-        q_new[j] = q[j] + h * (b1*K0[j] + b2*K1[j] + b3*K2[j]);
-    }
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-T RK23<T, N, SP, OdeType, Derived>::compute_error_impl(size_t j, const T* K, const T& h) const {
-    const size_t n = this->Nsys();
-
-    // E error coefficients: all nonzero
-    const T& e1 = this->Em_[0]; const T& e2 = this->Em_[1]; const T& e3 = this->Em_[2]; const T& e4 = this->Em_[3];
-
-    const T* __restrict__ K0 = K;
-    const T* __restrict__ K1 = K +   n;
-    const T* __restrict__ K2 = K + 2*n;
-    const T* __restrict__ K3 = K + 3*n;
-
-    return h * (e1*K0[j] + e2*K1[j] + e3*K2[j] + e4*K3[j]);
 }
 
 } // namespace ode

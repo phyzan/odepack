@@ -59,9 +59,9 @@ class BDF : public detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Der
 
 public:
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>) : BDF(ARGS, None()) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)) {}
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>) : BDF(ARGS, None(), events) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events = {}) requires (traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)) {}
 
     auto  local_interp() const;
 
@@ -69,15 +69,16 @@ public:
 
     void            Reset();
 
-    static constexpr Integrator INTEGRATOR = Integrator::BDF;
     static constexpr int ERR_EST_ORDER = 1;
     static constexpr bool IS_IMPLICIT = true;
+
+    Integrator method() const;
 
 protected:
 
     using Base = detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Derived>, T, N, SP, OdeType>;
     using Dlike = Array2D<T, 0, N>;
-    struct None{};
+    struct private_tag{};
     friend Base::MainSolverType;
     static constexpr size_t NEWTON_MAXITER = 4;
 
@@ -88,7 +89,7 @@ protected:
 
 private:
     template<typename... Type>
-    BDF(MAIN_CONSTRUCTOR(T), None, Type&&... extras);
+    BDF(private_tag, MAIN_CONSTRUCTOR(T), Type&&... extras);
 
     void    _reset_impl_alone();
 
@@ -117,6 +118,11 @@ private:
     BDFCONSTS<T> BDF_COEFS;
     int interp_idx = 0;
 
+};
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+struct SolverTypeGetter<Integrator::BDF, T, N, SP, OdeType, Derived>{
+    using type = BDF<T, N, SP, OdeType, Derived>;
 };
 
 

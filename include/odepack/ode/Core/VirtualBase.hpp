@@ -4,7 +4,6 @@
 #include <functional>
 #include "../Interpolation/Univariate/StateInterp.hpp"
 #include "Events.hpp"
-#include "Dispatcher.hpp"
 
 namespace ode {
 
@@ -20,8 +19,6 @@ class OdeSolver{
 
 public:
     
-    using UniqueClone = std::unique_ptr<OdeSolver<T, N>>;
-
     virtual ~OdeSolver() = default;
 
     // ODE PROPERTIES
@@ -65,7 +62,7 @@ public:
     virtual VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const = 0;
     virtual T                   auto_step(T t, const T* q) const = 0;
     virtual T                   auto_step() const = 0;
-    virtual OdeSolver<T, N>*    clone() const = 0;
+    virtual std::unique_ptr<OdeSolver<T, N>> clone() const = 0;
 
     // MODIFIERS
     virtual bool                advance() = 0;
@@ -85,7 +82,7 @@ protected:
 
     OdeSolver() = default;
 
-    DEFAULT_RULE_OF_FOUR(OdeSolver);
+    DEFAULT_RULE_OF_FOUR(OdeSolver)
 
 };
 
@@ -94,16 +91,12 @@ template<typename T, size_t N=0>
 class OdeRichSolver : public OdeSolver<T, N>{
 
 public:
-    
-    using UniqueClone = std::unique_ptr<OdeRichSolver<T, N>>;
 
     // ACCESSORS
     virtual const EventCollection<T>&       event_col() const = 0;
     virtual int                             event_idx(const std::string& name) const = 0;
     virtual bool                            at_event(int event_idx = -1) const = 0;
     virtual EventState<T>                   current_event() const = 0;
-    virtual OdeRichSolver<T, N>*            clone() const = 0;
-
     // MODIFIERS
     virtual bool                            advance_to_event(const std::vector<size_t>& event_idx = {}) = 0;
     virtual bool                            advance_to_event(const T& tmax, const std::vector<size_t>& event_idx = {}) = 0;
@@ -115,12 +108,35 @@ protected:
 
     OdeRichSolver() = default;
 
-    DEFAULT_RULE_OF_FOUR(OdeRichSolver);
+    DEFAULT_RULE_OF_FOUR(OdeRichSolver)
 };
 
 enum class UtilPolicy : std::uint8_t{ Virtual, RichVirtual};
 
 enum class SolverPolicy : std::uint8_t{ Static, RichStatic, Virtual, RichVirtual};
+
+namespace detail{
+
+template<typename T, size_t N, UtilPolicy UP>
+struct SolverBoxSelector{
+    using type = void;
+};
+
+template<typename T, size_t N>
+struct SolverBoxSelector<T, N, UtilPolicy::RichVirtual>{
+    using type = pbox::Box<OdeRichSolver<T, N>>;
+};
+
+template<typename T, size_t N>
+struct SolverBoxSelector<T, N, UtilPolicy::Virtual>{
+    using type = pbox::Box<OdeSolver<T, N>>;
+};
+
+} // namespace ode::detail
+
+
+template<typename T, size_t N, UtilPolicy UP>
+using BoxedSolver = typename detail::SolverBoxSelector<T, N, UP>::type;
 
 namespace traits{
 
@@ -138,7 +154,7 @@ using BaseInterface = typename HelperVirtualSolver<T, N, SP>::type;
 
 
 template<typename Solver, typename T, size_t N, SolverPolicy SP>
-using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual, OdeSolver<T, N>, std::conditional_t<SP==SolverPolicy::RichVirtual, OdeRichSolver<T, N>, Solver>>;
+using SolverCloneType = std::conditional_t<SP==SolverPolicy::Virtual || SP==SolverPolicy::RichVirtual, OdeSolver<T, N>, Solver>;
 
 
 template<SolverPolicy SP>
@@ -151,8 +167,13 @@ struct SolverVirtualTypeTraits {
     using type = BaseInterface<T, N, SP>;
 };
 
-} // namespace traits
+} // namespace ode::traits
 
+
+template<Integrator M, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
+struct SolverTypeGetter{
+    using type = void;
+};
 
 
 } // namespace ode

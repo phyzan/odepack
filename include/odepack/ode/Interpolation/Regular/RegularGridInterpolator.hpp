@@ -96,7 +96,7 @@ inline int get_point_count(const AxisViewContainer& grid){
     return count;
 }
 
-} // namespace detail
+} // namespace ode::detail
 
 } // namespace ode::interp::rgi
 

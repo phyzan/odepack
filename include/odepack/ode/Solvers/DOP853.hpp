@@ -1,12 +1,14 @@
 #ifndef DOP853_HPP
 #define DOP853_HPP
 
-#include "DOPRI.hpp"
+#include "../Core/RichBase.hpp"
+
 
 namespace ode{
 
 // ============================================================================
-// DECLARATIONS
+// Raw Butcher-tableau constants for DOP853 (Hairer, Norsett & Wanner).
+// Purely data - no solver logic lives here.
 // ============================================================================
 
 template<typename T>
@@ -19,7 +21,7 @@ struct DOP_COEFS{
 
     using DOP_A = Array2D<T, N_STAGES_EXT, N_STAGES_EXT, Allocation::Stack>;
     using DOP_B = Array1D<T, N_STAGES, Allocation::Stack>;
-    using DOP_C = Array1D<T, 16, Allocation::Stack>;
+    using DOP_C = Array1D<T, N_STAGES_EXT, Allocation::Stack>;
     using DOP_D = Array2D<T, INTERP_ORDER - 3, N_STAGES_EXT, Allocation::Stack>;
     using DOP_E = Array1D<T, N_STAGES+1, Allocation::Stack>;
 
@@ -35,84 +37,96 @@ struct DOP_COEFS{
 
     static constexpr DOP_D make_D();
 
-    DOP_A A = make_A();
-    DOP_B B = make_B();
-    DOP_C C = make_C();
-    DOP_E E3 = make_E3();
-    DOP_E E5 = make_E5();
-    DOP_D D = make_D();
-
 };
 
 template<typename T>
 void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, const T* y1, const T* y2, const T* coef_mat, size_t order, size_t size);
 
+/// @brief DOP853's combined 3rd/5th order embedded error norm (Hairer, Norsett & Wanner).
+template<typename T>
+T dop853_error_norm(const T* K, const T* E3, const T* E5, const T* q, const T* q_new,
+                     const T& h, const T& rtol, const T& atol, size_t Nstages, size_t n);
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived = void>
-class DOP853 : public RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, 12, 8, 16, SP, OdeType>{
+class DOP853 : public detail::BaseDispatcher<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>{
+
+    using Base = detail::BaseDispatcher<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, SP, OdeType>;
 
 public:
 
-    static constexpr Integrator INTEGRATOR = Integrator::DOP853;
-    static constexpr int    ERR_EST_ORDER = 7;
-    static constexpr size_t INTERP_ORDER = DOP_COEFS<T>::INTERP_ORDER;
+    static constexpr size_t N_STAGES       = DOP_COEFS<T>::N_STAGES;       // 12
+    static constexpr size_t N_STAGES_EXTRA = 3;                            // extra stages, dense output only
+    static constexpr size_t N_STAGES_EXT   = DOP_COEFS<T>::N_STAGES_EXT;   // 16
+    static constexpr size_t Norder         = 8;
+    static constexpr size_t INTERP_ORDER   = DOP_COEFS<T>::INTERP_ORDER;   // 7
+    static constexpr int    ERR_EST_ORDER  = DOP_COEFS<T>::ERR_EST_ORDER;  // 7
+    static constexpr bool   IS_IMPLICIT    = false;
 
     DOP853(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);
 
-    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EVENTS events = {}) requires (traits::is_rich<SP>);
+    DOP853(MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events = {}) requires (traits::is_rich<SP>);
 
-    auto    local_interp() const;
+    DEFAULT_RULE_OF_FOUR(DOP853)
 
+    Integrator method() const;
+
+    auto local_interp() const;
+
+    void Reset();
 
 protected:
 
-    using Base = RungeKuttaBaseDynamic<GetDerived<DOP853<T, N, SP, OdeType, Derived>, Derived>, T, N, 12, 8, 16, SP, OdeType>;
-    friend Base;
-    friend Base::Base;
-    friend Base::Base::Base;
+    void        ReAdjust(const T* new_vector);
 
-    // Explicit hardcoded stage computation (boost::odeint style)
-    void compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const;
+    StepResult  adapt_impl(T* res, const T* state);
 
-    void set_coef_matrix_impl() const;
-
-    T estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const;
-
-
-    static constexpr size_t N_STAGES = 12;
-    static constexpr size_t N_ORDER = 8;
-    static constexpr size_t N_STAGES_EXTRA = 3;
-    static constexpr size_t N_STAGES_EXT = DOP_COEFS<T>::N_STAGES_EXT;
-
-
-    using A_EXTRA_TYPE = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT>;
-
-    using C_EXTRA_TYPE = Array1D<T, N_STAGES_EXTRA>;
-
-    void interp_impl(T* result, const T& t) const;
-
-    static constexpr typename Base::Atype Amatrix();
-
-    static constexpr typename Base::Btype Bmatrix();
-
-    static constexpr typename Base::Ctype Cmatrix();
-
-    static constexpr A_EXTRA_TYPE Amatrix_extra();
-
-    static constexpr C_EXTRA_TYPE Cmatrix_extra();
+    void        interp_impl(T* result, const T& t) const;
 
 private:
-    A_EXTRA_TYPE A_EXTRA = Amatrix_extra();
 
-    C_EXTRA_TYPE C_EXTRA = Cmatrix_extra();
+    using Atype      = Array2D<T, N_STAGES, N_STAGES, Allocation::Stack>;
+    using Btype      = Array1D<T, N_STAGES, Allocation::Stack>;
+    using Ctype      = Array1D<T, N_STAGES, Allocation::Stack>;
+    using AExtraType = Array2D<T, N_STAGES_EXTRA, N_STAGES_EXT, Allocation::Stack>;
+    using CExtraType = Array1D<T, N_STAGES_EXTRA, Allocation::Stack>;
 
-    typename DOP_COEFS<T>::DOP_D D = DOP_COEFS<T>::make_D();
+    static constexpr Atype      Amatrix();
+    static constexpr Btype      Bmatrix();
+    static constexpr Ctype      Cmatrix();
+    static constexpr AExtraType Amatrix_extra();
+    static constexpr CExtraType Cmatrix_extra();
 
+    T           step_impl(T* result, const T* state, const T& h);
+
+    void        set_coef_matrix() const;
+
+    // Unlike RK23/RK45, these tables are built with fill()+indexed writes rather than a
+    // plain aggregate initializer, which ndspan cannot constant-evaluate - so, regardless
+    // of T, they are always plain (computed-once-at-construction) instance members here.
+    Atype      A       = Amatrix();
+    Btype      B       = Bmatrix();
+    Ctype      C       = Cmatrix();
+    AExtraType A_extra = Amatrix_extra();
+    CExtraType C_extra = Cmatrix_extra();
+    typename DOP_COEFS<T>::DOP_D D  = DOP_COEFS<T>::make_D();
     typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
-
     typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
 
+    mutable Array2D<T, N_STAGES_EXT, N, Allocation::Auto> K_;
+    mutable Array1D<T, N, Allocation::Auto>                df_tmp_;
+    mutable Array2D<T, N, 0>                               coef_mat_;
+    mutable bool                                           mat_is_set_ = false;
+
+    T ERR_EXP = T(-1)/T(ERR_EST_ORDER+1);
+    T INC_EXP = T(-1)/T(Norder);
+    T MIN_ERR = T(1)/pow(T(5), Norder);
+};
+
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+struct SolverTypeGetter<Integrator::DOP853, T, N, SP, OdeType, Derived>{
+    using type = DOP853<T, N, SP, OdeType, Derived>;
 };
 
 

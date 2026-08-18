@@ -2,41 +2,33 @@
 #define SOLVER_DISPATCHER_IMPL_HPP
 
 #include "SolverDispatcher.hpp"
+#include "odepack/ode/Core/VirtualBase.hpp"
+#include "odepack/ode/IntegratorEnum.hpp"
 
 namespace ode{
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+template<SolverTemplate typename Solver, SolverPolicy SP, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (traits::is_rich<SP>)
-Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args, EVENTS events) {
-    return Solver<T, N, SP, OdeType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args, events);
+Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, EventList<T> events) {
+    return Solver<T, N, SP, OdeType, void>(std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
 }
 
-template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
+template<SolverTemplate typename Solver, SolverPolicy SP, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (!traits::is_rich<SP>)
-Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, const T* q0, size_t nsys, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, const std::vector<T>& args) {
-    return Solver<T, N, SP, OdeType, void>(ode, t0, q0, nsys, rtol, atol, min_step, max_step, stepsize, dir, args);
+Solver<T, N, SP, OdeType, void> getSolver(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args) {
+    return Solver<T, N, SP, OdeType, void>(std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args));
 }
 
 
-template<typename T, size_t N, hasRhsFunc<T> OdeType>
-std::unique_ptr<OdeRichSolver<T, N>> get_virtual_solver(Integrator method, MAIN_CONSTRUCTOR(T), EVENTS events) {
-
-    switch (method){
-        case Integrator::Euler:
-            return std::make_unique<Euler<T, N, SolverPolicy::RichVirtual, OdeType>>(ode, t0, q0, nsys, stepsize, dir, args, events);
-        case Integrator::RK23:
-            return std::make_unique<RK23<T, N, SolverPolicy::RichVirtual, OdeType>>(ARGS, events);
-        case Integrator::RK45:
-            return std::make_unique<RK45<T, N, SolverPolicy::RichVirtual, OdeType>>(ARGS, events);
-        case Integrator::DOP853:
-            return std::make_unique<DOP853<T, N, SolverPolicy::RichVirtual, OdeType>>(ARGS, events);
-        case Integrator::BDF:
-            return std::make_unique<BDF<T, N, SolverPolicy::RichVirtual, OdeType>>(ARGS, events);
-        case Integrator::RK4:
-            return std::make_unique<RK4<T, N, SolverPolicy::RichVirtual, OdeType>>(ARGS, events);
-        default:
-            throw std::runtime_error("Unknown integrator enum value");
-    }
+template<UtilPolicy UP, typename T, size_t N, hasRhsFunc<T> OdeType, typename... Args>
+BoxedSolver<T, N, UP> make_solver(Integrator method, OdeType ode, T t0, View1D<T, N> q0, Args&&... args) {
+    constexpr SolverPolicy SP = UP == UtilPolicy::RichVirtual ? SolverPolicy::RichVirtual : SolverPolicy::Virtual;
+    return choose_integrator_case<BoxedSolver<T, N, UP>>(method,
+        [&]<Integrator M>(){
+            using Solver = typename SolverTypeGetter<M, T, N, SP, OdeType>::type;
+            return pbox::make_box<Solver>(std::move(ode), t0, q0, std::forward<Args>(args)...);
+        }
+    );
 }
 
 

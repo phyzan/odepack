@@ -10,7 +10,7 @@
 #include <odepack/ode/Core/SolverBase_impl.hpp>
 #include <odepack/ode/Core/RichBase_impl.hpp>
 #include <odepack/ode/Core/Events_impl.hpp>
-#include <odepack/ode/Core/ObjectiveSolver.hpp>
+#include <odepack/ode/Core/ObjectiveSolver_impl.hpp>
 
 #include <odepack/ode/OdeResult/OdeResult_impl.hpp>
 

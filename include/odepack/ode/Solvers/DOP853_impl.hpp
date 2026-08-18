@@ -2,11 +2,15 @@
 #define DOP853_IMPL_HPP
 
 #include "DOP853.hpp"
+#include "DOPRI_impl.hpp"
 
 namespace ode{
 
 
-// DOP_COEFS implementations
+// ============================================================================
+// DOP_COEFS: raw Butcher-tableau data
+// ============================================================================
+
 template<typename T>
 constexpr typename DOP_COEFS<T>::DOP_A DOP_COEFS<T>::make_A(){
     DOP_A res(N_STAGES_EXT, N_STAGES_EXT);
@@ -322,47 +326,136 @@ void coef_mat_interp_dop853(T* result, const T& t, const T& t1, const T& t2, con
     }
 }
 
+template<typename T>
+T dop853_error_norm(const T* K, const T* E3, const T* E5, const T* q, const T* q_new,
+                     const T& h, const T& rtol, const T& atol, size_t Nstages, size_t n){
+    // Combination of 3rd and 5th order embedded error estimates (Hairer, Norsett & Wanner):
+    // error_norm = |h| * ||err5||_2 / sqrt(||err5||_2^2 + 0.01 * ||err3||_2^2) / sqrt(n)
+    T err5_norm_2 = 0;
+    T err3_norm_2 = 0;
 
-// DOP853 implementations
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>): Base(ARGS) {}
+    for (size_t j = 0; j < n; j++){
+        T err5 = 0;
+        T err3 = 0;
+        for (size_t i = 0; i <= Nstages; i++){
+            err5 += K[i*n + j] * E5[i];
+            err3 += K[i*n + j] * E3[i];
+        }
+        const T scale = atol + rtol * ndspan::max<T>(abs<T>(q[j]), abs<T>(q_new[j]));
+        err5 /= scale;
+        err3 /= scale;
+
+        err5_norm_2 += err5*err5;
+        err3_norm_2 += err3*err3;
+    }
+
+    if (err5_norm_2 == 0 && err3_norm_2 == 0){
+        return 0;
+    }
+
+    const auto denom = err5_norm_2 + T(1)/100 * err3_norm_2;
+    return abs<T>(h) * err5_norm_2 / sqrt(denom * n);
+}
+
+
+// ============================================================================
+// DOP853
+// ============================================================================
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EVENTS events) requires (traits::is_rich<SP>): Base(ARGS, events) {}
+DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)),
+      K_(N_STAGES_EXT, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + N_STAGES*q0.size(), t0, q0.data());
+    }
+}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-void DOP853<T, N, SP, OdeType, Derived>::compute_stages_and_solution_impl(T* K, T* r, T* q_new, const T* q, const T& t, const T& h) const {
+DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EventList<T> events) requires (traits::is_rich<SP>)
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)),
+      K_(N_STAGES_EXT, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
+    if (q0.data() != nullptr){
+        this->rhs(K_.data() + N_STAGES*q0.size(), t0, q0.data());
+    }
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Integrator DOP853<T, N, SP, OdeType, Derived>::method() const{
+    return Integrator::DOP853;
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void DOP853<T, N, SP, OdeType, Derived>::Reset(){
+    Base::Reset();
+    K_.fill(0);
+    mat_is_set_ = false;
+    const T* state = this->new_state_ptr();
+    this->rhs(K_.data() + N_STAGES*this->Nsys(), state[0], state+2);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void DOP853<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
+    Base::ReAdjust(new_vector);
+    this->set_coef_matrix();
+    this->rhs(K_.data() + N_STAGES*this->Nsys(), this->t(), new_vector);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+void DOP853<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
+    if (mat_is_set_){
+        return;
+    }
+    mat_is_set_ = true;
+
+    const T h = this->stepsize() * this->direction();
+    const T* y_old = this->old_state_ptr() + 2;
+    const T& t_old = this->t_old();
     const size_t n = this->Nsys();
+    T* K = K_.data();
 
-    // A coefficients (from DOP_COEFS, only non-zero entries)
-    const T& a10 = this->Am_(1,0);
+    // Three extra stages, evaluated only for dense-output interpolation.
+    for (size_t s = 0; s < N_STAGES_EXTRA; s++){
+        const size_t stage_idx = N_STAGES + 1 + s; // 13, 14, 15
+        for (size_t j = 0; j < n; j++){
+            df_tmp_(j) = y_old[j];
+            for (size_t i = 0; i < stage_idx; i++){
+                df_tmp_(j) += K[i*n + j] * A_extra(s, i) * h;
+            }
+        }
+        this->rhs(K + stage_idx*n, t_old + C_extra(s)*h, df_tmp_.data());
+    }
 
-    const T& a20 = this->Am_(2,0); const T& a21 = this->Am_(2,1);
+    const T* f_old = K;                    // K[0]
+    const T* f_new = K + N_STAGES*n;       // K[12]
+    const T* y_new = this->new_state_ptr() + 2;
 
-    const T& a30 = this->Am_(3,0); const T& a32 = this->Am_(3,2);
+    for (size_t i = 0; i < n; i++){
+        coef_mat_(i, 0) = y_new[i] - y_old[i];                                      // F[0] = delta_y
+        coef_mat_(i, 1) = h*f_old[i] - (y_new[i] - y_old[i]);                       // F[1] = h*f_old - delta_y
+        coef_mat_(i, 2) = T(2)*(y_new[i] - y_old[i]) - h*(f_new[i] + f_old[i]);     // F[2]
+    }
 
-    const T& a40 = this->Am_(4,0); const T& a42 = this->Am_(4,2); const T& a43 = this->Am_(4,3);
+    // F[3:] = h * D @ K, D has shape (4, 16), K has shape (16, Nsys)
+    for (size_t j = 0; j < INTERP_ORDER - 3; j++){
+        for (size_t i = 0; i < n; i++){
+            T sum = 0;
+            for (size_t k = 0; k < N_STAGES_EXT; k++){
+                sum += D(j, k) * K[k*n + i];
+            }
+            coef_mat_(i, 3+j) = h*sum;
+        }
+    }
+}
 
-    const T& a50 = this->Am_(5,0); const T& a53 = this->Am_(5,3); const T& a54 = this->Am_(5,4);
-
-    const T& a60 = this->Am_(6,0); const T& a63 = this->Am_(6,3); const T& a64 = this->Am_(6,4); const T& a65 = this->Am_(6,5);
-
-    const T& a70 = this->Am_(7,0); const T& a73 = this->Am_(7,3); const T& a74 = this->Am_(7,4); const T& a75 = this->Am_(7,5); const T& a76 = this->Am_(7,6);
-
-    const T& a80 = this->Am_(8,0); const T& a83 = this->Am_(8,3); const T& a84 = this->Am_(8,4); const T& a85 = this->Am_(8,5); const T& a86 = this->Am_(8,6); const T& a87 = this->Am_(8,7);
-
-    const T& a90 = this->Am_(9,0); const T& a93 = this->Am_(9,3); const T& a94 = this->Am_(9,4); const T& a95 = this->Am_(9,5); const T& a96 = this->Am_(9,6); const T& a97 = this->Am_(9,7); const T& a98 = this->Am_(9,8);
-
-    const T& a100 = this->Am_(10,0); const T& a103 = this->Am_(10,3); const T& a104 = this->Am_(10,4); const T& a105 = this->Am_(10,5); const T& a106 = this->Am_(10,6); const T& a107 = this->Am_(10,7); const T& a108 = this->Am_(10,8); const T& a109 = this->Am_(10,9);
-
-    const T& a110 = this->Am_(11,0); const T& a113 = this->Am_(11,3); const T& a114 = this->Am_(11,4); const T& a115 = this->Am_(11,5); const T& a116 = this->Am_(11,6); const T& a117 = this->Am_(11,7); const T& a118 = this->Am_(11,8); const T& a119 = this->Am_(11,9); const T& a1110 = this->Am_(11,10);
-
-    // B weights (b1=b2=b3=b4=0)
-    const T& b0 = this->Bm_(0); const T& b5 = this->Bm_(5); const T& b6 = this->Bm_(6); const T& b7 = this->Bm_(7); const T& b8 = this->Bm_(8); const T& b9 = this->Bm_(9); const T& b10 = this->Bm_(10); const T& b11 = this->Bm_(11);
-
-    // C nodes
-    const T& c1 = this->Cm_[1]; const T& c2 = this->Cm_[2]; const T& c3 = this->Cm_[3]; const T& c4 = this->Cm_[4]; const T& c5 = this->Cm_[5];
-    const T& c6 = this->Cm_[6]; const T& c7 = this->Cm_[7]; const T& c8 = this->Cm_[8]; const T& c9 = this->Cm_[9]; const T& c10 = this->Cm_[10];
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+T DOP853<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h){
+    const T& t = state[0];
+    T* __restrict__ q_new = result + 2;
+    T* __restrict__ K = K_.data();
+    T* __restrict__ r = df_tmp_.data();
+    const T* __restrict__ q = state + 2;
+    const size_t n = this->Nsys();
 
     const T* __restrict__ K0 = K;
     T* __restrict__ K1 = K + n;
@@ -378,60 +471,76 @@ void DOP853<T, N, SP, OdeType, Derived>::compute_stages_and_solution_impl(T* K, 
     T* __restrict__ K11 = K + 11*n;
 
     // Stage 2 (K1)
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a10*K0[j]); }
-    this->rhs(K1, t + c1*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(1,0)*K0[j]); }
+    this->rhs(K1, t + C[1]*h, r);
 
     // Stage 3 (K2)
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a20*K0[j] + a21*K1[j]); }
-    this->rhs(K2, t + c2*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(2,0)*K0[j] + A(2,1)*K1[j]); }
+    this->rhs(K2, t + C[2]*h, r);
 
     // Stage 4 (K3) - a31=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a30*K0[j] + a32*K2[j]); }
-    this->rhs(K3, t + c3*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(3,0)*K0[j] + A(3,2)*K2[j]); }
+    this->rhs(K3, t + C[3]*h, r);
 
     // Stage 5 (K4) - a41=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a40*K0[j] + a42*K2[j] + a43*K3[j]); }
-    this->rhs(K4, t + c4*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(4,0)*K0[j] + A(4,2)*K2[j] + A(4,3)*K3[j]); }
+    this->rhs(K4, t + C[4]*h, r);
 
     // Stage 6 (K5) - a51=a52=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a50*K0[j] + a53*K3[j] + a54*K4[j]); }
-    this->rhs(K5, t + c5*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(5,0)*K0[j] + A(5,3)*K3[j] + A(5,4)*K4[j]); }
+    this->rhs(K5, t + C[5]*h, r);
 
     // Stage 7 (K6) - a61=a62=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a60*K0[j] + a63*K3[j] + a64*K4[j] + a65*K5[j]); }
-    this->rhs(K6, t + c6*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(6,0)*K0[j] + A(6,3)*K3[j] + A(6,4)*K4[j] + A(6,5)*K5[j]); }
+    this->rhs(K6, t + C[6]*h, r);
 
     // Stage 8 (K7) - a71=a72=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a70*K0[j] + a73*K3[j] + a74*K4[j] + a75*K5[j] + a76*K6[j]); }
-    this->rhs(K7, t + c7*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(7,0)*K0[j] + A(7,3)*K3[j] + A(7,4)*K4[j] + A(7,5)*K5[j] + A(7,6)*K6[j]); }
+    this->rhs(K7, t + C[7]*h, r);
 
     // Stage 9 (K8) - a81=a82=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a80*K0[j] + a83*K3[j] + a84*K4[j] + a85*K5[j] + a86*K6[j] + a87*K7[j]); }
-    this->rhs(K8, t + c8*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(8,0)*K0[j] + A(8,3)*K3[j] + A(8,4)*K4[j] + A(8,5)*K5[j] + A(8,6)*K6[j] + A(8,7)*K7[j]); }
+    this->rhs(K8, t + C[8]*h, r);
 
     // Stage 10 (K9) - a91=a92=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a90*K0[j] + a93*K3[j] + a94*K4[j] + a95*K5[j] + a96*K6[j] + a97*K7[j] + a98*K8[j]); }
-    this->rhs(K9, t + c9*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(9,0)*K0[j] + A(9,3)*K3[j] + A(9,4)*K4[j] + A(9,5)*K5[j] + A(9,6)*K6[j] + A(9,7)*K7[j] + A(9,8)*K8[j]); }
+    this->rhs(K9, t + C[9]*h, r);
 
     // Stage 11 (K10) - a101=a102=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a100*K0[j] + a103*K3[j] + a104*K4[j] + a105*K5[j] + a106*K6[j] + a107*K7[j] + a108*K8[j] + a109*K9[j]); }
-    this->rhs(K10, t + c10*h, r);
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(10,0)*K0[j] + A(10,3)*K3[j] + A(10,4)*K4[j] + A(10,5)*K5[j] + A(10,6)*K6[j] + A(10,7)*K7[j] + A(10,8)*K8[j] + A(10,9)*K9[j]); }
+    this->rhs(K10, t + C[10]*h, r);
 
     // Stage 12 (K11) - a111=a112=0
-    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (a110*K0[j] + a113*K3[j] + a114*K4[j] + a115*K5[j] + a116*K6[j] + a117*K7[j] + a118*K8[j] + a119*K9[j] + a1110*K10[j]); }
+    for (size_t j = 0; j < n; j++) { r[j] = q[j] + h * (A(11,0)*K0[j] + A(11,3)*K3[j] + A(11,4)*K4[j] + A(11,5)*K5[j] + A(11,6)*K6[j] + A(11,7)*K7[j] + A(11,8)*K8[j] + A(11,9)*K9[j] + A(11,10)*K10[j]); }
     this->rhs(K11, t + h, r);
 
     // Solution update (b1=b2=b3=b4=0)
     for (size_t j = 0; j < n; j++) {
-        q_new[j] = q[j] + h * (b0*K0[j] + b5*K5[j] + b6*K6[j] + b7*K7[j] + b8*K8[j] + b9*K9[j] + b10*K10[j] + b11*K11[j]);
+        q_new[j] = q[j] + h * (B(0)*K0[j] + B(5)*K5[j] + B(6)*K6[j] + B(7)*K7[j] + B(8)*K8[j] + B(9)*K9[j] + B(10)*K10[j] + B(11)*K11[j]);
     }
+
+    // FSAL: K12 = f(t+h, q_new), also used for error estimation and the next step
+    this->rhs(K + N_STAGES*n, t + h, q_new);
+    result[0] = t + h;
+
+    return dop853_error_norm(K, E3.data(), E5.data(), q, q_new, h, this->rtol(), this->atol(), N_STAGES, n);
+}
+
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+StepResult DOP853<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
+    mat_is_set_ = false;
+    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), N_STAGES,
+                          this->min_step(), this->max_step(), this->MIN_STEP,
+                          this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
+                          ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
+                          [this](T* r, const T* s, const T& h){ return this->step_impl(r, s, h); });
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void DOP853<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    return coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, this->_coef_mat.data(), INTERP_ORDER, this->Nsys());
+    coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
@@ -441,17 +550,15 @@ auto DOP853<T, N, SP, OdeType, Derived>::local_interp() const{
     const T* s2 = this->interp_new_state_ptr();
     const size_t n = this->Nsys();
 
-
-    return [cm=this->_coef_mat, t1=s1[0], t2=s2[0], y1=Array1D<T, N>(s1+2, n), y2=Array1D<T, N>(s2+2, n), order=INTERP_ORDER, n](T* out, const T& t){
-        coef_mat_interp_dop853(out, t, t1, t2, y1.data(), y2.data(), cm.data(), order, n);
+    return [cm=this->coef_mat_, t1=s1[0], t2=s2[0], y1=Array1D<T, N>(s1+2, n), y2=Array1D<T, N>(s2+2, n), n](T* out, const T& t){
+        coef_mat_interp_dop853(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);
     };
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename DOP853<T, N, SP, OdeType, Derived>::Base::Atype DOP853<T, N, SP, OdeType, Derived>::Amatrix(){
-    typename Base::Atype result(N_STAGES, N_STAGES);
-    typename DOP_COEFS<T>::DOP_A full_A = DOP_COEFS<T>::make_A();
-
+constexpr typename DOP853<T, N, SP, OdeType, Derived>::Atype DOP853<T, N, SP, OdeType, Derived>::Amatrix(){
+    Atype result(N_STAGES, N_STAGES);
+    auto full_A = DOP_COEFS<T>::make_A();
     for(size_t i = 0; i < N_STAGES; ++i){
         for(size_t j = 0; j < N_STAGES; ++j){
             result(i, j) = full_A(i, j);
@@ -461,127 +568,32 @@ constexpr typename DOP853<T, N, SP, OdeType, Derived>::Base::Atype DOP853<T, N, 
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename DOP853<T, N, SP, OdeType, Derived>::Base::Btype DOP853<T, N, SP, OdeType, Derived>::Bmatrix(){
+constexpr typename DOP853<T, N, SP, OdeType, Derived>::Btype DOP853<T, N, SP, OdeType, Derived>::Bmatrix(){
     return DOP_COEFS<T>::make_B();
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename DOP853<T, N, SP, OdeType, Derived>::Base::Ctype DOP853<T, N, SP, OdeType, Derived>::Cmatrix(){
-    typename Base::Ctype result(N_STAGES);
+constexpr typename DOP853<T, N, SP, OdeType, Derived>::Ctype DOP853<T, N, SP, OdeType, Derived>::Cmatrix(){
+    Ctype result(N_STAGES);
     auto C = DOP_COEFS<T>::make_C();
     ndspan::copy_array(result.data(), C.data(), N_STAGES);
     return result;
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename DOP853<T, N, SP, OdeType, Derived>::A_EXTRA_TYPE DOP853<T, N, SP, OdeType, Derived>::Amatrix_extra(){
-    Array2D<T, N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT> result(N_STAGES_EXTRA, DOP_COEFS<T>::N_STAGES_EXT);
+constexpr typename DOP853<T, N, SP, OdeType, Derived>::AExtraType DOP853<T, N, SP, OdeType, Derived>::Amatrix_extra(){
+    AExtraType result(N_STAGES_EXTRA, N_STAGES_EXT);
     auto A = DOP_COEFS<T>::make_A();
-    ndspan::copy_array(result.data(), A.data()+(N_STAGES+1)* DOP_COEFS<T>::N_STAGES_EXT, N_STAGES_EXTRA* DOP_COEFS<T>::N_STAGES_EXT);
+    ndspan::copy_array(result.data(), A.data() + (N_STAGES+1)*N_STAGES_EXT, N_STAGES_EXTRA*N_STAGES_EXT);
     return result;
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-constexpr typename DOP853<T, N, SP, OdeType, Derived>::C_EXTRA_TYPE DOP853<T, N, SP, OdeType, Derived>::Cmatrix_extra(){
-    Array1D<T, N_STAGES_EXTRA> result(N_STAGES_EXTRA);
+constexpr typename DOP853<T, N, SP, OdeType, Derived>::CExtraType DOP853<T, N, SP, OdeType, Derived>::Cmatrix_extra(){
+    CExtraType result(N_STAGES_EXTRA);
     auto C = DOP_COEFS<T>::make_C();
-    ndspan::copy_array(result.data(), C.data()+N_STAGES+1, N_STAGES_EXTRA);
+    ndspan::copy_array(result.data(), C.data() + N_STAGES+1, N_STAGES_EXTRA);
     return result;
-}
-
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-void DOP853<T, N, SP, OdeType, Derived>::set_coef_matrix_impl() const{
-
-    T h = this->stepsize() * this->direction();
-    const T* y_old = this->old_state_ptr()+2;
-    const T& t_old = this->t_old();
-    size_t Nsys = this->Nsys();
-    T* K = this->K_.data();
-
-    for (size_t s = 0; s < N_STAGES_EXTRA; s++){
-        size_t stage_idx = N_STAGES + 1 + s;  // 13, 14, 15
-
-        // Compute dy = sum(K[i] * A_EXTRA[s, i]) * h for i < stage_idx
-        for (size_t j = 0; j < Nsys; j++){
-            this->_df_tmp(j) = y_old[j];
-            for (size_t i = 0; i < stage_idx; i++){
-                this->_df_tmp(j) += K[i * Nsys + j] * A_EXTRA(s, i) * h;
-            }
-        }
-
-        // Evaluate K[stage_idx] = f(t_old + C_EXTRA[s] * h, y_old + dy)
-        this->rhs(K + stage_idx * Nsys, t_old + C_EXTRA(s) * h, this->_df_tmp.data());
-    }
-
-
-    const T* f_old = K;  // K[0]
-    const T* f_new = K + N_STAGES * Nsys;  // K[12]
-    const T* y_new = this->new_state_ptr()+2;
-
-    // F[0] = delta_y
-    for (size_t i = 0; i < Nsys; i++){
-        this->_coef_mat(i, 0) = y_new[i] - y_old[i];
-    }
-
-    // F[1] = h * f_old - delta_y
-    for (size_t i = 0; i < Nsys; i++){
-        this->_coef_mat(i, 1) = h * f_old[i] - (y_new[i] - y_old[i]);
-    }
-
-    // F[2] = 2 * delta_y - h * (f_new + f_old)
-    for (size_t i = 0; i < Nsys; i++){
-        this->_coef_mat(i, 2) = T(2) * (y_new[i] - y_old[i]) - h * (f_new[i] + f_old[i]);
-    }
-
-    // F[3:] = h * D @ K
-    // D has shape (4, 16), K has shape (16, Nsys)
-    // Result has shape (4, Nsys)
-    // _coef_mat[i, 3+j] = h * sum_k(D[j, k] * K[k, i])
-
-    for (size_t j = 0; j < 4; j++){  // 4 rows of D
-        for (size_t i = 0; i < Nsys; i++){  // Each equation
-            T sum = 0;
-            for (size_t k = 0; k < N_STAGES_EXT; k++){  // 16 stages
-                sum += D(j, k) * K[k * Nsys + i];
-            }
-            this->_coef_mat(i, 3 + j) = h * sum;
-        }
-    }
-}
-template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-T DOP853<T, N, SP, OdeType, Derived>::estimate_error_norm(const T* K, const T* q, const T* q_new, const T& rtol, const T& atol, T h) const{
-    // DOP853 uses a combination of 3rd and 5th order error estimates
-    // err5 = K.T @ E5 / scale
-    // err3 = K.T @ E3 / scale
-    // error_norm = |h| * ||err5||_2 / sqrt(||err5||_2^2 + 0.01 * ||err3||_2^2) * sqrt(n)
-
-    size_t Nsys = this->Nsys();
-    T err5_norm_2 = 0;
-    T err3_norm_2 = 0;
-
-    // Compute err5 = sum(K[i] * E5[i]) / scale for each equation
-    for (size_t j = 0; j < Nsys; j++){
-        T err5 = 0;
-        T err3 = 0;
-        for (size_t i = 0; i < N_STAGES + 1; i++){  // 13 elements in E5 and E3
-            err5 += K[i * Nsys + j] * E5(i);
-            err3 += K[i * Nsys + j] * E3(i);
-        }
-        T scale = atol + rtol * ndspan::max<T>(abs<T>(q[j]), abs<T>(q_new[j]));
-        err5 /= scale;
-        err3 /= scale;
-
-        err5_norm_2 += err5 * err5;
-        err3_norm_2 += err3 * err3;
-    }
-
-    // Handle special case
-    if (err5_norm_2 == 0 && err3_norm_2 == 0){
-        return 0;
-    }
-
-    T denom = err5_norm_2 + T(1)/100 * err3_norm_2;
-    return abs<T>(h) * err5_norm_2 / sqrt(denom * Nsys);
 }
 
 } // namespace ode

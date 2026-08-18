@@ -1,6 +1,4 @@
 .cache
-__pycache__/
-.venv
 build/
 
 # CMake artifacts
@@ -20,8 +18,3 @@ cmake_install.cmake
 # IDE
 .vscode/
 .idea/
-
-# Python
-*.egg-info/
-dist/
-*.pyc

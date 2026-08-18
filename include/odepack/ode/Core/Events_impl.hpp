@@ -4,8 +4,6 @@
 #include "Events.hpp"
 #include "../Tools_impl.hpp"
 
-// "../Tools_impl.hpp" is required as explicit instanciation
-// of bisect<T> is needed.
 
 namespace ode{
 
@@ -66,8 +64,8 @@ const std::vector<T>& EventBase<Derived, T, MaskFunc>::args() const{
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-Event<T>* EventBase<Derived, T, MaskFunc>::clone() const{
-    return new Derived(*THIS);
+std::unique_ptr<Event<T>> EventBase<Derived, T, MaskFunc>::clone() const{
+    return std::make_unique<Derived>(*THIS);
 }
 
 
@@ -143,7 +141,7 @@ void EventBase<Derived, T, MaskFunc>::reset(int direction){
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 template<StateInterp<T> Callable>
-bool EventBase<Derived, T, MaskFunc>::locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const{
+bool EventBase<Derived, T, MaskFunc>::locate_impl(T& /*t*/, State<T> /*before*/, State<T> /*after*/, Callable&& /*obj_fun*/) const{
     static_assert(false, "static override");
     return false;
 }
@@ -186,9 +184,9 @@ bool PreciseEvent<T, Target, MaskFunc, Derived>::locate_impl(T& t, State<T> befo
     if ( (((d == 0) && (val1*val2 < 0)) || (t_dir*d*val1 < 0 && 0 < t_dir*d*val2)) && (abs<T>(val1) > ftol)){
         T* vec = this->worker.data();
 
-        auto obj_fun_scalar = [&](T t) NDSPAN_LAMBDA_INLINE{
-            obj_fun(vec, t); // interpolate the state vector at time t, and pass the value on vec
-            return this->obj_fun(t, vec);
+        auto obj_fun_scalar = [&](T t_dummy) NDSPAN_LAMBDA_INLINE{
+            obj_fun(vec, t_dummy); // interpolate the state vector at time t_dummy, and pass the value on vec
+            return this->obj_fun(t_dummy, vec);
         };
 
         t = bisect<T, RootPolicy::Right>(obj_fun_scalar, before.t(), after.t(), this->ftol);
@@ -214,7 +212,7 @@ T PeriodicEvent<T, MaskFunc, Derived>::get_t(size_t n) const{
 
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
 template<StateInterp<T> Callable>
-bool PeriodicEvent<T, MaskFunc, Derived>::locate_impl(T& t, State<T> before, State<T> after, Callable&& obj_fun) const{
+bool PeriodicEvent<T, MaskFunc, Derived>::locate_impl(T& t, State<T> before, State<T> after, Callable&& /*obj_fun*/) const{
     _n_aux = _n;
     int d = this->direction();
 
@@ -241,20 +239,18 @@ void PeriodicEvent<T, MaskFunc, Derived>::reset_impl(int direction){
 }
 
 
-template<typename T>
-EventCollection<T>::EventCollection(const std::vector<const Event<T>*>& events) : EventCollection(events.data(), events.size()) {}
 
 template<typename T>
-EventCollection<T>::EventCollection(const Event<T>*const* events, size_t size) : events(size), event_times(size), detection_order(size), located(size) {
+EventCollection<T>::EventCollection(EventList<T> evs) : events(evs.size()), event_times(evs.size()), detection_order(evs.size()), located(evs.size()) {
 
-    if (size == 0){return;}
+    if (evs.size() == 0){return;}
 
-    for (size_t i=0; i<size; i++){
-        if (idx_of_name.find(events[i]->name()) != idx_of_name.end()){
-            throw std::runtime_error("Duplicate Event name not allowed: " + events[i]->name());
+    for (size_t i=0; i<evs.size(); i++){
+        if (idx_of_name.find(evs[i]->name()) != idx_of_name.end()){
+            throw std::runtime_error("Duplicate Event name not allowed: " + evs[i]->name());
         }
-        idx_of_name[events[i]->name()] = static_cast<int>(i);
-        this->events[i].steal(events[i]->clone());
+        idx_of_name[evs[i]->name()] = static_cast<int>(i);
+        this->events[i] = std::move(evs[i]);
     }
 }
 

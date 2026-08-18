@@ -160,11 +160,6 @@ size_t Interpolator<T, N>::array_size() const{
 }
 
 template<typename T, size_t N>
-std::unique_ptr<Interpolator<T, N>> Interpolator<T, N>::safe_clone() const{
-    return std::unique_ptr<Interpolator<T, N>>(this->clone());
-}
-
-template<typename T, size_t N>
 LocalInterpolator<T, N>::LocalInterpolator(const T& t, const T* q, size_t size) : Interpolator<T, N>(size), _interval(t), _tmin(t), _tmax(t), _q_old(q, size), _q(q, size){}
 
 
@@ -233,8 +228,8 @@ bool LocalInterpolator<T, N>::can_link_with(const Interpolator<T, N>& other) con
 }
 
 template<typename T, size_t N>
-LocalInterpolator<T, N>* LocalInterpolator<T, N>::clone() const{
-    return new LocalInterpolator<T, N>(*this);
+std::unique_ptr<Interpolator<T, N>> LocalInterpolator<T, N>::clone() const{
+    return std::make_unique<LocalInterpolator<T, N>>(*this);
 }
 
 template<typename T, size_t N>
@@ -313,7 +308,7 @@ void LocalInterpolator<T, N>::_call_impl(T* result, const T& t) const{
 template<typename T, size_t N, typename INTERPOLATOR>
 LinkedInterpolator<T, N, INTERPOLATOR>::LinkedInterpolator(const INTERPOLATOR* other) : Interpolator<T, N>(other->q_start().size()), _dir(other->dir()){
     if constexpr (_is_void){
-        _interp_ptrs.push_back(other->safe_clone());
+        _interp_ptrs.push_back(other->clone());
     }
     else{
         _interpolants.push_back(*other);
@@ -345,7 +340,7 @@ LinkedInterpolator<T, N, INTERPOLATOR>& LinkedInterpolator<T, N, INTERPOLATOR>::
     if constexpr (_is_void){
         _interp_ptrs.resize(other._interp_ptrs.size());
         for (size_t i=0; i<_interp_ptrs.size(); i++){
-            _interp_ptrs[i] = other._interp_ptrs[i]->safe_clone();
+            _interp_ptrs[i] = other._interp_ptrs[i]->clone();
         }
     }
     else{
@@ -449,8 +444,8 @@ bool LinkedInterpolator<T, N, INTERPOLATOR>::can_link_with(const Interpolator<T,
 
 
 template<typename T, size_t N, typename INTERPOLATOR>
-LinkedInterpolator<T, N, INTERPOLATOR>* LinkedInterpolator<T, N, INTERPOLATOR>::clone() const{
-    return new LinkedInterpolator<T, N, INTERPOLATOR>(*this);
+std::unique_ptr<Interpolator<T, N>> LinkedInterpolator<T, N, INTERPOLATOR>::clone() const{
+    return std::make_unique<LinkedInterpolator<T, N, INTERPOLATOR>>(*this);
 }
 
 template<typename T, size_t N, typename INTERPOLATOR>
@@ -482,7 +477,7 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::expand(const INTERPOLATOR& interpol
     _interval_cached = false;
     if (_can_replace_last_with(interpolant)){
         if constexpr (_is_void){
-            _interp_ptrs.back() = interpolant.safe_clone();
+            _interp_ptrs.back() = interpolant.clone();
         }
         else{
             _interpolants.back() = interpolant;
@@ -490,7 +485,7 @@ void LinkedInterpolator<T, N, INTERPOLATOR>::expand(const INTERPOLATOR& interpol
     }
     else if(_get_last().can_link_with(interpolant)){
         if constexpr (_is_void){
-            _interp_ptrs.push_back(interpolant.safe_clone());
+            _interp_ptrs.push_back(interpolant.clone());
             _interp_ptrs[size()-2]->link_with(*_interp_ptrs[size()-1]);
         }
         else{

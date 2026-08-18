@@ -1,8 +1,9 @@
 #ifndef ODE_HPP
 #define ODE_HPP
 
-#include "SolverDispatcher.hpp"
 #include "OdeResult/OdeResult.hpp"
+#include "SolverDispatcher.hpp" // IWYU pragma: keep
+
 
 namespace ode {
 
@@ -18,7 +19,7 @@ public:
 
     EventCounter(const std::vector<EventOptions>& options);
 
-    DEFAULT_RULE_OF_FOUR(EventCounter);
+    DEFAULT_RULE_OF_FOUR(EventCounter)
 
     int operator[](size_t i) const;
 
@@ -53,11 +54,9 @@ public:
 
     void                        Rhs(T* out, const T& t, const T* q) const;
 
-    void                        Jac(T* out, const T& t, const T* q, const T* dt = nullptr) const;        
+    void                        Jac(T* out, const T& t, const T* q, const T* dt = nullptr) const;
 
-    virtual ODE<T, N>*          clone() const;
-
-    std::unique_ptr<ODE<T, N>>  safe_clone() const;
+    virtual std::unique_ptr<ODE<T, N>>  clone() const;
 
     size_t                      Nsys() const;
 

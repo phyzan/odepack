@@ -1,9 +1,6 @@
 [submodule "external/qhull"]
 	path = external/qhull
 	url = https://github.com/qhull/qhull.git
-[submodule "external/mpreal"]
-	path = external/mpreal
-	url = https://github.com/advanpix/mpreal.git
 [submodule "external/ndspan"]
 	path = external/ndspan
 	url = https://github.com/phyzan/ndspan

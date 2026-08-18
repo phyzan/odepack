@@ -3,26 +3,25 @@
 
 
 #include <complex>
-#include <map>
 #include <chrono>
 #include <omp.h>
 #include <cmath>
-#include <xdiff/xdiff.hpp>
 #include <sstream>
+#include <xdiff/xdiff.hpp>
 #include <polybox/polybox.hpp>
-
-#ifdef DPK_MPREAL
-#include <mpreal.h>
-#endif
-
+#include <xdiff/tools.hpp>
 #include <ndspan/arrays.hpp>
+#include "IntegratorEnum.hpp" // IWYU pragma: keep
 
+#define ODE_LAMBDA(out, t, q, args) [=](auto* out, const auto& t, const auto* q, const auto* args) -> void 
 
 namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, ndspan::min, ndspan::max, std::complex;
 
 using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::View3D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array, ndspan::abs;
+
+using xdiff::Vector, xdiff::make_vector;
 
 template<typename cls, typename derived>
 using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, derived>;
@@ -110,6 +109,27 @@ inline int sgn(const T& t1, const T& t2){
     return (t1 < t2 ? 1 : (t1 > t2 ? -1 : 0));
 }
 
+template<typename T, typename A, typename B>
+NDSPAN_INLINE void set_min(T& out, const A& a, const B& b){
+    out = (a < b) ? a : b;
+}
+
+template<typename T, typename A, typename B>
+NDSPAN_INLINE void set_max(T& out, const A& a, const B& b){
+    out = (a > b) ? a : b;
+}
+
+template<typename T>
+NDSPAN_INLINE const T& max_ref(const T& a, const T& b){
+    return (a > b) ? a : b;
+}
+
+template<typename T>
+NDSPAN_INLINE const T& min_ref(const T& a, const T& b){
+    return (a < b) ? a : b;
+}
+
+
 template<typename T>
 class State{
 
@@ -174,6 +194,17 @@ struct OdeData {
     m[0] = a, m[1] = b, m[2] = c, m[3] = d;
     */
 };
+
+// Clang fails to synthesize the implicit aggregate deduction guide for
+// OdeData{.Rhs=...} when the initialization occurs inside a template (even if
+// unrelated to the enclosing template parameters); GCC handles it fine. These
+// explicit guides make designated-initializer CTAD work portably everywhere,
+// for both the Rhs-only and the Rhs+Jac aggregate-init forms.
+template<typename RHS>
+OdeData(RHS) -> OdeData<RHS>;
+
+template<typename RHS, typename JAC>
+OdeData(RHS, JAC) -> OdeData<RHS, JAC>;
 
 
 // Check if F has a callable Rhs (static or non-static, non-template)

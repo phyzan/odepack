@@ -165,8 +165,8 @@ OdeResult<T, N>::OdeResult(const OrbitData<T>& orbit_data, EventData<T> event_da
 }
 
 template<typename T, size_t N>
-OdeResult<T, N>* OdeResult<T, N>::clone() const {
-    return new OdeResult<T, N>(*this);
+std::unique_ptr<OdeResult<T, N>> OdeResult<T, N>::clone() const {
+    return std::make_unique<OdeResult<T, N>>(*this);
 }
 
 template<typename T, size_t N>
@@ -250,7 +250,7 @@ Array1D<T, N> OdeSolution<T, N>::operator()(const T& t) const{
 }
 
 template<typename T, size_t N>
-OdeSolution<T, N>* OdeSolution<T, N>::clone() const{ return new OdeSolution<T, N>(*this);}
+std::unique_ptr<OdeResult<T, N>> OdeSolution<T, N>::clone() const{ return std::make_unique<OdeSolution<T, N>>(*this);}
 
 
 

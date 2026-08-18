@@ -2,7 +2,6 @@
 #define VECTOR_FIELDS_HPP
 
 
-#include "../Tools.hpp"
 #include "../OdeInt.hpp"
 
 namespace ode::interp {

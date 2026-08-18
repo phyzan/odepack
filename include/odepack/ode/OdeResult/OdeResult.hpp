@@ -83,7 +83,7 @@ public:
 
     OdeResult() = default;
 
-    DEFAULT_RULE_OF_FOUR(OdeResult);
+    DEFAULT_RULE_OF_FOUR(OdeResult)
 
     virtual ~OdeResult() = default;
 
@@ -107,7 +107,7 @@ public:
 
     std::string event_log() const;
 
-    virtual OdeResult<T, N>* clone() const;
+    virtual std::unique_ptr<OdeResult<T, N>> clone() const;
 
 private:
 
@@ -139,7 +139,7 @@ public:
 
     Array1D<T, N> operator()(const T& t) const;
 
-    OdeSolution<T, N>* clone() const override;
+    std::unique_ptr<OdeResult<T, N>> clone() const override;
 
 private:
 

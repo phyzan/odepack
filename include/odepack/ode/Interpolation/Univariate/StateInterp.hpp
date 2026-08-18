@@ -16,7 +16,7 @@ public:
 
     Interval() = default;
 
-    DEFAULT_RULE_OF_FOUR(Interval);
+    DEFAULT_RULE_OF_FOUR(Interval)
 
     // ACCESSORS
 
@@ -98,9 +98,7 @@ public:
 
     virtual bool                        can_link_with(const Interpolator<T, N>& other) const = 0;
 
-    virtual Interpolator<T, N>*         clone() const = 0;
-
-    std::unique_ptr<Interpolator<T, N>> safe_clone() const;
+    virtual std::unique_ptr<Interpolator<T, N>> clone() const = 0;
 
     size_t                              array_size() const;
 
@@ -129,7 +127,7 @@ protected:
 
     Interpolator(size_t n);
 
-    DEFAULT_RULE_OF_FOUR(Interpolator);
+    DEFAULT_RULE_OF_FOUR(Interpolator)
 
 private:
 
@@ -155,7 +153,7 @@ public:
 
     LocalInterpolator(T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
 
-    DEFAULT_RULE_OF_FOUR(LocalInterpolator);
+    DEFAULT_RULE_OF_FOUR(LocalInterpolator)
 
     //ACCESSORS
 
@@ -181,7 +179,7 @@ public:
 
     bool                        can_link_with(const Interpolator<T, N>& other) const override;
 
-    LocalInterpolator<T, N>*    clone() const override;
+    std::unique_ptr<Interpolator<T, N>>    clone() const override;
 
     //MODIFIERS
 
@@ -229,7 +227,7 @@ public:
     template<typename U>
     CustomLocalInterpolator(U&& callable, T t1, T t2, const T* y1, const T* y2, size_t size, int left_bdr, int right_bdr);
 
-    DEFAULT_RULE_OF_FOUR(CustomLocalInterpolator);
+    DEFAULT_RULE_OF_FOUR(CustomLocalInterpolator)
 
     void _call_impl(T* result, const T& t) const override;
 
@@ -299,7 +297,7 @@ public:
 
     bool                    can_link_with(const Interpolator<T, N>& interpolant) const override;
 
-    LinkedInterpolator<T, N, INTERPOLATOR>* clone() const override;
+    std::unique_ptr<Interpolator<T, N>> clone() const override;
 
 
     //MODIFIERS

@@ -52,16 +52,20 @@ void rk4_interp(T* out, const T& t, const T& t1, const T& t2, const T* y1, const
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 template<typename... Type>
-RK4<T, N, SP, OdeType, Derived>::RK4(MAIN_CONSTRUCTOR(T), Type&&... extras) : Base(ode, t0, q0, nsys, rtol, atol, 0, inf<T>(), stepsize, dir, args, std::forward<Type>(extras)...),
+RK4<T, N, SP, OdeType, Derived>::RK4(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T /*min_step*/, T /*max_step*/, T stepsize, int dir,  std::vector<T> args, Type&&... extras) : Base(ode, t0, q0, rtol, atol, 0, inf<T>(), stepsize, dir, std::move(args), std::forward<Type>(extras)...),
 #ifdef DPK_DENSE_RK4
-K(9, nsys)
+K(9, q0.size())
 #else
-K(5, nsys)
+K(5, q0.size())
 #endif
 {
     // min_step and max_step are not used in RK4
 }
 
+template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
+Integrator RK4<T, N, SP, OdeType, Derived>::method() const{
+    return Integrator::RK4;
+}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 auto RK4<T, N, SP, OdeType, Derived>::local_interp() const{
@@ -93,8 +97,8 @@ StepResult RK4<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     res[0] = t + h; // t_new
     T* y_new = res + 2;
 
-    auto rhs_caller = [this](T* out, const T& t, const T* y) NDSPAN_LAMBDA_INLINE{
-        this->rhs(out, t, y);
+    auto rhs_caller = [this, t, y](T* out, const T& t_dummy, const T* y_dummy) NDSPAN_LAMBDA_INLINE{
+        this->rhs(out, t_dummy, y_dummy);
     };
 
     rk4_step(rhs_caller, y_new, t, h, y, K.data(), n, K.data() + 4*n);

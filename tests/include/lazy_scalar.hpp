@@ -1,0 +1,6 @@
+#ifndef ODEPACK_TESTS_LAZY_SCALAR_HPP
+#define ODEPACK_TESTS_LAZY_SCALAR_HPP
+
+void test_lazy_scalar();
+
+#endif // ODEPACK_TESTS_LAZY_SCALAR_HPP
