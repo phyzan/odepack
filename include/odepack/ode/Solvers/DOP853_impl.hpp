@@ -391,14 +391,14 @@ void DOP853<T, N, SP, OdeType, Derived>::Reset(){
     K_.fill(0);
     mat_is_set_ = false;
     const T* state = this->new_state_ptr();
-    this->rhs(K_.data() + N_STAGES*this->Nsys(), state[0], state+2);
+    this->rhs(K_.data() + N_STAGES*this->nsys(), state[0], state+2);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void DOP853<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
     Base::ReAdjust(new_vector);
     this->set_coef_matrix();
-    this->rhs(K_.data() + N_STAGES*this->Nsys(), this->t(), new_vector);
+    this->rhs(K_.data() + N_STAGES*this->nsys(), this->t(), new_vector);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
@@ -411,7 +411,7 @@ void DOP853<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
     const T h = this->stepsize() * this->direction();
     const T* y_old = this->old_state_ptr() + 2;
     const T& t_old = this->t_old();
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
     T* K = K_.data();
 
     // Three extra stages, evaluated only for dense-output interpolation.
@@ -455,7 +455,7 @@ T DOP853<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const
     T* __restrict__ K = K_.data();
     T* __restrict__ r = df_tmp_.data();
     const T* __restrict__ q = state + 2;
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
 
     const T* __restrict__ K0 = K;
     T* __restrict__ K1 = K + n;
@@ -529,7 +529,7 @@ T DOP853<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 StepResult DOP853<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     mat_is_set_ = false;
-    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), N_STAGES,
+    return detail::rk_adapt_step(res, state, K_.data(), this->nsys(), N_STAGES,
                           this->min_step(), this->max_step(), this->MIN_STEP,
                           this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
                           ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
@@ -540,7 +540,7 @@ template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename 
 void DOP853<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
+    coef_mat_interp_dop853(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
@@ -548,7 +548,7 @@ auto DOP853<T, N, SP, OdeType, Derived>::local_interp() const{
     this->set_coef_matrix();
     const T* s1 = this->old_state_ptr();
     const T* s2 = this->interp_new_state_ptr();
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
 
     return [cm=this->coef_mat_, t1=s1[0], t2=s2[0], y1=Array1D<T, N>(s1+2, n), y2=Array1D<T, N>(s2+2, n), n](T* out, const T& t){
         coef_mat_interp_dop853(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);

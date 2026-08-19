@@ -112,6 +112,19 @@ public:
     /// @brief Check if the solver is currently at a canon event.
     bool                        at_canon_event() const;
 
+    // VIRTUAL INTERFACE ALIASES (inline overrides to avoid virtual calls)
+    // Accessors
+    const EventCollection<T>&   get_event_col() const { return event_col(); }
+    int                         get_event_idx(const std::string& name) const { return event_idx(name); }
+    bool                        get_at_event(int event_idx = -1) const { return at_event(event_idx); }
+    EventState<T>               get_current_event() const { return current_event(); }
+    bool                        get_at_canon_event() const { return at_canon_event(); }
+    // Modifiers
+    bool                        do_advance_to_event(const std::vector<size_t>& event_idx = {}) { return advance_to_event(event_idx); }
+    bool                        do_advance_to_event(const T& tmax, const std::vector<size_t>& event_idx = {}) { return advance_to_event(tmax, event_idx); }
+    bool                        do_advance_to_event(const std::vector<std::string>& event_names) { return advance_to_event(event_names); }
+    bool                        do_advance_to_event(const T& tmax, const std::vector<std::string>& event_names) { return advance_to_event(tmax, event_names); }
+
     /// @brief Reset implementation hook. Resets events and stops interpolation.
     void                        Reset();
 

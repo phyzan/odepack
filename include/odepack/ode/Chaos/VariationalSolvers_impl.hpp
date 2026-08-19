@@ -163,7 +163,7 @@ T VariationalSolver<Solver, T, N, SP, OdeType, Derived>::elapsed_time() const{
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 T VariationalSolver<Solver, T, N, SP, OdeType, Derived>::stretching_number() const{
-    const size_t nsys = this->Nsys()/2;
+    const size_t nsys = this->nsys()/2;
     return log(norm(this->true_state_ptr()+2+nsys, nsys));
 }
 
@@ -190,7 +190,7 @@ T VariationalSolver<Solver, T, N, SP, OdeType, Derived>::lyapunov_exponent() con
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void VariationalSolver<Solver, T, N, SP, OdeType, Derived>::Reset(){
     Base::Reset();
-    ndspan::copy_array(tmp_state_.data(), this->ics().vector(), this->Nsys());
+    ndspan::copy_array(tmp_state_.data(), this->ics().vector(), this->nsys());
     t_last_ = this->ics_ptr()[0];
     t_next_ = t_last_ + period_*this->direction();
     np = 0;
@@ -212,7 +212,7 @@ void VariationalSolver<Solver, T, N, SP, OdeType, Derived>::JacMain(T* out, cons
     } else {
         jac_approx<T>([this](T* jm, const T& t_dummy, const T* q_dummy){
             this->RhsMain(jm, t_dummy, q_dummy);
-        }, out, worker.data(), t, q, dt, this->atol(), this->Nsys()/2);
+        }, out, worker.data(), t, q, dt, this->atol(), this->nsys()/2);
     }
 }
 
@@ -232,7 +232,7 @@ bool VariationalSolver<Solver, T, N, SP, OdeType, Derived>::Adv_Impl(Args&&... a
     const int d = this->direction();
     const bool success = Base::Adv_Impl(t_next_, std::forward<Args>(args)...);
     if (success && (this->t() == t_next_)){
-        const size_t nsys = this->Nsys()/2;
+        const size_t nsys = this->nsys()/2;
         t_last_ = t_next_;
         t_next_ = this->ics_ptr()[0] + (++np + 1UL)*period_*d;
         ndspan::copy_array(tmp_state_.data(), THIS->true_state_ptr()+2, 2*nsys);

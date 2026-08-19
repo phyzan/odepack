@@ -146,7 +146,7 @@ public:
 
     const T* vector() const;
 
-    size_t Nsys() const;
+    size_t nsys() const;
 
 protected:
 

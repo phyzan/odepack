@@ -1,4 +1,3 @@
-#include "odepack/ode/Core/VirtualBase.hpp"
 #include "xdiff/tools.hpp"
 #include <odepack/odepack.hpp>
 

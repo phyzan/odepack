@@ -47,7 +47,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
             );
             return;
         } else {
-            const size_t nsys = this->Nsys();
+            const size_t nsys = this->nsys();
             const size_t nvars_default = DualType::get_default_nvars();
             DualType::set_default_nvars(nsys);
             for (size_t i=0; i<nsys; i++){
@@ -76,7 +76,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::jac(T* jm, const T& t, const T* q, 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::jac_approx(T* out, const T& t, const T* q, const T* dt) const{
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
 
     // ----------- Used only if N > 0 --------------
     static thread_local std::array<T, 4*N> work;
@@ -107,22 +107,22 @@ const T& BaseSolver<Derived, T, N, SP, OdeType>::t() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector() const{
-    return View1D<T, N>(this->true_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(this->true_state_ptr()+2, this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_last() const{
-    return View1D<T, N>(this->last_true_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(this->last_true_state_ptr()+2, this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_new() const{
-    return View1D<T, N>(this->new_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(this->new_state_ptr()+2, this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_old() const{
-    return View1D<T, N>(this->old_state_ptr()+2, this->Nsys());
+    return View1D<T, N>(this->old_state_ptr()+2, this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -161,8 +161,8 @@ const Array1D<T>& BaseSolver<Derived, T, N, SP, OdeType>::args() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-size_t BaseSolver<Derived, T, N, SP, OdeType>::Nupdates() const{
-    return _Nupdates;
+size_t BaseSolver<Derived, T, N, SP, OdeType>::step_count() const{
+    return _step_count;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -187,39 +187,39 @@ const std::string& BaseSolver<Derived, T, N, SP, OdeType>::status() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::show_state(int prec) const{
-    SolverState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->status()).show(prec);
+    SolverState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->nsys(), this->diverges(), this->is_running(), this->is_dead(), this->step_count(), this->status()).show(prec);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::new_state() const{
-    return State<T>(this->new_state_ptr(), this->Nsys());
+    return State<T>(this->new_state_ptr(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::old_state() const{
-    return State<T>(this->old_state_ptr(), this->Nsys());
+    return State<T>(this->old_state_ptr(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::state() const{
-    return State<T>(this->true_state_ptr(), this->Nsys());
+    return State<T>(this->true_state_ptr(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::last_state() const{
-    return State<T>(this->last_true_state_ptr(), this->Nsys());
+    return State<T>(this->last_true_state_ptr(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::ics() const{
-    return State<T>(this->ics_ptr(), this->Nsys());
+    return State<T>(this->ics_ptr(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::interp(T* out, const T& t) const{
     assert((t*this->direction() >= this->t_old()*this->direction() && t*this->direction() <= this->interp_new_state_ptr()[0]*this->direction()) && "Out of bounds interpolation requested");
     if (this->t_old() == this->t_new()){
-        ndspan::copy_array(out, this->new_state_ptr(), this->Nsys());
+        ndspan::copy_array(out, this->new_state_ptr(), this->nsys());
     }
     return interp_impl(out, t);
 }
@@ -243,7 +243,7 @@ T BaseSolver<Derived, T, N, SP, OdeType>::auto_step(T t, const T* q) const{
         //needed even if the resulting stepsize will have a positive value.
         throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
     }
-    size_t n = this->Nsys();
+    size_t n = this->nsys();
     T h0, d2, h1;
 
     
@@ -256,7 +256,7 @@ T BaseSolver<Derived, T, N, SP, OdeType>::auto_step(T t, const T* q) const{
     if constexpr (N > 0){
         y1 = work.data();
     } else{
-        _cache_4.resize(4, this->Nsys()); // will only resize the first time.
+        _cache_4.resize(4, this->nsys()); // will only resize the first time.
         y1 = _cache_4.ptr(0, 0);
     }
 
@@ -319,8 +319,8 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::advance(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 template<OptionalObserver<T> Callable>
-pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interpolate_until(const T& time, const Callable& observer){
-    pbox::Box<LinkedInterpolator<T, N>> interp = pbox::make_box<LinkedInterpolator<T, N>>(this->t_old(), this->vector_old().data(), this->Nsys());
+BoxedInterp<T, N> BaseSolver<Derived, T, N, SP, OdeType>::interpolate_until(const T& time, const Callable& observer){
+    pbox::Box<LinkedInterpolator<T, N>> interp = pbox::make_box<LinkedInterpolator<T, N>>(this->t_old(), this->vector_old().data(), this->nsys());
     bool current_state_is_new = false;
     if (!this->is_at_new_state()){
         interp->expand_by_owning(this->state_interpolator(0, -1));
@@ -341,7 +341,7 @@ pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interpolat
                 if (current_state_is_new){
                     interp->expand_by_owning(this->state_interpolator(0, -1));
                 }
-                interp->expand_by_owning(std::make_unique<LocalInterpolator<T, N>>(this->t(), this->vector().data(), this->Nsys()));
+                interp->expand_by_owning(std::make_unique<LocalInterpolator<T, N>>(this->t(), this->vector().data(), this->nsys()));
                 current_state_is_new = true;
             } else if (current_state_is_new) {
                 interp->expand_by_owning(this->state_interpolator(0, -1));
@@ -362,13 +362,13 @@ pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interpolat
         interp->close_end();
         return interp;
     } else {
-        return pbox::Box<Interpolator<T, N>>();
+        return BoxedInterp<T, N>();
     }
 
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-pbox::Box<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
+BoxedInterp<T, N> BaseSolver<Derived, T, N, SP, OdeType>::interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer){
     return this->interpolate_until(time, observer);
 }
 
@@ -479,7 +479,7 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> 
 template<typename Setter>
 auto BaseSolver<Derived, T, N, SP, OdeType>::restart_from_modified_state(T t0, Setter&& func, T stepsize){
     T* ics = const_cast<T*>(this->ics_ptr());
-    ndspan::copy_array(ics+2, this->vector().data(), this->Nsys());
+    ndspan::copy_array(ics+2, this->vector().data(), this->nsys());
     return priv_apply_ics_setter(ics, t0, std::forward<Setter>(func), stepsize);
 }
 
@@ -502,7 +502,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsi
         T* ics = const_cast<T*>(this->ics_ptr());
         ics[0] = t0;
         ics[1] = stepsize;
-        ndspan::copy_array(ics+2, y0, this->Nsys());
+        ndspan::copy_array(ics+2, y0, this->nsys());
         THIS->Reset();
         return true;
     }else {
@@ -556,7 +556,7 @@ std::unique_ptr<Interpolator<T, N>> BaseSolver<Derived, T, N, SP, OdeType>::stat
     auto interp = this->local_interp();
     const T* s1 = this->old_state_ptr();
     const T* s2 = this->interp_new_state_ptr();
-    return std::make_unique<CustomLocalInterpolator<T, N, decltype(interp)>>(std::move(interp), s1[0], s2[0], s1+2, s2+2, this->Nsys(), bdr1, bdr2);
+    return std::make_unique<CustomLocalInterpolator<T, N, decltype(interp)>>(std::move(interp), s1[0], s2[0], s1+2, s2+2, this->nsys(), bdr1, bdr2);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -577,7 +577,7 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
-    _Nupdates = 0;
+    _step_count = 0;
     _new_state_idx = 1;
     _old_state_idx = 2;
     _true_state_idx = 1;
@@ -592,7 +592,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
     _n_evals_jac = 0;
     _use_new_state = true;
     for (int i=1; i<6; i++){
-        ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2); //copy the initial state to all others
+        ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->nsys()+2); //copy the initial state to all others
     }
 }
 
@@ -725,11 +725,11 @@ void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
-    ndspan::copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->Nsys()+2); //store the re-adjusted new state for interpolation
+    ndspan::copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->nsys()+2); //store the re-adjusted new state for interpolation
     T* state = const_cast<T*>(this->true_state_ptr());
     state[0] = this->t();
     state[1] = this->stepsize();
-    ndspan::copy_array(state+2, new_vector, this->Nsys());
+    ndspan::copy_array(state+2, new_vector, this->nsys());
     if (_true_state_idx != _new_state_idx){
         if (_last_true_state_idx == _aux_state_idx){
             _aux_state_idx = _new_state_idx;
@@ -750,7 +750,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics(T t0, const T* q0) con
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0) const {
 
-    if (!all_are_finite(q0, this->Nsys()) || !isfinite(t0)){
+    if (!all_are_finite(q0, this->nsys()) || !isfinite(t0)){
         return false;
     }
 
@@ -763,7 +763,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0
     if constexpr (N > 0){
         worker = work.data();
     } else{
-        _cache_ics.resize(this->Nsys());
+        _cache_ics.resize(this->nsys());
         worker = _cache_ics.data();
     }
 
@@ -774,7 +774,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0
     */
     this->Rhs(worker, t0, q0);
 
-    return all_are_finite(worker, this->Nsys());
+    return all_are_finite(worker, this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -791,7 +791,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
     //by doing
     // auto matrix = solver->jac_view(jac_ptr);
     // matrix(i, j) = ...
-    return MutView<T, Layout::F, N, N>(j, this->Nsys(), this->Nsys());
+    return MutView<T, Layout::F, N, N>(j, this->nsys(), this->nsys());
 }
 
 
@@ -800,7 +800,7 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, q0.size()+2), _args(args.data(), args.size()), _diff_worker(JP==JacPolicy::Autodiff ? 2*q0.size() : 0), _ode(ode), _Nsys(q0.size()), _direction(dir){
-    assert(this->Nsys() > 0 && "Ode system size is 0");
+    assert(this->nsys() > 0 && "Ode system size is 0");
     _scalar_data = {rtol, atol, min_step, max_step};
     if (stepsize < 0){
         throw std::runtime_error("The stepsize argument cannot be negative");
@@ -815,9 +815,9 @@ BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _sta
         T habs = (stepsize == 0 ? this->auto_step(t0, q0.data()) : abs<T>(stepsize));
         _state_data(0, 0) = t0;
         _state_data(0, 1) = habs;
-        ndspan::copy_array(_state_data.ptr(0, 2), q0.data(), this->Nsys());
+        ndspan::copy_array(_state_data.ptr(0, 2), q0.data(), this->nsys());
         for (int i=1; i<5; i++){
-            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->Nsys()+2);
+            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->nsys()+2);
         }
     } else {
         this->kill("Initial conditions contain nan or inf, or ode(ics) does");
@@ -854,7 +854,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::register_states(){
         _old_state_idx = _last_true_state_idx;
     }
     _use_new_state = true;
-    _Nupdates++;
+    _step_count++;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -892,7 +892,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, cons
         //but since the step failed, the current interpolation interval is no longer valid.
         _use_new_state = false;
         T* d = _state_data.ptr(5, 0);
-        ndspan::copy_array(d, this->old_state_ptr(), this->Nsys()+2);
+        ndspan::copy_array(d, this->old_state_ptr(), this->nsys()+2);
     }
 
     return success;
@@ -948,7 +948,7 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::priv_apply_ics_setter(T* ics, T t0,
     ics[0] = t0;
     if constexpr (std::is_void_v<std::invoke_result_t<Setter, T*>>){
         func(ics+2);
-        assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
+        assert(all_are_finite(ics+2, this->nsys()) && "Invalid ics in apply_ics_setter");
         if (stepsize < 0) {
             this->cerr("Cannot set negative stepsize in solver initialization");
         } else if (stepsize == 0) {
@@ -958,7 +958,7 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::priv_apply_ics_setter(T* ics, T t0,
         THIS->Reset();
     } else {
         auto res = func(ics+2);
-        assert(all_are_finite(ics+2, this->Nsys()) && "Invalid ics in apply_ics_setter");
+        assert(all_are_finite(ics+2, this->nsys()) && "Invalid ics in apply_ics_setter");
         if (stepsize < 0) {
             this->cerr("Cannot set negative stepsize in solver initialization");
         } else if (stepsize == 0) {

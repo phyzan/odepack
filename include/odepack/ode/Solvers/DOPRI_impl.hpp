@@ -103,7 +103,7 @@ void RK23<T, N, SP, OdeType, Derived>::Reset(){
     K_.fill(0);
     mat_is_set_ = false;
     const T* state = this->new_state_ptr();
-    this->rhs(K_.data() + Nstages*this->Nsys(), state[0], state+2);
+    this->rhs(K_.data() + Nstages*this->nsys(), state[0], state+2);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
@@ -111,13 +111,13 @@ void RK23<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
     Base::ReAdjust(new_vector);
     // freeze the interpolation coefficients (from t_old to t) before K is overwritten
     this->set_coef_matrix();
-    this->rhs(K_.data() + Nstages*this->Nsys(), this->t(), new_vector);
+    this->rhs(K_.data() + Nstages*this->nsys(), this->t(), new_vector);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void RK23<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
     if (!mat_is_set_){
-        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->Nsys());
+        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->nsys());
         mat_is_set_ = true;
     }
 }
@@ -129,7 +129,7 @@ T RK23<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T
     T* __restrict__ K = K_.data();
     T* __restrict__ r = df_tmp_.data();
     const T* __restrict__ q = state + 2;
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
 
     const T rtol = this->rtol(), atol = this->atol();
     const T habs = abs<T>(h);
@@ -169,7 +169,7 @@ T RK23<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 StepResult RK23<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     mat_is_set_ = false;
-    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), Nstages,
+    return detail::rk_adapt_step(res, state, K_.data(), this->nsys(), Nstages,
                           this->min_step(), this->max_step(), this->MIN_STEP,
                           this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
                           ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
@@ -180,14 +180,14 @@ template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename 
 void RK23<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
+    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 auto RK23<T, N, SP, OdeType, Derived>::local_interp() const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(d+2, this->Nsys()), n=this->Nsys()](T* out, const T& t){
+    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->nsys()), y2=Array1D<T, N>(d+2, this->nsys()), n=this->nsys()](T* out, const T& t){
         coef_mat_interp(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);
     };
 }
@@ -263,20 +263,20 @@ void RK45<T, N, SP, OdeType, Derived>::Reset(){
     K_.fill(0);
     mat_is_set_ = false;
     const T* state = this->new_state_ptr();
-    this->rhs(K_.data() + Nstages*this->Nsys(), state[0], state+2);
+    this->rhs(K_.data() + Nstages*this->nsys(), state[0], state+2);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void RK45<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector){
     Base::ReAdjust(new_vector);
     this->set_coef_matrix();
-    this->rhs(K_.data() + Nstages*this->Nsys(), this->t(), new_vector);
+    this->rhs(K_.data() + Nstages*this->nsys(), this->t(), new_vector);
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void RK45<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
     if (!mat_is_set_){
-        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->Nsys());
+        detail::rk_interp_matrix(coef_mat_.data(), K_.data(), P.data(), Nstages, INTERP_ORDER, this->nsys());
         mat_is_set_ = true;
     }
 }
@@ -288,7 +288,7 @@ T RK45<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T
     T* __restrict__ K = K_.data();
     T* __restrict__ r = df_tmp_.data();
     const T* __restrict__ q = state + 2;
-    const size_t n = this->Nsys();
+    const size_t n = this->nsys();
 
     const T rtol = this->rtol(), atol = this->atol();
     const T habs = abs<T>(h);
@@ -343,7 +343,7 @@ T RK45<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 StepResult RK45<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     mat_is_set_ = false;
-    return detail::rk_adapt_step(res, state, K_.data(), this->Nsys(), Nstages,
+    return detail::rk_adapt_step(res, state, K_.data(), this->nsys(), Nstages,
                           this->min_step(), this->max_step(), this->MIN_STEP,
                           this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
                           ERR_EXP, INC_EXP, MIN_ERR, this->direction(),
@@ -354,14 +354,14 @@ template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename 
 void RK45<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->Nsys());
+    coef_mat_interp(result, t, this->t_old(), d[0], this->old_state_ptr()+2, d+2, coef_mat_.data(), INTERP_ORDER, this->nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 auto RK45<T, N, SP, OdeType, Derived>::local_interp() const{
     this->set_coef_matrix();
     const T* d = this->interp_new_state_ptr();
-    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->Nsys()), y2=Array1D<T, N>(d+2, this->Nsys()), n=this->Nsys()](T* out, const T& t){
+    return [cm=this->coef_mat_, t1=this->t_old(), t2=d[0], y1=Array1D<T, N>(this->old_state_ptr()+2, this->nsys()), y2=Array1D<T, N>(d+2, this->nsys()), n=this->nsys()](T* out, const T& t){
         coef_mat_interp(out, t, t1, t2, y1.data(), y2.data(), cm.data(), INTERP_ORDER, n);
     };
 }

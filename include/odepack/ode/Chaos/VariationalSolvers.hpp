@@ -38,21 +38,22 @@ class ChaoticSolver : public std::conditional_t<UP==UtilPolicy::RichVirtual, Ode
 
 public:
 
-    virtual void    RhsMain(T* out, const T& t, const T* q) const = 0;
+    // ACCESSORS
+    virtual void    get_rhs_main(T* out, const T& t, const T* q) const = 0;
 
-    virtual void    JacMain(T* out, const T& t, const T* q, const T* dt = nullptr) const = 0;
+    virtual void    get_jac_main(T* out, const T& t, const T* q, const T* dt = nullptr) const = 0;
 
-    virtual T       elapsed_time() const = 0;
+    virtual T       get_elapsed_time() const = 0;
 
-    virtual T       kick() const = 0;
+    virtual T       get_kick() const = 0;
 
-    virtual T       period() const = 0;
+    virtual T       get_period() const = 0;
 
-    virtual T       log_ksi() const = 0;
+    virtual T       get_log_ksi() const = 0;
 
-    virtual T       lyapunov_exponent() const = 0;
+    virtual T       get_lyapunov_exponent() const = 0;
 
-    virtual T       stretching_number() const = 0;
+    virtual T       get_stretching_number() const = 0;
 
 };
 
@@ -134,6 +135,16 @@ public:
     void    RhsMain(T* out, const T& t, const T* q) const;
 
     void    JacMain(T* out, const T& t, const T* q, const T* dt = nullptr) const;
+
+    // VIRTUAL INTERFACE ALIASES (inline overrides to avoid virtual calls)
+    void    get_rhs_main(T* out, const T& t, const T* q) const { RhsMain(out, t, q); }
+    void    get_jac_main(T* out, const T& t, const T* q, const T* dt = nullptr) const { JacMain(out, t, q, dt); }
+    T       get_elapsed_time() const { return elapsed_time(); }
+    T       get_kick() const { return kick(); }
+    T       get_period() const { return period(); }
+    T       get_log_ksi() const { return log_ksi(); }
+    T       get_lyapunov_exponent() const { return lyapunov_exponent(); }
+    T       get_stretching_number() const { return stretching_number(); }
 
 protected:
 

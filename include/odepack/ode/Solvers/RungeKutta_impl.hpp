@@ -69,7 +69,7 @@ Integrator RK4<T, N, SP, OdeType, Derived>::method() const{
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 auto RK4<T, N, SP, OdeType, Derived>::local_interp() const{
-    size_t nsys = this->Nsys();
+    size_t nsys = this->nsys();
 #ifdef DPK_DENSE_RK4
     return [solver=*this](T* out, const T& t){
             rk4_step([&solver](T* out, const T& tt, const T* y) NDSPAN_LAMBDA_INLINE{
@@ -92,7 +92,7 @@ StepResult RK4<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     const T& t = state[0];
     T h = state[1] * this->direction();
     const T* y = state + 2;
-    size_t n = this->Nsys();
+    size_t n = this->nsys();
 
     res[0] = t + h; // t_new
     T* y_new = res + 2;
@@ -112,7 +112,7 @@ StepResult RK4<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void RK4<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
-    size_t nsys = this->Nsys();
+    size_t nsys = this->nsys();
 #ifdef DPK_DENSE_RK4    
     rk4_step([this](T* out, const T& tt, const T* y) NDSPAN_LAMBDA_INLINE{
         this->rhs(out, tt, y);
@@ -143,7 +143,7 @@ template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename 
 void RK4<T, N, SP, OdeType, Derived>::set_interp_data() const{
     if (!interp_data_set){
         const T* d = this->interp_new_state_ptr();
-        this->rhs(K.data()+this->Nsys(), d[0], d+2);
+        this->rhs(K.data()+this->nsys(), d[0], d+2);
         interp_data_set = true;
     }
 }

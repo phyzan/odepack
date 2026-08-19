@@ -195,7 +195,7 @@ public:
     void                    apply_mask(T* out, const T& t, const T* q) const;
 
     /// @brief Get the ODE system size.
-    size_t                  Nsys() const;
+    size_t                  nsys() const;
 
     /// @brief Get the trigger count.
     size_t                  counter() const;

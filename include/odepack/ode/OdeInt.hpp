@@ -58,7 +58,7 @@ public:
 
     virtual std::unique_ptr<ODE<T, N>>  clone() const;
 
-    size_t                      Nsys() const;
+    size_t                      nsys() const;
 
     template<OptionalObserver<T> Callable = std::nullptr_t>
     bool                        rich_integrate(OdeSolution<T, N>& out, const T& interval, const std::vector<EventOptions>& event_options={}, Callable&& observer = nullptr, int max_prints = 0);

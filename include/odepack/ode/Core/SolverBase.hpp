@@ -207,10 +207,10 @@ public:
     const Array1D<T>&   args() const;
 
     /// @brief Get the number of equations in the ODE system.
-    constexpr size_t    Nsys() const {if constexpr (N > 0) {return N;} else {return _Nsys;}}
-
+    constexpr size_t    nsys() const {if constexpr (N > 0) {return N;} else {return _Nsys;}}
+    
     /// @brief Get the number of successful integration steps taken.
-    size_t              Nupdates() const;
+    size_t              step_count() const;
 
     /// @brief Check if the solver is currently running (not paused or dead).
     bool                is_running() const;
@@ -307,9 +307,9 @@ public:
 
     /// @brief observer(t, q_ptr, t_ptr) -> bool
     template<OptionalObserver<T> Callable = std::nullptr_t>
-    pbox::Box<Interpolator<T, N>>   interpolate_until(const T& time, const Callable& observer = nullptr);
+    BoxedInterp<T, N>   interpolate_until(const T& time, const Callable& observer = nullptr);
 
-    pbox::Box<Interpolator<T, N>>  interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer = [](const auto&, const auto*, const auto*){return true;});
+    BoxedInterp<T, N>   interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer = [](const auto&, const auto*, const auto*){return true;});
 
     /**
      * @brief Advance the solver by a specified time interval (along the integration direction).
@@ -381,6 +381,60 @@ public:
      * @note Must be implemented by derived class.
      */
     VirtualInterp<T, N> state_interpolator(int bdr1, int bdr2) const;
+
+    // VIRTUAL INTERFACE ALIASES (inline overrides to avoid virtual calls)
+    // Accessors
+    void                get_rhs(T* dq_dt, const T& t, const T* q) const { Rhs(dq_dt, t, q); }
+    void                get_jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const { Jac(jm, t, q, dt); }
+    void                get_jac_approx(T* j, const T& t, const T* q, const T* dt) const { jac_approx(j, t, q, dt); }
+    const T&            get_time() const { return t(); }
+    const T&            get_previous_time() const { return t_last(); }
+    const T&            get_new_time() const { return t_new(); }
+    const T&            get_old_time() const { return t_old(); }
+    View1D<T, N>        get_vector() const { return vector(); }
+    View1D<T, N>        get_previous_vector() const { return vector_last(); }
+    View1D<T, N>        get_new_vector() const { return vector_new(); }
+    View1D<T, N>        get_old_vector() const { return vector_old(); }
+    State<T>            get_ics() const { return ics(); }
+    State<T>            get_state() const { return state(); }
+    State<T>            get_last_state() const { return last_state(); }
+    State<T>            get_new_state() const { return new_state(); }
+    State<T>            get_old_state() const { return old_state(); }
+    const T&            get_stepsize() const { return stepsize(); }
+    int                 get_direction() const { return direction(); }
+    const T&            get_rtol() const { return rtol(); }
+    const T&            get_atol() const { return atol(); }
+    const T&            get_min_step() const { return min_step(); }
+    const T&            get_max_step() const { return max_step(); }
+    size_t              get_nsys() const { return nsys(); }
+    const Array1D<T>&   get_args() const { return args(); }
+    size_t              get_step_count() const { return step_count(); }
+    bool                get_is_running() const { return is_running(); }
+    bool                get_is_dead() const { return is_dead(); }
+    bool                get_diverges() const { return diverges(); }
+    const std::string&  get_status() const { return status(); }
+    bool                get_validate_ics(T t0, const T* q0) const { return validate_ics(t0, q0); }
+    Integrator          get_method() const { return method(); }
+    void                get_interp(T* result, const T& t) const { interp(result, t); }
+    size_t              get_n_evals_rhs() const { return n_evals_rhs(); }
+    size_t              get_n_evals_jac() const { return n_evals_jac(); }
+    VirtualInterp<T, N> get_state_interpolator(int bdr1, int bdr2) const { return state_interpolator(bdr1, bdr2); }
+    T                   get_auto_step(T t, const T* q) const { return auto_step(t, q); }
+    T                   get_auto_step() const { return auto_step(); }
+    
+    // Modifiers
+    bool                do_advance() { return advance(); }
+    bool                do_advance_by(T interval) { return advance_by(interval); }
+    bool                do_advance_until(const T& time) { return advance_until(time); }
+    bool                do_observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer) { return observe_until(time, observer); }
+    bool                do_observe_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer, View1D<T> extra_steps) { return observe_until(time, observer, extra_steps); }
+    BoxedInterp<T, N>   do_interp_until(const T& time, std::function<bool(const T&, const T*, const T*)> observer = [](const auto&, const auto*, const auto*){return true;}) { return interp_until(time, observer); }
+    void                do_reset() { THIS->Reset(); }
+    bool                do_resume() { return resume(); }
+    void                do_stop(const std::string& text = "") { stop(text); }
+    void                do_kill(const std::string& text = "") { kill(text); }
+    void                do_set_args(const T* new_args) { THIS->SetArgs(new_args); }
+    bool                do_set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0) { return set_ics(t0, y0, stepsize, direction); }
 
     // =================== STATIC OVERRIDES (NECESSARY) ===============================
     // Derived classes MUST implement these methods / attributes.
@@ -584,7 +638,7 @@ private:
     mutable Array1D<DualType, JP==JacPolicy::Autodiff ? 2*N : 0>           _diff_worker;
     OdeType                                             _ode;
     size_t                                              _Nsys = N;
-    size_t                                              _Nupdates = 0;
+    size_t                                              _step_count = 0;
     mutable size_t                                      _n_evals_rhs = 0;
     mutable size_t                                      _n_evals_jac = 0;
     std::string                                         _message = "Running";

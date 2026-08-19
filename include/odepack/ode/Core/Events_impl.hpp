@@ -49,7 +49,7 @@ void EventBase<Derived, T, MaskFunc>::apply_mask(T* out, const T& t, const T* q)
 
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-size_t EventBase<Derived, T, MaskFunc>::Nsys() const{
+size_t EventBase<Derived, T, MaskFunc>::nsys() const{
     return worker.size();
 }
 

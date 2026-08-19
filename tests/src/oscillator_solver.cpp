@@ -53,13 +53,13 @@ void crossing_test(Integrator method) {
     );
 
     // Advance until event is detected
-    while (!solver->at_event()) {
-        solver->advance();
+    while (!solver->get_at_event()) {
+        solver->do_advance();
     }
 
-    std::cout << "Event detected at t = " << solver->t() << "\n";
+    std::cout << "Event detected at t = " << solver->get_time() << "\n";
     std::cout << "State at event: ";
-    auto v = solver->vector();
+    auto v = solver->get_vector();
     for (size_t i = 0; i < 2; ++i) {
         std::cout << v[i] << " ";
     }

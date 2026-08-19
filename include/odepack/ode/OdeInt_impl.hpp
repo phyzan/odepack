@@ -86,8 +86,8 @@ std::unique_ptr<ODE<T, N>> ODE<T, N>::clone() const{
 }
 
 template<typename T, size_t N>
-size_t ODE<T, N>::Nsys() const{
-    return solver_->Nsys();
+size_t ODE<T, N>::nsys() const{
+    return solver_->get_nsys();
 }
 
 template<typename T, size_t N>
@@ -131,12 +131,12 @@ template<typename ArrayType, OptionalObserver<T> Callable>
 bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options, Callable&& observer, int max_prints, bool interpolate){
     if (solver_->is_dead()){
         if (out){
-            *out = OdeResult<T, N>({}, {this->Nsys()}, solver_->diverges(), 0, false, 0, solver_->status());
+            *out = OdeResult<T, N>({}, {this->nsys()}, solver_->diverges(), 0, false, 0, solver_->status());
         }
         return false;
     }else if (t_max*solver_->direction() < solver_->t()*solver_->direction()){
         if (out){
-            *out = OdeResult<T, N>({}, {this->Nsys()}, 0, false, false, 0, "Cannot integrate in opposite direction");
+            *out = OdeResult<T, N>({}, {this->nsys()}, 0, false, false, 0, "Cannot integrate in opposite direction");
         }
         return false; //cannot integrate in opposite direction
     }
@@ -213,7 +213,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     };
 
     bool success;
-    pbox::Box<Interpolator<T, N>> interpolator;
+    BoxedInterp<T, N> interpolator;
     if constexpr (store_explicit_steps){
         success = solver_->observe_until(t_max, main_observer, t_eval);
     } else if (interpolate){
@@ -272,7 +272,7 @@ View1D<T> ODE<T, N>::t()const{
 
 template<typename T, size_t N>
 View2D<T, 0, N> ODE<T, N>::q()const{
-    return View2D<T, 0, N>{orbit_data_.q.data(), this->n_points(), this->Nsys()};
+    return View2D<T, 0, N>{orbit_data_.q.data(), this->n_points(), this->nsys()};
 }
 
 template<typename T, size_t N>
@@ -283,7 +283,7 @@ const T& ODE<T, N>::t(size_t i)const{
 
 template<typename T, size_t N>
 View1D<T, N> ODE<T, N>::q(size_t i)const{
-    return View1D<T, N>(orbit_data_.q.data() + i*this->Nsys(), this->Nsys());
+    return View1D<T, N>(orbit_data_.q.data() + i*this->nsys(), this->nsys());
 }
 
 template<typename T, size_t N>

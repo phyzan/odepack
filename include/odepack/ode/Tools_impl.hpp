@@ -28,7 +28,7 @@ const T* State<T>::vector() const{
 }
 
 template<typename T>
-size_t State<T>::Nsys() const{
+size_t State<T>::nsys() const{
     return _nsys;
 }
 

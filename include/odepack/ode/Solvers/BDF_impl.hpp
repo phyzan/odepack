@@ -172,13 +172,13 @@ BDF<T, N, SP, OdeType, Derived>::BDF(private_tag, MAIN_CONSTRUCTOR(T), Type&&...
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void BDF<T, N, SP, OdeType, Derived>::ReAdjust(const T* new_vector) {
     Base::ReAdjust(new_vector);
-    ndspan::copy_array(_D[2].data(), _D[_idx_D].data(), this->Nsys());
+    ndspan::copy_array(_D[2].data(), _D[_idx_D].data(), this->nsys());
     _D[0].fill(0);
     _D[1].fill(0);
-    ndspan::copy_array(_D[0].data(), new_vector, this->Nsys());
-    this->rhs(_D[0].data()+this->Nsys(), this->t(), new_vector);
-    for (size_t i=0; i<this->Nsys(); i++){
-        _D[0][i+this->Nsys()] *= this->stepsize() * this->direction();
+    ndspan::copy_array(_D[0].data(), new_vector, this->nsys());
+    this->rhs(_D[0].data()+this->nsys(), this->t(), new_vector);
+    for (size_t i=0; i<this->nsys(); i++){
+        _D[0][i+this->nsys()] *= this->stepsize() * this->direction();
     }
     this->jac(_J.data(), this->t(), new_vector);
     _order = 1;
@@ -218,12 +218,12 @@ void BDF<T, N, SP, OdeType, Derived>::_reset_impl_alone(){
     T t0 = this->ics().t();
     T h0 = this->ics().habs() * this->direction();
     const T* q0 = this->ics().vector();
-    Array1D<T, N> f(this->Nsys());
+    Array1D<T, N> f(this->nsys());
     this->rhs(f.data(), t0, q0);
 
     for (size_t k = 0; k<_D.size(); k++){
-        _D[k] = Dlike(BDF_MAX_ORDER+3, this->Nsys());
-        for (size_t j=0; j<this->Nsys(); j++){
+        _D[k] = Dlike(BDF_MAX_ORDER+3, this->nsys());
+        for (size_t j=0; j<this->nsys(); j++){
             _D[k](0, j) = q0[j];
             _D[k](1, j) = f[j] * h0;
         }
@@ -245,7 +245,7 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
 
     const T& t = state[0];
     const T& stepsize = state[1];
-    size_t nsys = this->Nsys();
+    size_t nsys = this->nsys();
 
     T& t_new = res[0] = state[0];
     T& habs = res[1];
@@ -416,20 +416,20 @@ StepResult BDF<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 auto BDF<T, N, SP, OdeType, Derived>::local_interp() const{
-    return [D=_D[interp_idx], order=_order, t2=this->interp_new_state_ptr()[0], n=this->Nsys(), h = this->stepsize()*this->direction()](T* out, const T& t){
+    return [D=_D[interp_idx], order=_order, t2=this->interp_new_state_ptr()[0], n=this->nsys(), h = this->stepsize()*this->direction()](T* out, const T& t){
         bdf_interp<T>(out, t, t2, h, D.data(), order, n);
     };
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
  void BDF<T, N, SP, OdeType, Derived>::interp_impl(T* result, const T& t) const{
-    bdf_interp<T>(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->Nsys());
+    bdf_interp<T>(result, t, this->interp_new_state_ptr()[0], this->stepsize()*this->direction(), _D[interp_idx].data(), _order, this->nsys());
 }
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 NewtConv BDF<T, N, SP, OdeType, Derived>::_solve_bdf_system(T* y, const T* y_pred, Array1D<T, N>& d, const T& t_new, const T& c, const Array1D<T, N>& psi, const LUResult<T, N>& LU, const Array1D<T, N>& scale){
     d.fill(0);
-    size_t n = this->Nsys();
+    size_t n = this->nsys();
     ndspan::copy_array(y, y_pred, n);
     T dy_norm = 0;
     T dy_norm_old = 0;
@@ -486,7 +486,7 @@ void BDF<T, N, SP, OdeType, Derived>::_change_D(const T& factor){
     T* U = _U.data();
     T* RU = _RU.data();
     size_t n = _order+1;
-    size_t nsys = this->Nsys();
+    size_t nsys = this->nsys();
     compute_R(_R.data(), _order, factor);
     compute_R(_U.data(), _order, T(1));
 
@@ -523,7 +523,7 @@ void BDF<T, N, SP, OdeType, Derived>::_change_D(const T& factor){
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void BDF<T, N, SP, OdeType, Derived>::_set_prediction(T* y){
-    size_t n=this->Nsys();
+    size_t n=this->nsys();
     T* D = _D[_idx_D].data();
 
     for (size_t j=0; j < n; j++){
@@ -540,7 +540,7 @@ void BDF<T, N, SP, OdeType, Derived>::_set_prediction(T* y){
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void BDF<T, N, SP, OdeType, Derived>::_set_psi(T* psi){
-    size_t n = this->Nsys();
+    size_t n = this->nsys();
     const T* D = _D[_idx_D].data();
     const T* g = BDF_COEFS.GAMMA.data();
     const T& a = BDF_COEFS.ALPHA[_order];

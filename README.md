@@ -118,7 +118,7 @@ bool                advance_until(const T& time); // Advance the solver until a 
 bool                advance_until(const T& time, const Callable& observer); // Advance the solver until a specified time is reached, calling an observer function at each step
 bool                set_ics(T t0, const T* y0, T stepsize, int direction); // Set new initial conditions and reset the solver in-place (no memory reallocation happens)
 void                Reset(); // Reset the solver to its initial state
-pbox::Box<Interpolator<T, N>> interpolate_until(const T& time, const Callable& observer = nullptr); // Advance the solver until a specified time is reached, returning an interpolator over the integration interval
+BoxedInterp<T, N>   interpolate_until(const T& time, const Callable& observer = nullptr); // Advance the solver until a specified time is reached, returning an interpolator over the integration interval
 ```
 
 ### Available Solvers
@@ -290,6 +290,7 @@ odepack/
 │       ├── ode/                     # Core ODE library
 │       │   ├── Core/                # Foundation & base classes
 │       │   │   ├── VirtualBase.hpp  # Virtual interfaces & solver policies
+│       │   │   ├── VirtualTraits.hpp # Traits for virtual solvers
 │       │   │   ├── SolverBase.hpp   # CRTP base solver
 │       │   │   ├── RichBase.hpp     # Event-aware solver extension
 │       │   │   ├── Events.hpp       # Event detection system

@@ -43,14 +43,14 @@ std::vector<size_t> RichSolver<Derived, T, N, SP, OdeType>::toEventIdx(const std
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void RichSolver<Derived, T, N, SP, OdeType>::show_state(int prec) const{
-    SolverRichState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->Nsys(), this->diverges(), this->is_running(), this->is_dead(), this->Nupdates(), this->status(), this->current_event().event ? this->current_event().event->name() : "").show(prec);
+    SolverRichState<T, N>(this->vector().data(), this->t(), this->stepsize(), this->nsys(), this->diverges(), this->is_running(), this->is_dead(), this->step_count(), this->status(), this->current_event().event ? this->current_event().event->name() : "").show(prec);
 }
 
 // PUBLIC MODIFIERS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 RichSolver<Derived, T, N, SP, OdeType>::RichSolver(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, EventList<T> evs) : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)), evt_col(std::move(evs)) {
-    this->evt_col.setup(t0, this->args().data(), this->args().size(), this->Nsys(), this->direction());
+    this->evt_col.setup(t0, this->args().data(), this->args().size(), this->nsys(), this->direction());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
