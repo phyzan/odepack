@@ -27,7 +27,7 @@ OdePack is a modern, object-oriented C++ header library for solving **Ordinary D
 - **Memory efficient**: Solvers preallocate memory for zero heap (de)allocations between steps
 - **Flexible solver policies**: Choose between static, rich, virtual, and rich-virtual solvers for performance vs. flexibility trade-offs
 - **Extensible**: Easily add new solvers or event types
-- **Template-based**: Allows for any numeric type including arbitrary precision (MPFR), supports automatic differentiation via `xdiff`, lazy evaluation via `lazy`, and more
+- **Template-based**: Allows for any numeric type including arbitrary precision (MPFR), supports automatic differentiation via [xdiff](https://github.com/phyzan/xdiff), lazy evaluation via [lazy](https://github.com/phyzan/lazy), and more
 - **Dynamical systems analysis**: Built-in support for variational equations and Lyapunov exponent calculations
 
 ---
@@ -138,13 +138,70 @@ Currently, the following solver classes are provided, overriding the proper `Bas
 
 One main component of the library is the event detection system, which allows users to define conditions that trigger during integration. This feature was mainly developed for accurately detecting crossings in a *Poincaré surface of section* in dynamical systems, but it can be used for any situation where you need to detect when a certain condition is met during the integration of a system of ODE's.
 
-- **Compile-time events**: For events that can be hardcoded in a project, it is preferred to use the compile-time event system, which avoids the overhead of virtual function calls, and allows for inlining and more compiler optimizations. This is achieved via the `ObjectiveSolver` class. See tutorials/CompileTimeEvents.cpp for different ways to declare relevant solvers.
+- **Compile-time events**: For events that can be hardcoded in a project, it is preferred to use the compile-time event system, which avoids the overhead of virtual function calls, and allows for inlining and more compiler optimizations. This is achieved via the `ObjectiveSolver` class. See the relevant [example](tutorials/CompileTimeEvents.cpp) for different ways to declare relevant solvers.
 
 - **Runtime events**: For events whose number or type is not known at compile-time, the polymorphic `Event<T>` class
 is provided, which requires that the solver is declared with `ode::SolverPolicy::RichVirtual` or `RichStatic`.
-See tutorials/RuntimeEvents.cpp for examples of how to use the runtime event system.
+See the relevant [example](tutorials/RuntimeEvents.cpp) for examples of how to use the runtime event system.
 
----
+## Arbitrary Precision Support
+
+All classes are templated, and the `T` template parameter can be any numeric type, including arbitrary precision:
+```cpp
+#include <odepack/odepack.hpp>
+#include <mpreal.h>
+
+using namespace ode;
+
+int main(){
+
+    // Set precision to 100 bits for all subsequent mpreal objects
+    mpfr::mpreal::set_default_prec(100);
+
+    using T = mpfr::mpreal; // `T` alias for simplicity
+    std::array<T, 2> q0 = {10, 0}; // Initial conditions
+    
+    // Let's create a solver for the simple harmonic oscillator using the RK45 method
+    pbox::Box<OdeSolver<T, 2>> solver = make_vsolver(
+        Integrator::RK45,
+        OdeData{
+            .Rhs=[](auto* dq_dt, const auto& t, const auto* q, const auto* args){
+                dq_dt[0] = q[1];
+                dq_dt[1] = -q[0];
+            },
+        },
+        T{0}, // t0
+        View1D<T, 2>{q0.data()},
+        T{1e-10}, // relative tolerance
+        T{1e-10} // absolute tolerance
+    );
+
+    solver->do_advance_until(1000);
+    const T& x = solver->get_vector()[0];
+    const T& v = solver->get_vector()[1];
+    std::cout << "Final state: " << x << ", " << v << std::endl;
+    return 0;
+}
+```
+
+However, `mpfr::mpreal` performs heap allocation when instantiated, and every intermediate algebraic expression
+creates a temporary `mpreal` object. This can be avoided by using the `lazy` library, which allows for lazy evaluation of expressions and avoids unnecessary temporaries. See the [lazy](https://github.com/phyzan/lazy) submodule for more details. In practice, it can be used exactly like `mpreal` in most cases, by simply replacing `mpfr::mpreal` with `lazy::LazyType<mpfr::mpreal>` in the code above, using
+```cpp
+#include <lazy/apps/mpfrLazy.hpp>
+```
+and calling
+```cpp
+lazy::set_default_mpreal_prec(prec);
+```
+instead of
+```cpp
+mpfr::mpreal::set_default_prec(prec);
+```
+
+For instance, this [example](tutorials/CompileTimeEvents.cpp) demonstrates the performance difference between `mpreal` and `lazy::LazyType<mpfr::mpreal>` for a simple harmonic oscillator.
+
+Note that as the number of requested bits of precision increases, the performance difference diminishes,
+and the overhead of algebraic evaluations dominates.
 
 # Installation
 
@@ -180,7 +237,7 @@ CMake options that toggle preprocessor macros across the library, its bundled de
 | `DEBUG` | — | Debug build: `-O0 -g3 -ggdb3 -fno-omit-frame-pointer -UNDEBUG` (asserts enabled), instead of the default optimized release build (`-O3 -DNDEBUG`, LTO where supported). Also triggered by `-DCMAKE_BUILD_TYPE=Debug`. |
 | `ODEPACK_BUILD_TESTS` | — | Build the `odepack_tests` executable from `tests/src/*.cpp`. Defaults to `ON` when configuring odepack directly, `OFF` when pulled in via `add_subdirectory` by another project. |
 
-See useful [macros](external/xdiff/README.md##Macros) for the `xdiff` submodule.
+See useful [macros](https://github.com/phyzan/xdiff#macros) for the `xdiff` submodule.
 
 ## Linking via CMake
 
