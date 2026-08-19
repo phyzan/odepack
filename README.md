@@ -1,24 +1,23 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/C%2B%2B-20-blue?style=for-the-badge&logo=cplusplus&logoColor=white" alt="C++20">
-  <img src="https://img.shields.io/badge/Header_Only-yes-green?style=for-the-badge" alt="Header Only">
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License">
+<img src="https://img.shields.io/badge/C%2B%2B20-blue?style=for-the-badge&logo=cplusplus&logoColor=white" alt="C++20">
+<img src="https://img.shields.io/badge/Header_Only-green?style=for-the-badge" alt="Header Only">
 </p>
 
-<h1 align="center">ODEPACK</h1>
+<h1 align="center">OdePack</h1>
 
 <p align="center">
   <strong>A Modern C++ Library for Ordinary Differential Equations</strong>
 </p>
 
 <p align="center">
-  High-performance, header-only ODE solvers with event detection and dense output
+  High-performance, templated ODE solvers with flexible event detection mechanisms
 </p>
 
 ---
 
 ## Overview
 
-ODEPACK is a modern, object-oriented C++ header library for solving **Ordinary Differential Equations (ODEs)**. Originally inspired by Alan Hindmarsh's classic Fortran77 ODEPACK library, this implementation brings a fresh, template-based design heavily influenced by SciPy's ODE solver interface.
+OdePack is a modern, object-oriented C++ header library for solving **Ordinary Differential Equations (ODEs)**. Originally inspired by Alan Hindmarsh's classic Fortran77 library, this implementation brings a fresh, template-based design heavily influenced by SciPy's ODE solver interface.
 
 ## Features:
 
