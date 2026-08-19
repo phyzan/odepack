@@ -280,7 +280,7 @@ VariationalODE<T, N>::VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<
     // Must create solver BEFORE register_state(), since it accesses solver_
     this->solver_ = make_variational_solver<UtilPolicy::RichVirtual>(method, ode, t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
 
-    const EventCollection<T>& event_coll = this->get_event_col();
+    const EventCollection<T>& event_coll = this->solver()->get_event_col();
 
     this->cached_idx_.resize(event_coll.size(), 0);
     Base::register_state();
