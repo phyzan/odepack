@@ -240,7 +240,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
         
         assert(this->contains(ics.data()) && "Initial point out of bounds");
         assert((dir == 1 || dir == -1) && "Direction must be either +1 or -1");
-        if (!rich_solver->set_ics(0, ics.data(), stepsize, dir)) {
+        if (!rich_solver->do_set_ics(0, ics.data(), stepsize, dir)) {
             return 0;
         }
         int n_steps = 0;
@@ -248,8 +248,8 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
 
 
         GetIdx(i_start, ics.data());
-        while ((n_steps < max_pts) && rich_solver->advance_by(ds)){
-            q_new = rich_solver->vector().data();
+        while ((n_steps < max_pts) && rich_solver->do_advance_by(ds)){
+            q_new = rich_solver->get_vector().data();
             GetIdx(i_curr, q_new);
             n_steps++;
             n_steps_tot++;
@@ -282,7 +282,7 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
             }
 
         }
-        s_total += std::abs(rich_solver->t());
+        s_total += std::abs(rich_solver->get_time());
         return n_steps;
     };
 

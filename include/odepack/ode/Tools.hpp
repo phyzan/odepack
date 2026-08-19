@@ -19,7 +19,7 @@ namespace ode {
 
 using std::pow, std::sin, std::cos, std::exp, std::real, std::imag, ndspan::min, ndspan::max, std::complex;
 
-using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::View3D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array, ndspan::abs;
+using ndspan::Array, ndspan::Array1D, ndspan::Array2D, ndspan::View, ndspan::MutView, ndspan::View1D, ndspan::View2D, ndspan::View3D, ndspan::Allocation, ndspan::Layout, ndspan::prod, ndspan::copy_array, ndspan::copy_array;
 
 using xdiff::Vector, xdiff::make_vector;
 
@@ -99,6 +99,11 @@ template<typename T>
 T detLU_row_major(T* mat, size_t N);
 
 template<typename T>
+inline T abs(const T& x){
+    return x >= 0 ? x : T{-x};
+}
+
+template<typename T>
 inline int sgn(const T& x){
     return ( x > 0) ? 1 : ( (x < 0) ? -1 : 0);
 }
@@ -111,12 +116,12 @@ inline int sgn(const T& t1, const T& t2){
 
 template<typename T, typename A, typename B>
 NDSPAN_INLINE void set_min(T& out, const A& a, const B& b){
-    out = (a < b) ? a : b;
+    (a < b) ? (out = a) : (out = b);
 }
 
 template<typename T, typename A, typename B>
 NDSPAN_INLINE void set_max(T& out, const A& a, const B& b){
-    out = (a > b) ? a : b;
+    (a > b) ? (out = a) : (out = b);
 }
 
 template<typename T>

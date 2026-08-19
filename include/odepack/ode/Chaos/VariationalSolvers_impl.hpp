@@ -280,7 +280,7 @@ VariationalODE<T, N>::VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<
     // Must create solver BEFORE register_state(), since it accesses solver_
     this->solver_ = make_variational_solver<UtilPolicy::RichVirtual>(method, ode, t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
 
-    const EventCollection<T>& event_coll = this->solver_->event_col();
+    const EventCollection<T>& event_coll = this->get_event_col();
 
     this->cached_idx_.resize(event_coll.size(), 0);
     Base::register_state();
@@ -333,9 +333,9 @@ const ChaoticSolver<T, N, UtilPolicy::RichVirtual>* VariationalODE<T, N>::solver
 template<typename T, size_t N>
 void VariationalODE<T, N>::register_state(){
     Base::register_state();
-    renorm_times_.push_back(this->solver()->t());
-    lyap_values_.push_back(this->solver()->lyapunov_exponent());
-    kick_values_.push_back(this->solver()->kick());
+    renorm_times_.push_back(this->solver()->get_time());
+    lyap_values_.push_back(this->solver()->get_lyapunov_exponent());
+    kick_values_.push_back(this->solver()->get_kick());
 }
 
 

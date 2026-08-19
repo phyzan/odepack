@@ -72,12 +72,12 @@ ODE<T, N>::ODE(size_t nsys) : event_data_(nsys){
 
 template<typename T, size_t N>
 void ODE<T, N>::Rhs(T* out, const T& t, const T* q) const{
-    solver_->Rhs(out, t, q);
+    solver_->get_rhs(out, t, q);
 }
 
 template<typename T, size_t N>
 void ODE<T, N>::Jac(T* out, const T& t, const T* q, const T* dt) const{
-    solver_->Jac(out, t, q, dt);
+    solver_->get_jac(out, t, q, dt);
 }
 
 template<typename T, size_t N>
@@ -96,7 +96,7 @@ bool ODE<T, N>::integrate(OdeResult<T, N>* out, const T& interval, const std::ve
     if (interval < 0){
         throw std::runtime_error("Integration interval must be positive");
     }
-    return this->priv_integrate_until(out, solver_->t()+interval*solver_->direction(), t_array, event_options, std::forward<Callable>(observer), max_prints);
+    return this->priv_integrate_until(out, solver_->get_time()+interval*solver_->get_direction(), t_array, event_options, std::forward<Callable>(observer), max_prints);
 }
 
 template<typename T, size_t N>
@@ -105,7 +105,7 @@ bool ODE<T, N>::integrate(OdeResult<T, N>* out, const T& interval, const std::ve
     if (interval < 0){
         throw std::runtime_error("Integration interval must be positive");
     }
-    return this->priv_integrate_until(out, solver_->t()+interval*solver_->direction(), EmptyArr<T>{}, event_options, std::forward<Callable>(observer), max_prints);
+    return this->priv_integrate_until(out, solver_->get_time()+interval*solver_->get_direction(), EmptyArr<T>{}, event_options, std::forward<Callable>(observer), max_prints);
 }
 
 template<typename T, size_t N>
@@ -123,18 +123,18 @@ bool ODE<T, N>::integrate_until(OdeResult<T, N>* out, const T& t, const std::vec
 template<typename T, size_t N>
 template<OptionalObserver<T> Callable>
 bool ODE<T, N>::rich_integrate(OdeSolution<T, N>& out, const T& interval, const std::vector<EventOptions>& event_options, Callable&& observer, int max_prints){
-    return this->priv_integrate_until(&out, solver_->t()+interval*solver_->direction(), EmptyArr<T>{}, event_options, std::forward<Callable>(observer), max_prints, true);
+    return this->priv_integrate_until(&out, solver_->get_time()+interval*solver_->get_direction(), EmptyArr<T>{}, event_options, std::forward<Callable>(observer), max_prints, true);
 }
 
 template<typename T, size_t N>
 template<typename ArrayType, OptionalObserver<T> Callable>
 bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const ArrayType& t_store, const std::vector<EventOptions>& event_options, Callable&& observer, int max_prints, bool interpolate){
-    if (solver_->is_dead()){
+    if (solver_->get_is_dead()){
         if (out){
-            *out = OdeResult<T, N>({}, {this->nsys()}, solver_->diverges(), 0, false, 0, solver_->status());
+            *out = OdeResult<T, N>({}, {this->nsys()}, solver_->get_diverges(), 0, false, 0, solver_->get_status());
         }
         return false;
-    }else if (t_max*solver_->direction() < solver_->t()*solver_->direction()){
+    }else if (t_max*solver_->get_direction() < solver_->get_time()*solver_->get_direction()){
         if (out){
             *out = OdeResult<T, N>({}, {this->nsys()}, 0, false, false, 0, "Cannot integrate in opposite direction");
         }
@@ -146,8 +146,8 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
         assert(interpolate == false && "Explicit step storage is enabled only for non-interpolating integration");
     }
     // ------------------------------ IMPLEMENTATION --------------------------------------
-    solver_->resume();
-    const T         t0 = solver_->t();
+    solver_->do_resume();
+    const T         t0 = solver_->get_time();
     const bool      first_eval_t0 = (t_store.size() > 0 && t_store[0] == t0);
     const char*     terminate_message = nullptr;
     const bool      include_first = (!store_explicit_steps || first_eval_t0);
@@ -160,12 +160,12 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     }
 
     //check that all names in max_events are valid
-    const std::vector<EventOptions> options = this->solver()->event_col().validate_events(event_options);
+    const std::vector<EventOptions> options = this->solver()->get_event_col().validate_events(event_options);
     EventCounter<T, N>              event_counter(options);
 
     auto event_state_valid = [&]()NDSPAN_LAMBDA_INLINE{
         bool res = false;
-        if (const EventState<T> es = solver_->current_event()){
+        if (const EventState<T> es = solver_->get_current_event()){
             if (event_counter.count_it(es.idx)){
                 res = true;
                 register_event(es.idx);
@@ -177,7 +177,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     // Since we pass an array of t_eval in the solver later, if step_ptr is not null,
     // it is guaranteed to point to an element in t_eval.
     auto main_observer = [&](const T& t, const T* q, const T* step_ptr) NDSPAN_LAMBDA_INLINE -> bool {
-        const bool at_valid_event = solver_->at_event() && event_state_valid();
+        const bool at_valid_event = solver_->get_at_event() && event_state_valid();
 
         if constexpr (!store_explicit_steps) {
             // step_ptr is true only at the last step
@@ -193,7 +193,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
 
         // =========================== Manage console output ==========================
         if (max_prints > 0){
-            T percentage = (solver_->t() - t0)/(t_max-t0);
+            T percentage = (solver_->get_time() - t0)/(t_max-t0);
             if (percentage*max_prints >= prints){
                 #pragma omp critical
                 {
@@ -215,17 +215,17 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     bool success;
     BoxedInterp<T, N> interpolator;
     if constexpr (store_explicit_steps){
-        success = solver_->observe_until(t_max, main_observer, t_eval);
+        success = solver_->do_observe_until(t_max, main_observer, t_eval);
     } else if (interpolate){
-        success = static_cast<bool>(interpolator = solver_->interp_until(t_max, main_observer));
+        success = static_cast<bool>(interpolator = solver_->do_interp_until(t_max, main_observer));
     } else {
-        success = solver_->observe_until(t_max, main_observer);
+        success = solver_->do_observe_until(t_max, main_observer);
     }
 
     if (success) {
         terminate_message = "t-goal";
     } else if (!terminate_message){
-        terminate_message = solver_->status().c_str();
+        terminate_message = solver_->get_status().c_str();
     }
 
     TimePoint       TIME_END = Clock::now();
@@ -233,7 +233,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
     _runtime +=     duration;
     if (out){
         EventData<T>    event_res(this->event_data_, cached_idx_);
-        OdeResult<T, N> res(orbit_data_, event_res, t_start_idx, solver_->diverges(), success, duration, terminate_message);
+        OdeResult<T, N> res(orbit_data_, event_res, t_start_idx, solver_->get_diverges(), success, duration, terminate_message);
         
         if (interpolate){
             OdeSolution<T, N>* rich_res = dynamic_cast<OdeSolution<T, N>*>(out);
@@ -252,12 +252,12 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
 
 template<typename T, size_t N>
 bool ODE<T, N>::diverges() const{
-    return solver_->diverges();
+    return solver_->get_diverges();
 }
 
 template<typename T, size_t N>
 bool ODE<T, N>::is_dead() const{
-    return solver_->is_dead();
+    return solver_->get_is_dead();
 }
 
 template<typename T, size_t N>
@@ -312,7 +312,7 @@ void ODE<T, N>::clear(){
 template<typename T, size_t N>
 void ODE<T, N>::reset(){
     _runtime = 0;
-    solver_->Reset();
+    solver_->do_reset();
     this->clear();
 }
 
@@ -320,7 +320,7 @@ template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
 void ODE<T, N>::init(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method){
     solver_ = make_solver<UtilPolicy::RichVirtual>(method, std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
-    const EventCollection<T>& event_coll = this->solver_->event_col();
+    const EventCollection<T>& event_coll = this->solver_->get_event_col();
     cached_idx_.resize(event_coll.size(), 0);
     register_state();
     for (size_t i=0; i<event_coll.size(); i++){
@@ -330,12 +330,12 @@ void ODE<T, N>::init(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method
 
 template<typename T, size_t N>
 void ODE<T, N>::register_state(){
-    orbit_data_.add_point(solver_->t(), solver_->vector().data());
+    orbit_data_.add_point(solver_->get_time(), solver_->get_vector().data());
 }
 
 template<typename T, size_t N>
 void ODE<T, N>::register_event(size_t i){
-    event_data_.add_event(i, solver_->t(), solver_->vector().data());
+    event_data_.add_event(i, solver_->get_time(), solver_->get_vector().data());
 }
 
 

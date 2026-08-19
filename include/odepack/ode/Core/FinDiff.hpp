@@ -1,9 +1,8 @@
 #ifndef FINDIFF_HPP
 #define FINDIFF_HPP
 
-#include <algorithm>
+#include "odepack/ode/Tools.hpp"
 #include <limits>
-#include <ndspan/arrays.hpp>
 
 namespace ode{
 
@@ -38,7 +37,12 @@ constexpr void jac_approx(Callable&& f, T* out, T* worker, const T& t, const T* 
     for (size_t i = 0; i < n; i++) {
         // Compute step size: use provided dt or compute
         const T abs_qi = abs<T>(q[i]);
-        const T h_i = (dt != nullptr) ? dt[i] : EPS_SQRT * std::max<T>(threshold, abs_qi);
+        T h_i;
+        if (dt != nullptr) {
+            h_i = dt[i];
+        } else {
+            h_i = EPS_SQRT * max_ref(threshold, abs_qi);
+        }
 
         x1[i] = q[i] - h_i;
         x2[i] = q[i] + h_i;
