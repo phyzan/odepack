@@ -212,7 +212,7 @@ const std::string& OdeResult<T, N>::message() const {
 
 template<typename T, size_t N>
 void OdeResult<T, N>::examine() const {
-    std::cout << std::endl << "OdeResult\n------------------------\n------------------------\n"
+    std::cout << std::endl << "\n=============== OdeResult ===============\n"
               << "\tPoints           : " << orbit_data_.t.size() << "\n"
               << "\tDiverges         : " << (diverges_ ? "true" : "false") << "\n"
               << "\tSuccess          : " << (success_ ? "true" : "false") << "\n"
