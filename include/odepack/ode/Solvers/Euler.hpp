@@ -17,9 +17,9 @@ public:
 
     DEFAULT_RULE_OF_FOUR(Euler)
 
-    Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir=1, std::vector<T> args = {}) requires (!traits::is_rich<SP>);
+    Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir=1) requires (!traits::is_rich<SP>);
 
-    Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir=1, std::vector<T> args = {}, EventList<T> events = {}) requires (traits::is_rich<SP>);
+    Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir=1, EventList<T> events = {}) requires (traits::is_rich<SP>);
 
     // Constructor signature that follows the main constructor pattern.
     Euler(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>);

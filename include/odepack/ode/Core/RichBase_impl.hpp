@@ -49,8 +49,8 @@ void RichSolver<Derived, T, N, SP, OdeType>::show_state(int prec) const{
 // PUBLIC MODIFIERS
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-RichSolver<Derived, T, N, SP, OdeType>::RichSolver(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, EventList<T> evs) : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)), evt_col(std::move(evs)) {
-    this->evt_col.setup(t0, this->args().data(), this->args().size(), this->nsys(), this->direction());
+RichSolver<Derived, T, N, SP, OdeType>::RichSolver(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, EventList<T> evs) : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir), evt_col(std::move(evs)) {
+    this->evt_col.setup(t0, this->nsys(), this->direction());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -214,12 +214,6 @@ bool RichSolver<Derived, T, N, SP, OdeType>::push_event_queue(){
 }
 
 // PRIVATE METHODS
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void RichSolver<Derived, T, N, SP, OdeType>::SetArgs(const T* new_args){
-    Base::SetArgs(new_args);
-    evt_col.set_args(new_args, this->args().size());
-}
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>

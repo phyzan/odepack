@@ -13,7 +13,7 @@ VariationalOdeSys<T, N, OdeType>::VariationalOdeSys(OdeType ode, size_t ode_nsys
     }
 }
 template<typename T, size_t N, hasRhsFunc<T> OdeType>
-void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q, const T* args) const{
+void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q) const{
     const T* delta_q = q + nsys;
 
     if constexpr (JP == JacPolicy::Autodiff){
@@ -24,7 +24,7 @@ void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q, const
                 y[I] = DualType(q[I], {.axis=I});
             );
 
-            ode_.Rhs(rhs, t, y, args);
+            ode_.Rhs(rhs, t, y);
 
             std::fill(out+nsys, out+2*nsys, 0);
             NDSPAN_FOR_LOOP(J, N,
@@ -41,7 +41,7 @@ void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q, const
             for (size_t i=0; i<nsys; i++){
                 y[i] = DualType(q[i], {.axis=int(i)});
             }
-            ode_.Rhs(rhs, t, y, args);
+            ode_.Rhs(rhs, t, y);
             std::fill(out+nsys, out+2*nsys, 0);
             for (size_t j=0; j<nsys; j++){
                 out[j] = rhs[j].value();
@@ -52,10 +52,10 @@ void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q, const
             DualType::set_default_nvars(nvars_default);
         }
     } else {
-        ode_.Rhs(out, t, q, args); //fills the first half (nsys) entries
+        ode_.Rhs(out, t, q); //fills the first half (nsys) entries
         // fills jm with the jacobian of the original system at (t, q)
         // this should not call Base::jac_approx since we have demanded that the base solver has an exact jacobian for the original system
-        ode_.Jac(jm.data(), t, q, args);
+        ode_.Jac(jm.data(), t, q);
         for (size_t i=0; i<nsys; i++){
             out[i+nsys] = 0;
             for (size_t j=0; j<nsys; j++){
@@ -67,7 +67,7 @@ void VariationalOdeSys<T, N, OdeType>::Rhs(T* out, const T& t, const T* q, const
 
 // Only provided if it does not require finite differences, otherwise the base solver will automatically use jac_approx to compute the jacobian of the full system.
 template<typename T, size_t N, hasRhsFunc<T> OdeType>
-void VariationalOdeSys<T, N, OdeType>::Jac(T* out, const T& t, const T* q, const T* args, const T* dt) const requires (JP == JacPolicy::Autodiff) {
+void VariationalOdeSys<T, N, OdeType>::Jac(T* out, const T& t, const T* q, const T* dt) const requires (JP == JacPolicy::Autodiff) {
 
     assert(dt == nullptr && "VariationalSolver overrides Jacobian computation for templated r.h.s functions and uses autodiff, so passing the `dt` argument is not used and should be nullptr");
 
@@ -81,7 +81,7 @@ void VariationalOdeSys<T, N, OdeType>::Jac(T* out, const T& t, const T* q, const
         }
 
         // compute the jacobian using autodiff
-        ode_.Rhs(rhs, t, y, args);
+        ode_.Rhs(rhs, t, y);
 
         // extract the jacobian matrix from the autodiff output
         ndspan::MutView<T, ndspan::Layout::F, 2*N, 2*N> m(out);
@@ -107,7 +107,7 @@ void VariationalOdeSys<T, N, OdeType>::Jac(T* out, const T& t, const T* q, const
             y[i] = VarDualType(q[i], {.axis=i});
         }
 
-        ode_.Rhs(rhs, t, y, args);
+        ode_.Rhs(rhs, t, y);
 
         ndspan::MutView<T, ndspan::Layout::F> m(out, 2*nsys, 2*nsys);
         for (size_t i=0; i<nsys; i++){
@@ -132,13 +132,13 @@ const OdeType& VariationalOdeSys<T, N, OdeType>::ode() const{
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 template<typename... Args>
-VariationalSolver<Solver, T, N, SP, OdeType, Derived>::VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, Args&&... extra) : Base(VariationalOdeSys<T, N, OdeType>(ode, q0.size()), t0,
+VariationalSolver<Solver, T, N, SP, OdeType, Derived>::VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, Args&&... extra) : Base(VariationalOdeSys<T, N, OdeType>(ode, q0.size()), t0,
     !q0.data() || !delta_q0.data() ?
     View1D<T, 2*N>{nullptr, 2*q0.size()} :
     View1D<T, 2*N>{
         join_arrays(q0, delta_q0).data(),
         2*q0.size()
-    }, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::forward<Args>(extra)...), worker(4*q0.size()), tmp_state_(2*q0.size()), period_(period), t_next_(t0+period*dir), t_last_(t0) {
+    }, rtol, atol, min_step, max_step, stepsize, dir, std::forward<Args>(extra)...), worker(4*q0.size()), tmp_state_(2*q0.size()), period_(period), t_next_(t0+period*dir), t_last_(t0) {
 
     if (period <= 0){
         throw std::runtime_error("The renormalization period must be positive");
@@ -201,13 +201,13 @@ void VariationalSolver<Solver, T, N, SP, OdeType, Derived>::Reset(){
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void VariationalSolver<Solver, T, N, SP, OdeType, Derived>::RhsMain(T* out, const T& t, const T* q) const{
-    this->ode().ode().Rhs(out, t, q, this->args().data()); //fills the first half (nsys) entries
+    this->ode().ode().Rhs(out, t, q); //fills the first half (nsys) entries
 }
 
 template<Integrator Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 void VariationalSolver<Solver, T, N, SP, OdeType, Derived>::JacMain(T* out, const T& t, const T* q, const T* dt) const{
     if constexpr (hasJacFunc<OdeType, T>){
-        this->ode().ode().Jac(out, t, q, this->args().data());
+        this->ode().ode().Jac(out, t, q);
         return;
     } else {
         jac_approx<T>([this](T* jm, const T& t_dummy, const T* q_dummy){
@@ -275,10 +275,10 @@ void normalized(T* out, const T* src, size_t nsys){
 
 template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
-VariationalODE<T, N>::VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, EventList<T> events, Integrator method) : Base(2*q0.size()){
+VariationalODE<T, N>::VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, EventList<T> events, Integrator method) : Base(2*q0.size()){
     assert(q0.size() == delta_q0.size() && "q0 and delta_q0 must have the same size in VariationalODE");
     // Must create solver BEFORE register_state(), since it accesses solver_
-    this->solver_ = make_variational_solver<UtilPolicy::RichVirtual>(method, ode, t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
+    this->solver_ = make_variational_solver<UtilPolicy::RichVirtual>(method, ode, t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(events));
 
     const EventCollection<T>& event_coll = this->solver()->get_event_col();
 
@@ -360,15 +360,15 @@ pbox::Box<ChaoticSolver<T, 2*N, UP>> make_variational_solver(Integrator method, 
 
 template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (!traits::is_rich<SP>)
-auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args){
-    return VariationalSolver<Solver, T, N, SP, OdeType, void>(std::move(ode), t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(args));
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir){
+    return VariationalSolver<Solver, T, N, SP, OdeType, void>(std::move(ode), t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir);
 }
 
 
 template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (traits::is_rich<SP>)
-auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args, EventList<T> events){
-    return VariationalSolver<Solver, T, N, SP, OdeType, void>(std::move(ode), t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, EventList<T> events){
+    return VariationalSolver<Solver, T, N, SP, OdeType, void>(std::move(ode), t0, q0, delta_q0, period, rtol, atol, min_step, max_step, stepsize, dir, std::move(events));
 }
 
 } // namespace ode

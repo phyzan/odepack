@@ -128,9 +128,6 @@ public:
     /// @brief Reset implementation hook. Resets events and stops interpolation.
     void                        Reset();
 
-    /// @brief Args update that also updates event arguments.
-    void                        SetArgs(const T* new_args);
-
     RichSolver() = delete;
 
 protected:

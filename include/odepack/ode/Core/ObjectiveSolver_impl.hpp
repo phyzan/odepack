@@ -78,7 +78,7 @@ bool ObjectiveSolver<Solver, T, N, SP, OdeType, ObjFun...>::RequestTimeFloor(T& 
     T my_floor = this->t_new();
     NDSPAN_FOR_LOOP(I, NOBJ,
         const int old_sgn = cached_sign[I];
-        const int new_sign = sgn(std::get<I>(obj).func(this->t_new(), this->vector().data(), this->args().data()));
+        const int new_sign = sgn(std::get<I>(obj).func(this->t_new(), this->vector().data()));
         cached_sign[I] = new_sign;
         detected[I] = false;
         if (old_sgn != 0){
@@ -95,7 +95,7 @@ bool ObjectiveSolver<Solver, T, N, SP, OdeType, ObjFun...>::RequestTimeFloor(T& 
             if ((detected[I] = crossed)){
                 values[I] = bisect<T, RootPolicy::Right>([&](const T& t){
                     this->interp_impl(worker.data(), t);
-                    return std::get<I>(obj).func(t, worker.data(), this->args().data());
+                    return std::get<I>(obj).func(t, worker.data());
                 }, this->t_old(), this->t_new(), std::get<I>(obj).ftol);
                 my_floor = this->minimum_time(my_floor, values[I]);
             }
@@ -130,7 +130,7 @@ bool ObjectiveSolver<Solver, T, N, SP, OdeType, ObjFun...>::get_nearest_floor(T&
 template<SolverTemplate typename Solver, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, isObjFun<T>... ObjFun>
 void ObjectiveSolver<Solver, T, N, SP, OdeType, ObjFun...>::cache_current_signs(){
     NDSPAN_FOR_LOOP(I, NOBJ,
-        cached_sign[I] = sgn(std::get<I>(obj).func(this->t(), this->vector().data(), this->args().data()));
+        cached_sign[I] = sgn(std::get<I>(obj).func(this->t(), this->vector().data()));
     );
 }
 

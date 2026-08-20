@@ -364,7 +364,7 @@ T dop853_error_norm(const T* K, const T* E3, const T* E5, const T* q, const T* q
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>)
-    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)),
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir),
       K_(N_STAGES_EXT, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
     if (q0.data() != nullptr){
         this->rhs(K_.data() + N_STAGES*q0.size(), t0, q0.data());
@@ -373,7 +373,7 @@ DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T)) requires (!trait
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 DOP853<T, N, SP, OdeType, Derived>::DOP853(MAIN_CONSTRUCTOR(T), EventList<T> events) requires (traits::is_rich<SP>)
-    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)),
+    : Base(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(events)),
       K_(N_STAGES_EXT, q0.size()), df_tmp_(q0.size()), coef_mat_(q0.size(), INTERP_ORDER) {
     if (q0.data() != nullptr){
         this->rhs(K_.data() + N_STAGES*q0.size(), t0, q0.data());
@@ -408,7 +408,10 @@ void DOP853<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
     }
     mat_is_set_ = true;
 
-    const T h = this->stepsize() * this->direction();
+    // The step size that was actually used, not stepsize(): that returns new_state_[1], which
+    // rk_adapt_step has already grown/shrunk into the *next* step's proposed size, and it also
+    // differs from the accepted h whenever an attempt was rejected.
+    const T h = h_last_;
     const T* y_old = this->old_state_ptr() + 2;
     const T& t_old = this->t_old();
     const size_t n = this->nsys();
@@ -450,6 +453,7 @@ void DOP853<T, N, SP, OdeType, Derived>::set_coef_matrix() const{
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 T DOP853<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const T& h){
+    h_last_ = h; // remembered for the dense-output coefficients
     const T& t = state[0];
     T* __restrict__ q_new = result + 2;
     T* __restrict__ K = K_.data();
@@ -529,7 +533,8 @@ T DOP853<T, N, SP, OdeType, Derived>::step_impl(T* result, const T* state, const
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 StepResult DOP853<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     mat_is_set_ = false;
-    return detail::rk_adapt_step(res, state, K_.data(), this->nsys(), N_STAGES,
+    copy_array(K_.data(), K_.data() + N_STAGES*this->nsys(), this->nsys());
+    return detail::rk_adapt_step(res, state, this->nsys(),
                           this->min_step(), this->max_step(), this->MIN_STEP,
                           this->SAFETY, this->MAX_FACTOR, this->MIN_FACTOR,
                           ERR_EXP, INC_EXP, MIN_ERR, this->direction(),

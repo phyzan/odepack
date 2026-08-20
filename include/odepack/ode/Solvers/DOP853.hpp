@@ -113,6 +113,7 @@ private:
     typename DOP_COEFS<T>::DOP_E E3 = DOP_COEFS<T>::make_E3();
     typename DOP_COEFS<T>::DOP_E E5 = DOP_COEFS<T>::make_E5();
 
+    T                                                     h_last_ = 0; // step size actually used by the last sweep
     mutable Array2D<T, N_STAGES_EXT, N, Allocation::Auto> K_;
     mutable Array1D<T, N, Allocation::Auto>                df_tmp_;
     mutable Array2D<T, N, 0>                               coef_mat_;

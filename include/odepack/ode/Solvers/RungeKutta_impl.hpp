@@ -52,7 +52,7 @@ void rk4_interp(T* out, const T& t, const T& t1, const T& t2, const T* y1, const
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 template<typename... Type>
-RK4<T, N, SP, OdeType, Derived>::RK4(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T /*min_step*/, T /*max_step*/, T stepsize, int dir,  std::vector<T> args, Type&&... extras) : Base(ode, t0, q0, rtol, atol, 0, inf<T>(), stepsize, dir, std::move(args), std::forward<Type>(extras)...),
+RK4<T, N, SP, OdeType, Derived>::RK4(OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T /*min_step*/, T /*max_step*/, T stepsize, int dir, Type&&... extras) : Base(ode, t0, q0, rtol, atol, 0, inf<T>(), stepsize, dir, std::forward<Type>(extras)...),
 #ifdef DPK_DENSE_RK4
 K(9, q0.size())
 #else

@@ -59,7 +59,7 @@ class RegularVectorField : public RegularGridInterpolator<T, NDIM, AS_VIRTUAL>, 
 public:
 
     // overriden to support different coordinate systems (Cartesian, Polar, Spherical)
-    void OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const;
+    void OdeFuncNorm(T* out, const T& t, const T* q) const;
 
     // grid[i].data(), grid[i].size() : grid points along axis i
     template<typename ValuesContainer, typename AxisViewContainer>

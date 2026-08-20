@@ -13,7 +13,7 @@
 #include <ndspan/arrays.hpp>
 #include "IntegratorEnum.hpp" // IWYU pragma: keep
 
-#define ODE_LAMBDA(out, t, q, args) [=](auto* out, const auto& t, const auto* q, const auto* args) -> void 
+#define ODE_LAMBDA(out, t, q) [=](auto* out, const auto& t, const auto* q) -> void 
 
 namespace ode {
 
@@ -29,19 +29,19 @@ using GetDerived = std::conditional_t<(std::is_same_v<derived, void>), cls, deri
 // USEFUL ALIASES
 
 template<typename T>
-using RhsFunc = void(*)(T*, const T&, const T*, const T*); // f(t, q, args) -> array
+using RhsFunc = void(*)(T*, const T&, const T*); // f(t, q) -> array
 
 template<typename T>
-using ObjFun = T(*)(const T&, const T*, const T*); // f(t, q, args) -> scalar
+using ObjFun = T(*)(const T&, const T*); // f(t, q) -> scalar
 
 template<typename T, size_t N, size_t Order>
 using DualType = std::conditional_t<(N > 0), xdiff::Dual<T, N, Order, xdiff::Layout::Flat>, xdiff::Dual<T, 0, Order, xdiff::Layout::Nested>>;
 
 template<typename F, typename T>
 concept isRhsFunc = 
-requires(F f, T* out, T t, const T* q, const T* args){
-    { f(out, t, q, args) } -> std::same_as<void>;
-    { f(out, std::as_const(t), q, args) } -> std::same_as<void>;
+requires(F f, T* out, T t, const T* q){
+    { f(out, t, q) } -> std::same_as<void>;
+    { f(out, std::as_const(t), q) } -> std::same_as<void>;
 };
 
 template<typename F, typename T>
@@ -49,9 +49,9 @@ concept OptionalRhsFunc = std::same_as<F, std::nullptr_t> || isRhsFunc<F, T>;
 
 template<typename F, typename T>
 concept isObjFun =
-requires(F f, T t, const T* q, const T* args){
-    { f(t, q, args) } -> std::convertible_to<T>;
-    { f(std::as_const(t), q, args) } -> std::convertible_to<T>;
+requires(F f, T t, const T* q){
+    { f(t, q) } -> std::convertible_to<T>;
+    { f(std::as_const(t), q) } -> std::convertible_to<T>;
 };
 
 
@@ -215,33 +215,33 @@ OdeData(RHS, JAC) -> OdeData<RHS, JAC>;
 // Check if F has a callable Rhs (static or non-static, non-template)
 template<typename F, typename T>
 concept hasRhsFunc =
-    requires(F f, T* out, T t, const T* q, const T* args) {
-        { f.Rhs(out, t, q, args) } -> std::same_as<void>;
-        { f.Rhs(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    requires(F f, T* out, T t, const T* q) {
+        { f.Rhs(out, t, q) } -> std::same_as<void>;
+        { f.Rhs(out, std::as_const(t), q) } -> std::same_as<void>;
     };
 
 // Check if F has a callable Jac (static or non-static, non-template)
 template<typename F, typename T>
 concept hasJacFunc =
-    requires(F f, T* out, T t, const T* q, const T* args) {
-        { f.Jac(out, t, q, args) } -> std::same_as<void>;
-        { f.Jac(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    requires(F f, T* out, T t, const T* q) {
+        { f.Jac(out, t, q) } -> std::same_as<void>;
+        { f.Jac(out, std::as_const(t), q) } -> std::same_as<void>;
     };
 
 // Check if F has a callable templated Rhs (static or non-static)
 template<typename F, typename T, size_t N>
 concept supportsDualRhs =
-    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q, const T* args) {
-        { f.Rhs(out, t, q, args) } -> std::same_as<void>;
-        { f.Rhs(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q) {
+        { f.Rhs(out, t, q) } -> std::same_as<void>;
+        { f.Rhs(out, std::as_const(t), q) } -> std::same_as<void>;
     };
 
 // Check if F has a callable templated Jac (static or non-static)
 template<typename F, typename T, size_t N>
 concept supportsDualJac =
-    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q, const T* args) {
-        { f.Jac(out, t, q, args) } -> std::same_as<void>;
-        { f.Jac(out, std::as_const(t), q, args) } -> std::same_as<void>;
+    requires(F f, DualType<T, N, 1>* out, T t, const DualType<T, N, 1>* q) {
+        { f.Jac(out, t, q) } -> std::same_as<void>;
+        { f.Jac(out, std::as_const(t), q) } -> std::same_as<void>;
     };
 
 template<typename F, typename T>

@@ -75,10 +75,10 @@ public:
 
     VariationalOdeSys(OdeType ode, size_t ode_nsys);
 
-    void    Rhs(T* out, const T& t, const T* q, const T* args) const;
+    void    Rhs(T* out, const T& t, const T* q) const;
 
     // Only provided if it does not require finite differences, otherwise the base solver will automatically use jac_approx to compute the jacobian of the full system.
-    void    Jac(T* out, const T& t, const T* q, const T* args, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff);
+    void    Jac(T* out, const T& t, const T* q, const T* dt = nullptr) const requires (JP == JacPolicy::Autodiff);
 
     const OdeType& ode() const;
 
@@ -116,7 +116,7 @@ public:
     using Base = typename SolverTypeGetter<Solver, T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>::type;
 
     template<typename... Args>
-    VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args = {}, Args&&... extra);
+    VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir = 1, Args&&... extra);
 
     T elapsed_time() const;
 
@@ -181,7 +181,7 @@ public:
     using Base = ODE<T, N>;
 
     template<hasRhsFunc<T> OdeType>
-    VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args = {}, EventList<T> events = {}, Integrator method = Integrator::RK45);
+    VariationalODE(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir = 1, EventList<T> events = {}, Integrator method = Integrator::RK45);
 
     std::unique_ptr<ODE<T, N>> clone() const override;
 
@@ -219,12 +219,12 @@ pbox::Box<ChaoticSolver<T, 2*N, UP>> make_variational_solver(Integrator method, 
 
 template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (!traits::is_rich<SP>)
-auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args={});
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1);
 
 
 template<SolverPolicy SP, Integrator Solver, typename T, size_t N, hasRhsFunc<T> OdeType>
 requires (traits::is_rich<SP>)
-auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, std::vector<T> args={}, EventList<T> events = {});
+auto getVariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1, EventList<T> events = {});
 
 } // namespace ode::chaos
 

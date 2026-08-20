@@ -21,11 +21,11 @@
 #include "VirtualBase.hpp"
 
 
-#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1,  std::vector<T> args={}
+#define MAIN_DEFAULT_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir=1
 
-#define MAIN_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args
+#define MAIN_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir
 
-#define SOLVER_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir, std::vector<T> args
+#define SOLVER_CONSTRUCTOR(T) OdeType ode, T t0, View1D<T, N> q0, T rtol, T atol, T min_step, T max_step, T stepsize, int dir
 
 #define ODE_CONSTRUCTOR(T) MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events={}, Integrator method = Integrator::RK45
 
@@ -79,6 +79,73 @@ namespace ode{
  * @note This class uses static polymorphism (CRTP). The derived class passes itself as the
  *       first template parameter.
  */
+
+namespace detail{
+
+// Whether a solver's scratch buffers can live in automatic storage. That needs two things:
+// a system size known at compile time, and a scalar cheap enough that creating the buffer is
+// free. A type like mpfr::mpreal is neither trivially constructible nor trivially copyable -
+// every element owns a heap allocation - so a fresh stack array per access would construct and
+// destroy nsys of them on every step. Those types use the persistent heap-backed form instead,
+// which allocates once in the constructor and hands out references.
+template<typename T, size_t N>
+inline constexpr bool scratch_is_static = (N > 0) && std::is_trivially_copyable_v<T>
+                                          && std::is_trivially_default_constructible_v<T>;
+
+// Scratch storage. If a function requires s scratch buffer for a state vector,
+// meaning that the size is (nsys+2), then the scratch buffer is allocated on the stack
+// if the system size is known at compile time and the scalar type is trivially copyable and default constructible (e.g. double)
+// Otherwise, it is allocated on the heap once in the constructor and reused (e.g. mpfr::mpreal or dynamic size system of any type).
+template<typename T, size_t N>
+using ScratchState = Array1D<T, (N > 0 ? N+2 : 0),
+                           scratch_is_static<T, N> ? Allocation::Auto : Allocation::Heap>;
+
+template<typename T, size_t N>
+class StaticSolverScratch{
+
+public:
+
+    using DualType = ::ode::DualType<T, N, 1>;
+
+    StaticSolverScratch(size_t nsys) {
+        assert(nsys == N && "SolverScratchSpace: nsys must match template parameter N for fixed-size systems.");
+    }
+
+    ScratchState<T, N> state() const {return ScratchState<T, N>{};}
+    Array1D<T, 4*N> four_state_cache() const {return Array1D<T, 4*N>{};}
+    Array1D<T, N> ics_cache() const {return Array1D<T, N>{};}
+    Array1D<DualType, 2*N> duals() const {return Array1D<DualType, 2*N>{};}
+};
+
+
+// Heap-backed scratch. Used for runtime-sized systems, and for any scalar that is not trivial
+// to construct/copy. N is still carried so that DualType keeps the solver's derivative width.
+template<typename T, size_t N>
+class DynamicSolverScratch{
+
+public:
+
+    using DualType = ::ode::DualType<T, N, 1>;
+
+    DynamicSolverScratch(size_t nsys) : state_(nsys+2), four_state_cache_(4*nsys), ics_cache_(nsys), duals_(2*nsys) {}
+
+    ScratchState<T, N>& state() const {return state_;}
+    Array1D<T>& four_state_cache() const {return four_state_cache_;}
+    Array1D<T>& ics_cache() const {return ics_cache_;}
+    Array1D<DualType>& duals() const {return duals_;}
+private:
+    mutable ScratchState<T, N> state_; // for trying the next step
+    mutable Array1D<T> four_state_cache_; // for approx jac and auto step
+    mutable Array1D<T> ics_cache_; // for trying the next step with modified ICs
+    mutable Array1D<DualType> duals_; // for autodiff when JP==JacPolicy::Autodiff
+};
+
+template<typename T, size_t N>
+using SolverScratchSpace = std::conditional_t<scratch_is_static<T, N>,
+                                              StaticSolverScratch<T, N>,
+                                              DynamicSolverScratch<T, N>>;
+
+} // ode::detail
 
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -149,9 +216,6 @@ public:
     /// @brief Get the current time value.
     const T&            t() const;
 
-    /// @brief Get the time value of the last "true" state.
-    const T&            t_last() const;
-
     /// @brief Get the time value of the newest computed step.
     const T&            t_new() const;
 
@@ -161,9 +225,6 @@ public:
     /// @brief Get a view of the current state vector.
     View1D<T, N>        vector() const;
 
-    /// @brief Get a view of the state vector from the previous accepted step.
-    View1D<T, N>        vector_last() const;
-
     /// @brief Get a view of the state vector from the newest computed step.
     View1D<T, N>        vector_new() const;
 
@@ -172,12 +233,6 @@ public:
 
     /// @brief Get a State object representing the initial conditions.
     State<T>            ics() const;
-
-    /// @brief Get a State object representing the current solver position.
-    State<T>            state() const;
-
-    /// @brief Get a State object representing the last solver position.
-    State<T>            last_state() const;
 
     /// @brief Get a State object representing the most recent computed step.
     State<T>            new_state() const;
@@ -203,11 +258,8 @@ public:
     /// @brief Get the maximum allowed step size.
     const T&            max_step() const;
 
-    /// @brief Get the additional arguments passed to the ODE function.
-    const Array1D<T>&   args() const;
-
     /// @brief Get the number of equations in the ODE system.
-    constexpr size_t    nsys() const {if constexpr (N > 0) {return N;} else {return _Nsys;}}
+    constexpr size_t    nsys() const {if constexpr (N > 0) {return N;} else {return nsys_;}}
     
     /// @brief Get the number of successful integration steps taken.
     size_t              step_count() const;
@@ -250,13 +302,13 @@ public:
      * @brief Get the number of RHS function evaluations performed so far.
      * @return Total count of RHS evaluations. User calls to Rhs() do NOT increment this counter.
     */
-    size_t              n_evals_rhs() const;
+    size_t              rhs_eval_count() const;
 
     /**
      * @brief Get the number of Jacobian evaluations performed so far.
      * @return Total count of Jacobian evaluations. User calls to Jac() do NOT increment this counter.
     */
-    size_t              n_evals_jac() const;
+    size_t              jac_eval_count() const;
 
     /**
      * @brief Compute an appropriate initial step size.
@@ -368,12 +420,6 @@ public:
     void                Reset();
 
     /**
-     * @brief Update the additional arguments passed to the ODE function.
-     * @param new_args Pointer to new argument values (must match original size).
-     */
-    void                SetArgs(const T* new_args);
-
-    /**
      * @brief Create an interpolator for dense output between two boundaries.
      * @param bdr1 First boundary index.
      * @param bdr2 Second boundary index.
@@ -388,16 +434,12 @@ public:
     void                get_jac(T* jm, const T& t, const T* q, const T* dt = nullptr) const { Jac(jm, t, q, dt); }
     void                get_jac_approx(T* j, const T& t, const T* q, const T* dt) const { jac_approx(j, t, q, dt); }
     const T&            get_time() const { return t(); }
-    const T&            get_previous_time() const { return t_last(); }
     const T&            get_new_time() const { return t_new(); }
     const T&            get_old_time() const { return t_old(); }
     View1D<T, N>        get_vector() const { return vector(); }
-    View1D<T, N>        get_previous_vector() const { return vector_last(); }
     View1D<T, N>        get_new_vector() const { return vector_new(); }
     View1D<T, N>        get_old_vector() const { return vector_old(); }
     State<T>            get_ics() const { return ics(); }
-    State<T>            get_state() const { return state(); }
-    State<T>            get_last_state() const { return last_state(); }
     State<T>            get_new_state() const { return new_state(); }
     State<T>            get_old_state() const { return old_state(); }
     const T&            get_stepsize() const { return stepsize(); }
@@ -407,7 +449,6 @@ public:
     const T&            get_min_step() const { return min_step(); }
     const T&            get_max_step() const { return max_step(); }
     size_t              get_nsys() const { return nsys(); }
-    const Array1D<T>&   get_args() const { return args(); }
     size_t              get_step_count() const { return step_count(); }
     bool                get_is_running() const { return is_running(); }
     bool                get_is_dead() const { return is_dead(); }
@@ -416,8 +457,8 @@ public:
     bool                get_validate_ics(T t0, const T* q0) const { return validate_ics(t0, q0); }
     Integrator          get_method() const { return method(); }
     void                get_interp(T* result, const T& t) const { interp(result, t); }
-    size_t              get_n_evals_rhs() const { return n_evals_rhs(); }
-    size_t              get_n_evals_jac() const { return n_evals_jac(); }
+    size_t              get_rhs_eval_count() const { return rhs_eval_count_; }
+    size_t              get_jac_eval_count() const { return jac_eval_count_; }
     VirtualInterp<T, N> get_state_interpolator(int bdr1, int bdr2) const { return state_interpolator(bdr1, bdr2); }
     T                   get_auto_step(T t, const T* q) const { return auto_step(t, q); }
     T                   get_auto_step() const { return auto_step(); }
@@ -433,7 +474,6 @@ public:
     bool                do_resume() { return resume(); }
     void                do_stop(const std::string& text = "") { stop(text); }
     void                do_kill(const std::string& text = "") { kill(text); }
-    void                do_set_args(const T* new_args) { THIS->SetArgs(new_args); }
     bool                do_set_ics(T t0, const T* y0, T stepsize = 0, int direction = 0) { return set_ics(t0, y0, stepsize, direction); }
 
     // =================== STATIC OVERRIDES (NECESSARY) ===============================
@@ -518,7 +558,7 @@ protected:
 
     // =========================== HELPER METHODS =====================================
 
-    inline const OdeType& ode() const {return _ode;}
+    inline const OdeType& ode() const {return ode_;}
 
     /// @brief Same as this->Rhs, but increments the RHS evaluation counter.
     void        rhs(T* dq_dt, const T& t, const T* q) const;
@@ -598,9 +638,6 @@ protected:
 
 private:
 
-    const T*                aux_state_ptr() const;
-    T*                      aux_state_ptr();
-    void                    register_states();
     bool                    validate_it(StepResult result, const T* state);
     void                    set_state(const T& time, T* state);
 
@@ -628,36 +665,22 @@ private:
     template<typename Setter>
     auto                    priv_apply_ics_setter(T* ics, T t0, Setter&& func, T stepsize);
 
-
-    Array2D<T, 6, (N>0 ? N+2 : 0)>                      _state_data;
-    Array1D<T, 4>                                       _scalar_data;
-    mutable Array2D<T, 4, 0>                            _cache_4; // initially empty
-    mutable Array1D<T, 0>                               _cache_advun; // initially empty
-    mutable Array1D<T, 0>                               _cache_ics; // initially empty
-    Array1D<T>                                          _args;
-    mutable Array1D<DualType, JP==JacPolicy::Autodiff ? 2*N : 0>           _diff_worker;
-    OdeType                                             _ode;
-    size_t                                              _Nsys = N;
-    size_t                                              _step_count = 0;
-    mutable size_t                                      _n_evals_rhs = 0;
-    mutable size_t                                      _n_evals_jac = 0;
-    std::string                                         _message = "Running";
-    int                                                 _direction = 1;
-    int                                                 _new_state_idx = 1;
-    int                                                 _old_state_idx = 2;
-    int                                                 _true_state_idx = 1;
-    int                                                 _last_true_state_idx = 2;
-    int                                                 _aux_state_idx = 3;
-    int                                                 _aux2_state_idx = 4;
-    bool                                                _is_dead = false;
-    bool                                                _diverges = false;
-    bool                                                _is_running = true;
-    bool                                                _use_new_state = true; //for interpolation purposes
-
-    static constexpr int rtol_idx = 0;
-    static constexpr int atol_idx = 1;
-    static constexpr int min_step_idx = 2;
-    static constexpr int max_step_idx = 3;
+    
+    detail::ScratchState<T, N> ics_state_, old_state_, new_state_, true_state_, interp_state_;
+    T rtol_, atol_, min_step_, max_step_;
+    detail::SolverScratchSpace<T, N> scratch_;
+    OdeType                                             ode_;
+    size_t                                              nsys_ = N;
+    size_t                                              step_count_ = 0;
+    mutable size_t                                      rhs_eval_count_ = 0;
+    mutable size_t                                      jac_eval_count_ = 0;
+    std::string                                         msg_ = "Running";
+    int                                                 direction_ = 1;
+    bool                                                is_dead_ = false;
+    bool                                                diverges_ = false;
+    bool                                                is_running_ = true;
+    bool                                                use_new_state_ = true; //for interpolation purposes
+    bool                                                is_at_new_state_ = true;
 };
 
 

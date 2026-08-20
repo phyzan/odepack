@@ -117,9 +117,6 @@ public:
     /// @brief Get the number of times this event has been triggered.
     virtual size_t                  counter() const = 0;
 
-    /// @brief Get the additional arguments for event functions.
-    virtual const std::vector<T>&   args() const = 0;
-
     /// @brief Create a dynamically allocated copy of this event.
     virtual std::unique_ptr<Event<T>> clone() const = 0;
 
@@ -130,19 +127,10 @@ public:
     /**
      * @brief Initialize the event for use with a solver.
      * @param t_start  Starting time of integration.
-     * @param args     Additional arguments for event functions.
-     * @param nargs    Number of arguments.
      * @param n_sys    Size of the ODE system.
      * @param direction Integration direction (+1 or -1).
      */
-    virtual void setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction) = 0;
-
-    /**
-     * @brief Update the event's argument array.
-     * @param args Pointer to new argument values.
-     * @param size Number of arguments.
-     */
-    virtual void set_args(const T* args, size_t size) = 0;
+    virtual void setup(T t_start, size_t n_sys, int direction) = 0;
 
     /**
      * @brief Attempt to locate when this event triggers between two states.
@@ -200,9 +188,6 @@ public:
     /// @brief Get the trigger count.
     size_t                  counter() const;
 
-    /// @brief Get the event arguments.
-    const std::vector<T>&   args() const;
-
     /// @brief Clone this event.
     std::unique_ptr<Event<T>> clone() const;
 
@@ -217,11 +202,8 @@ public:
 
     // ------------------------------ MODIFIERS -----------------------------------
 
-    /// @brief Update event arguments.
-    void                    set_args(const T* args, size_t size);
-
     /// @brief Initialize event for use with solver.
-    void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
+    void                    setup(T t_start, size_t n_sys, int direction);
 
     /// @brief Attempt to locate event in an interval. obj_fun(T* out, T t) -> void fills the state vector at time t.
     template<StateInterp<T> Callable>
@@ -456,10 +438,7 @@ public:
     size_t                  detection_size() const;
 
     /// @brief Initialize all events for use with solver.
-    void                    setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction);
-
-    /// @brief Update arguments for all events.
-    void                    set_args(const T* args, size_t size);
+    void                    setup(T t_start, size_t n_sys, int direction);
 
     /**
      * @brief Detect all events between two states.

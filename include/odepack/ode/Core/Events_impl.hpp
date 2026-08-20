@@ -43,7 +43,7 @@ void EventBase<Derived, T, MaskFunc>::apply_mask(T* out, const T& t, const T* q)
     if constexpr (std::is_same_v<MaskFunc, std::nullptr_t>){
         assert(false && "apply_mask called when MaskFunc is std::nullptr_t");
     } else {
-        _mask(out, t, q, this->args().data());
+        _mask(out, t, q);
     }
 }
 
@@ -56,11 +56,6 @@ size_t EventBase<Derived, T, MaskFunc>::nsys() const{
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 size_t EventBase<Derived, T, MaskFunc>::counter() const{
     return _counter;
-}
-
-template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-const std::vector<T>& EventBase<Derived, T, MaskFunc>::args() const{
-    return _args;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
@@ -86,18 +81,11 @@ const T& EventBase<Derived, T, MaskFunc>::t_start() const{
 
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-void EventBase<Derived, T, MaskFunc>::set_args(const T* args, size_t size){
-    _args.resize(size);
-    ndspan::copy_array(_args.data(), args, size);
-}
-
-template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-void EventBase<Derived, T, MaskFunc>::setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction){
+void EventBase<Derived, T, MaskFunc>::setup(T t_start, size_t n_sys, int direction){
     // checks that it has not been already setup
     // no other modifiers can be called if setup has not been called yet
     assert(!this->_is_setup && "Setup takes place only once");
     assert(abs(direction)==1 && "Invalid direction");
-    set_args(args, nargs);
     worker.resize(n_sys);
     _direction = direction;
     _is_setup = true;
@@ -165,7 +153,7 @@ PreciseEvent<T, Target, MaskFunc, Derived>::PreciseEvent(std::string name, Targe
 
 template<typename T, isObjFun<T> Target, OptionalRhsFunc<T> MaskFunc, typename Derived>
 T PreciseEvent<T, Target, MaskFunc, Derived>::obj_fun(const T& t, const T* q) const{
-    return target(t, q, this->args().data());
+    return target(t, q);
 }
 
 template<typename T, isObjFun<T> Target, OptionalRhsFunc<T> MaskFunc, typename Derived>
@@ -280,18 +268,11 @@ size_t EventCollection<T>::detection_size() const{
 }
 
 template<typename T>
-void EventCollection<T>::setup(T t_start, const T* args, size_t nargs, size_t n_sys, int direction){
+void EventCollection<T>::setup(T t_start, size_t n_sys, int direction){
     worker.resize(n_sys);
     masked_data.masked_vector.resize(n_sys);
     for (size_t i=0; i<this->size(); i++){
-        events[i]->setup(t_start, args, nargs, n_sys, direction);
-    }
-}
-
-template<typename T>
-void EventCollection<T>::set_args(const T* args, size_t size){
-    for (size_t i=0; i<this->size(); i++){
-        events[i]->set_args(args, size);
+        events[i]->setup(t_start, n_sys, direction);
     }
 }
 

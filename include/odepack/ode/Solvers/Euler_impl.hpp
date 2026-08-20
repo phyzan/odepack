@@ -7,17 +7,17 @@ namespace ode{
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir, std::vector<T> args) requires (!traits::is_rich<SP>) : Base(ode, t0, q0, 0, 0, 0, inf<T>(), stepsize, dir, std::move(args)) {}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir) requires (!traits::is_rich<SP>) : Base(ode, t0, q0, 0, 0, 0, inf<T>(), stepsize, dir) {}
 
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir, std::vector<T> args, EventList<T> events) requires (traits::is_rich<SP>) : Base(ode, t0, q0, 0, 0, 0, inf<T>(), stepsize, dir, std::move(args), std::move(events)) {}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T stepsize, int dir, EventList<T> events) requires (traits::is_rich<SP>) : Base(ode, t0, q0, 0, 0, 0, inf<T>(), stepsize, dir, std::move(events)) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T /*rtol*/, T /*atol*/, T /*min_step*/, T /*max_step*/, T stepsize, int dir, std::vector<T> args) requires (!traits::is_rich<SP>) : Euler(ode, t0, q0, stepsize, dir, std::move(args)) {}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T /*rtol*/, T /*atol*/, T /*min_step*/, T /*max_step*/, T stepsize, int dir) requires (!traits::is_rich<SP>) : Euler(ode, t0, q0, stepsize, dir) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
-Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T /*rtol*/, T /*atol*/, T /*min_step*/, T /*max_step*/, T stepsize, int dir, std::vector<T> args, EventList<T> events) requires (traits::is_rich<SP>) : Euler(ode, t0, q0, stepsize, dir, std::move(args), std::move(events)) {}
+Euler<T, N, SP, OdeType, Derived>::Euler(OdeType ode, T t0, View1D<T, N> q0, T /*rtol*/, T /*atol*/, T /*min_step*/, T /*max_step*/, T stepsize, int dir, EventList<T> events) requires (traits::is_rich<SP>) : Euler(ode, t0, q0, stepsize, dir, std::move(events)) {}
 
 template<typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType, typename Derived>
 Integrator Euler<T, N, SP, OdeType, Derived>::method() const{

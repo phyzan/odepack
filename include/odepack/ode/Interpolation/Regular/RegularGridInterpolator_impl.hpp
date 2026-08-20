@@ -109,10 +109,10 @@ bool RegularVectorField<T, NDIM, AS_VIRTUAL>::contains(const T* coords) const{
 }
 
 template<typename T, int NDIM, bool AS_VIRTUAL>
-void RegularVectorField<T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& t, const T* q, const T* args) const{
+void RegularVectorField<T, NDIM, AS_VIRTUAL>::OdeFuncNorm(T* out, const T& t, const T* q) const{
     
     if (coord_type_ == CoordType::Cartesian){
-        VFBase::OdeFuncNorm(out, t, q, args);
+        VFBase::OdeFuncNorm(out, t, q);
         return;
     }
     
@@ -156,15 +156,14 @@ std::vector<Array2D<T, NDIM, 0>> RegularVectorField<T, NDIM, AS_VIRTUAL>::stream
     
     assert(max_length > ds && max_length > 0 && ds > 0 && "max_length and ds must be positive, and max_length must be greater than ds");
     assert(density > 1 && "Density must be greater than 1");
-    std::vector<T> args{};
     EventList<T> events{};
     pbox::Box<OdeRichSolver<T, NDIM>> solver = make_solver<UtilPolicy::RichVirtual>(method,
         OdeData{
-            .Rhs=[this](T* out, const T& t, const T* q, const T* args_dummy){
-                this->OdeFuncNorm(out, t, q, args_dummy);
+            .Rhs=[this](T* out, const T& t, const T* q){
+                this->OdeFuncNorm(out, t, q);
             }
         },
-        T{0}, View1D<T, NDIM>{nullptr, this->ndim()}, rtol, atol, min_step, max_step, stepsize, +1, std::move(args), std::move(events));
+        T{0}, View1D<T, NDIM>{nullptr, this->ndim()}, rtol, atol, min_step, max_step, stepsize, +1, std::move(events));
 
     const auto& X = this->grid().data();
     Array1D<int, NDIM, InterpBase::ALLOC> N(this->ndim());

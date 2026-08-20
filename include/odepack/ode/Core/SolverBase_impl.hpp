@@ -19,13 +19,13 @@ namespace ode{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::Rhs(T* dq_dt, const T& t, const T* q) const{
-    return _ode.Rhs(dq_dt, t, q, _args.data());
+    return ode_.Rhs(dq_dt, t, q);
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::rhs(T* dq_dt, const T& t, const T* q) const{
     this->Rhs(dq_dt, t, q);
-    this->_n_evals_rhs++;
+    this->rhs_eval_count_++;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -34,12 +34,15 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
     if constexpr (JP == JacPolicy::Approx){
         return this->jac_approx(jm, t, q, dt);
     } else if constexpr (JP == JacPolicy::Autodiff){
+        // TODO : maybe use only the second branch for both cases
+        // (for large N, the compiler might explode from the double template recursion)
+        decltype(auto) scratch_duals = this->scratch_.duals();
         if constexpr (N > 0){
             NDSPAN_FOR_LOOP(I, N,
-                _diff_worker[I+N] = DualType(q[I], {.axis=I});
+                scratch_duals[I+N] = DualType(q[I], {.axis=I});
             );
-            _ode.Rhs(_diff_worker.data(), t, _diff_worker.data()+N, _args.data());
-            const DualType* rhs = _diff_worker.data();
+            ode_.Rhs(scratch_duals.data(), t, scratch_duals.data()+N);
+            const DualType* rhs = scratch_duals.data();
             NDSPAN_FOR_LOOP(I, N,
                 NDSPAN_FOR_LOOP(J, N,
                     jm[I + J*N] = rhs[I].get_diff_wrt(J);
@@ -51,10 +54,10 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
             const size_t nvars_default = DualType::get_default_nvars();
             DualType::set_default_nvars(nsys);
             for (size_t i=0; i<nsys; i++){
-                _diff_worker[i + nsys] = DualType(q[i], {.axis=int(i)});
+                scratch_duals[i + nsys] = DualType(q[i], {.axis=int(i)});
             }
-            _ode.Rhs(_diff_worker.data(), t, _diff_worker.data() + nsys, _args.data());
-            const DualType* rhs = _diff_worker.data();
+            ode_.Rhs(scratch_duals.data(), t, scratch_duals.data() + nsys);
+            const DualType* rhs = scratch_duals.data();
             for (size_t i=0; i<nsys; i++){
                 for (size_t j=0; j<nsys; j++){
                     jm[i + j*nsys] = rhs[i].get_diff_wrt(j);
@@ -63,7 +66,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
             DualType::set_default_nvars(nvars_default);
         }
     } else {
-        _ode.Jac(jm, t, q, _args.data());
+        ode_.Jac(jm, t, q, dt);
     }
 
 }
@@ -71,31 +74,18 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::jac(T* jm, const T& t, const T* q, const T* dt) const{
     this->Jac(jm, t, q, dt);
-    this->_n_evals_jac++;
+    this->jac_eval_count_++;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::jac_approx(T* out, const T& t, const T* q, const T* dt) const{
     const size_t n = this->nsys();
 
-    // ----------- Used only if N > 0 --------------
-    static thread_local std::array<T, 4*N> work;
-    // ---------------------------------------------
-
-    T* worker;
-
-    if constexpr (N > 0){
-        worker = work.data();
-    } else{
-        if (_cache_4.size() != 4*n){
-            _cache_4.resize(4, n);
-        }
-        worker = _cache_4.data();
-    }
+    decltype(auto) scratch = this->scratch_.four_state_cache();
 
     ode::jac_approx<T>([this](T* dummy_out, const T& dummy_t, const T* dummy_q){
         this->Rhs(dummy_out, dummy_t, dummy_q);
-    }, out, worker, t, q, dt, this->atol(), n);
+    }, out, scratch.data(), t, q, dt, this->atol(), n);
 }
 
 // PUBLIC ACCESSORS
@@ -111,11 +101,6 @@ View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_last() const{
-    return View1D<T, N>(this->last_true_state_ptr()+2, this->nsys());
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_new() const{
     return View1D<T, N>(this->new_state_ptr()+2, this->nsys());
 }
@@ -127,62 +112,57 @@ View1D<T, N> BaseSolver<Derived, T, N, SP, OdeType>::vector_old() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::stepsize() const{
-    return this->_state_data(_new_state_idx, 1);
+    return new_state_[1];
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 int BaseSolver<Derived, T, N, SP, OdeType>::direction() const{
-    return _direction;
+    return direction_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::rtol() const{
-    return this->_scalar_data[rtol_idx];
+    return rtol_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
  const T& BaseSolver<Derived, T, N, SP, OdeType>::atol() const{
-    return this->_scalar_data[atol_idx];
+    return atol_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::min_step() const{
-    return this->_scalar_data[min_step_idx];
+    return min_step_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::max_step() const{
-    return this->_scalar_data[max_step_idx];
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-const Array1D<T>& BaseSolver<Derived, T, N, SP, OdeType>::args() const{
-    return _args;
+    return max_step_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 size_t BaseSolver<Derived, T, N, SP, OdeType>::step_count() const{
-    return _step_count;
+    return step_count_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::is_running() const{
-    return _is_running;
+    return is_running_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::is_dead() const{
-    return _is_dead;
+    return is_dead_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::diverges() const{
-    return _diverges;
+    return diverges_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const std::string& BaseSolver<Derived, T, N, SP, OdeType>::status() const{
-    return _message;
+    return msg_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -201,16 +181,6 @@ State<T> BaseSolver<Derived, T, N, SP, OdeType>::old_state() const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-State<T> BaseSolver<Derived, T, N, SP, OdeType>::state() const{
-    return State<T>(this->true_state_ptr(), this->nsys());
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-State<T> BaseSolver<Derived, T, N, SP, OdeType>::last_state() const{
-    return State<T>(this->last_true_state_ptr(), this->nsys());
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 State<T> BaseSolver<Derived, T, N, SP, OdeType>::ics() const{
     return State<T>(this->ics_ptr(), this->nsys());
 }
@@ -225,20 +195,20 @@ void BaseSolver<Derived, T, N, SP, OdeType>::interp(T* out, const T& t) const{
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-size_t BaseSolver<Derived, T, N, SP, OdeType>::n_evals_rhs() const{
-    return _n_evals_rhs;
+size_t BaseSolver<Derived, T, N, SP, OdeType>::rhs_eval_count() const{
+    return rhs_eval_count_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-size_t BaseSolver<Derived, T, N, SP, OdeType>::n_evals_jac() const{
-    return _n_evals_jac;
+size_t BaseSolver<Derived, T, N, SP, OdeType>::jac_eval_count() const{
+    return jac_eval_count_;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 T BaseSolver<Derived, T, N, SP, OdeType>::auto_step(T t, const T* q) const{
     //returns absolute value of emperically determined first step.
-    const int dir = _direction;
 
+    const int dir = this->direction();
     if (dir == 0){
         //needed even if the resulting stepsize will have a positive value.
         throw std::runtime_error("Cannot auto-determine step when a direction of integration has not been specified.");
@@ -246,19 +216,8 @@ T BaseSolver<Derived, T, N, SP, OdeType>::auto_step(T t, const T* q) const{
     size_t n = this->nsys();
     T h0, d2, h1;
 
-    
-    // ----------- Used only if N > 0 --------------
-    static thread_local std::array<T, 4*N> work;
-    // ---------------------------------------------
-
-    T* y1;
-
-    if constexpr (N > 0){
-        y1 = work.data();
-    } else{
-        _cache_4.resize(4, this->nsys()); // will only resize the first time.
-        y1 = _cache_4.ptr(0, 0);
-    }
+    decltype(auto) scratch = this->scratch_.four_state_cache();
+    T* y1 = scratch.data();
 
     T* f1 = y1+n;
     T* scale = y1+2*n;
@@ -487,16 +446,16 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> 
 bool BaseSolver<Derived, T, N, SP, OdeType>::set_ics(T t0, const T* y0, T stepsize, int direction){
 
     assert((direction == 1 || direction == -1 || direction == 0) && "Direction must be 1, -1, or 0");
-    direction = (direction == 0) ? _direction : direction; // if 0, keep existing direction;
+    direction = (direction == 0) ? this->direction() : direction; // if 0, keep existing direction;
     if (this->validate_ics(t0, y0)){
         if (stepsize < 0) {
             this->cerr("Cannot set negative stepsize in solver initialization");
             return false;
         } else if (stepsize == 0) {
-            _direction = direction;
+            this->direction_ = direction;
             stepsize = this->auto_step(t0, y0);
         }else{
-            _direction = direction;
+            this->direction_ = direction;
         }
 
         T* ics = const_cast<T*>(this->ics_ptr());
@@ -518,7 +477,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::stop(const std::string& text){
     if (!this->is_running()){
         return;
     }
-    _is_running = false;
+    this->is_running_ = false;
     this->set_message((text == "") ? "Stopped by user" : text);
 }
 
@@ -527,9 +486,9 @@ void BaseSolver<Derived, T, N, SP, OdeType>::kill(const std::string& text){
     if (this->is_dead()){
         return;
     }
-    _is_running = false;
-    _is_dead = true;
-    _message = (text == "") ? "Killed by user" : text;
+    this->is_running_ = false;
+    this->is_dead_ = true;
+    this->msg_ = (text == "") ? "Killed by user" : text;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -539,14 +498,9 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::resume(){
         return false;
     }else{
         this->set_message("Running");
-        _is_running = true;
+        this->is_running_ = true;
         return true;
     }
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::SetArgs(const T* new_args){
-    ndspan::copy_array(_args.data(), new_args, _args.size());
 }
 
 //====================== STATIC OVERRIDES =====================================
@@ -577,23 +531,18 @@ auto BaseSolver<Derived, T, N, SP, OdeType>::local_interp() const{
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
-    _step_count = 0;
-    _new_state_idx = 1;
-    _old_state_idx = 2;
-    _true_state_idx = 1;
-    _last_true_state_idx = 2;
-    _aux_state_idx = 3;
-    _aux2_state_idx = 4;
-    _is_dead = false;
-    _is_running = true;
-    _diverges = false;
-    _message = "Running";
-    _n_evals_rhs = 0;
-    _n_evals_jac = 0;
-    _use_new_state = true;
-    for (int i=1; i<6; i++){
-        ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->nsys()+2); //copy the initial state to all others
-    }
+    this->msg_ = "Running";
+    this->step_count_ = 0;
+    this->rhs_eval_count_ = 0;
+    this->jac_eval_count_ = 0;
+    this->use_new_state_ = true;
+    this->is_running_ = true;
+    this->is_dead_ = false;
+    this->diverges_ = false;
+    old_state_ = ics_state_;
+    new_state_ = ics_state_;
+    true_state_ = ics_state_;
+    interp_state_ = ics_state_;
 }
 
 //=============================================================================
@@ -603,12 +552,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Reset(){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T* BaseSolver<Derived, T, N, SP, OdeType>::true_state_ptr() const{
-    return this->_state_data.ptr(this->_true_state_idx, 0);
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-const T* BaseSolver<Derived, T, N, SP, OdeType>::last_true_state_ptr() const{
-    return this->_state_data.ptr(this->_last_true_state_idx, 0);
+    return true_state_.data();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -620,9 +564,18 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
         if (this->is_at_new_state() && (time_floor*d <= t_new()*d)){
             return false;
         } else if (this->is_at_new_state()){
-            StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
-            if (validate_it(result, this->aux_state_ptr())){
-                register_states();
+            decltype(auto) scratch_state = this->scratch_.state();
+            StepResult result = this->adapt_impl(scratch_state.data(), this->new_state_ptr());
+            if (validate_it(result, scratch_state.data())){
+                // ======== update internal states ========
+                std::swap(old_state_, new_state_);
+                std::swap(new_state_, scratch_state);
+                for (size_t i=0; i<scratch_state.size(); i++){
+                    true_state_[i] = new_state_[i];
+                }
+                use_new_state_ = true;
+                step_count_++;
+                // ==========================================
                 T new_floor;
                 if (ODEPACK_CALL_DERIVED(RequestTimeFloor, new_floor)){
                     assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested, with additional requests");
@@ -644,9 +597,18 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
             return true;
         }
     } else if (this->is_at_new_state()){
-        StepResult result = this->adapt_impl(this->aux_state_ptr(), this->new_state_ptr());
-        if (validate_it(result, this->aux_state_ptr())){
-            register_states();
+        decltype(auto) scratch_state = this->scratch_.state();
+        StepResult result = this->adapt_impl(scratch_state.data(), this->new_state_ptr());
+        if (validate_it(result, scratch_state.data())){
+            // ======== update internal states ========
+                std::swap(old_state_, new_state_);
+                std::swap(new_state_, scratch_state);
+                for (size_t i=0; i<scratch_state.size(); i++){
+                    true_state_[i] = new_state_[i];
+                }
+                use_new_state_ = true;
+                step_count_++;
+            // ==========================================
             T new_floor;
             if (ODEPACK_CALL_DERIVED(RequestTimeFloor, new_floor) && new_floor*d < t_new()*d){
                 assert((new_floor*d > t_old()*d && new_floor*d <= t_new()*d) && "Invalid floor requested without additional requests.");
@@ -667,46 +629,41 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T* BaseSolver<Derived, T, N, SP, OdeType>::ics_ptr() const{
-    return this->_state_data.data();
+    return this->ics_state_.data();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T* BaseSolver<Derived, T, N, SP, OdeType>::new_state_ptr() const{
-    return this->_state_data.ptr(this->_new_state_idx, 0);
+    return this->new_state_.data();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T* BaseSolver<Derived, T, N, SP, OdeType>::old_state_ptr() const{
-    return this->_state_data.ptr(this->_old_state_idx, 0);
+    return this->old_state_.data();
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T* BaseSolver<Derived, T, N, SP, OdeType>::interp_new_state_ptr() const{
-    if (this->_use_new_state){
+    if (this->use_new_state_){
         return this->new_state_ptr();
     }else{
-        return this->_state_data.ptr(5, 0); // 5th index reserved for interpolation purposes
+        return this->interp_state_.data(); // 5th index reserved for interpolation purposes
     }
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::t_new() const{
-    return this->_state_data(this->_new_state_idx, 0);
+    return this->new_state_[0];
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 const T& BaseSolver<Derived, T, N, SP, OdeType>::t_old() const{
-    return this->_state_data(this->_old_state_idx, 0);
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-const T& BaseSolver<Derived, T, N, SP, OdeType>::t_last() const{
-    return this->last_true_state_ptr()[0];
+    return this->old_state_[0];
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::set_message(const std::string& text){
-    _message = text;
+    this->msg_ = text;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -719,27 +676,21 @@ void BaseSolver<Derived, T, N, SP, OdeType>::warn_paused() const{
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::warn_dead() const{
 #ifndef DPK_NO_WARN
-    this->cerr("\nSolver has permanently stopped integrating. Termination cause:\n\t" + _message);
+    this->cerr("\nSolver has permanently stopped integrating. Termination cause:\n\t" + this->msg_);
 #endif
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::ReAdjust(const T* new_vector){
-    ndspan::copy_array(this->_state_data.ptr(5, 0), this->new_state_ptr(), this->nsys()+2); //store the re-adjusted new state for interpolation
-    T* state = const_cast<T*>(this->true_state_ptr());
+    ndspan::copy_array(this->interp_state_.data(), this->new_state_ptr(), this->nsys()+2); //store the re-adjusted new state for interpolation
+    T* state = true_state_.data();
     state[0] = this->t();
     state[1] = this->stepsize();
     ndspan::copy_array(state+2, new_vector, this->nsys());
-    if (_true_state_idx != _new_state_idx){
-        if (_last_true_state_idx == _aux_state_idx){
-            _aux_state_idx = _new_state_idx;
-            _new_state_idx = _true_state_idx;
-        } else {
-            _aux2_state_idx = _new_state_idx;
-            _new_state_idx = _true_state_idx;
-        }
+    if (! is_at_new_state_){
+        new_state_ = true_state_;
     }
-    _use_new_state = false;
+    use_new_state_ = false;
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
@@ -754,32 +705,21 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_ics_impl(T t0, const T* q0
         return false;
     }
 
-    // ----------- Used only if N > 0 --------------
-    static thread_local std::array<T, N> work;
-    // ---------------------------------------------
-
-    T* worker;
-    
-    if constexpr (N > 0){
-        worker = work.data();
-    } else{
-        _cache_ics.resize(this->nsys());
-        worker = _cache_ics.data();
-    }
+    decltype(auto) scratch_state = this->scratch_.ics_cache();
 
     /*
     Calling "this", not "THIS". Derived classes that override Rhs can have their version validated.
     However since this function might be called before the Derived classes has been fully constructed,
     calling "THIS" could lead to undefined behavior.
     */
-    this->Rhs(worker, t0, q0);
+    this->Rhs(scratch_state.data(), t0, q0);
 
-    return all_are_finite(worker, this->nsys());
+    return all_are_finite(scratch_state.data(), this->nsys());
 }
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::is_at_new_state() const{
-    return _true_state_idx == _new_state_idx;
+    return is_at_new_state_;
 }
 
 
@@ -799,63 +739,46 @@ MutView<T, Layout::F, N, N> BaseSolver<Derived, T, N, SP, OdeType>::jac_view(T* 
 // PROTECTED CONSTRUCTOR
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : _state_data(6, q0.size()+2), _args(args.data(), args.size()), _diff_worker(JP==JacPolicy::Autodiff ? 2*q0.size() : 0), _ode(ode), _Nsys(q0.size()), _direction(dir){
-    assert(this->nsys() > 0 && "Ode system size is 0");
-    _scalar_data = {rtol, atol, min_step, max_step};
-    if (stepsize < 0){
-        throw std::runtime_error("The stepsize argument cannot be negative");
-    }
-    if (max_step < min_step){
-        throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
-    }
-    
-    if (q0.data() == nullptr){
-        this->kill("Initial conditions not set (nullptr provided)");
-    } else if (this->validate_ics_impl(t0, q0.data())){
-        T habs = (stepsize == 0 ? this->auto_step(t0, q0.data()) : abs<T>(stepsize));
-        _state_data(0, 0) = t0;
-        _state_data(0, 1) = habs;
-        ndspan::copy_array(_state_data.ptr(0, 2), q0.data(), this->nsys());
-        for (int i=1; i<5; i++){
-            ndspan::copy_array(this->_state_data.ptr(i, 0), this->ics_ptr(), this->nsys()+2);
+BaseSolver<Derived, T, N, SP, OdeType>::BaseSolver(SOLVER_CONSTRUCTOR(T)) : 
+    ics_state_(q0.size()+2),
+    old_state_(q0.size()+2),
+    new_state_(q0.size()+2),
+    true_state_(q0.size()+2),
+    interp_state_(q0.size()+2),
+    rtol_(rtol),
+    atol_(atol),
+    min_step_(min_step),
+    max_step_(max_step),
+    scratch_(q0.size()),
+    ode_(std::move(ode)),
+    nsys_(q0.size()),
+    direction_(dir){
+        assert(this->nsys() > 0 && "Ode system size is 0");
+        if (stepsize < 0){
+            throw std::runtime_error("The stepsize argument cannot be negative");
         }
-    } else {
-        this->kill("Initial conditions contain nan or inf, or ode(ics) does");
-    }
+        if (max_step < min_step){
+            throw std::runtime_error("Maximum allowed stepsize cannot be smaller than minimum allowed stepsize");
+        }
+        
+        if (q0.data() == nullptr){
+            this->kill("Initial conditions not set (nullptr provided)");
+        } else if (this->validate_ics_impl(t0, q0.data())){
+            T habs = (stepsize == 0 ? this->auto_step(t0, q0.data()) : abs<T>(stepsize));
+            ics_state_[0] = t0;
+            ics_state_[1] = habs;
+            ndspan::copy_array(ics_state_.data()+2, q0.data(), this->nsys());
+            old_state_ = ics_state_;
+            new_state_ = ics_state_;
+            true_state_ = ics_state_;
+            interp_state_ = ics_state_;
+        } else {
+            this->kill("Initial conditions contain nan or inf, or ode(ics) does");
+        }
 }
 
 
 // PRIVATE METHODS
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-const T* BaseSolver<Derived, T, N, SP, OdeType>::aux_state_ptr() const{
-    return _state_data.ptr(_aux_state_idx, 0);
-}
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-T* BaseSolver<Derived, T, N, SP, OdeType>::aux_state_ptr(){
-    return _state_data.ptr(_aux_state_idx, 0);
-}
-
-
-template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
-void BaseSolver<Derived, T, N, SP, OdeType>::register_states(){
-    if (_old_state_idx == _last_true_state_idx){
-        _old_state_idx = _new_state_idx;
-        _new_state_idx = _true_state_idx = _aux_state_idx;
-        _aux_state_idx = _last_true_state_idx;
-        _last_true_state_idx = _old_state_idx;
-    }else {
-        _aux2_state_idx = _last_true_state_idx;
-        _new_state_idx = _aux_state_idx;
-        _aux_state_idx = _old_state_idx;
-        _last_true_state_idx = _true_state_idx;
-        _true_state_idx = _new_state_idx;
-        _old_state_idx = _last_true_state_idx;
-    }
-    _use_new_state = true;
-    _step_count++;
-}
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, const T* state){
@@ -865,7 +788,7 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, cons
             break;
         case StepResult::INF_ERROR:
             this->set_message("ODE solution diverges (inf or nan encountered)");
-            this->_diverges = true;
+            this->diverges_ = true;
             success = false;
             break;
         case StepResult::TINY_STEP_ERROR:
@@ -890,9 +813,8 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, cons
         //close the interpolation interval as most integration algorithms
         //alter their interpolation polynomials when calling adapt_impl,
         //but since the step failed, the current interpolation interval is no longer valid.
-        _use_new_state = false;
-        T* d = _state_data.ptr(5, 0);
-        ndspan::copy_array(d, this->old_state_ptr(), this->nsys()+2);
+        use_new_state_ = false;;
+        ndspan::copy_array(interp_state_.data(), this->old_state_ptr(), this->nsys()+2);
     }
 
     return success;
@@ -901,36 +823,15 @@ bool BaseSolver<Derived, T, N, SP, OdeType>::validate_it(StepResult result, cons
 
 template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> OdeType>
 void BaseSolver<Derived, T, N, SP, OdeType>::move_state(const T& time){
-    const int d = this->direction();
-    assert( (time*d > this->t_last()*d && time*d <= this->t_new()*d) && "Out of bounds time requested in move_state");
+    assert( (time*direction() <= this->t_new()*direction()) && "Out of bounds time requested in move_state");
 
-
-
-    if ((time*d < this->t_new()*d)) {
-        if (_true_state_idx == _new_state_idx) {
-            if (_last_true_state_idx == _aux_state_idx){
-                T* ptr = _state_data.ptr(_aux2_state_idx, 0);
-                set_state(time, ptr);
-                _true_state_idx = _aux2_state_idx;
-                _aux2_state_idx = _old_state_idx;
-            } else {
-                T* ptr = _state_data.ptr(_aux_state_idx, 0);
-                set_state(time, ptr);
-                _true_state_idx = _aux_state_idx;
-                _aux_state_idx = _aux2_state_idx;
-                _aux2_state_idx = _old_state_idx;
-            }
-        }else{
-            T* ptr = _state_data.ptr(_aux_state_idx, 0);
-            set_state(time, ptr);
-            _last_true_state_idx = _true_state_idx;
-            _true_state_idx = _aux_state_idx;
-            _aux_state_idx = _last_true_state_idx;
-        }
-    }else if (_true_state_idx != _new_state_idx){
+    if (time != this->t_new()) {
+        set_state(time, true_state_.data());
+        is_at_new_state_ = false;
+    }else if (! is_at_new_state()){
         // update the true state to the new state, because time is exactly at t_new
-        _last_true_state_idx = _true_state_idx;
-        _true_state_idx = _new_state_idx;
+        is_at_new_state_ = true;
+        true_state_ = new_state_;
     }
 }
 

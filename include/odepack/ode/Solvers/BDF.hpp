@@ -59,9 +59,9 @@ class BDF : public detail::BaseDispatcher<GetDerived<BDF<T, N, SP, OdeType>, Der
 
 public:
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args)) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T)) requires (!traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir) {}
 
-    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events = {}) requires (traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events)) {}
+    BDF(MAIN_DEFAULT_CONSTRUCTOR(T), EventList<T> events = {}) requires (traits::is_rich<SP>) : BDF(private_tag{}, ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(events)) {}
 
     auto  local_interp() const;
 

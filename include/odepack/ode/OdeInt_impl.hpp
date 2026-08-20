@@ -62,7 +62,7 @@ size_t EventCounter<T, N>::total()const{
 template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
 ODE<T, N>::ODE(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method) : ODE(q0.size()){
-    init(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events), method);
+    init(ode, t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(events), method);
 }
 
 template<typename T, size_t N>
@@ -319,7 +319,7 @@ void ODE<T, N>::reset(){
 template<typename T, size_t N>
 template<hasRhsFunc<T> OdeType>
 void ODE<T, N>::init(MAIN_CONSTRUCTOR(T), EventList<T> events, Integrator method){
-    solver_ = make_solver<UtilPolicy::RichVirtual>(method, std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(args), std::move(events));
+    solver_ = make_solver<UtilPolicy::RichVirtual>(method, std::move(ode), t0, q0, rtol, atol, min_step, max_step, stepsize, dir, std::move(events));
     const EventCollection<T>& event_coll = this->solver_->get_event_col();
     cached_idx_.resize(event_coll.size(), 0);
     register_state();
