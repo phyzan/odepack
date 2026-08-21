@@ -57,16 +57,16 @@ template<typename Derived, typename T, size_t N, SolverPolicy SP, hasRhsFunc<T> 
 template<typename... Args>
 bool RichSolver<Derived, T, N, SP, OdeType>::Adv_Impl(Args&&... args){
 
-    // When restarting from a masked event, then at the next step, the last state vector will display the masked state, whether the mask was hidden or not
+    // When restarting from a masked event, then at the next step, the last state vector will display the masked state, whether the mask was delayed or not
     
     if (evt_col.size() == 0){
         return Base::Adv_Impl(std::forward<Args>(args)...);
     } else if (this->at_canon_event()) {
         const MaskedState<T>* ms = evt_col.masked_state();
         assert(ms != nullptr && "Solver is at a canon event but has no masked state. Report bug.");
-        if (this->current_event().event->hides_mask()){
+        if (this->current_event().event->mask_delayed()){
             ODEPACK_CALL_DERIVED(ReAdjust, ms->masked_vector.data());
-        } // if the mask is not hidden, the state has already been ReAdjusted
+        } // if the mask is not delayed, the state has already been ReAdjusted
     }
     
     if (this->is_at_new_state()){
@@ -200,7 +200,7 @@ bool RichSolver<Derived, T, N, SP, OdeType>::push_event_queue(){
         current_idx = evt_col.get_event_idx(size_t(++detection_idx));
         // determine if this one is a canon event
         if (const MaskedState<T>* ms = evt_col.masked_state()){
-            if ((is_at_canon_event = static_cast<bool>(ms->idx == current_idx)) && !evt_col.event(current_idx).hides_mask()){
+            if ((is_at_canon_event = static_cast<bool>(ms->idx == current_idx)) && !evt_col.event(current_idx).mask_delayed()){
                 ODEPACK_CALL_DERIVED(ReAdjust, ms->masked_vector.data());
             }
         }

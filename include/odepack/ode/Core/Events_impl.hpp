@@ -10,15 +10,15 @@ namespace ode{
 // EventBase implementations
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-EventBase<Derived, T, MaskFunc>::EventBase(std::string name, MaskFunc mask, bool hide_mask) : _name(std::move(name)), _mask(std::move(mask)), _hide_mask(hide_mask) {
-    if (_name.empty()){
+EventBase<Derived, T, MaskFunc>::EventBase(std::string name, MaskFunc mask, bool delay_mask) : name_(std::move(name)), mask_(std::move(mask)), delay_mask_(delay_mask) {
+    if (name_.empty()){
         throw std::runtime_error("Please provide a non-empty name when instanciating an Event class");
     }
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 const std::string& EventBase<Derived, T, MaskFunc>::name() const{
-    return _name;
+    return name_;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
@@ -26,15 +26,15 @@ constexpr bool EventBase<Derived, T, MaskFunc>::is_masked() const{
     if constexpr (std::is_same_v<MaskFunc, std::nullptr_t>){
         return false;
     } else if constexpr (std::is_pointer_v<MaskFunc>){
-        return _mask != nullptr;
+        return mask_ != nullptr;
     } else {
         return true;
     }
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
-bool EventBase<Derived, T, MaskFunc>::hides_mask() const{
-    return _hide_mask && this->is_masked();
+bool EventBase<Derived, T, MaskFunc>::mask_delayed() const{
+    return delay_mask_ && this->is_masked();
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
@@ -43,7 +43,7 @@ void EventBase<Derived, T, MaskFunc>::apply_mask(T* out, const T& t, const T* q)
     if constexpr (std::is_same_v<MaskFunc, std::nullptr_t>){
         assert(false && "apply_mask called when MaskFunc is std::nullptr_t");
     } else {
-        _mask(out, t, q);
+        mask_(out, t, q);
     }
 }
 
@@ -55,7 +55,7 @@ size_t EventBase<Derived, T, MaskFunc>::nsys() const{
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 size_t EventBase<Derived, T, MaskFunc>::counter() const{
-    return _counter;
+    return counter_;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
@@ -66,17 +66,17 @@ std::unique_ptr<Event<T>> EventBase<Derived, T, MaskFunc>::clone() const{
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 int EventBase<Derived, T, MaskFunc>::direction() const{
-    return this->_direction;
+    return this->direction_;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 bool EventBase<Derived, T, MaskFunc>::is_located() const{
-    return _is_located;
+    return is_located_;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 const T& EventBase<Derived, T, MaskFunc>::t_start() const{
-    return _start;
+    return start_;
 }
 
 
@@ -84,25 +84,25 @@ template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 void EventBase<Derived, T, MaskFunc>::setup(T t_start, size_t n_sys, int direction){
     // checks that it has not been already setup
     // no other modifiers can be called if setup has not been called yet
-    assert(!this->_is_setup && "Setup takes place only once");
+    assert(!this->is_setup_ && "Setup takes place only once");
     assert(abs(direction)==1 && "Invalid direction");
     worker.resize(n_sys);
-    _direction = direction;
-    _is_setup = true;
-    _start = t_start;
+    direction_ = direction;
+    is_setup_ = true;
+    start_ = t_start;
 }
 
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 template<StateInterp<T> Callable>
 bool EventBase<Derived, T, MaskFunc>::locate_state(T& out, State<T> before, State<T> after, Callable&& obj_fun){
-    assert(this->_is_setup && "Call setup() method before trying to locate an event");
-    assert((sgn(before.t(), after.t()) == this->_direction) && "Invalid direction");
+    assert(this->is_setup_ && "Call setup() method before trying to locate an event");
+    assert((sgn(before.t(), after.t()) == this->direction_) && "Invalid direction");
     if (THIS->locate_impl(out, before, after, obj_fun)){
-        _is_located = true;
+        is_located_ = true;
         return true;
     }else {
-        _is_located = false;
+        is_located_ = false;
         return false;
     }
 }
@@ -114,7 +114,7 @@ bool EventBase<Derived, T, MaskFunc>::locate(T& out, State<T> before, State<T> a
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 bool EventBase<Derived, T, MaskFunc>::lock(){
-    if (_is_located){
+    if (is_located_){
         THIS->register_impl();
         return true;
     }else{
@@ -136,20 +136,20 @@ bool EventBase<Derived, T, MaskFunc>::locate_impl(T& /*t*/, State<T> /*before*/,
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 void EventBase<Derived, T, MaskFunc>::register_impl(){
-    _counter++;
+    counter_++;
 }
 
 template<typename Derived, typename T, OptionalRhsFunc<T> MaskFunc>
 void EventBase<Derived, T, MaskFunc>::reset_impl(int direction){
-    _counter = 0;
-    _is_located = false;
-    _direction = (direction == 0) ? _direction : direction;
+    counter_ = 0;
+    is_located_ = false;
+    direction_ = (direction == 0) ? direction_ : direction;
 }
 
 // PreciseEvent implementations
 
 template<typename T, isObjFun<T> Target, OptionalRhsFunc<T> MaskFunc, typename Derived>
-PreciseEvent<T, Target, MaskFunc, Derived>::PreciseEvent(std::string name, Target when, T event_tol, int dir, MaskFunc mask, bool hide_mask) : Base(std::move(name), std::move(mask), hide_mask), target(std::move(when)), crossing_dir(dir), ftol(event_tol) {}
+PreciseEvent<T, Target, MaskFunc, Derived>::PreciseEvent(std::string name, Target when, T event_tol, int dir, MaskFunc mask, bool delay_mask) : Base(std::move(name), std::move(mask), delay_mask), target(std::move(when)), crossing_dir(dir), ftol(event_tol) {}
 
 template<typename T, isObjFun<T> Target, OptionalRhsFunc<T> MaskFunc, typename Derived>
 T PreciseEvent<T, Target, MaskFunc, Derived>::obj_fun(const T& t, const T* q) const{
@@ -186,11 +186,11 @@ bool PreciseEvent<T, Target, MaskFunc, Derived>::locate_impl(T& t, State<T> befo
 // PeriodicEvent implementations
 
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
-PeriodicEvent<T, MaskFunc, Derived>::PeriodicEvent(std::string name, T period, MaskFunc mask, bool hide_mask) : Base(name, std::move(mask), hide_mask), _period(period) {}
+PeriodicEvent<T, MaskFunc, Derived>::PeriodicEvent(std::string name, T period, MaskFunc mask, bool delay_mask) : Base(name, std::move(mask), delay_mask), period_(period) {}
 
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
 const T& PeriodicEvent<T, MaskFunc, Derived>::period() const{
-    return _period;
+    return period_;
 }
 
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
@@ -201,13 +201,13 @@ T PeriodicEvent<T, MaskFunc, Derived>::get_t(size_t n) const{
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
 template<StateInterp<T> Callable>
 bool PeriodicEvent<T, MaskFunc, Derived>::locate_impl(T& t, State<T> before, State<T> after, Callable&& /*obj_fun*/) const{
-    _n_aux = _n;
+    n_aux_ = n_;
     int d = this->direction();
 
-    while (get_t(++_n_aux)*d <= before.t()*d){}
+    while (get_t(++n_aux_)*d <= before.t()*d){}
 
-    if (get_t(_n_aux)*d <= after.t()*d){
-        t = get_t(_n_aux);
+    if (get_t(n_aux_)*d <= after.t()*d){
+        t = get_t(n_aux_);
         return true;
     }else {
         return false;
@@ -217,13 +217,13 @@ bool PeriodicEvent<T, MaskFunc, Derived>::locate_impl(T& t, State<T> before, Sta
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
 void PeriodicEvent<T, MaskFunc, Derived>::register_impl(){
     Base::register_impl();
-    _n = _n_aux;
+    n_ = n_aux_;
 }
 
 template<typename T, OptionalRhsFunc<T> MaskFunc, typename Derived>
 void PeriodicEvent<T, MaskFunc, Derived>::reset_impl(int direction){
     Base::reset_impl(direction);
-    _n = _n_aux = 0;
+    n_ = n_aux_ = 0;
 }
 
 

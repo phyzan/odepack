@@ -103,8 +103,8 @@ public:
     /// @brief Check if this event has a mask function that transforms the state.
     virtual bool                    is_masked() const = 0;
 
-    /// @brief Check if the masked (transformed) state is hidden, showing only the original.
-    virtual bool                    hides_mask() const = 0;
+    /// @brief Check if the masked (transformed) state is delayed, showing only the original.
+    virtual bool                    mask_delayed() const = 0;
 
     /**
      * @brief Apply the mask transformation to a state vector.
@@ -176,8 +176,8 @@ public:
     /// @brief Check if this event has a mask function.
     constexpr bool          is_masked() const;
 
-    /// @brief Check if the masked state is hidden (showing original instead).
-    bool                    hides_mask() const;
+    /// @brief Check if the mask is delayed (showing original state until mask is applied).
+    bool                    mask_delayed() const;
 
     /// @brief Apply the mask transformation to a state.
     void                    apply_mask(T* out, const T& t, const T* q) const;
@@ -226,10 +226,10 @@ protected:
      * @brief Construct an event with optional mask.
      * @param name      Unique event name.
      * @param mask      Optional mask function to transform state at trigger.
-     * @param hide_mask If true, hide the masked state and show original.
+     * @param delay_mask If true, delay the application of the mask, showing the unfiltered state until the event has been processed.
      * @param obj       Optional user object pointer for callbacks.
      */
-    EventBase(std::string name, MaskFunc mask, bool hide_mask);
+    EventBase(std::string name, MaskFunc mask, bool delay_mask);
 
     DEFAULT_RULE_OF_FOUR(EventBase)
 
@@ -259,20 +259,19 @@ protected:
     //==========================================================
 
 private:
-    std::string             _name;
-    std::vector<T>          _args;
-    T                       _start;
+    std::string             name_;
+    T                       start_;
 protected:
     /// @brief Auxiliary array for intermediate calculations.
     mutable Array1D<T>      worker;
     /// @brief User object pointer passed to callbacks.
 private:
-    MaskFunc                _mask;
-    size_t                  _counter = 0;
-    int                     _direction = 0; //+1 forward, -1 backward
-    bool                    _hide_mask = false;
-    bool                    _is_setup = false;
-    bool                    _is_located = false;
+    MaskFunc                mask_;
+    size_t                  counter_ = 0;
+    int                     direction_ = 0; //+1 forward, -1 backward
+    bool                    delay_mask_ = false;
+    bool                    is_setup_ = false;
+    bool                    is_located_ = false;
 
 };
 
@@ -301,11 +300,11 @@ public:
      * @param when      Objective function: triggers when this crosses zero.
      * @param dir       Crossing direction: +1 (increasing), -1 (decreasing), 0 (any).
      * @param mask      Optional mask function to transform state at trigger.
-     * @param hide_mask If true, hide the masked state and show original.
+     * @param delay_mask If true, delay the application of the mask, showing the unfiltered state until the event has been processed.
      * @param event_tol Tolerance for bisection root finding.
      * @param obj       Optional user object pointer for callbacks.
      */
-    PreciseEvent(std::string name, Target when, T event_tol=1e-20, int dir=0, MaskFunc mask=nullptr, bool hide_mask=false);
+    PreciseEvent(std::string name, Target when, T event_tol=1e-20, int dir=0, MaskFunc mask=nullptr, bool delay_mask=false);
 
     /// @brief Evaluate the objective function at given time and state.
     T    obj_fun(const T& t, const T* q) const;
@@ -348,9 +347,9 @@ public:
      * @param name      Unique event name.
      * @param period    Time interval between triggers.
      * @param mask      Optional mask function to transform state at trigger.
-     * @param hide_mask If true, hide the masked state and show original.
+     * @param delay_mask If true, delay the application of the mask, showing the unfiltered state until the event has been processed.
      */ 
-    PeriodicEvent(std::string name, T period, MaskFunc mask=nullptr, bool hide_mask=false);
+    PeriodicEvent(std::string name, T period, MaskFunc mask=nullptr, bool delay_mask=false);
 
     /// @brief Get the period (time between triggers).
     const T&    period() const;
@@ -375,9 +374,9 @@ protected:
 
 private:
 
-    T _period;                  ///< Time interval between triggers.
-    size_t _n = 0;              ///< Current period count.
-    mutable size_t _n_aux = 0;  ///< Auxiliary counter for detection.
+    T period_;                  ///< Time interval between triggers.
+    size_t n_ = 0;              ///< Current period count.
+    mutable size_t n_aux_ = 0;  ///< Auxiliary counter for detection.
 
 };
 
