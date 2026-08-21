@@ -572,9 +572,6 @@ protected:
     /// @brief Get pointer to the current "true" state.
     const T*    true_state_ptr() const;
 
-    /// @brief Get pointer to the previous "true" state.
-    const T*    last_true_state_ptr() const;
-
     /// @brief Get pointer to the most recently computed state.
     const T*    new_state_ptr() const;
 
