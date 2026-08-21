@@ -3,7 +3,7 @@
 
 using namespace ode;
 template<typename T>
-void f(T* out, const T& /*t*/, const T* y, const T* /*args*/){
+void f(T* out, const T& /*t*/, const T* y){
     out[0] = y[1];
     out[1] = -y[0];
 }

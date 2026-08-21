@@ -17,12 +17,12 @@ int main(){
      * 
      * @tparam T : Numeric type
      * @tparam Target : satisfies isObjFun<T> concept:
-        func(T t, const T* q, const T* args) -> T
+        func(T t, const T* q) -> T
         when `func` crosses zero, the event is triggered
      * @tparam MaskFunc 
         Optionally modify the solver's state when the event is detected.
         Signature:
-            mask(T* out, T t, const T* q, const T* args) -> void
+            mask(T* out, T t, const T* q) -> void
             or `nullptr` to *not* use the feature
      */
 
@@ -34,7 +34,7 @@ int main(){
     // and avoid writing PreciseEvent<...>
     PreciseEvent event{
         "my_event", // name
-        [](const T& t, const T* q, const T* args){
+        [](const T& t, const T* q){
             return q[1] - 1; // Event triggered when q[1] = 1
         },
         T{1e-15}, // or 0.0 for maximum precision
@@ -48,7 +48,7 @@ int main(){
     // We want to allocate all events as Event<T>* for type-erasure
     Event<T>* raw_event = new PreciseEvent{
         "raw_event_pointer", // name
-        [](const T& t, const T* q, const T* args){
+        [](const T& t, const T* q){
             return q[1] - 1; // Event triggered when q[1] = 1
         },
         T{1e-15}, // or 0.0 for maximum precision
@@ -69,7 +69,7 @@ int main(){
 
     pbox::Box<Event<T>> event_1 = make_event<T, PreciseEvent>(
         "boxed_event_1",
-        [](const T& t, const T* q, const T* args){
+        [](const T& t, const T* q){
             return q[1] - 1; // Event triggered when q[1] = 1
         },
         T{1e-15}, // or 0.0 for maximum precision
@@ -78,7 +78,7 @@ int main(){
 
     pbox::Box<Event<T>> event_2 = make_event<T, PreciseEvent>(
         "boxed_event_2",
-        [](const T& t, const T* q, const T* args){
+        [](const T& t, const T* q){
             return q[0] - 1.25; // Event triggered when q[0] = 1.25
         },
         T{0.0}
@@ -124,11 +124,10 @@ int main(){
     T stepsize{0};
     int dir = 1;
 
-    T omega_param = 1;
     auto solver = getSolver<RK45, ode::SolverPolicy::RichStatic>(
         OdeData{.Rhs=
-            ODE_LAMBDA(out, /*t*/, q, args) {
-                const auto& omega = args[0];
+            ODE_LAMBDA(out, /*t*/, q) {
+                const T omega{1}; // angular frequency
                 out[0] = q[1];
                 out[1] = - omega*omega*q[0];
             }
@@ -141,7 +140,6 @@ int main(){
         max_step,
         stepsize,
         dir,
-        std::vector<T>{omega_param},
         make_event_list<T>(std::move(event_1), std::move(event_2))
     );
 

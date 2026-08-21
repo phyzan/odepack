@@ -6,8 +6,8 @@ using namespace ode;
 Testing a simple non-virtual solver, using all available methods
 */
 
-static void rhs(double* out, const double& /*t*/, const double* q, const double* args){
-    const double& mu = args[0];
+static void rhs(double* out, const double& /*t*/, const double* q){
+    const double mu = 300.;
     const double& x = q[0];
     const double& xdot = q[1];
     out[0] = xdot;
@@ -19,7 +19,6 @@ void run(const char* label){
     // declare ics
     const double t0 = 0;
     std::array<double, 2> q0 = {1, 0};
-    std::vector<double> args = {300.};
     const double rtol = 1e-10;
     const double atol = 1e-10;
     const double min_step = 0;
@@ -32,11 +31,11 @@ void run(const char* label){
 
     // Stack allocated solver (nsys is passed as a compile-time parameter)
     auto solver_1 = getSolver<Solver, SolverPolicy::Static>(
-        OdeData{.Rhs=rhs}, t0, View1D<double, nsys>{q0.data()}, rtol, atol, min_step, max_step, stepsize, 1, args);
+        OdeData{.Rhs=rhs}, t0, View1D<double, nsys>{q0.data()}, rtol, atol, min_step, max_step, stepsize, 1);
 
     // Heap allocated solver (nsys is passed as a runtime parameter)
     auto solver_2 = getSolver<Solver, SolverPolicy::Static>(
-        OdeData{.Rhs=rhs}, t0, View1D{q0.data(), nsys}, rtol, atol, min_step, max_step, stepsize, 1, args);
+        OdeData{.Rhs=rhs}, t0, View1D{q0.data(), nsys}, rtol, atol, min_step, max_step, stepsize, 1);
 
     
     

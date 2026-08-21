@@ -14,14 +14,14 @@ Assuming that the solution of a 2D ODE system is accessed via q[0] and q[1], we 
 // the compiler to inline the calls by passing the structs as template parameters to the solver class.
 template<typename T>
 struct Obj1{
-    inline T operator()(T t, const T* q, const T* args) const{
+    inline T operator()(T t, const T* q) const{
         return q[0] - 1;
     }
 };
 
 template<typename T>
 struct Obj2{
-    inline T operator()(const T& t, const T* q, const T* args) const{
+    inline T operator()(const T& t, const T* q) const{
         return q[1] - 2;
     }
 };
@@ -30,7 +30,7 @@ struct Obj2{
 struct MyOdeRhs{
 
     // Declare parameters as `auto` to allow for automatic differentiation with dual numbers
-    inline static void Rhs(auto* out, const auto& t, const auto* q, const auto* args){
+    inline static void Rhs(auto* out, const auto& t, const auto* q){
         out[0] = q[1];
         out[1] = -q[0];
     }
@@ -92,8 +92,7 @@ int main(){
             T{1e-6}, // minimum step size
             T{0.1}, // maximum step size
             T{0.01}, // initial step size
-            1, // integration direction
-            std::vector<T>{} // additional arguments to the ODE function
+            1 // integration direction
         };
 
         size_t event_count = 0;
@@ -115,14 +114,14 @@ int main(){
                 ObjFunData{
                     // passing the lambda and ftol automatically deduces the template
                     // parameters for ObjFunData, so we don't need to explicitly specify them.
-                    .func=[](T t, const T* q, const T* arg){
+                    .func=[](T t, const T* q){
                         return q[0] - 1;
                     },
                     .ftol=T{0.0},
                     .dir=1
                 },
                 ObjFunData{
-                    .func=[](T t, const T* q, const T* arg){
+                    .func=[](T t, const T* q){
                         return q[0] - 2;
                     },
                     .ftol=T{0.0},
@@ -131,7 +130,7 @@ int main(){
             },
             OdeData{
                     // passing .Rhs as a lambda and .Jac as nullptr automatically deduces the template parameters for OdeData, so we don't need to explicitly specify them.
-                    .Rhs=ODE_LAMBDA(out, t, q, args){
+                    .Rhs=ODE_LAMBDA(out, t, q){
                         out[0] = q[1];
                         out[1] = -q[0];
                     },
@@ -144,8 +143,7 @@ int main(){
             T{1e-6}, // minimum step size
             T{0.1}, // maximum step size
             T{0.01}, // initial step size
-            1, // integration direction
-            std::vector<T>{} // additional arguments to the ODE function
+            1 // integration direction
         );
 
         size_t event_count = 0;
@@ -176,8 +174,7 @@ int main(){
             T{1e-6}, // minimum step size
             T{0.1}, // maximum step size
             T{0.01}, // initial step size
-            1, // integration direction
-            std::vector<T>{} // additional arguments to the ODE function
+            1 // integration direction
         );
 
         size_t event_count = 0;
@@ -202,8 +199,7 @@ int main(){
             T{1e-6}, // minimum step size
             T{0.1}, // maximum step size
             T{0.01}, // initial step size
-            1, // integration direction
-            std::vector<T>{} // additional arguments to the ODE function
+            1 // integration direction
         );
 
         size_t event_count = 0;

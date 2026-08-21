@@ -72,17 +72,16 @@ The `SolverPolicy` template parameter controls inheritance and feature availabil
 The `OdeType` template parameter must satisfy the `hasRhsFunc<T>` concept, which requires the ODE type to expose an `Rhs` member computing dq/dt:
 
 ```cpp
-void Rhs(T* out, const T& t, const T* q, const T* args);
+void Rhs(T* out, const T& t, const T* q);
 ```
 
 - `out` — output array, receives dq/dt
 - `t` — independent variable (time)
 - `q` — current state array
-- `args` — extra parameters
 
 An analytic Jacobian can optionally be provided via the `N x N` Jacobian matrix function
 ```cpp
-void Jac(T* jac_mat, const T& t, const T* q, const T* args);
+void Jac(T* jac_mat, const T& t, const T* q);
 ```
 which satisfies the `hasJacFunc<T>` concept, and is filled in column-major order as
 ```cpp
@@ -91,7 +90,7 @@ jac_mat[i + j*system_size] = df_i/dx_j
 
 **Automatic differentiation**: if no analytic `Jac` is given but `Rhs` is written generically enough (templated), ideally as
 ```cpp
-void Rhs(auto* out, const auto& t, const auto* q, const auto* args);
+void Rhs(auto* out, const auto& t, const auto* q);
 ```
 to also run over `xdiff::Dual` numbers (checked via `supportsDualRhs`), the library seeds the state with dual numbers and differentiates `Rhs` itself to obtain an exact Jacobian at no extra coding cost — no finite-difference approximation needed. Jacobian source is chosen automatically: exact analytic `Jac` > autodiff via `xdiff` > finite-difference approximation.
 
@@ -165,7 +164,7 @@ int main(){
     pbox::Box<OdeSolver<T, 2>> solver = make_vsolver(
         Integrator::RK45,
         OdeData{
-            .Rhs=[](auto* dq_dt, const auto& t, const auto* q, const auto* args){
+            .Rhs=[](auto* dq_dt, const auto& t, const auto* q){
                 dq_dt[0] = q[1];
                 dq_dt[1] = -q[0];
             },

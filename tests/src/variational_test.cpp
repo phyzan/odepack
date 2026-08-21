@@ -4,11 +4,14 @@
 
 struct MyODE{
 
-    static void Rhs(auto* dy_dt, const auto& /*t*/, const auto* y, const auto* args) {
+    static void Rhs(auto* dy_dt, const auto& /*t*/, const auto* q) {
         //3D lorenz system, args = {sigma, rho, beta}
-        dy_dt[0] = args[0]*(y[1] - y[0]);
-        dy_dt[1] = y[0]*(args[1] - y[2]) - y[1];
-        dy_dt[2] = y[0]*y[1] - args[2]*y[2];
+        const double sigma = 10.0;
+        const double rho = 28.0;
+        const double beta = 8.0/3.0;
+        dy_dt[0] = sigma*(q[1] - q[0]);
+        dy_dt[1] = q[0]*(rho - q[2]) - q[1];
+        dy_dt[2] = q[0]*q[1] - beta*q[2];
     }
 
 };
@@ -29,7 +32,6 @@ void test_variational_solver(){
 
     std::array<T, 3> y0 = {1.0, 1.0, 1.0};
     std::array<T, 3> y0_var = {1.0, 1.0, 1.0};
-    std::vector<T> args = {10.0, 28.0, 8.0/3.0}; // sigma, rho, beta
 
     chaos::VariationalSolver<Integrator::RK45, T, NSYS, ode::SolverPolicy::Static, MyODE> solver(
         MyODE{},
@@ -42,8 +44,7 @@ void test_variational_solver(){
         0.0,
         inf<T>(),
         0.0,
-        1,
-        std::move(args)
+        1
     );
 
     

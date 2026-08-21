@@ -6,7 +6,7 @@
 using namespace ode;
 
 template<typename T>
-T crossing(const T& /*t*/, const T* y, const T* /*args*/) {
+T crossing(const T& /*t*/, const T* y) {
     return y[1] - 1;
 }
 
@@ -30,12 +30,12 @@ void crossing_test(Integrator method) {
     constexpr size_t nsys = 2;
     int dir = 1;
 
-    Scalar omega = 1;
 
     pbox::Box<OdeRichSolver<Scalar, nsys>> solver = make_solver<UtilPolicy::RichVirtual>(
         method,
         OdeData{.Rhs=
-            ODE_LAMBDA(out, /*t*/, q, /*args*/) {
+            ODE_LAMBDA(out, /*t*/, q) {
+                const Scalar omega{1}; // angular frequency
                 out[0] = q[1];
                 out[1] = - omega*omega*q[0];
             }
@@ -48,7 +48,6 @@ void crossing_test(Integrator method) {
         max_step,
         stepsize,
         dir,
-        std::vector<Scalar>{},
         make_event_list<Scalar>(std::move(event))
     );
 

@@ -5,7 +5,7 @@ using namespace ode;
 
 // Harmonic oscillator: q0' = q1, q1' = -q0
 // Solution from (1, 0): q0 = cos(t), q1 = -sin(t)
-static void rhs(T* out, const T& /*t*/, const T* q, const T* /*args*/){
+static void rhs(T* out, const T& /*t*/, const T* q){
     out[0] = q[1];
     out[1] = -q[0];
 }
@@ -15,7 +15,7 @@ static void rhs(T* out, const T& /*t*/, const T* q, const T* /*args*/){
 void test_single_objective(){
     std::cout << "=== test_single_objective ===\n";
 
-    auto obj = [](const T& /*t*/, const T* q, const T* /*args*/) -> T { return q[0]; };
+    auto obj = [](const T& /*t*/, const T* q) -> T { return q[0]; };
     using ObjFun = decltype(obj);
 
     ObjFunData<T, ObjFun> obj_data{.func=obj, .dir=-1};  // decreasing crossing
@@ -32,8 +32,7 @@ void test_single_objective(){
         0.0,              // min_step
         0.1,              // max_step
         0.0,              // stepsize (auto)
-        1,                // direction (forward)
-        std::vector<T>{}  // args
+        1                // direction (forward)
     );
 
     const T period = 2.0 * M_PI;
@@ -74,8 +73,8 @@ void test_single_objective(){
 void test_two_objectives(){
     std::cout << "=== test_two_objectives ===\n";
 
-    auto obj0 = [](const T& /*t*/, const T* q, const T* /*args*/) -> T { return q[0]; };  // position
-    auto obj1 = [](const T& /*t*/, const T* q, const T* /*args*/) -> T { return q[1]; };  // velocity
+    auto obj0 = [](const T& /*t*/, const T* q) -> T { return q[0]; };  // position
+    auto obj1 = [](const T& /*t*/, const T* q) -> T { return q[1]; };  // velocity
     using ObjFun0 = decltype(obj0);
     using ObjFun1 = decltype(obj1);
 
@@ -91,8 +90,7 @@ void test_two_objectives(){
         View1D<T, 2>{y0}, // q0
         1e-10, 1e-10,  // rtol, atol
         0.0, 0.1, 0.0, // min_step, max_step, stepsize
-        1,             // direction
-        std::vector<T>{}
+        1             // direction
     );
 
     const T period = 2.0 * M_PI;

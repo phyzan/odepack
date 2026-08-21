@@ -15,7 +15,7 @@ void run(const char* label){
     Box<OdeSolver<T, 2>> solver = make_vsolver(
         Integrator::RK45,
         OdeData{
-            .Rhs=[](auto* dq_dt, const auto& t, const auto* q, const auto* args){
+            .Rhs=[](auto* dq_dt, const auto& t, const auto* q){
                 dq_dt[0] = q[1];
                 dq_dt[1] = -q[0];
             },
