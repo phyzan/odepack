@@ -33,7 +33,10 @@ template<typename T>
 class Event;
 
 template<typename T>
-using EventList = Vector<pbox::Box<Event<T>>>;
+using BoxedEvent = pbox::Box<Event<T>>;
+
+template<typename T>
+using EventList = Vector<BoxedEvent<T>>;
 
 // ============================================================================
 // DECLARATIONS
@@ -489,14 +492,14 @@ struct EventState{
 
 
 template<typename T, template<typename...> typename EventType, typename... Args>
-inline pbox::Box<Event<T>> make_event(Args&&... args){
+inline BoxedEvent<T> make_event(Args&&... args){
     return pbox::make_template_box<EventType>(std::forward<Args>(args)...);
 }
 
 template<typename T, typename... U>
 requires (std::is_same_v<T, U> && ...)
-inline EventList<T> make_event_list(pbox::Box<Event<U>>... events){
-    return make_vector<pbox::Box<Event<T>>>(std::move(events)...);
+inline EventList<T> make_event_list(BoxedEvent<U>... events){
+    return make_vector<BoxedEvent<T>>(std::move(events)...);
 }
 
 } // namespace ode
