@@ -14,15 +14,15 @@ namespace ode{
 // EventCounter implementations
 template<typename T, size_t N>
 EventCounter<T, N>::EventCounter(const std::vector<EventOptions>& options) : _options(options), _counter(options.size(), 0), _period_counter(options.size(), 0) {
-    for (size_t i=0; i<options.size(); i++){
-        if (options[i].period < 1){
+    for (const auto & option : options){
+        if (option.period < 1){
             throw std::runtime_error("The period argument in event options must be at least 1.");
         }
     }
 }
 
 template<typename T, size_t N>
- int EventCounter<T, N>::operator[](size_t i) const{
+int EventCounter<T, N>::operator[](size_t i) const{
     return _counter[i];
 }
 
@@ -236,7 +236,7 @@ bool ODE<T, N>::priv_integrate_until(OdeResult<T, N>* out, const T& t_max, const
         OdeResult<T, N> res(orbit_data_, event_res, t_start_idx, solver_->get_diverges(), success, duration, terminate_message);
         
         if (interpolate){
-            OdeSolution<T, N>* rich_res = dynamic_cast<OdeSolution<T, N>*>(out);
+            auto* rich_res = dynamic_cast<OdeSolution<T, N>*>(out);
             assert(rich_res && "Output must be of type OdeSolution when interpolation is enabled");
             *rich_res = OdeSolution<T, N>(std::move(res), std::move(interpolator));
         } else {

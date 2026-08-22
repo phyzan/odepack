@@ -66,7 +66,7 @@ void BaseSolver<Derived, T, N, SP, OdeType>::Jac(T* jm, const T& t, const T* q, 
             DualType::set_default_nvars(nvars_default);
         }
     } else {
-        ode_.Jac(jm, t, q, dt);
+        ode_.Jac(jm, t, q);
     }
 
 }
