@@ -244,7 +244,7 @@ EventCollection<T>::EventCollection(EventList<T> evs) : events(evs.size()), even
 
 template<typename T>
 const Event<T>& EventCollection<T>::event(size_t event_idx) const{
-    return *events[event_idx].get();
+    return *events[event_idx].get_raw_pointer();
 }
 
 

@@ -417,7 +417,7 @@ public:
         if (detection_idx >= detections){
             return nullptr;
         }else{
-            return events[detection_order[detection_idx]].get();
+            return events[detection_order[detection_idx]].get_raw_pointer();
         }
     }
 

@@ -298,7 +298,7 @@ double ODE<T, N>::runtime()const{
 
 template<typename T, size_t N>
 const OdeRichSolver<T, N>* ODE<T, N>::solver()const{
-    return solver_.get();
+    return solver_.get_raw_pointer();
 }
 
 template<typename T, size_t N>
