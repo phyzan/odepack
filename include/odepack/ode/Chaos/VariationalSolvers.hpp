@@ -111,24 +111,24 @@ class VariationalSolver : public SolverTypeGetter<Solver, T, 2*N, SP, Variationa
 
     */
 
-public:
-
     using Base = typename SolverTypeGetter<Solver, T, 2*N, SP, VariationalOdeSys<T, N, OdeType>, GetDerived<VariationalSolver<Solver, T, N, SP, OdeType, Derived>, Derived>>::type;
+
+public:
 
     template<typename... Args>
     VariationalSolver(OdeType ode, T t0, View1D<T, N> q0, View1D<T, N> delta_q0, T period, T rtol, T atol, T min_step=0, T max_step=inf<T>(), T stepsize=0, int dir = 1, Args&&... extra);
 
-    T elapsed_time() const;
+    T       elapsed_time() const;
 
-    T stretching_number() const;
+    T       stretching_number() const;
 
-    T kick() const;
+    T       kick() const;
 
-    T period() const;
+    T       period() const;
 
-    T log_ksi() const;
+    T       log_ksi() const;
 
-    T lyapunov_exponent() const;
+    T       lyapunov_exponent() const;
 
     void    Reset();
 

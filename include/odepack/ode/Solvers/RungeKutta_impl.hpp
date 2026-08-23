@@ -90,11 +90,14 @@ StepResult RK4<T, N, SP, OdeType, Derived>::adapt_impl(T* res, const T* state){
     // standard Runge-Kutta-4 with fixed step size
 
     const T& t = state[0];
-    T h = state[1] * this->direction();
+
+    const T& habs = state[1];
+    const T& h = habs * this->direction();
     const T* y = state + 2;
     size_t n = this->nsys();
 
     res[0] = t + h; // t_new
+    res[1] = habs;
     T* y_new = res + 2;
 
     auto rhs_caller = [this, t, y](T* out, const T& t_dummy, const T* y_dummy) NDSPAN_LAMBDA_INLINE{
